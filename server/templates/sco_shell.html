@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ frame.name }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #fff; }
+    .frame-container { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .oam-frame { border: none; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame-container">
+    <!-- Blocks rendered here by publish service -->
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- SCORM bridge — injected when OAM has_scorm_calls = true -->
+  {% if scorm_bridge %}
+  <script>
+  (function() {
+    var API = window.API || window.parent.API;
+    var API_1484_11 = window.API_1484_11 || window.parent.API_1484_11;
+    window.addEventListener('message', function(e) {
+      if (!e.data || e.data.source !== 'oam_scorm_bridge') return;
+      var fn = e.data.fn;
+      var args = e.data.args || [];
+      var result = null;
+      if (API && typeof API[fn] === 'function') result = API[fn].apply(API, args);
+      else if (API_1484_11 && typeof API_1484_11[fn] === 'function') result = API_1484_11[fn].apply(API_1484_11, args);
+      e.source.postMessage({ source: 'oam_scorm_bridge_response', fn: fn, result: result }, '*');
+    });
+  })();
+  </script>
+  {% endif %}
+
+  <!-- SCORM 1.2 API init stub — replaced by publish service -->
+  {% block scorm_api %}{% endblock %}
+</body>
+</html>
