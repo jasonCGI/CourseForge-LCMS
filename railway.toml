@@ -2,6 +2,9 @@
 builder = "nixpacks"
 
 [deploy]
+# Apply any pending DB migrations before the new release starts taking traffic.
+# --app is passed explicitly since FLASK_APP lives in .env (not deployed).
+preDeployCommand = "flask --app server.app:create_app db upgrade"
 startCommand = "gunicorn 'server.app:create_app()' --bind 0.0.0.0:$PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30

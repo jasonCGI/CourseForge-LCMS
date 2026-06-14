@@ -6,7 +6,6 @@ venv/
 uploads/
 client/dist/
 client/node_modules/
-migrations/
 *.egg-info/
 .DS_Store
 .claude/
