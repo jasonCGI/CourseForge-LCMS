@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "project_name": "Sample Training Course",
+  "project_description": "CourseForge Sprint 2 test import",
+  "courses": [
+    {
+      "course_name": "Course One",
+      "modules": [
+        {
+          "module_name": "Module A",
+          "lessons": [
+            {
+              "lesson_name": "Lesson 1",
+              "frames": [
+                {
+                  "frame_name": "Welcome",
+                  "frame_type": "content",
+                  "narration": "Welcome to the course.",
+                  "media": [],
+                  "knowledge_check": null,
+                  "branch": null
+                },
+                {
+                  "frame_name": "Overview",
+                  "frame_type": "content",
+                  "narration": "In this lesson you will learn...",
+                  "media": [
+                    { "kind": "image", "placeholder_label": "overview_diagram", "caption": "Course overview" }
+                  ],
+                  "knowledge_check": null,
+                  "branch": null
+                },
+                {
+                  "frame_name": "Knowledge Check",
+                  "frame_type": "assessment",
+                  "narration": null,
+                  "media": [],
+                  "knowledge_check": {
+                    "question": "What is the purpose of this course?",
+                    "choices": ["Option A", "Option B", "Option C", "Option D"],
+                    "correct_index": 1,
+                    "feedback_correct": "That is correct!",
+                    "feedback_incorrect": "Please review the material."
+                  },
+                  "branch": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
