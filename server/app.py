@@ -41,9 +41,18 @@ def create_app(config_name=None):
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_spa(path):
-        dist = os.path.join(app.static_folder)
+        dist = app.static_folder
         if path and os.path.exists(os.path.join(dist, path)):
             return app.send_static_file(path)
-        return app.send_static_file('index.html')
+        index_path = os.path.join(dist, 'index.html')
+        if os.path.exists(index_path):
+            return app.send_static_file('index.html')
+        # client/dist wasn't built — make the cause obvious instead of a bare 404.
+        return jsonify({
+            'status': 'error',
+            'message': 'Frontend not built: client/dist is missing. '
+                       'Run `cd client && npm run build`, or ensure the deploy build step produces it.',
+            'api_health': '/api/health',
+        }), 503
 
     return app

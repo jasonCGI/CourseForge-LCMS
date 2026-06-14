@@ -1,0 +1,16 @@
+# Single-service Railway build: install Python deps (auto-detected install
+# phase) AND build the React client so Flask can serve client/dist as static.
+#
+# We add Node to the setup phase and a build phase for the client. We do NOT
+# override the install phase, so Nixpacks' auto-generated Python venv + pip
+# install (and its PATH wiring for gunicorn) stay intact.
+
+[phases.setup]
+nixPkgs = ["python3", "postgresql_16.dev", "gcc", "nodejs_20"]
+
+[phases.build]
+# Runs after the install phase. Produces client/dist/ (vite outDir).
+cmds = ["cd client && npm ci && npm run build"]
+
+[start]
+cmd = "gunicorn 'server.app:create_app()' --bind 0.0.0.0:$PORT"
