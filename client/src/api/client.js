@@ -67,4 +67,11 @@ export const uploadMedia = (file, projectId, kind) => {
 export const listProjectMedia = (projectId) =>
   api.get(`/media/project/${projectId}`)
 
+// ── Themes ───────────────────────────────────────────────────────────────────
+export const getThemes   = ()                => api.get('/themes')
+export const createTheme  = (data)           => api.post('/themes', data)
+export const updateTheme  = (id, data)       => api.patch(`/themes/${id}`, data)
+export const deleteTheme  = (id)             => api.delete(`/themes/${id}`)
+export const assignTheme  = (projectId, data) => api.post(`/projects/${projectId}/theme`, data)
+
 export default api

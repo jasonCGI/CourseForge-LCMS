@@ -4,6 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ frame_name }}</title>
+  <!-- Video.js — bundled for offline SCORM delivery -->
+  <link href="assets/video-js/video-js.min.css" rel="stylesheet">
+  <script src="assets/video-js/video.min.js"></script>
+  <style>
+    .cf-video-player .vjs-control-bar { background: var(--cf-nav-bg, #042C53); }
+    .cf-video-player .vjs-play-progress,
+    .cf-video-player .vjs-volume-level { background: var(--cf-accent, #EF9F27); }
+    .cf-video-player .vjs-big-play-button {
+      background: var(--cf-accent, #EF9F27); border: none; border-radius: 50%;
+      width: 60px; height: 60px; margin-top: -30px; margin-left: -30px;
+    }
+    .cf-video-player .vjs-big-play-button .vjs-icon-placeholder::before {
+      color: #000; font-size: 28px; line-height: 60px;
+    }
+    .cf-video-player .vjs-text-track-display .vjs-text-track-cue > div {
+      background: rgba(0,0,0,0.85) !important; color: #FFFFFF !important;
+      font-size: 14px; padding: 4px 8px; border-radius: 3px;
+    }
+  </style>
   <style>
     /* ── Resolved theme tokens ── */
     {{ theme_css }}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { publishProject } from '../../api/client'
 import useProjectStore from '../../store/projectStore'
+import AuditPanel from './AuditPanel'
 
 const FORMATS = [
   { id: 'scorm12', label: 'SCORM 1.2', desc: 'Compatible with all LMS platforms including ADLS', icon: '📦' },
@@ -13,6 +14,7 @@ export default function PublishModal({ onClose }) {
   const [publishing,  setPublishing] = useState(false)
   const [error,       setError]    = useState(null)
   const [done,        setDone]     = useState(false)
+  const [step,        setStep]     = useState('audit')   // 'audit' | 'publish'
 
   const handlePublish = async () => {
     if (!activeProject) return
@@ -72,6 +74,17 @@ export default function PublishModal({ onClose }) {
         </div>
 
         <div style={{ padding: 24 }}>
+          {step === 'audit' ? (
+            <AuditPanel onProceed={() => setStep('publish')} onCancel={onClose} />
+          ) : (
+          <>
+          {/* Back to audit */}
+          <button onClick={() => setStep('audit')} style={{
+            background: 'none', border: 'none', color: 'var(--color-text-secondary)',
+            cursor: 'pointer', fontSize: 12, marginBottom: 12, padding: 0,
+            fontFamily: 'var(--font-sans)',
+          }}>← Back to Audit</button>
+
           {/* Format selector */}
           <div style={{ marginBottom: 20 }}>
             <label style={{
@@ -157,6 +170,8 @@ export default function PublishModal({ onClose }) {
               {publishing ? 'Building package…' : `⬇ Publish ${FORMATS.find(f=>f.id===format)?.label}`}
             </button>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

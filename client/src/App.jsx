@@ -4,6 +4,7 @@ import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
 import FrameEditor from './components/Editor/FrameEditor'
 import PublishModal from './components/Publish/PublishModal'
+import ThemeEditorModal from './components/ThemeEditor/ThemeEditorModal'
 import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import useProjectStore from './store/projectStore'
@@ -15,6 +16,7 @@ const DEMO_AUTOLOAD = true
 export default function App() {
   const { projects, fetchProjects, fetchProject, autoloadDemo, loading } = useProjectStore()
   const [showPublish, setShowPublish] = useState(false)
+  const [showThemeEditor, setShowThemeEditor] = useState(false)
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
 
@@ -141,6 +143,24 @@ export default function App() {
           {/* Mode toggle */}
           <ModeToggle />
 
+          {/* Theme editor */}
+          <button
+            onClick={() => setShowThemeEditor(true)}
+            aria-label="Open theme editor"
+            title="Theme Editor"
+            style={{
+              marginLeft: 12,
+              padding: '5px 10px',
+              background: 'transparent',
+              color: 'var(--cf-text-secondary)',
+              border: '1px solid var(--cf-border-secondary)',
+              borderRadius: 4, fontSize: 12, cursor: 'pointer',
+              fontFamily: "'SF Mono', Consolas, monospace",
+            }}
+          >
+            🎨
+          </button>
+
           {/* Publish */}
           <button
             onClick={() => setShowPublish(true)}
@@ -237,6 +257,7 @@ export default function App() {
         </div>
 
         {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
+        {showThemeEditor && <ThemeEditorModal onClose={() => setShowThemeEditor(false)} />}
       </div>
     </ThemeProvider>
   )

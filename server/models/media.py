@@ -14,6 +14,7 @@ class MediaAsset(db.Model):
     stored_path  = db.Column(db.String(512))
     file_size    = db.Column(db.Integer)
     mime_type    = db.Column(db.String(100))
+    companion_files = db.Column(db.JSON, default=dict)
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     oam_asset    = db.relationship('OamAsset', back_populates='media_asset', uselist=False, cascade='all, delete-orphan')
 

@@ -9,10 +9,11 @@ from ..services.oam_importer import ingest_oam, OAMIngestError
 
 media_bp = Blueprint('media', __name__)
 
-ALLOWED_IMAGE = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
-ALLOWED_VIDEO = {'mp4', 'mov', 'avi', 'webm', 'mkv'}
-ALLOWED_AUDIO = {'mp3', 'wav', 'ogg', 'm4a', 'aac'}
-ALLOWED_OAM   = {'oam'}
+ALLOWED_IMAGE   = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
+ALLOWED_VIDEO   = {'mp4', 'mov', 'avi', 'webm', 'mkv'}
+ALLOWED_AUDIO   = {'mp3', 'wav', 'ogg', 'm4a', 'aac'}
+ALLOWED_CAPTION = {'vtt', 'srt'}
+ALLOWED_OAM     = {'oam'}
 
 
 def allowed_ext(filename, allowed_set):
@@ -172,6 +173,9 @@ def upload_media():
     elif ext in ALLOWED_AUDIO:
         kind = 'audio'
         subdir = 'audio'
+    elif ext in ALLOWED_CAPTION:
+        kind = 'caption'
+        subdir = 'captions'
     else:
         return jsonify({'error': f'Unsupported file type: .{ext}'}), 400
 
@@ -202,6 +206,8 @@ def upload_media():
     )
     db.session.add(media_asset)
     db.session.commit()
+
+    _pair_companions(media_asset, project_id)
 
     return jsonify(_serialize_media(media_asset)), 201
 
@@ -239,14 +245,83 @@ def list_project_media(project_id):
     return jsonify(result)
 
 
+def _pair_companions(asset: MediaAsset, project_id: str) -> None:
+    """
+    After uploading a media file, scan existing project assets for
+    companion files with the same base name and link them bidirectionally.
+    """
+    if not asset.original_name:
+        return
+
+    base = asset.original_name.rsplit('.', 1)[0].lower()
+    ext  = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in asset.original_name else ''
+
+    siblings = MediaAsset.query.filter(
+        MediaAsset.project_id == project_id,
+        MediaAsset.id != asset.id,
+    ).all()
+
+    def base_name(name):
+        return name.rsplit('.', 1)[0].lower() if name and '.' in name else (name or '').lower()
+
+    matches = [s for s in siblings if base_name(s.original_name) == base]
+
+    companions = dict(asset.companion_files or {})
+
+    for sibling in matches:
+        sib_ext = sibling.original_name.rsplit('.', 1)[-1].lower()
+        sib_companions = dict(sibling.companion_files or {})
+
+        # Video companions
+        if ext in ('mp4', 'mov') and sib_ext == 'webm':
+            companions['webm_asset_id']     = sibling.id
+            sib_companions['mp4_asset_id']  = asset.id
+        elif ext in ('mp4', 'mov') and sib_ext == 'vtt':
+            companions['vtt_asset_id']      = sibling.id
+            sib_companions['mp4_asset_id']  = asset.id
+        elif ext in ('mp4', 'mov') and sib_ext in ('jpg', 'jpeg', 'png'):
+            companions['poster_asset_id']   = sibling.id
+            sib_companions['video_asset_id'] = asset.id
+        elif ext in ('jpg', 'jpeg', 'png') and sib_ext in ('mp4', 'mov'):
+            companions['video_asset_id']     = sibling.id
+            sib_companions['poster_asset_id'] = asset.id
+        elif ext == 'webm' and sib_ext in ('mp4', 'mov'):
+            companions['mp4_asset_id']      = sibling.id
+            sib_companions['webm_asset_id'] = asset.id
+        elif ext == 'vtt' and sib_ext in ('mp4', 'mov', 'webm'):
+            companions['video_asset_id']    = sibling.id
+            sib_companions['vtt_asset_id']  = asset.id
+
+        # Audio companions
+        elif ext == 'wav' and sib_ext == 'mp3':
+            companions['mp3_asset_id']      = sibling.id
+            sib_companions['wav_asset_id']  = asset.id
+        elif ext == 'wav' and sib_ext == 'ogg':
+            companions['ogg_asset_id']      = sibling.id
+            sib_companions['wav_asset_id']  = asset.id
+        elif ext == 'mp3' and sib_ext == 'ogg':
+            companions['ogg_asset_id']      = sibling.id
+            sib_companions['mp3_asset_id']  = asset.id
+
+        sibling.companion_files = sib_companions
+
+    asset.companion_files = companions
+    db.session.commit()
+
+
 def _serialize_media(asset):
+    companions = asset.companion_files or {}
     return {
-        'id':            asset.id,
-        'project_id':    asset.project_id,
-        'kind':          asset.kind,
-        'original_name': asset.original_name,
-        'file_size':     asset.file_size,
-        'mime_type':     asset.mime_type,
-        'serve_url':     f'/api/media/serve/{asset.id}',
-        'created_at':    asset.created_at.isoformat(),
+        'id':             asset.id,
+        'project_id':     asset.project_id,
+        'kind':           asset.kind,
+        'original_name':  asset.original_name,
+        'file_size':      asset.file_size,
+        'mime_type':      asset.mime_type,
+        'serve_url':      f'/api/media/serve/{asset.id}',
+        'companion_files': companions,
+        'has_captions':   bool(companions.get('vtt_asset_id')),
+        'has_webm':       bool(companions.get('webm_asset_id')),
+        'has_poster':     bool(companions.get('poster_asset_id')),
+        'created_at':     asset.created_at.isoformat(),
     }

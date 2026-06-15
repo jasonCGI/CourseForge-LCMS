@@ -3,6 +3,7 @@ import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './TextBlock'
 import MediaUploader from './MediaUploader'
+import VideoPlayer from './VideoPlayer'
 import { uploadMedia } from '../../../api/client'
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'oam']
@@ -34,6 +35,7 @@ export default function MediaBlock({ block }) {
 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState(null)
+  const [useVideoJs, setUseVideoJs] = useState(block.data.use_videojs !== false)
   const activeProject = useProjectStore(s => s.activeProject)
 
   const handleUpload = async (file) => {
@@ -45,6 +47,7 @@ export default function MediaBlock({ block }) {
       update('asset_id', data.id)
       update('serve_url', data.serve_url)
       update('original_name', data.original_name)
+      update('asset_meta', data)
     } catch (e) {
       setUploadError(e.response?.data?.error || 'Upload failed.')
     } finally {
@@ -150,15 +153,88 @@ export default function MediaBlock({ block }) {
                 </div>
               </div>
               <button
-                onClick={() => { update('asset_id', null); update('serve_url', null) }}
+                onClick={() => { update('asset_id', null); update('serve_url', null); update('asset_meta', null) }}
                 aria-label="Remove media asset"
                 style={{ background:'none', border:'none', color:'#E24B4A', cursor:'pointer', fontSize:14 }}
               >✕</button>
             </div>
           )}
         </div>
+
+        {/* Video.js player + companions — video kind only */}
+        {kind === 'video' && block.data.asset_id && (
+          <div style={{ marginTop: 14 }}>
+
+            {/* Video.js toggle */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px',
+              background: 'var(--cf-input-bg)',
+              border: '1px solid var(--cf-border-secondary)',
+              borderRadius: 6, marginBottom: 12,
+            }}>
+              <input
+                type="checkbox"
+                id={`vjs-toggle-${block.id}`}
+                checked={block.data.use_videojs !== false}
+                onChange={e => { update('use_videojs', e.target.checked); setUseVideoJs(e.target.checked) }}
+              />
+              <label htmlFor={`vjs-toggle-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)', flex: 1 }}>
+                Use Video.js player (controls, captions, playback speed)
+              </label>
+            </div>
+
+            {/* Companion file indicators */}
+            {block.data.asset_meta && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <CompanionBadge label="WebM fallback" present={block.data.asset_meta.has_webm} tip="Browser fallback format" />
+                <CompanionBadge label="Captions (VTT)" present={block.data.asset_meta.has_captions} tip="Required for 508 compliance if video has speech" />
+                <CompanionBadge label="Poster image" present={block.data.asset_meta.has_poster} tip="Thumbnail shown before playback" />
+              </div>
+            )}
+
+            {/* Live preview */}
+            {block.data.use_videojs !== false ? (
+              <VideoPlayer
+                mp4Url={`/api/media/serve/${block.data.asset_id}`}
+                webmUrl={block.data.asset_meta?.has_webm
+                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.webm_asset_id}` : null}
+                vttUrl={block.data.asset_meta?.has_captions
+                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.vtt_asset_id}` : null}
+                posterUrl={block.data.asset_meta?.has_poster
+                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.poster_asset_id}` : null}
+                title={block.data.original_name || 'Video'}
+                controls={true}
+              />
+            ) : (
+              <video
+                src={`/api/media/serve/${block.data.asset_id}`}
+                controls
+                style={{ width: '100%', borderRadius: 4 }}
+                aria-label={block.data.original_name || 'Video'}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+function CompanionBadge({ label, present, tip }) {
+  return (
+    <span
+      title={tip}
+      style={{
+        fontSize: 10, fontWeight: 600, padding: '2px 8px',
+        borderRadius: 3, letterSpacing: '0.04em',
+        background: present ? 'rgba(59,138,74,0.15)' : 'rgba(194,57,52,0.1)',
+        color:      present ? '#4CAF50' : '#E87070',
+        border:     `1px solid ${present ? 'rgba(59,138,74,0.3)' : 'rgba(194,57,52,0.3)'}`,
+      }}
+    >
+      {present ? '✓' : '!'} {label}
+    </span>
   )
 }
 

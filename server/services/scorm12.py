@@ -15,8 +15,9 @@ from pathlib import Path
 from datetime import datetime
 from flask import current_app, render_template
 
+import urllib.request
 from ..models.project import Project, Frame
-from ..models.media import OamAsset
+from ..models.media import OamAsset, MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 
 
@@ -53,6 +54,46 @@ def _render_blocks(blocks, scorm_bridge=False):
             if data.get('narrator_script'):
                 html += f'<div class="cf-narration">🎙 {data["narrator_script"]}</div>'
             parts.append(html)
+
+        elif btype == 'media' and data.get('kind') == 'video' and data.get('asset_id'):
+            asset_id   = data['asset_id']
+            use_vjs    = data.get('use_videojs', True)
+            companions = data.get('asset_meta', {}).get('companion_files', {}) or {}
+            webm_id    = companions.get('webm_asset_id')
+            vtt_id     = companions.get('vtt_asset_id')
+            poster_id  = companions.get('poster_asset_id')
+            title      = data.get('original_name', 'Video')
+            caption    = data.get('caption', '')
+
+            mp4_src    = f'media/video/{asset_id}.mp4'
+            webm_src   = f'media/video/{webm_id}.webm'   if webm_id   else None
+            vtt_src    = f'media/captions/{vtt_id}.vtt'   if vtt_id    else None
+            poster_src = f'media/images/{poster_id}.jpg'  if poster_id else None
+
+            sources = ''
+            if webm_src:
+                sources += f'<source src="{webm_src}" type="video/webm">'
+            sources += f'<source src="{mp4_src}" type="video/mp4">'
+            track = f'<track kind="captions" src="{vtt_src}" srclang="en" label="English" default>' if vtt_src else ''
+            poster_attr = f'poster="{poster_src}"' if poster_src else ''
+            cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+
+            if use_vjs:
+                parts.append(
+                    f'<div style="margin-bottom:20px">'
+                    f'<video id="vid-{asset_id}" class="video-js vjs-big-play-centered cf-video-player" '
+                    f'controls {poster_attr} aria-label="{title}" '
+                    f'data-setup=\'{{"playbackRates":[0.5,0.75,1,1.25,1.5,2]}}\'>'
+                    f'{sources}{track}'
+                    f'<p>Your browser does not support HTML5 video.</p>'
+                    f'</video>{cap_html}</div>'
+                )
+            else:
+                parts.append(
+                    f'<video controls {poster_attr} style="width:100%;border-radius:6px;margin-bottom:20px" '
+                    f'aria-label="{title}">{sources}{track}'
+                    f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}'
+                )
 
         elif btype == 'media':
             kind  = data.get('kind', 'image')
@@ -232,6 +273,52 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                         arc_path = f"oam/{oam_asset_id}/{oam_file.relative_to(extract_dir)}"
                         zf.write(str(oam_file), arc_path)
                 bundled_oam_ids.add(oam_asset_id)
+
+        # ── Bundle Video.js (cached) ───────────────────────────────
+        try:
+            cache_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'cache' / 'videojs'
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            videojs_cdn = {
+                'assets/video-js/video.min.js':     'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video.min.js',
+                'assets/video-js/video-js.min.css': 'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video-js.min.css',
+            }
+            for arc_path, url in videojs_cdn.items():
+                cached = cache_dir / arc_path.split('/')[-1]
+                if not cached.exists():
+                    urllib.request.urlretrieve(url, str(cached))
+                zf.write(str(cached), arc_path)
+        except Exception:
+            # Network egress unavailable — omit player JS; publish still succeeds.
+            pass
+
+        # ── Bundle video + companion media (webm/vtt/poster) ───────
+        _bundled_media = set()
+
+        def _bundle_media(stored_path, arc_path):
+            if arc_path in _bundled_media:
+                return
+            if stored_path and Path(stored_path).exists():
+                zf.write(stored_path, arc_path)
+                _bundled_media.add(arc_path)
+
+        for asset in MediaAsset.query.filter_by(project_id=project_id).all():
+            companions = asset.companion_files or {}
+            if asset.kind == 'video':
+                vext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'mp4'
+                _bundle_media(asset.stored_path, f'media/video/{asset.id}.{vext}')
+            if companions.get('webm_asset_id'):
+                webm = MediaAsset.query.get(companions['webm_asset_id'])
+                if webm:
+                    _bundle_media(webm.stored_path, f'media/video/{webm.id}.webm')
+            if companions.get('vtt_asset_id'):
+                vtt = MediaAsset.query.get(companions['vtt_asset_id'])
+                if vtt:
+                    _bundle_media(vtt.stored_path, f'media/captions/{vtt.id}.vtt')
+            if companions.get('poster_asset_id'):
+                poster = MediaAsset.query.get(companions['poster_asset_id'])
+                if poster:
+                    pext = poster.original_name.rsplit('.', 1)[-1].lower() if '.' in (poster.original_name or '') else 'jpg'
+                    _bundle_media(poster.stored_path, f'media/images/{poster.id}.{pext}')
 
     buf.seek(0)
     safe_name = project.name.replace(' ', '_').lower()[:40]
