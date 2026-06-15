@@ -87,6 +87,7 @@ export const MODES = {
 
     '--cf-level-frame-tab':    '#263848',
     '--cf-level-frame-bg':     '#0b0e14',
+    '--cf-level-frame-bg-alt': '#11151e',
     '--cf-level-frame-text':   '#7A90A0',
     '--cf-level-frame-fw':     '300',
 
@@ -190,6 +191,7 @@ export const MODES = {
 
     '--cf-level-frame-tab':    '#5A8AAA',
     '--cf-level-frame-bg':     '#D0E0EC',
+    '--cf-level-frame-bg-alt': '#E0ECF6',
     '--cf-level-frame-text':   '#2A4A64',
     '--cf-level-frame-fw':     '300',
 
@@ -291,6 +293,7 @@ export const MODES = {
 
     '--cf-level-frame-tab':    '#666666',
     '--cf-level-frame-bg':     '#000000',
+    '--cf-level-frame-bg-alt': '#141414',
     '--cf-level-frame-text':   '#CCCCCC',
     '--cf-level-frame-fw':     '400',
 

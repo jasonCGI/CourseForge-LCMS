@@ -157,23 +157,7 @@ export default function App() {
           {/* Mode toggle */}
           <ModeToggle />
 
-          {/* Theme editor */}
-          <button
-            onClick={() => setShowThemeEditor(true)}
-            aria-label="Open theme editor"
-            title="Theme Editor"
-            style={{
-              marginLeft: 12,
-              padding: '5px 10px',
-              background: 'transparent',
-              color: 'var(--cf-text-secondary)',
-              border: '1px solid var(--cf-border-secondary)',
-              borderRadius: 4, fontSize: 12, cursor: 'pointer',
-              fontFamily: "'SF Mono', Consolas, monospace",
-            }}
-          >
-            🎨
-          </button>
+          {/* Theme editor — header trigger hidden for now (feature kept; see ThemeEditorModal) */}
 
           {/* Publish */}
           <button

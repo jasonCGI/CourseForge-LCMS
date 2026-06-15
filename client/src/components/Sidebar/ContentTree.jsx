@@ -93,7 +93,7 @@ const BADGE_STYLE = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, onClick, children
+  frameType, onClick, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
@@ -108,7 +108,11 @@ function TreeRow({
         outline: `1px solid ${cssVar('--cf-level-frame-active-outline')}`,
         outlineOffset: '-1px',
       }
-    : { background: isFrame ? cssVar('--cf-level-frame-bg') : lv?.bg }
+    : {
+        background: isFrame
+          ? cssVar(rowIndex % 2 === 1 ? '--cf-level-frame-bg-alt' : '--cf-level-frame-bg')
+          : lv?.bg,
+      }
 
   const textColor = isCurrent
     ? cssVar('--cf-level-frame-active-text')
@@ -304,11 +308,12 @@ export default function ContentTree() {
                           isOpen={lessonOpen}
                           onClick={() => toggle(setOpenLessons, lesson.id)}
                         >
-                          {frames.map(frame => (
+                          {frames.map((frame, fi) => (
                             <TreeRow
                               key={frame.id}
                               level="frame"
                               depth={4}
+                              rowIndex={fi}
                               label={frame.name}
                               frameType={frame.frame_type || 'content'}
                               isFrame={true}
