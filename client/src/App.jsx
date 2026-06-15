@@ -5,10 +5,14 @@ import ImportButton from './components/Sidebar/ImportButton'
 import FrameEditor from './components/Editor/FrameEditor'
 import useProjectStore from './store/projectStore'
 
-export default function App() {
-  const { projects, fetchProjects, fetchProject, loading } = useProjectStore()
+// Testing convenience: auto-load a project (or seed a demo) on startup.
+// Set to false to return to the blank-start behavior.
+const DEMO_AUTOLOAD = true
 
-  useEffect(() => { fetchProjects() }, [])
+export default function App() {
+  const { projects, fetchProjects, fetchProject, autoloadDemo, loading } = useProjectStore()
+
+  useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
 
   return (
     <div style={{

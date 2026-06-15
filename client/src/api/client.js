@@ -21,6 +21,9 @@ export const importJson = (file) => {
   })
 }
 
+// Import directly from a JS object (raw JSON body) — used for demo autoload.
+export const importJsonBody = (data) => api.post('/import', data)
+
 // ── Frames ───────────────────────────────────────────────────────────────────
 export const getFrame    = (id)       => api.get(`/frames/${id}`)
 export const updateFrame = (id, data) => api.patch(`/frames/${id}`, data)
