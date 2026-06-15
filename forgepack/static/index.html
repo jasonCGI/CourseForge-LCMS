@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ForgePack · Video Processor</title>
+  <title>ForgePack · Media Processor</title>
   <script>
     /* Apply saved/OS viewing mode before paint to avoid a flash. */
     (function(){try{var m=localStorage.getItem('fp_mode');
@@ -428,6 +428,11 @@
         <p id="dz-sub">or click to browse · .mov .mp4 .avi .mts .mkv .wmv .m4v accepted</p>
       </div>
       <input type="file" id="file-input" accept=".mov,.mp4,.avi,.mts,.m2ts,.mkv,.wmv,.flv,.webm,.m4v" onchange="handleFileSelect(event)">
+      <!-- WYSIWYG preview of the dropped video -->
+      <div id="video-preview-wrap" style="display:none;margin-top:14px;text-align:center">
+        <video id="video-preview" controls preload="metadata"
+          style="max-width:100%;max-height:320px;border:1px solid var(--border);border-radius:var(--radius);background:#000"></video>
+      </div>
 
       <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end">
         <button class="btn btn-amber" id="btn-process" onclick="startProcessing()" disabled>
@@ -1002,6 +1007,7 @@ function handleFileSelect(e) {
   if (file) setFile(file);
 }
 
+var videoPreviewUrl = null;
 function setFile(file) {
   selectedFile = file;
   var mb = (file.size / 1024 / 1024).toFixed(1);
@@ -1009,6 +1015,11 @@ function setFile(file) {
   document.getElementById('dz-title').textContent = file.name;
   document.getElementById('dz-sub').textContent   = mb + ' MB · Click to change';
   document.getElementById('btn-process').disabled = false;
+  // WYSIWYG preview of the source video (browser shows the first frame)
+  if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+  videoPreviewUrl = URL.createObjectURL(file);
+  document.getElementById('video-preview').src = videoPreviewUrl;
+  document.getElementById('video-preview-wrap').style.display = 'block';
 }
 
 // ── Upload + process ───────────────────────────────────────────
@@ -1113,6 +1124,9 @@ function resetTool() {
   document.getElementById('file-input').value     = '';
   document.getElementById('audio-warning').style.display    = 'none';
   document.getElementById('caption-reminder').style.display = 'none';
+  if (videoPreviewUrl) { URL.revokeObjectURL(videoPreviewUrl); videoPreviewUrl = null; }
+  document.getElementById('video-preview-wrap').style.display = 'none';
+  document.getElementById('video-preview').src = '';
 }
 </script>
 

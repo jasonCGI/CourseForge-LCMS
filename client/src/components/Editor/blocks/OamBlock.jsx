@@ -132,6 +132,27 @@ export default function OamBlock({ block }) {
           </div>
         )}
 
+        {/* Inline WYSIWYG preview — shows the actual animation in the editor */}
+        {oamMeta && oamMeta.iframe_src && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={fieldLabel}>Live preview</div>
+            <div style={{
+              border: '1px solid var(--cf-border-secondary)',
+              borderRadius: 6, overflow: 'auto', maxHeight: 360,
+              background: '#fff',
+            }}>
+              <iframe
+                src={oamMeta.iframe_src}
+                width={block.data.responsive ? '100%' : (block.data.width || 800)}
+                height={block.data.height || 600}
+                style={{ border: 'none', display: 'block' }}
+                title={`Live preview: ${oamMeta.original_name}`}
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Settings — shown when asset is linked */}
         {assetId && (
           <>
