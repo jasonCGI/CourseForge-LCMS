@@ -1,14 +1,15 @@
 /* ── Design tokens ──────────────────────────────────────────────────────────
-   Defined here because the Sprint 3 editor components reference these CSS
-   variables (the bootstrap omitted their definitions). Dark palette matching
-   the App shell. */
+   The Sprint 3 editor components (right pane) reference these --color-* tokens.
+   They are aliased to the mode-reactive --cf-* tokens (set per-mode on
+   <html> by ThemeContext), so the editor adheres to dark/light/HC switching.
+   Dark hex fallbacks keep them valid before the first applyMode() runs. */
 :root {
-  --color-background-primary:   #1a1a2e;
-  --color-background-secondary: #16213e;
-  --color-text-primary:         #e6e6ea;
-  --color-text-secondary:       #9a9ab0;
-  --color-border-secondary:     #3a3a5a;
-  --color-border-tertiary:      #2a2a4a;
+  --color-background-primary:   var(--cf-block-bg, #0d1017);
+  --color-background-secondary: var(--cf-input-bg, #060810);
+  --color-text-primary:         var(--cf-text-primary, #e6e6ea);
+  --color-text-secondary:       var(--cf-text-secondary, #9a9ab0);
+  --color-border-secondary:     var(--cf-border-secondary, #3a3a5a);
+  --color-border-tertiary:      var(--cf-border-tertiary, #2a2a4a);
   --font-sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
 }
