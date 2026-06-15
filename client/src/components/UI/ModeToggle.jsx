@@ -19,9 +19,17 @@ function SunIcon({ color, size = 14 }) {
 }
 
 function MoonIcon({ color, size = 14 }) {
+  // Crescent = a filled disc with an offset disc masked out. Reliable solid
+  // fill (the old two-arc path collapsed to a near-zero filled area).
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" aria-hidden="true">
-      <path d="M7 2 A5 5 0 1 0 7 12 A3.5 3.5 0 1 1 7 2 Z" fill={color}/>
+      <defs>
+        <mask id="cf-moon-cut">
+          <rect width="14" height="14" fill="white"/>
+          <circle cx="9.7" cy="5" r="4.6" fill="black"/>
+        </mask>
+      </defs>
+      <circle cx="6.6" cy="7" r="5" fill={color} mask="url(#cf-moon-cut)"/>
     </svg>
   )
 }
