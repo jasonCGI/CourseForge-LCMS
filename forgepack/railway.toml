@@ -2,7 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 300 --workers 2"
+# Single worker: the job store is an in-memory dict (services/video_processor.py),
+# so all requests for a job must hit the same process. --threads gives concurrency
+# without a second worker that wouldn't share the JOBS dict.
+startCommand = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 300 --workers 1 --threads 4"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
