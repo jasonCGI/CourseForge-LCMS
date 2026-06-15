@@ -12,6 +12,7 @@
   <metadata>
     <schema>ADL SCORM</schema>
     <schemaversion>1.2</schemaversion>
+    <!-- CourseForge v{{ cf_version }} | Published {{ publish_date }} -->
   </metadata>
 
   <organizations default="{{ org_id }}">

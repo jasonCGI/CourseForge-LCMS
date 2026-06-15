@@ -14,6 +14,7 @@ from flask import render_template
 from ..models.project import Project
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks
+from ..version import VERSION, SCHEMA_VERSION
 
 
 def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
@@ -51,6 +52,9 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="CourseForge v{VERSION}">
+  <meta name="cf-schema" content="{SCHEMA_VERSION}">
+  <meta name="cf-published" content="{datetime.utcnow().strftime('%Y-%m-%d')}">
   <title>{project.name}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;400;600&display=swap" rel="stylesheet">

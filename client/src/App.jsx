@@ -8,6 +8,7 @@ import ThemeEditorModal from './components/ThemeEditor/ThemeEditorModal'
 import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import useProjectStore from './store/projectStore'
+import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
 // Set to false to return to the blank-start behavior.
@@ -125,6 +126,19 @@ export default function App() {
               animation: 'cf-blink 1.05s step-end infinite',
             }}/>
           </div>
+
+          {/* Version */}
+          <span style={{
+            fontFamily: "'JetBrains Mono', Consolas, monospace",
+            fontSize: 9,
+            color: 'var(--cf-text-tertiary)',
+            letterSpacing: '0.06em',
+            marginLeft: 10,
+            opacity: 0.6,
+            alignSelf: 'center',
+          }}>
+            v{VERSION}
+          </span>
 
           {/* Spacer */}
           <div style={{ flex: 1 }}/>

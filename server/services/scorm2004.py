@@ -22,6 +22,7 @@ from ..models.project import Project
 from ..models.media import MediaAsset, OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks, _has_oam_with_scorm
+from ..version import VERSION
 
 # Video.js CDN — same files as SCORM 1.2, cached locally
 VIDEOJS_CDN = {
@@ -117,6 +118,8 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
         project_name=project.name,
         items=items,
         resources=resources,
+        cf_version=VERSION,
+        publish_date=datetime.utcnow().strftime('%Y-%m-%d'),
     )
 
     metadata_xml = render_template(
@@ -150,6 +153,10 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 frame_map=frame_map,
                 theme_css=css,
                 scorm_bridge=_has_oam_with_scorm(frame),
+            )
+            html = (
+                f"<!-- CourseForge v{VERSION} | SCORM 2004 3rd Ed | "
+                f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n" + html
             )
             zf.writestr(fname, html)
 

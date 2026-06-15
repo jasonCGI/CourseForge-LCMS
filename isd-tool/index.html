@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="application-name" content="ForgeBlueprint">
+  <meta name="version" content="1.0.0">
+  <meta name="fb-schema" content="1.0">
   <title>CourseForge — ISD Structure Tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -505,6 +508,14 @@
   <!-- Tool tag -->
   <span class="header-tag">ISD Structure Tool</span>
 
+  <span style="
+    font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    font-size: 9px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.06em;
+    margin-left: auto;
+  ">v1.0.0</span>
+
 </header>
 
 <!-- ── Body ────────────────────────────────────────────────────────────── -->
@@ -815,13 +826,15 @@ function handleParsed(rows, filename) {
     project_description: '',
     courses,
     _meta: {
-      source_file:   filename,
-      generated_at:  new Date().toISOString(),
-      tool:          'CourseForge ISD Structure Tool',
-      total_courses: courseCount,
-      total_modules: moduleCount,
-      total_lessons: lessonCount,
-      total_frames:  frameCount,
+      source_file:    filename,
+      generated_at:   new Date().toISOString(),
+      tool:           'ForgeBlueprint',
+      tool_version:   '1.0.0',
+      schema_version: '1.0',
+      total_courses:  courseCount,
+      total_modules:  moduleCount,
+      total_lessons:  lessonCount,
+      total_frames:   frameCount,
     }
   }
 

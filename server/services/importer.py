@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime
 from ..extensions import db
 from ..models.project import Project, Course, Module, Lesson, Frame
+from ..version import SUPPORTED_SCHEMA_VERSIONS, MIN_SCHEMA_VERSION
 
 SUPPORTED_SCHEMA_VERSION = "1.0"
 
@@ -30,10 +31,24 @@ def validate_import(data: dict) -> None:
         raise ImportValidationError("Payload must be a JSON object.")
 
     version = data.get("schema_version")
-    if version != SUPPORTED_SCHEMA_VERSION:
+
+    if not version:
         raise ImportValidationError(
-            f"Unsupported schema_version '{version}'. Expected '{SUPPORTED_SCHEMA_VERSION}'."
+            "'schema_version' is required. "
+            f"Expected one of: {SUPPORTED_SCHEMA_VERSIONS}"
         )
+
+    if version not in SUPPORTED_SCHEMA_VERSIONS:
+        raise ImportValidationError(
+            f"Unsupported schema_version '{version}'. "
+            f"Supported versions: {SUPPORTED_SCHEMA_VERSIONS}. "
+            f"Please export from ForgeBlueprint v{MIN_SCHEMA_VERSION}+ "
+            f"or update your CourseForge instance."
+        )
+
+    # Future: migration handlers per version
+    # if version == "1.1":
+    #     data = _migrate_1_1_to_1_0(data)
 
     if not (data.get("project_name") or "").strip():
         raise ImportValidationError("'project_name' is required and cannot be empty.")

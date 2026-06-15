@@ -19,6 +19,7 @@ import urllib.request
 from ..models.project import Project, Frame
 from ..models.media import OamAsset, MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
+from ..version import VERSION, SCHEMA_VERSION
 
 
 def build_frame_html(frame, lesson, frame_index, total_frames,
@@ -230,6 +231,8 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
         project_name=project.name,
         items=items,
         resources=resources,
+        cf_version=VERSION,
+        publish_date=datetime.utcnow().strftime('%Y-%m-%d'),
     )
 
     # Build ZIP in memory
@@ -250,6 +253,10 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 frame_map=frame_map,
                 theme_css=css,
                 scorm_bridge=_has_oam_with_scorm(frame),
+            )
+            html = (
+                f"<!-- CourseForge v{VERSION} | schema {SCHEMA_VERSION} | "
+                f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n" + html
             )
             zf.writestr(fname, html)
 

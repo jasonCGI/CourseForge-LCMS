@@ -39,6 +39,15 @@ def create_app(config_name=None):
     def health():
         return jsonify({'status': 'ok', 'service': 'courseforge'})
 
+    # Version
+    from .version import version_info
+
+    @app.route('/api/version')
+    def version():
+        info = version_info()
+        info['environment'] = os.environ.get('FLASK_ENV', 'production')
+        return jsonify(info)
+
     # Serve React SPA for all non-API routes (production)
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')

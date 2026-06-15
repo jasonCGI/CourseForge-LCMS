@@ -25,6 +25,9 @@ def publish():
         return jsonify({'error': 'project_id required'}), 400
 
     # Log publish job
+    # TODO Sprint 7: add cf_version column to publish_jobs to track which
+    # version of CourseForge produced each package (needs a schema migration).
+    # cf_version = db.Column(db.String(20))
     job = PublishJob(
         project_id=project_id,
         format=fmt,
