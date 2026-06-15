@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { Tree } from 'react-arborist'
 import useProjectStore from '../../store/projectStore'
+import useEditorStore from '../../store/editorStore'
 
 // ── Build flat node list from project hierarchy ──────────────────────────────
 function buildNodes(project) {
@@ -56,11 +57,15 @@ const FRAME_TYPE_COLOR = {
 // ── Single node renderer ──────────────────────────────────────────────────────
 function Node({ node, style, dragHandle }) {
   const setActiveFrameId = useProjectStore(s => s.setActiveFrameId)
+  const loadFrame = useEditorStore(s => s.loadFrame)
   const isFrame = node.data.type === 'frame'
 
   const handleClick = () => {
     node.toggle()
-    if (isFrame) setActiveFrameId(node.data.id)
+    if (isFrame) {
+      setActiveFrameId(node.data.id)
+      loadFrame(node.data.id)
+    }
   }
 
   return (

@@ -1,106 +1,125 @@
 import React, { useEffect } from 'react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
+import FrameEditor from './components/Editor/FrameEditor'
 import useProjectStore from './store/projectStore'
 
-const SIDEBAR_WIDTH = 280
-
 export default function App() {
-  const { projects, activeProject, fetchProjects, fetchProject, loading } = useProjectStore()
+  const { projects, fetchProjects, fetchProject, loading } = useProjectStore()
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
+  useEffect(() => { fetchProjects() }, [])
 
   return (
     <div style={{
       display: 'flex',
+      flexDirection: 'column',
       height: '100vh',
       background: '#121212',
-      color: '#e0e0e0',
-      fontFamily: 'Inter, system-ui, sans-serif',
+      color: 'var(--color-text-primary)',
+      fontFamily: 'var(--font-sans)',
       overflow: 'hidden',
     }}>
 
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <aside style={{
-        width: SIDEBAR_WIDTH,
-        minWidth: SIDEBAR_WIDTH,
-        background: '#1a1a2e',
-        borderRight: '1px solid #2a2a4a',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '14px 12px',
-          borderBottom: '1px solid #2a2a4a',
-          fontWeight: 700,
-          fontSize: 15,
-          letterSpacing: '0.02em',
-          color: '#90CAF9',
-        }}>
-          CourseForge
-        </div>
-
-        {/* Project selector */}
-        {projects.length > 0 && (
-          <div style={{ padding: '8px', borderBottom: '1px solid #2a2a4a' }}>
-            <select
-              onChange={e => fetchProject(e.target.value)}
-              defaultValue=""
-              style={{
-                width: '100%',
-                background: '#16213e',
-                color: '#e0e0e0',
-                border: '1px solid #2a2a4a',
-                borderRadius: 4,
-                padding: '6px 8px',
-                fontSize: 13,
-              }}
-            >
-              <option value="" disabled>Select a project…</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Import button */}
-        <ImportButton />
-
-        {/* Content tree */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <ContentTree height={window.innerHeight - 180} />
-        </div>
-      </aside>
-
-      {/* ── Main area ────────────────────────────────────────────────────── */}
-      <main style={{
-        flex: 1,
+      {/* App header */}
+      <div style={{
+        height: 44,
+        background: '#0a0a1a',
+        borderBottom: '1px solid #1e1e3a',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
+        padding: '0 16px',
         gap: 12,
-        color: '#555',
+        flexShrink: 0,
       }}>
-        {loading && <p>Loading…</p>}
-        {!loading && !activeProject && (
-          <>
-            <p style={{ fontSize: 18 }}>No project selected</p>
-            <p style={{ fontSize: 13 }}>Import a JSON file or select a project from the sidebar.</p>
-          </>
-        )}
-        {activeProject && (
-          <p style={{ fontSize: 14 }}>
-            Select a frame from the sidebar to open the editor.
-          </p>
-        )}
-      </main>
+        <span style={{
+          fontWeight: 600,
+          fontSize: 15,
+          letterSpacing: '0.01em',
+          color: '#85B7EB',
+        }}>
+          Course
+        </span>
+        <span style={{
+          fontWeight: 300,
+          fontSize: 15,
+          color: '#5F5E5A',
+        }}>
+          /
+        </span>
+        <span style={{
+          fontWeight: 700,
+          fontSize: 15,
+          color: '#EF9F27',
+        }}>
+          Forge
+        </span>
+      </div>
 
+      {/* Main split pane */}
+      <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
+
+        {/* Sidebar panel */}
+        <Panel defaultSize={22} minSize={16} maxSize={35}>
+          <div style={{
+            height: '100%',
+            background: '#1a1a2e',
+            borderRight: '1px solid #2a2a4a',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            {/* Project selector */}
+            {projects.length > 0 && (
+              <div style={{ padding: 8, borderBottom: '1px solid #2a2a4a' }}>
+                <select
+                  onChange={e => fetchProject(e.target.value)}
+                  defaultValue=""
+                  style={{
+                    width: '100%',
+                    background: '#16213e',
+                    color: '#e0e0e0',
+                    border: '1px solid #2a2a4a',
+                    borderRadius: 4,
+                    padding: '6px 8px',
+                    fontSize: 13,
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  <option value="" disabled>Select a project…</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <ImportButton />
+
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <ContentTree height={window.innerHeight - 160} />
+            </div>
+          </div>
+        </Panel>
+
+        {/* Drag handle */}
+        <PanelResizeHandle style={{
+          width: 4,
+          background: '#2a2a4a',
+          cursor: 'col-resize',
+          transition: 'background 0.15s',
+        }}
+          onDragging={(isDragging) => {}}
+        />
+
+        {/* Editor panel */}
+        <Panel minSize={40}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <FrameEditor />
+          </div>
+        </Panel>
+
+      </PanelGroup>
     </div>
   )
 }

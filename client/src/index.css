@@ -1,0 +1,64 @@
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   Defined here because the Sprint 3 editor components reference these CSS
+   variables (the bootstrap omitted their definitions). Dark palette matching
+   the App shell. */
+:root {
+  --color-background-primary:   #1a1a2e;
+  --color-background-secondary: #16213e;
+  --color-text-primary:         #e6e6ea;
+  --color-text-secondary:       #9a9ab0;
+  --color-border-secondary:     #3a3a5a;
+  --color-border-tertiary:      #2a2a4a;
+  --font-sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { margin: 0; font-family: var(--font-sans); }
+
+/* TipTap editor styles */
+.tiptap {
+  outline: none;
+  min-height: 60px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.tiptap p { margin: 0 0 0.5em; }
+.tiptap p:last-child { margin-bottom: 0; }
+.tiptap strong { font-weight: 600; }
+.tiptap em { font-style: italic; }
+
+.tiptap ul, .tiptap ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+
+.tiptap h1 { font-size: 1.4em; font-weight: 600; margin: 0.4em 0; }
+.tiptap h2 { font-size: 1.2em; font-weight: 600; margin: 0.4em 0; }
+.tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0; }
+
+.tiptap blockquote {
+  border-left: 3px solid #185FA5;
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--color-text-secondary);
+}
+
+.tiptap code {
+  background: var(--color-background-secondary);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  height: 0;
+  opacity: 0.5;
+}
