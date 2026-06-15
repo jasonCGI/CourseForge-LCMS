@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ForgeClip · Interactive Video</title>
+  <script>
+    /* Apply saved/OS viewing mode before paint to avoid a flash. */
+    (function(){try{var m=localStorage.getItem('fk_mode');
+      if(!m)m=(window.matchMedia&&matchMedia('(prefers-contrast: more)').matches)?'hc'
+        :(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+      document.documentElement.setAttribute('data-mode',m);
+    }catch(e){document.documentElement.setAttribute('data-mode','dark');}})();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -30,6 +38,63 @@
       --mono:    'JetBrains Mono', Consolas, monospace;
     }
 
+    /* ── Viewing modes — dark is the :root default above ── */
+    html[data-mode="light"] {
+      --navy:    #1B3A5C;   /* header stays a deep brand bar */
+      --bg:      #F0F4F8;
+      --bg2:     #FFFFFF;
+      --bg3:     #EEF4FA;
+      --border:  #C8D4DC;
+      --text:    #0E2030;
+      --text2:   #3A5A78;
+      --text3:   #6A8AA8;
+    }
+    html[data-mode="hc"] {
+      --navy:    #000000;
+      --blue:    #4DA3FF;
+      --blue-lt: #FFFFFF;
+      --bg:      #000000;
+      --bg2:     #000000;
+      --bg3:     #000000;
+      --border:  #FFFFFF;
+      --text:    #FFFFFF;
+      --text2:   #DDDDDD;
+      --text3:   #AAAAAA;
+    }
+
+    /* ── 508: visible focus + skip link ── */
+    a:focus-visible, button:focus-visible, input:focus-visible,
+    select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid var(--amber);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute; left: 8px; top: -120px;
+      background: var(--amber); color: #042C53; font-weight: 700;
+      padding: 8px 16px; border-radius: 4px; z-index: 9999;
+      font-family: var(--font); font-size: 14px; transition: top 0.12s;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 8px; }
+
+    /* ── Mode toggle (matches CourseForge ModeToggle) ── */
+    .mode-toggle {
+      display: inline-flex; gap: 2px;
+      background: #0e1320; border: 1px solid #2a3848;
+      border-radius: 6px; padding: 3px;
+    }
+    html[data-mode="hc"] .mode-toggle { background: #000; border-color: #fff; }
+    .mode-btn {
+      width: 30px; height: 26px; padding: 0; cursor: pointer;
+      border: 1px solid transparent; border-radius: 4px; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      color: #8AAAC8; transition: background .15s, border-color .15s;
+    }
+    html[data-mode="light"] .mode-btn { color: #90C0E8; }
+    html[data-mode="hc"]    .mode-btn { color: #CCCCCC; }
+    .mode-btn[aria-pressed="true"] { background: #1B3A5C; border-color: #2A5A8A; color: #EF9F27; }
+    html[data-mode="hc"] .mode-btn[aria-pressed="true"] { background: #EF9F27; border-color: #EF9F27; color: #000; }
+
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
     body {
@@ -46,8 +111,8 @@
     .header {
       background: var(--navy);
       border-bottom: 2px solid var(--amber);
-      padding: 0 20px;
-      height: 48px;
+      padding: 0 16px;
+      min-height: 48px;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -57,7 +122,9 @@
 
     .logo {
       font-family: var(--font);
-      font-size: 16px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      line-height: 1;
       display: flex;
       align-items: baseline;
     }
@@ -66,9 +133,9 @@
     .logo-sl { font-weight: 100; color: var(--amber); }
     .logo-c  { font-weight: 200; color: #fff; }
     .logo-cur {
-      display: inline-block; width: 8px; height: 2px;
-      background: var(--amber); margin-left: 2px; margin-bottom: 1px;
-      border-radius: 1px; animation: blink 1.05s step-end infinite;
+      display: inline-block; width: 13px; height: 2px;
+      background: var(--amber); margin-left: 4px; margin-bottom: 2px;
+      border-radius: 1px; align-self: flex-end; animation: blink 1.05s step-end infinite;
     }
 
     .header-tag {
@@ -449,6 +516,8 @@
 </head>
 <body>
 
+<a href="#main" class="skip-link">Skip to content</a>
+
 <header class="header">
   <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
     <rect x="3" y="17" width="22" height="4" rx="2" fill="#185FA5" opacity="0.3"/>
@@ -473,6 +542,17 @@
 
   <div style="display:flex;gap:8px;align-items:center">
     <span id="autosave-label" style="font-size:10px;color:var(--text3);font-family:var(--mono)"></span>
+    <div class="mode-toggle" role="group" aria-label="Display mode">
+      <button class="mode-btn" id="mode-light" aria-label="Light mode" aria-pressed="false" title="Light" onclick="setMode('light')">
+        <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="11.2" y1="7" x2="12.6" y2="7"/><line x1="9.97" y1="9.97" x2="10.96" y2="10.96"/><line x1="7" y1="11.2" x2="7" y2="12.6"/><line x1="4.03" y1="9.97" x2="3.04" y2="10.96"/><line x1="2.8" y1="7" x2="1.4" y2="7"/><line x1="4.03" y1="4.03" x2="3.04" y2="3.04"/><line x1="7" y1="2.8" x2="7" y2="1.4"/><line x1="9.97" y1="4.03" x2="10.96" y2="3.04"/></g></svg>
+      </button>
+      <button class="mode-btn" id="mode-dark" aria-label="Dark mode" aria-pressed="false" title="Dark" onclick="setMode('dark')">
+        <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><defs><mask id="fk-moon"><rect width="14" height="14" fill="white"/><circle cx="9.7" cy="5" r="4.6" fill="black"/></mask></defs><circle cx="6.6" cy="7" r="5" fill="currentColor" mask="url(#fk-moon)"/></svg>
+      </button>
+      <button class="mode-btn" id="mode-hc" aria-label="High contrast mode" aria-pressed="false" title="High contrast" onclick="setMode('hc')">
+        <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 1.5 A5.5 5.5 0 0 1 7 12.5 Z" fill="currentColor"/></svg>
+      </button>
+    </div>
     <button class="btn btn-outline" style="width:auto;padding:5px 12px;font-size:11px"
       onclick="importClip()" aria-label="Import existing .clip.json">↑ Import</button>
     <button class="btn btn-amber" style="width:auto;padding:5px 14px;font-size:11px"
@@ -480,7 +560,7 @@
   </div>
 </header>
 
-<div class="workspace">
+<div class="workspace" id="main">
 
   <div class="top-row">
 
@@ -575,6 +655,20 @@
 </div>
 
 <script>
+// ── Viewing mode (light / dark / high-contrast) ─────────────────
+function applyMode(mode) {
+  document.documentElement.setAttribute('data-mode', mode)
+  ;['light','dark','hc'].forEach(function(m) {
+    var btn = document.getElementById('mode-' + m)
+    if (btn) btn.setAttribute('aria-pressed', String(m === mode))
+  })
+}
+function setMode(mode) {
+  applyMode(mode)
+  try { localStorage.setItem('fk_mode', mode) } catch (e) {}
+}
+applyMode(document.documentElement.getAttribute('data-mode') || 'dark')
+
 // ── State ──────────────────────────────────────────────────────
 var state = {
   clipId: null, clip: null, player: null,
