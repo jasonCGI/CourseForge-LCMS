@@ -39,6 +39,7 @@ export default function BlockToolbar() {
         <button
           key={type}
           onClick={() => available && addBlock(type)}
+          aria-label={`Add ${label} block`}
           title={available ? `Add ${label} block` : `${label} — available in Sprint 4`}
           style={{
             padding: '5px 12px',

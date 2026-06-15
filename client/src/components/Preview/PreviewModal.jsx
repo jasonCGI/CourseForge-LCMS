@@ -12,6 +12,32 @@ export default function PreviewModal({ onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  // Focus trap + restore focus to trigger on close (508)
+  useEffect(() => {
+    const prevFocused = document.activeElement
+    const modal = document.getElementById('preview-modal')
+    const focusable = modal?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    focusable?.[0]?.focus()
+
+    const handler = (e) => {
+      if (e.key !== 'Tab' || !focusable || focusable.length === 0) return
+      const els = [...focusable]
+      const first = els[0], last = els[els.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => {
+      document.removeEventListener('keydown', handler)
+      if (prevFocused && prevFocused.focus) prevFocused.focus()
+    }
+  }, [])
+
   return (
     <div
       onClick={onClose}
@@ -26,6 +52,10 @@ export default function PreviewModal({ onClose }) {
       }}
     >
       <div
+        id="preview-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Frame preview"
         onClick={e => e.stopPropagation()}
         style={{
           background: '#fff',

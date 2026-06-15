@@ -62,3 +62,69 @@ body { margin: 0; font-family: var(--font-sans); }
   height: 0;
   opacity: 0.5;
 }
+
+/* ── Theme CSS custom property fallbacks (Sprint 5b) ── */
+:root {
+  --cf-app-bg:          #06080f;
+  --cf-header-bg:       #06080f;
+  --cf-header-border:   #EF9F27;
+  --cf-text-primary:    #E0E8F0;
+  --cf-text-secondary:  #7A90A8;
+  --cf-text-tertiary:   #3A5A7A;
+  --cf-accent:          #EF9F27;
+  --cf-border-primary:  #1c1c2c;
+  --cf-border-tertiary: rgba(255,255,255,0.04);
+  --cf-font:            Inter, system-ui, sans-serif;
+  --cf-mono:            'SF Mono', 'JetBrains Mono', Consolas, monospace;
+}
+
+/* ── Focus indicators — 508 required on all interactive elements ── */
+.cf-tree-row:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: var(--cf-focus-outline, 2px solid #EF9F27) !important;
+  outline-offset: -2px;
+  z-index: 10;
+  position: relative;
+}
+
+/* High contrast mode — thicker focus ring */
+[data-cf-mode="hc"] .cf-tree-row:focus-visible,
+[data-cf-mode="hc"] button:focus-visible,
+[data-cf-mode="hc"] [tabindex="0"]:focus-visible {
+  outline: 3px solid #EF9F27 !important;
+  outline-offset: -1px;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--cf-scrollbar-track, #06080f); }
+::-webkit-scrollbar-thumb { background: var(--cf-scrollbar-thumb, #2a3848); border-radius: 3px; }
+
+/* ── Skip to content — 508 required ── */
+.skip-to-content {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  padding: 8px 16px;
+  background: #EF9F27;
+  color: #000;
+  font-weight: 700;
+  border-radius: 4px;
+  z-index: 9999;
+  font-family: var(--cf-font);
+  font-size: 14px;
+  transition: top 0.1s;
+}
+
+.skip-to-content:focus {
+  top: 8px;
+}
+
+/* ── Tree hover ── */
+.cf-tree-row:hover > div:last-child {
+  filter: brightness(1.12);
+}

@@ -96,6 +96,7 @@ export default function FrameHeader({ onPreview }) {
       {/* Manual save button */}
       <button
         onClick={save}
+        aria-label={isSaving ? 'Saving frame' : isDirty ? 'Save frame' : 'Frame saved'}
         disabled={!isDirty || isSaving}
         style={{
           padding: '6px 14px',

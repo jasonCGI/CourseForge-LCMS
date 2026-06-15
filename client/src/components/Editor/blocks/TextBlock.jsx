@@ -107,9 +107,9 @@ export function BlockHeader({ label, color, blockId, onRemove, onMove }) {
       }}>
         {label}
       </span>
-      <button onClick={() => onMove(blockId, 'up')}   title="Move up"   style={btnStyle}>↑</button>
-      <button onClick={() => onMove(blockId, 'down')} title="Move down" style={btnStyle}>↓</button>
-      <button onClick={() => onRemove(blockId)}       title="Remove"    style={{ ...btnStyle, color: '#E24B4A' }}>✕</button>
+      <button onClick={() => onMove(blockId, 'up')}   aria-label="Move block up"   title="Move up"   style={btnStyle}>↑</button>
+      <button onClick={() => onMove(blockId, 'down')} aria-label="Move block down" title="Move down" style={btnStyle}>↓</button>
+      <button onClick={() => onRemove(blockId)}       aria-label="Remove block"    title="Remove"    style={{ ...btnStyle, color: '#E24B4A' }}>✕</button>
     </div>
   )
 }
