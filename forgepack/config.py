@@ -76,6 +76,22 @@ class Config:
         },
     }
 
+    # Audio loudness presets (EBU R128)
+    AUDIO_PRESETS = {
+        'training_standard': {
+            'label':'Training Standard','description':'-16 LUFS · 128kbps MP3 · DoD narration standard',
+            'target_lufs':-16,'true_peak':-1.5,'lra':11,'mp3_bitrate':'128k','ogg_quality':'4','m4a_bitrate':'128k',
+        },
+        'low_bandwidth': {
+            'label':'Low Bandwidth','description':'-18 LUFS · 96kbps MP3 · Restricted networks',
+            'target_lufs':-18,'true_peak':-2.0,'lra':11,'mp3_bitrate':'96k','ogg_quality':'3','m4a_bitrate':'96k',
+        },
+        'high_quality': {
+            'label':'High Quality','description':'-14 LUFS · 192kbps MP3 · Maximum fidelity',
+            'target_lufs':-14,'true_peak':-1.0,'lra':13,'mp3_bitrate':'192k','ogg_quality':'6','m4a_bitrate':'192k',
+        },
+    }
+
 class DevelopmentConfig(Config):
     DEBUG = True
 

@@ -140,6 +140,22 @@
       font-family: var(--mono);
     }
 
+    /* ── Module tabs ── */
+    .module-tabs {
+      display: flex; gap: 0; padding: 0 32px;
+      background: var(--navy); border-bottom: 1px solid var(--border);
+    }
+    .module-tab {
+      padding: 10px 18px; border: none; background: transparent;
+      color: var(--text2); font-family: var(--font); font-size: 13px;
+      cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color .15s, border-color .15s;
+      letter-spacing: 0.02em;
+    }
+    .module-tab:hover { color: var(--blue-lt); }
+    .module-tab.active { color: var(--amber); border-bottom-color: var(--amber); font-weight: 500; }
+    .module-tab:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
     /* ── Mark ── */
     .mark { flex-shrink: 0; }
 
@@ -338,7 +354,7 @@
     <span class="logo-p">Pack</span>
     <span class="logo-cur"></span>
   </div>
-  <span class="header-tag">Video · v1.0</span>
+  <span class="header-tag">Media Processor</span>
   <span style="
     font-family: var(--mono);
     font-size: 9px;
@@ -361,6 +377,12 @@
   </div>
 </header>
 
+<div class="module-tabs" role="tablist" aria-label="ForgePack modules">
+  <button class="module-tab active" id="mod-video-btn" role="tab" aria-selected="true" aria-controls="mod-video" onclick="switchModule('video')">🎬 Video</button>
+  <button class="module-tab" id="mod-audio-btn" role="tab" aria-selected="false" aria-controls="mod-audio" onclick="switchModule('audio')">🎙 Audio</button>
+</div>
+
+<div id="mod-video" role="tabpanel" aria-labelledby="mod-video-btn">
 <main class="body" id="main">
 
   <div class="hero">
@@ -475,6 +497,85 @@
   </div>
 
 </main>
+</div><!-- /mod-video -->
+
+<div id="mod-audio" role="tabpanel" aria-labelledby="mod-audio-btn" style="display:none">
+  <main class="body">
+    <div class="hero">
+      <h1>Process audio for <strong>CourseForge</strong></h1>
+      <p>Upload raw narration or audio — ForgePack normalizes loudness to the
+         DoD training standard and outputs MP3, OGG, and M4A, ready to drop
+         into CourseForge.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">01</span>
+        Select loudness preset
+      </div>
+      <div class="section-body"><div class="preset-grid" id="audio-preset-grid"></div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">02</span>
+        Upload source audio
+      </div>
+      <div class="section-body">
+        <div class="drop-zone" id="audio-drop-zone" role="button" tabindex="0"
+          aria-label="Drop audio file or click to browse"
+          onclick="document.getElementById('audio-file-input').click()"
+          ondragover="audioDragOver(event)" ondragleave="audioDragLeave(event)" ondrop="audioDrop(event)"
+          onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('audio-file-input').click()">
+          <div class="drop-zone-icon" id="audio-dz-icon">🎙</div>
+          <h3 id="audio-dz-title">Drop audio file here</h3>
+          <p id="audio-dz-sub">.wav .aiff .flac .mp3 .m4a .aac .ogg accepted</p>
+        </div>
+        <input type="file" id="audio-file-input"
+          accept=".wav,.aiff,.aif,.flac,.mp3,.m4a,.aac,.ogg,.opus" onchange="audioFileSelect(event)">
+        <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-amber" id="audio-btn-process" onclick="startAudioProcessing()" disabled>⚙ Process Audio</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="audio-step-progress" style="display:none">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">03</span>
+        Processing
+      </div>
+      <div class="section-body">
+        <div class="progress-wrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="audio-progress-fill" style="width:0%"></div></div>
+          <div class="progress-label"><span id="audio-progress-msg">Starting…</span><span id="audio-progress-pct">0%</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);font-family:var(--mono)">// Normalizing loudness · do not close this tab</p>
+      </div>
+    </div>
+
+    <div class="section" id="audio-step-output" style="display:none">
+      <div class="section-header">
+        <span style="color:#4CAF50;font-family:var(--mono);font-size:12px">✓</span>
+        Output ready
+      </div>
+      <div class="section-body">
+        <div id="audio-output-card" class="output-card" style="margin-bottom:14px"></div>
+        <div id="audio-lufs-card" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="resetAudio()">↺ Process another</button>
+          <button class="btn btn-green" onclick="downloadAudio()">⬇ Download ZIP</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="audio-error" style="display:none" class="alert alert-error">
+      <strong>Processing failed:</strong> <span id="audio-error-msg"></span>
+      <div style="margin-top:8px">
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 12px" onclick="resetAudio()">Try again</button>
+      </div>
+    </div>
+  </main>
+</div>
 
 <footer>
   ForgePack · Video module · Part of the CourseForge ecosystem &nbsp;·&nbsp;
@@ -496,6 +597,124 @@ function setMode(mode) {
 }
 // Sync toggle buttons to the mode the head script already applied
 applyMode(document.documentElement.getAttribute('data-mode') || 'dark');
+
+// ── Module switcher ─────────────────────────────────────────────
+function switchModule(name) {
+  ['video','audio'].forEach(function(m) {
+    var panel = document.getElementById('mod-' + m)
+    var btn   = document.getElementById('mod-' + m + '-btn')
+    if (panel) panel.style.display = m === name ? 'block' : 'none'
+    if (btn) { btn.classList.toggle('active', m === name); btn.setAttribute('aria-selected', m === name ? 'true' : 'false') }
+  })
+}
+
+// ── Audio module ────────────────────────────────────────────────
+var audioFile = null, audioPreset = 'training_standard', audioJobId = null, audioPoll = null
+
+fetch('/api/audio/presets').then(r => r.json()).then(function(presets) {
+  var grid = document.getElementById('audio-preset-grid'); if (!grid) return
+  presets.forEach(function(p) {
+    var card = document.createElement('div')
+    card.className = 'preset-card' + (p.key === audioPreset ? ' selected' : '')
+    card.setAttribute('role','radio'); card.setAttribute('aria-checked', p.key === audioPreset ? 'true':'false')
+    card.setAttribute('tabindex','0'); card.setAttribute('aria-label', p.label + ' — ' + p.description)
+    card.innerHTML = '<div class="preset-radio"></div><div><div class="preset-label">'+p.label+'</div><div class="preset-desc">'+p.description+'</div></div>'
+    card.onclick = function(){ selectAudioPreset(p.key) }
+    card.onkeydown = function(e){ if(e.key==='Enter'||e.key===' ') selectAudioPreset(p.key) }
+    grid.appendChild(card)
+  })
+}).catch(function(){})
+
+function selectAudioPreset(key) {
+  audioPreset = key
+  var cards = document.querySelectorAll('#audio-preset-grid .preset-card')
+  fetch('/api/audio/presets').then(r=>r.json()).then(function(presets){
+    presets.forEach(function(p, i){
+      if (!cards[i]) return
+      var sel = p.key === key
+      cards[i].className = 'preset-card' + (sel ? ' selected' : '')
+      cards[i].setAttribute('aria-checked', sel ? 'true' : 'false')
+    })
+  })
+}
+
+function audioDragOver(e){ e.preventDefault(); document.getElementById('audio-drop-zone').classList.add('drag-over') }
+function audioDragLeave(e){ document.getElementById('audio-drop-zone').classList.remove('drag-over') }
+function audioDrop(e){ e.preventDefault(); document.getElementById('audio-drop-zone').classList.remove('drag-over'); var f=e.dataTransfer.files[0]; if(f) setAudioFile(f) }
+function audioFileSelect(e){ var f=e.target.files[0]; if(f) setAudioFile(f) }
+function setAudioFile(file) {
+  audioFile = file
+  document.getElementById('audio-dz-icon').textContent  = '✓'
+  document.getElementById('audio-dz-title').textContent = file.name
+  document.getElementById('audio-dz-sub').textContent   = (file.size/1024/1024).toFixed(1) + ' MB · Click to change'
+  document.getElementById('audio-btn-process').disabled = false
+}
+
+function startAudioProcessing() {
+  if (!audioFile) return
+  var form = new FormData(); form.append('file', audioFile); form.append('preset', audioPreset)
+  document.getElementById('audio-step-progress').style.display = 'block'
+  document.getElementById('audio-btn-process').disabled = true
+  document.getElementById('audio-error').style.display = 'none'
+  fetch('/api/audio/upload', { method:'POST', body:form })
+    .then(function(r){ if(!r.ok) return r.json().then(function(d){ throw new Error(d.error||'Upload failed') }); return r.json() })
+    .then(function(data){ audioJobId = data.job_id; audioPoll = setInterval(pollAudioStatus, 1500) })
+    .catch(function(err){ showAudioError(err.message) })
+}
+
+function pollAudioStatus() {
+  if (!audioJobId) return
+  fetch('/api/audio/status/' + audioJobId).then(r=>r.json()).then(function(job){
+    document.getElementById('audio-progress-fill').style.width = job.progress + '%'
+    document.getElementById('audio-progress-msg').textContent  = job.message || ''
+    document.getElementById('audio-progress-pct').textContent  = job.progress + '%'
+    if (job.status === 'complete') { clearInterval(audioPoll); showAudioOutput(job) }
+    else if (job.status === 'failed') { clearInterval(audioPoll); showAudioError(job.error || 'Processing failed.') }
+  }).catch(function(){})
+}
+
+function showAudioOutput(job) {
+  document.getElementById('audio-step-progress').style.display = 'none'
+  document.getElementById('audio-step-output').style.display   = 'block'
+  var files = [
+    { ext:'MP3', color:'#185FA5', bg:'#0C3060', label:'Primary — libmp3lame, loudness normalized' },
+    { ext:'OGG', color:'#1A7A5E', bg:'#0a2a1a', label:'Fallback — OGG Vorbis, for Firefox/Chrome' },
+    { ext:'M4A', color:'#B87A1A', bg:'#2a1a00', label:'Fallback — AAC, for Safari / iOS' },
+  ]
+  document.getElementById('audio-output-card').innerHTML = files.map(function(f){
+    return '<div class="output-file"><span class="output-ext" style="background:'+f.bg+';color:'+f.color+'">'+f.ext+'</span><span style="font-size:12px;color:var(--text2);flex:1">'+f.label+'</span></div>'
+  }).join('')
+  var lufsCard = document.getElementById('audio-lufs-card')
+  if (job.source_lufs !== null && job.source_lufs !== undefined) {
+    var diff = (job.target_lufs - job.source_lufs).toFixed(1)
+    var dir  = diff > 0 ? '↑ boosted' : '↓ reduced'
+    var color = Math.abs(diff) > 10 ? '#EF9F27' : '#4CAF50'
+    lufsCard.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:11px"><div style="display:flex;gap:20px;flex-wrap:wrap">'+
+      '<div><span style="color:var(--text3)">Source LUFS</span><span style="color:var(--text);margin-left:8px">'+job.source_lufs.toFixed(1)+' LUFS</span></div>'+
+      '<div><span style="color:var(--text3)">Target LUFS</span><span style="color:var(--amber);margin-left:8px">'+job.target_lufs+' LUFS</span></div>'+
+      '<div><span style="color:var(--text3)">Adjustment</span><span style="color:'+color+';margin-left:8px">'+(diff>0?'+':'')+diff+' dB '+dir+'</span></div>'+
+      '<div><span style="color:var(--text3)">Duration</span><span style="color:var(--text);margin-left:8px">'+(job.duration?job.duration.toFixed(1)+'s':'n/a')+'</span></div>'+
+      '</div></div>'
+  } else { lufsCard.innerHTML = '' }
+}
+
+function downloadAudio(){ if(audioJobId) window.location.href = '/api/audio/download/' + audioJobId }
+function showAudioError(msg) {
+  document.getElementById('audio-step-progress').style.display = 'none'
+  document.getElementById('audio-error').style.display = 'block'
+  document.getElementById('audio-error-msg').textContent = msg
+}
+function resetAudio() {
+  clearInterval(audioPoll); audioJobId = null; audioFile = null
+  document.getElementById('audio-step-progress').style.display = 'none'
+  document.getElementById('audio-step-output').style.display   = 'none'
+  document.getElementById('audio-error').style.display         = 'none'
+  document.getElementById('audio-btn-process').disabled        = true
+  document.getElementById('audio-dz-icon').textContent         = '🎙'
+  document.getElementById('audio-dz-title').textContent        = 'Drop audio file here'
+  document.getElementById('audio-dz-sub').textContent          = '.wav .aiff .flac .mp3 .m4a .aac .ogg accepted'
+  document.getElementById('audio-file-input').value            = ''
+}
 
 // ── State ──────────────────────────────────────────────────────
 var selectedFile   = null;

@@ -22,7 +22,9 @@ def create_app(config_name=None):
 
     # Routes
     from routes.video import video_bp
+    from routes.audio import audio_bp
     app.register_blueprint(video_bp)
+    app.register_blueprint(audio_bp)
 
     # Health
     @app.route('/api/health')
