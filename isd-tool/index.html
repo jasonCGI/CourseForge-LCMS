@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CourseForge — ISD Structure Tool</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* ── Reset + Base ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:     #042C53;
+      --blue:     #185FA5;
+      --blue-mid: #378ADD;
+      --blue-lt:  #B5D4F4;
+      --amber:    #EF9F27;
+      --amber-dk: #BA7517;
+      --red:      #C0392B;
+      --red-lt:   #FDECEA;
+      --green:    #1E7E34;
+      --green-lt: #EAF6EC;
+      --warn:     #7D4E00;
+      --warn-lt:  #FFF8EC;
+      --bg:       #0d0d1a;
+      --bg2:      #13132a;
+      --bg3:      #1a1a3a;
+      --border:   #2a2a4a;
+      --text:     #e0e0f0;
+      --text2:    #8888aa;
+      --radius:   6px;
+      --font:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── App header ─────────────────────────────────────────────────── */
+    .app-header {
+      background: var(--navy);
+      border-bottom: 2px solid var(--amber);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .logo-course {
+      font-size: 20px;
+      font-weight: 300;
+      color: var(--blue-lt);
+      letter-spacing: -0.02em;
+    }
+
+    .logo-slash {
+      font-size: 20px;
+      font-weight: 200;
+      color: var(--text2);
+      margin: 0 6px;
+    }
+
+    .logo-forge {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: -0.02em;
+    }
+
+    .header-tag {
+      margin-left: 20px;
+      padding: 3px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text2);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    .app-body {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+    }
+
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 300;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .hero h1 strong {
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    .hero p {
+      color: var(--text2);
+      font-size: 15px;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Step cards ─────────────────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 32px 0;
+    }
+
+    .step-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    .step-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .step-card p {
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    /* ── Section ────────────────────────────────────────────────────── */
+    .section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-icon {
+      font-size: 16px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .section-body {
+      padding: 20px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      border: none;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-amber   { background: var(--amber); color: var(--navy); }
+    .btn-outline {
+      background: transparent;
+      color: var(--blue-lt);
+      border: 1px solid var(--blue);
+    }
+    .btn-green { background: var(--green); color: white; }
+
+    /* ── Drop zone ──────────────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--bg3);
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--blue);
+      background: rgba(24, 95, 165, 0.08);
+    }
+
+    .drop-zone-icon { font-size: 36px; margin-bottom: 12px; }
+    .drop-zone h3   { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+    .drop-zone p    { font-size: 13px; color: var(--text2); }
+
+    /* ── Validation report ──────────────────────────────────────────── */
+    .report-summary {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .report-badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge-error   { background: var(--red-lt);  color: var(--red);  }
+    .badge-warn    { background: var(--warn-lt);  color: var(--warn); }
+    .badge-ok      { background: var(--green-lt); color: var(--green); }
+
+    .report-list { list-style: none; }
+
+    .report-item {
+      display: flex;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      align-items: flex-start;
+    }
+
+    .report-item.error { background: var(--red-lt);  color: #7B241C; }
+    .report-item.warn  { background: var(--warn-lt); color: var(--warn); }
+    .report-item.ok    { background: var(--green-lt); color: var(--green); }
+
+    .report-item-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .report-item-text { flex: 1; line-height: 1.4; }
+
+    /* ── Tree ───────────────────────────────────────────────────────── */
+    .tree { font-size: 13px; }
+
+    .tree-node {
+      margin: 1px 0;
+    }
+
+    .tree-node-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.1s;
+      user-select: none;
+    }
+
+    .tree-node-row:hover { background: var(--bg3); }
+
+    .tree-toggle {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text2);
+      flex-shrink: 0;
+    }
+
+    .tree-icon  { flex-shrink: 0; }
+    .tree-label { flex: 1; color: var(--text); }
+    .tree-count {
+      font-size: 11px;
+      color: var(--text2);
+      background: var(--bg3);
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .tree-children { padding-left: 20px; }
+    .tree-children.collapsed { display: none; }
+
+    /* Frame type badges */
+    .frame-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+    }
+
+    .badge-content    { background: #0C447C; color: #B5D4F4; }
+    .badge-assessment { background: #633806; color: #FAC775; }
+    .badge-branch     { background: #3C3489; color: #CECBF6; }
+
+    /* ── Stats strip ────────────────────────────────────────────────── */
+    .stats-strip {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .stat {
+      flex: 1;
+      padding: 14px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    .stat:last-child { border-right: none; }
+
+    .stat-num {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--amber);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Actions bar ────────────────────────────────────────────────── */
+    .actions-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Column guide ───────────────────────────────────────────────── */
+    .col-guide {
+      display: grid;
+      grid-template-columns: 40px 160px 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    .col-guide-header {
+      background: var(--navy);
+      color: var(--blue-lt);
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .col-guide div {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .col-guide div:nth-child(3n+1) { color: var(--amber); font-weight: 700; }
+    .col-guide div:nth-child(3n+2) { font-weight: 500; }
+    .col-guide div:nth-child(3n+3) { color: var(--text2); }
+    .col-guide div:last-child,
+    .col-guide div:nth-last-child(2),
+    .col-guide div:nth-last-child(3) { border-bottom: none; }
+
+    /* ── Hidden file input ──────────────────────────────────────────── */
+    #file-input { display: none; }
+
+    /* ── Footer ─────────────────────────────────────────────────────── */
+    .app-footer {
+      text-align: center;
+      padding: 32px;
+      color: var(--text2);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .app-header { padding: 12px 16px; }
+      .app-body   { padding: 16px 12px 60px; }
+      .steps      { grid-template-columns: 1fr 1fr; }
+      .stats-strip { flex-wrap: wrap; }
+      .stat       { min-width: 50%; border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <span class="logo-course">Course</span>
+  <span class="logo-slash">/</span>
+  <span class="logo-forge">Forge</span>
+  <span class="header-tag">ISD Structure Tool</span>
+</header>
+
+<!-- ── Body ────────────────────────────────────────────────────────────── -->
+<main class="app-body">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Build your course structure in <strong>Excel</strong>,<br>validate it here, export to CourseForge.</h1>
+    <p>For Instructional Systems Designers. Upload your planning spreadsheet to validate the hierarchy, preview the structure, and download a JSON file ready for courseware development.</p>
+  </div>
+
+  <!-- Step cards -->
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <h3>Download template</h3>
+      <p>Start from the pre-formatted Excel template with correct columns and an example row</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <h3>Build your structure</h3>
+      <p>Add courses, modules, lessons, and frames. One row per frame.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">3</div>
+      <h3>Upload &amp; validate</h3>
+      <p>Drop your file here to check for errors and preview the hierarchy tree</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">4</div>
+      <h3>Export JSON</h3>
+      <p>Download the validated JSON file and hand off to your courseware developer</p>
+    </div>
+  </div>
+
+  <!-- ── Section 1: Template download ─────────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">📋</span>
+      <span class="section-title">Excel Template</span>
+    </div>
+    <div class="section-body">
+      <p style="color:var(--text2); margin-bottom:16px;">
+        Download the official CourseForge structure template. Fill in one row per frame —
+        repeat Course, Module, and Lesson names to group your frames correctly.
+      </p>
+
+      <!-- Column guide -->
+      <div class="col-guide" style="margin-bottom:20px;">
+        <div class="col-guide-header">Col</div>
+        <div class="col-guide-header">Field</div>
+        <div class="col-guide-header">Notes</div>
+
+        <div>A</div><div>Project Name</div><div>Row 2 only — used as the top-level project title</div>
+        <div>B</div><div>Course Name</div><div>Required — repeat to group multiple modules under one course</div>
+        <div>C</div><div>Module Name</div><div>Required — repeat to group multiple lessons under one module</div>
+        <div>D</div><div>Lesson Name</div><div>Required — repeat to group multiple frames under one lesson</div>
+        <div>E</div><div>Frame Name</div><div>Required — unique name for each frame (one row per frame)</div>
+        <div>F</div><div>Frame Type</div><div>Optional — content (default) | assessment | branch</div>
+      </div>
+
+      <button class="btn btn-amber" onclick="downloadTemplate()">
+        ⬇ Download Excel Template
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Section 2: Upload ─────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">⬆</span>
+      <span class="section-title">Upload Your Structure File</span>
+    </div>
+    <div class="section-body">
+      <div
+        class="drop-zone"
+        id="drop-zone"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave(event)"
+        ondrop="handleDrop(event)"
+      >
+        <div class="drop-zone-icon">📂</div>
+        <h3>Drop your Excel file here</h3>
+        <p>or click to browse — .xlsx and .xls accepted</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+    </div>
+  </div>
+
+  <!-- ── Section 3: Results (hidden until file loaded) ─────────────────── -->
+  <div id="results" style="display:none;">
+
+    <!-- Validation report -->
+    <div class="section" id="validation-section">
+      <div class="section-header">
+        <span class="section-icon">✅</span>
+        <span class="section-title">Validation Report</span>
+      </div>
+      <div class="section-body">
+        <div class="report-summary" id="report-summary"></div>
+        <ul class="report-list" id="report-list"></ul>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-strip" id="stats-strip">
+      <div class="stat"><div class="stat-num" id="stat-courses">0</div><div class="stat-label">Courses</div></div>
+      <div class="stat"><div class="stat-num" id="stat-modules">0</div><div class="stat-label">Modules</div></div>
+      <div class="stat"><div class="stat-num" id="stat-lessons">0</div><div class="stat-label">Lessons</div></div>
+      <div class="stat"><div class="stat-num" id="stat-frames">0</div><div class="stat-label">Frames</div></div>
+    </div>
+
+    <!-- Hierarchy preview -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">🌲</span>
+        <span class="section-title">Hierarchy Preview</span>
+        <span style="margin-left:auto; font-size:12px; color:var(--text2);">Click nodes to expand/collapse</span>
+      </div>
+      <div class="section-body">
+        <div class="tree" id="tree-root"></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-bar">
+      <button class="btn btn-green" id="download-json-btn" onclick="downloadJSON()" disabled>
+        ⬇ Download JSON for CourseForge
+      </button>
+      <button class="btn btn-outline" onclick="resetTool()">
+        ↺ Upload a different file
+      </button>
+    </div>
+
+  </div>
+
+</main>
+
+<footer class="app-footer">
+  CourseForge ISD Structure Tool &nbsp;·&nbsp; Structure-only export &nbsp;·&nbsp;
+  Frame content is authored separately in CourseForge
+</footer>
+
+<!-- ── JavaScript ───────────────────────────────────────────────────────── -->
+<script>
+
+// ─── State ────────────────────────────────────────────────────────────────
+let parsedData   = null
+let hasErrors    = false
+
+// ─── Drag and drop ────────────────────────────────────────────────────────
+function handleDragOver(e) {
+  e.preventDefault()
+  document.getElementById('drop-zone').classList.add('drag-over')
+}
+
+function handleDragLeave(e) {
+  document.getElementById('drop-zone').classList.remove('drag-over')
+}
+
+function handleDrop(e) {
+  e.preventDefault()
+  document.getElementById('drop-zone').classList.remove('drag-over')
+  const file = e.dataTransfer.files[0]
+  if (file) processFile(file)
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0]
+  if (file) processFile(file)
+}
+
+// ─── Parse Excel ──────────────────────────────────────────────────────────
+function processFile(file) {
+  const reader = new FileReader()
+  reader.onload = function(e) {
+    try {
+      const data  = new Uint8Array(e.target.result)
+      const wb    = XLSX.read(data, { type: 'array' })
+      const ws    = wb.Sheets[wb.SheetNames[0]]
+      const rows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+      handleParsed(rows, file.name)
+    } catch(err) {
+      showFatalError('Could not read file: ' + err.message)
+    }
+  }
+  reader.readAsArrayBuffer(file)
+}
+
+function cell(row, idx) {
+  const val = row[idx]
+  return (val !== undefined && val !== null) ? String(val).trim() : ''
+}
+
+function handleParsed(rows, filename) {
+  // Skip header row (row index 0)
+  const dataRows = rows.slice(1).filter(r => r.some(c => c !== ''))
+
+  const errors   = []
+  const warnings = []
+
+  // ── Project name ──
+  const projectName = cell(dataRows[0] || [], 0)
+  if (!projectName) {
+    errors.push({ msg: 'Cell A2 (Project Name) is empty. The project must have a name.', row: 2 })
+  }
+
+  // ── Parse hierarchy ──
+  const hierarchy = {}       // course → module → lesson → [frames]
+  const frameCounts = { content: 0, assessment: 0, branch: 0 }
+  const VALID_TYPES = ['content', 'assessment', 'branch', '']
+
+  let lastCourse = '', lastModule = '', lastLesson = ''
+
+  dataRows.forEach((row, i) => {
+    const rowNum     = i + 2   // 1-based, +1 for header
+    const courseName = cell(row, 1) || lastCourse
+    const moduleName = cell(row, 2) || lastModule
+    const lessonName = cell(row, 3) || lastLesson
+    const frameName  = cell(row, 4)
+    const frameType  = cell(row, 5).toLowerCase() || 'content'
+
+    // Track last seen values for repeat-down pattern
+    if (cell(row, 1)) lastCourse = cell(row, 1)
+    if (cell(row, 2)) lastModule = cell(row, 2)
+    if (cell(row, 3)) lastLesson = cell(row, 3)
+
+    // Skip if no frame name
+    if (!frameName) {
+      if (row.some(c => c !== '')) {
+        warnings.push({ msg: `Row ${rowNum}: has data but no Frame Name (col E) — row skipped.`, row: rowNum })
+      }
+      return
+    }
+
+    // Validate required hierarchy fields
+    if (!courseName) {
+      errors.push({ msg: `Row ${rowNum} (${frameName}): Course Name (col B) is missing.`, row: rowNum })
+      return
+    }
+    if (!moduleName) {
+      errors.push({ msg: `Row ${rowNum} (${frameName}): Module Name (col C) is missing.`, row: rowNum })
+      return
+    }
+    if (!lessonName) {
+      errors.push({ msg: `Row ${rowNum} (${frameName}): Lesson Name (col D) is missing.`, row: rowNum })
+      return
+    }
+
+    // Validate frame type
+    if (!VALID_TYPES.includes(frameType)) {
+      errors.push({
+        msg: `Row ${rowNum} (${frameName}): Frame Type "${frameType}" is invalid. Use: content, assessment, or branch.`,
+        row: rowNum
+      })
+      return
+    }
+
+    // Build hierarchy
+    if (!hierarchy[courseName]) hierarchy[courseName] = {}
+    if (!hierarchy[courseName][moduleName]) hierarchy[courseName][moduleName] = {}
+    if (!hierarchy[courseName][moduleName][lessonName]) hierarchy[courseName][moduleName][lessonName] = []
+
+    const resolvedType = frameType || 'content'
+    hierarchy[courseName][moduleName][lessonName].push({
+      frame_name: frameName,
+      frame_type: resolvedType,
+    })
+    frameCounts[resolvedType] = (frameCounts[resolvedType] || 0) + 1
+  })
+
+  // ── Structural warnings ──
+  const courseCount = Object.keys(hierarchy).length
+  const moduleCount = Object.values(hierarchy).reduce((a, m) => a + Object.keys(m).length, 0)
+  const lessonCount = Object.values(hierarchy).reduce((a, m) =>
+    a + Object.values(m).reduce((b, l) => b + Object.keys(l).length, 0), 0)
+  const frameCount  = Object.values(hierarchy).reduce((a, m) =>
+    a + Object.values(m).reduce((b, l) =>
+      b + Object.values(l).reduce((c, f) => c + f.length, 0), 0), 0)
+
+  if (courseCount === 0) errors.push({ msg: 'No valid courses found. Check that col B has course names.' })
+  if (frameCount  === 0) errors.push({ msg: 'No valid frames found. Check that col E has frame names.' })
+  if (frameCount > 500) warnings.push({ msg: `Large project: ${frameCount} frames detected. Consider splitting into multiple imports.` })
+
+  // ── Build output JSON ──
+  const courses = Object.entries(hierarchy).map(([cName, modules]) => ({
+    course_name: cName,
+    modules: Object.entries(modules).map(([mName, lessons]) => ({
+      module_name: mName,
+      lessons: Object.entries(lessons).map(([lName, frames]) => ({
+        lesson_name: lName,
+        frames: frames.map(f => ({
+          frame_name:       f.frame_name,
+          frame_type:       f.frame_type,
+          narration:        null,
+          media:            [],
+          knowledge_check:  null,
+          branch:           null,
+        }))
+      }))
+    }))
+  }))
+
+  parsedData = {
+    schema_version:      '1.0',
+    project_name:        projectName || 'Untitled Project',
+    project_description: '',
+    courses,
+    _meta: {
+      source_file:   filename,
+      generated_at:  new Date().toISOString(),
+      tool:          'CourseForge ISD Structure Tool',
+      total_courses: courseCount,
+      total_modules: moduleCount,
+      total_lessons: lessonCount,
+      total_frames:  frameCount,
+    }
+  }
+
+  hasErrors = errors.length > 0
+
+  // ── Render results ──
+  renderValidation(errors, warnings, frameCount)
+  renderStats(courseCount, moduleCount, lessonCount, frameCount)
+  renderTree(parsedData)
+
+  document.getElementById('results').style.display = 'block'
+  document.getElementById('download-json-btn').disabled = hasErrors
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// ─── Render validation ────────────────────────────────────────────────────
+function renderValidation(errors, warnings, frameCount) {
+  const summary = document.getElementById('report-summary')
+  const list    = document.getElementById('report-list')
+
+  summary.innerHTML = ''
+  list.innerHTML    = ''
+
+  if (errors.length === 0 && warnings.length === 0) {
+    summary.innerHTML = `<span class="report-badge badge-ok">✓ ${frameCount} frames validated — no issues found</span>`
+    list.innerHTML = `<li class="report-item ok"><span class="report-item-icon">✓</span><span class="report-item-text">Structure is valid and ready for CourseForge import.</span></li>`
+    return
+  }
+
+  if (errors.length > 0)   summary.innerHTML += `<span class="report-badge badge-error">✕ ${errors.length} error${errors.length > 1 ? 's' : ''}</span>`
+  if (warnings.length > 0) summary.innerHTML += `<span class="report-badge badge-warn">⚠ ${warnings.length} warning${warnings.length > 1 ? 's' : ''}</span>`
+  if (errors.length === 0) summary.innerHTML += `<span class="report-badge badge-ok">✓ Ready to export</span>`
+
+  errors.forEach(e => {
+    list.innerHTML += `<li class="report-item error"><span class="report-item-icon">✕</span><span class="report-item-text">${e.msg}</span></li>`
+  })
+  warnings.forEach(w => {
+    list.innerHTML += `<li class="report-item warn"><span class="report-item-icon">⚠</span><span class="report-item-text">${w.msg}</span></li>`
+  })
+}
+
+// ─── Render stats ─────────────────────────────────────────────────────────
+function renderStats(courses, modules, lessons, frames) {
+  document.getElementById('stat-courses').textContent = courses
+  document.getElementById('stat-modules').textContent = modules
+  document.getElementById('stat-lessons').textContent = lessons
+  document.getElementById('stat-frames').textContent  = frames
+}
+
+// ─── Render tree ──────────────────────────────────────────────────────────
+function renderTree(data) {
+  const root = document.getElementById('tree-root')
+  root.innerHTML = ''
+
+  const projectNode = makeNode({
+    icon: '📁', label: data.project_name,
+    count: `${data.courses.length} course${data.courses.length !== 1 ? 's' : ''}`,
+    open: true,
+    children: data.courses.map(course => makeNode({
+      icon: '📚', label: course.course_name,
+      count: `${course.modules.length} module${course.modules.length !== 1 ? 's' : ''}`,
+      open: true,
+      children: course.modules.map(mod => makeNode({
+        icon: '📂', label: mod.module_name,
+        count: `${mod.lessons.length} lesson${mod.lessons.length !== 1 ? 's' : ''}`,
+        open: false,
+        children: mod.lessons.map(lesson => makeNode({
+          icon: '📄', label: lesson.lesson_name,
+          count: `${lesson.frames.length} frame${lesson.frames.length !== 1 ? 's' : ''}`,
+          open: false,
+          children: lesson.frames.map(frame => makeNode({
+            icon: '🎞',
+            label: frame.frame_name,
+            badge: frame.frame_type,
+            open: false,
+            children: []
+          }))
+        }))
+      }))
+    }))
+  })
+
+  root.appendChild(projectNode)
+}
+
+function makeNode({ icon, label, count, badge, open, children }) {
+  const hasChildren = children && children.length > 0
+
+  const node = document.createElement('div')
+  node.className = 'tree-node'
+
+  const row = document.createElement('div')
+  row.className = 'tree-node-row'
+
+  const toggle = document.createElement('span')
+  toggle.className = 'tree-toggle'
+  toggle.textContent = hasChildren ? (open ? '▾' : '▸') : ''
+
+  const iconEl = document.createElement('span')
+  iconEl.className = 'tree-icon'
+  iconEl.textContent = icon
+
+  const labelEl = document.createElement('span')
+  labelEl.className = 'tree-label'
+  labelEl.textContent = label
+
+  row.appendChild(toggle)
+  row.appendChild(iconEl)
+  row.appendChild(labelEl)
+
+  if (badge) {
+    const badgeEl = document.createElement('span')
+    badgeEl.className = `frame-badge badge-${badge}`
+    badgeEl.textContent = badge
+    row.appendChild(badgeEl)
+  }
+
+  if (count) {
+    const countEl = document.createElement('span')
+    countEl.className = 'tree-count'
+    countEl.textContent = count
+    row.appendChild(countEl)
+  }
+
+  node.appendChild(row)
+
+  if (hasChildren) {
+    const childContainer = document.createElement('div')
+    childContainer.className = `tree-children ${open ? '' : 'collapsed'}`
+    children.forEach(c => childContainer.appendChild(c))
+    node.appendChild(childContainer)
+
+    row.addEventListener('click', () => {
+      const isOpen = !childContainer.classList.contains('collapsed')
+      childContainer.classList.toggle('collapsed', isOpen)
+      toggle.textContent = isOpen ? '▸' : '▾'
+    })
+  }
+
+  return node
+}
+
+// ─── Download JSON ────────────────────────────────────────────────────────
+function downloadJSON() {
+  if (!parsedData || hasErrors) return
+
+  const output = { ...parsedData }
+  delete output._meta   // strip internal meta before export
+
+  const blob     = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' })
+  const url      = URL.createObjectURL(blob)
+  const filename = (parsedData.project_name || 'courseforge_structure')
+    .replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_structure.json'
+
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Download Excel template ──────────────────────────────────────────────
+function downloadTemplate() {
+  const wb = XLSX.utils.book_new()
+
+  // ── Structure sheet ──
+  const structureData = [
+    ['Project Name', 'Course Name', 'Module Name', 'Lesson Name', 'Frame Name', 'Frame Type'],
+    ['My Training Project', 'Course One', 'Module A', 'Lesson 1', 'Welcome', 'content'],
+    ['', 'Course One', 'Module A', 'Lesson 1', 'Overview', 'content'],
+    ['', 'Course One', 'Module A', 'Lesson 1', 'Knowledge Check', 'assessment'],
+    ['', 'Course One', 'Module A', 'Lesson 2', 'Introduction', 'content'],
+    ['', 'Course One', 'Module A', 'Lesson 2', 'Core Concept', 'content'],
+    ['', 'Course One', 'Module B', 'Lesson 3', 'Decision Point', 'branch'],
+    ['', 'Course Two', 'Module C', 'Lesson 4', 'Getting Started', 'content'],
+  ]
+
+  const ws = XLSX.utils.aoa_to_sheet(structureData)
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 28 }, { wch: 14 }
+  ]
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Structure')
+
+  // ── Instructions sheet ──
+  const instructionsData = [
+    ['CourseForge ISD Structure Tool — Column Reference'],
+    [''],
+    ['Column', 'Field', 'Required', 'Notes'],
+    ['A', 'Project Name', 'Row 2 only', 'Enter once in row 2. This becomes the top-level project name in CourseForge.'],
+    ['B', 'Course Name', 'Yes', 'Repeat this value for every row that belongs to the same course.'],
+    ['C', 'Module Name', 'Yes', 'Repeat this value for every row that belongs to the same module.'],
+    ['D', 'Lesson Name', 'Yes', 'Repeat this value for every row that belongs to the same lesson.'],
+    ['E', 'Frame Name', 'Yes', 'Each row is one frame. Give each frame a unique, descriptive name.'],
+    ['F', 'Frame Type', 'No', 'Leave blank for standard content. Use: assessment (for knowledge checks) or branch (for decision points).'],
+    [''],
+    ['Rules'],
+    ['1', 'One row per frame'],
+    ['2', 'Repeat Course, Module, and Lesson names down the column to group frames (or leave blank — the tool carries forward the last value)'],
+    ['3', 'Frame names should be unique within a lesson'],
+    ['4', 'Frame Type defaults to "content" if left blank'],
+    ['5', 'This tool covers STRUCTURE ONLY. Narration, media, and knowledge check content is added in CourseForge.'],
+    [''],
+    ['Frame Types'],
+    ['content', 'Standard instructional frame — text, media, narration'],
+    ['assessment', 'Knowledge check frame — quiz question with feedback'],
+    ['branch', 'Decision point frame — learner chooses a path'],
+  ]
+
+  const wsInstr = XLSX.utils.aoa_to_sheet(instructionsData)
+  wsInstr['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 80 }]
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instructions')
+
+  XLSX.writeFile(wb, 'CourseForge_ISD_Structure_Template.xlsx')
+}
+
+// ─── Fatal error ──────────────────────────────────────────────────────────
+function showFatalError(msg) {
+  document.getElementById('results').style.display = 'block'
+  document.getElementById('report-summary').innerHTML =
+    `<span class="report-badge badge-error">✕ File error</span>`
+  document.getElementById('report-list').innerHTML =
+    `<li class="report-item error"><span class="report-item-icon">✕</span><span class="report-item-text">${msg}</span></li>`
+  document.getElementById('tree-root').innerHTML = ''
+  document.getElementById('download-json-btn').disabled = true
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────
+function resetTool() {
+  parsedData = null
+  hasErrors  = false
+  document.getElementById('results').style.display = 'none'
+  document.getElementById('file-input').value = ''
+  document.getElementById('report-summary').innerHTML = ''
+  document.getElementById('report-list').innerHTML    = ''
+  document.getElementById('tree-root').innerHTML      = ''
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+</script>
+</body>
+</html>
