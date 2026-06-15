@@ -4,9 +4,9 @@ import useEditorStore from '../../store/editorStore'
 const BLOCK_TYPES = [
   { type: 'text',    label: 'Text',    icon: '¶',  color: '#185FA5', available: true  },
   { type: 'media',   label: 'Media',   icon: '🖼',  color: '#3B6D11', available: true  },
-  { type: 'quiz',    label: 'Quiz',    icon: '?',   color: '#854F0B', available: false },
-  { type: 'hotspot', label: 'Hotspot', icon: '⊕',  color: '#533AB7', available: false },
-  { type: 'branch',  label: 'Branch',  icon: '⋔',  color: '#3C3489', available: false },
+  { type: 'quiz',    label: 'Quiz',    icon: '?',   color: '#854F0B', available: true  },
+  { type: 'hotspot', label: 'Hotspot', icon: '⊕',  color: '#533AB7', available: true  },
+  { type: 'branch',  label: 'Branch',  icon: '⋔',  color: '#3C3489', available: true  },
   { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: false },
 ]
 

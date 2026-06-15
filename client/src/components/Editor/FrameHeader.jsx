@@ -8,7 +8,7 @@ const FRAME_TYPE_COLOR = {
   branch:     { bg: '#3C3489', text: '#CECBF6' },
 }
 
-export default function FrameHeader() {
+export default function FrameHeader({ onPreview }) {
   const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName } = useEditorStore()
   const activeProject = useProjectStore(s => s.activeProject)
 
@@ -74,6 +74,24 @@ export default function FrameHeader() {
       }}>
         {savedLabel}
       </span>
+
+      {/* Preview button */}
+      <button
+        onClick={onPreview}
+        style={{
+          padding: '6px 14px',
+          background: 'transparent',
+          color: 'var(--color-text-secondary)',
+          border: '1px solid var(--color-border-secondary)',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer',
+          flexShrink: 0,
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        ▶ Preview
+      </button>
 
       {/* Manual save button */}
       <button
