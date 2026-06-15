@@ -42,8 +42,10 @@
       --border:   #2a2a4a;
       --text:     #e0e0f0;
       --text2:    #8888aa;
+      --text3:    #5a5a72;
       --radius:   6px;
       --font:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono:     'SF Mono', 'JetBrains Mono', Consolas, monospace;
     }
 
     /* ── Viewing modes — dark is the :root default above ── */
@@ -54,6 +56,7 @@
       --border: #C8D4DC;
       --text:   #0E2030;
       --text2:  #4A6480;
+      --text3:  #6A8AA8;
     }
     html[data-mode="hc"] {
       --navy:    #000000;
@@ -65,7 +68,29 @@
       --border:  #FFFFFF;
       --text:    #FFFFFF;
       --text2:   #DDDDDD;
+      --text3:   #AAAAAA;
     }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      background: var(--navy);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 24px;
+      gap: 0;
+    }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: transparent;
+      color: var(--text2); font-family: var(--font); font-size: 13px;
+      cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color 0.15s, border-color 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .tab-btn:hover { color: var(--blue-lt); }
+    .tab-btn.active {
+      color: var(--amber); border-bottom-color: var(--amber); font-weight: 500;
+    }
+    .tab-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 
     /* ── 508: visible focus on every interactive element ── */
     a:focus-visible, button:focus-visible, input:focus-visible,
@@ -594,7 +619,14 @@
 
 </header>
 
+<!-- ── Tab bar ──────────────────────────────────────────────────────────── -->
+<div class="tab-bar" role="tablist" aria-label="ForgeBlueprint sections">
+  <button class="tab-btn active" id="tab-structure" role="tab" aria-selected="true" aria-controls="panel-structure" onclick="switchTab('structure')">📐 Structure</button>
+  <button class="tab-btn" id="tab-frame" role="tab" aria-selected="false" aria-controls="panel-frame" onclick="switchTab('frame')">🎞 Frame Content</button>
+</div>
+
 <!-- ── Body ────────────────────────────────────────────────────────────── -->
+<div id="panel-structure" role="tabpanel" aria-labelledby="tab-structure">
 <main class="app-body" id="main">
 
   <!-- Hero -->
@@ -730,6 +762,187 @@
   </div>
 
 </main>
+</div><!-- /panel-structure -->
+
+<div id="panel-frame" role="tabpanel" aria-labelledby="tab-frame" style="display:none">
+  <div class="app-body">
+
+    <!-- No structure loaded state -->
+    <div id="frame-no-structure" style="text-align:center;padding:60px 20px">
+      <div style="font-size:32px;margin-bottom:12px">📐</div>
+      <p style="color:var(--text2);font-size:14px;margin-bottom:16px">
+        Import or build your course structure first in the Structure tab.
+      </p>
+      <button class="btn btn-outline" onclick="switchTab('structure')">
+        → Go to Structure tab
+      </button>
+    </div>
+
+    <!-- Frame editor -->
+    <div id="frame-editor-wrap" style="display:none">
+
+      <!-- Frame selector -->
+      <div class="section" style="margin-bottom:16px">
+        <div class="section-header">
+          <span class="section-icon">🎞</span>
+          <span class="section-title">Select Frame</span>
+          <span id="frame-counter" style="margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--mono)"></span>
+        </div>
+        <div class="section-body" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="frame-selector" onchange="loadFrameForEdit()" aria-label="Select frame to edit"
+            style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font)">
+            <option value="">— select a frame —</option>
+          </select>
+          <button class="btn btn-outline" onclick="prevFrame()" aria-label="Previous frame" id="btn-prev-frame">← Prev</button>
+          <button class="btn btn-outline" onclick="nextFrame()" aria-label="Next frame"     id="btn-next-frame">Next →</button>
+        </div>
+      </div>
+
+      <!-- Frame content form -->
+      <div id="frame-form" style="display:none">
+
+        <!-- Frame header info -->
+        <div style="padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;display:flex;gap:12px;align-items:center">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500;color:var(--text)" id="ff-name"></div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px" id="ff-breadcrumb"></div>
+          </div>
+          <span id="ff-type-badge" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em"></span>
+        </div>
+
+        <!-- Narration -->
+        <div class="section" style="margin-bottom:12px">
+          <div class="section-header">
+            <span class="section-icon">🎙</span>
+            <span class="section-title">Narration Script</span>
+          </div>
+          <div class="section-body">
+            <textarea id="ff-narration" rows="4"
+              placeholder="Enter the narrator script for this frame. This is what the learner hears (or reads if audio is unavailable)."
+              aria-label="Narration script"
+              style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-family:var(--font);resize:vertical;line-height:1.6"
+              oninput="autoSaveFrame()"></textarea>
+          </div>
+        </div>
+
+        <!-- Media placeholders -->
+        <div class="section" style="margin-bottom:12px" id="ff-media-section">
+          <div class="section-header">
+            <span class="section-icon">🖼</span>
+            <span class="section-title">Media Placeholders</span>
+            <button onclick="addMediaPlaceholder()" class="btn btn-outline" style="margin-left:auto;font-size:11px;padding:4px 10px">+ Add</button>
+          </div>
+          <div class="section-body">
+            <div id="ff-media-list"></div>
+            <p style="font-size:11px;color:var(--text3);margin-top:8px">
+              Describe the media needed at this point. Courseware developers will upload actual files in CourseForge.
+            </p>
+          </div>
+        </div>
+
+        <!-- WCN blocks -->
+        <div class="section" style="margin-bottom:12px">
+          <div class="section-header">
+            <span class="section-icon">⚠</span>
+            <span class="section-title">Warnings / Cautions / Notes</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button onclick="addWCN('warning')" class="btn" style="background:#C0392B;color:#fff;font-size:10px;padding:3px 8px">+ WARNING</button>
+              <button onclick="addWCN('caution')" class="btn" style="background:#B87A1A;color:#fff;font-size:10px;padding:3px 8px">+ CAUTION</button>
+              <button onclick="addWCN('note')"    class="btn" style="background:#185FA5;color:#fff;font-size:10px;padding:3px 8px">+ NOTE</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div id="ff-wcn-list"></div>
+          </div>
+        </div>
+
+        <!-- Knowledge Check (assessment frames only) -->
+        <div class="section" style="margin-bottom:12px" id="ff-kc-section">
+          <div class="section-header">
+            <span class="section-icon">?</span>
+            <span class="section-title">Knowledge Check</span>
+          </div>
+          <div class="section-body">
+            <div style="margin-bottom:12px">
+              <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Question</label>
+              <textarea id="ff-kc-question" rows="2" placeholder="Enter the question…" aria-label="Knowledge check question"
+                style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font);resize:vertical"
+                oninput="autoSaveFrame()"></textarea>
+            </div>
+            <div style="margin-bottom:12px">
+              <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Choices (mark correct with ✓)</label>
+              <div id="ff-kc-choices"></div>
+              <button onclick="addKCChoice()" class="btn btn-outline" style="font-size:11px;padding:4px 10px;margin-top:6px">+ Add choice</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Correct feedback</label>
+                <textarea id="ff-kc-correct" rows="2" placeholder="Great job! That's correct." aria-label="Correct feedback"
+                  style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font);resize:vertical"
+                  oninput="autoSaveFrame()"></textarea>
+              </div>
+              <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Incorrect feedback</label>
+                <textarea id="ff-kc-incorrect" rows="2" placeholder="Not quite — review the material." aria-label="Incorrect feedback"
+                  style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font);resize:vertical"
+                  oninput="autoSaveFrame()"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Branch (branch frames only) -->
+        <div class="section" style="margin-bottom:12px" id="ff-branch-section">
+          <div class="section-header">
+            <span class="section-icon">⋔</span>
+            <span class="section-title">Branch Decision</span>
+          </div>
+          <div class="section-body">
+            <div style="margin-bottom:10px">
+              <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Decision prompt</label>
+              <textarea id="ff-branch-condition" rows="2" placeholder="e.g. Does the learner need remediation?" aria-label="Branch decision prompt"
+                style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font);resize:vertical"
+                oninput="autoSaveFrame()"></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#3B8A4A;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">✓ True path label</label>
+                <input id="ff-branch-true" type="text" value="Yes" aria-label="True path button label"
+                  style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font)"
+                  oninput="autoSaveFrame()">
+              </div>
+              <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#C0392B;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">✕ False path label</label>
+                <input id="ff-false" type="text" value="No" aria-label="False path button label"
+                  style="width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:13px;font-family:var(--font)"
+                  oninput="autoSaveFrame()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completion status -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);margin-top:4px">
+          <input type="checkbox" id="ff-complete" onchange="autoSaveFrame()">
+          <label for="ff-complete" style="font-size:12px;color:var(--text2)">
+            Mark this frame content as complete
+          </label>
+          <span id="ff-autosave-label" style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)"></span>
+        </div>
+
+      </div><!-- end frame-form -->
+
+      <!-- Export enriched JSON -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="resetTool()">↺ Start over</button>
+        <button class="btn btn-amber" onclick="downloadEnrichedJSON()" id="btn-export-enriched">
+          ⬇ Export Enriched JSON
+        </button>
+      </div>
+
+    </div><!-- end frame-editor-wrap -->
+  </div>
+</div>
 
 <footer class="app-footer">
   CourseForge ISD Structure Tool &nbsp;·&nbsp; Structure-only export &nbsp;·&nbsp;
@@ -1156,14 +1369,366 @@ function showFatalError(msg) {
 }
 
 // ─── Reset ────────────────────────────────────────────────────────────────
+// ═══ Frame Content tab ══════════════════════════════════════════
+function switchTab(name) {
+  // Save unsaved frame edits before leaving the Frame tab
+  try {
+    var ff = document.getElementById('frame-form')
+    if (ff && ff.style.display !== 'none' && flatFrameList.length) saveCurrentFrame()
+  } catch (e) {}
+
+  document.getElementById('panel-structure').style.display = 'none'
+  document.getElementById('panel-frame').style.display     = 'none'
+
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.classList.remove('active')
+    btn.setAttribute('aria-selected', 'false')
+  })
+
+  document.getElementById('panel-' + name).style.display = 'block'
+  var activeBtn = document.getElementById('tab-' + name)
+  activeBtn.classList.add('active')
+  activeBtn.setAttribute('aria-selected', 'true')
+
+  if (name === 'frame' && (!parsedData || !parsedData.courses)) {
+    document.getElementById('frame-no-structure').style.display = 'block'
+    document.getElementById('frame-editor-wrap').style.display  = 'none'
+  } else if (name === 'frame') {
+    document.getElementById('frame-no-structure').style.display = 'none'
+    document.getElementById('frame-editor-wrap').style.display  = 'block'
+    populateFrameSelector()
+  }
+}
+
+// frameContent[flatIndex] = { narration, media[], wcn[], kc{}, branch{}, complete }
+var frameContent    = {}
+var flatFrameList   = []
+var currentFrameIdx = 0
+
+function buildFlatFrameList() {
+  flatFrameList = []
+  if (!parsedData || !parsedData.courses) return
+  parsedData.courses.forEach(function(course) {
+    ;(course.modules || []).forEach(function(mod) {
+      ;(mod.lessons || []).forEach(function(lesson) {
+        ;(lesson.frames || []).forEach(function(frame) {
+          flatFrameList.push({
+            path:  course.course_name + ' › ' + mod.module_name + ' › ' + lesson.lesson_name,
+            frame: frame,
+          })
+          var idx = flatFrameList.length - 1
+          if (!frameContent[idx]) {
+            frameContent[idx] = {
+              narration: frame.narration || '',
+              media:     frame.media     || [],
+              wcn:       frame.wcn       || [],
+              kc:        frame.knowledge_check || null,
+              branch:    frame.branch    || null,
+              complete:  false,
+            }
+          }
+        })
+      })
+    })
+  })
+}
+
+function populateFrameSelector() {
+  buildFlatFrameList()
+  var sel = document.getElementById('frame-selector')
+  sel.innerHTML = '<option value="">— select a frame —</option>'
+  flatFrameList.forEach(function(item, idx) {
+    var opt = document.createElement('option')
+    opt.value = idx
+    var complete = frameContent[idx] && frameContent[idx].complete ? ' ✓' : ''
+    opt.textContent = (idx+1) + '. ' + item.frame.frame_name + ' [' + item.frame.frame_type + ']' + complete
+    sel.appendChild(opt)
+  })
+  document.getElementById('frame-counter').textContent = flatFrameList.length + ' frames total'
+  if (flatFrameList.length > 0) {
+    sel.value = 0
+    loadFrameForEdit()
+  }
+}
+
+function loadFrameForEdit() {
+  var sel = document.getElementById('frame-selector')
+  var idx = parseInt(sel.value)
+  if (isNaN(idx)) { document.getElementById('frame-form').style.display = 'none'; return }
+  // Flush any edits from the currently-open frame before switching away,
+  // so fast navigation (before the debounced autosave) never loses content.
+  clearTimeout(autoSaveTimer)
+  if (document.getElementById('frame-form').style.display !== 'none' && flatFrameList[currentFrameIdx]) {
+    saveCurrentFrame()
+  }
+  currentFrameIdx = idx
+  var item = flatFrameList[idx]
+  var content = frameContent[idx] || {}
+  var frame   = item.frame
+
+  document.getElementById('ff-name').textContent       = frame.frame_name
+  document.getElementById('ff-breadcrumb').textContent = item.path
+
+  var badge = document.getElementById('ff-type-badge')
+  var typeStyles = {
+    content:    { bg:'#0C3668', color:'#90C0F0' },
+    assessment: { bg:'#4A2800', color:'#F0B84A' },
+    branch:     { bg:'#2A1F60', color:'#C8C0FF' },
+  }
+  var ts = typeStyles[frame.frame_type] || typeStyles.content
+  badge.textContent      = frame.frame_type
+  badge.style.background = ts.bg
+  badge.style.color      = ts.color
+
+  document.getElementById('ff-narration').value = content.narration || ''
+  renderMediaList(content.media || [])
+  renderWCNList(content.wcn || [])
+
+  var kcSection = document.getElementById('ff-kc-section')
+  kcSection.style.display = frame.frame_type === 'assessment' ? 'block' : 'none'
+  if (frame.frame_type === 'assessment' && content.kc) {
+    document.getElementById('ff-kc-question').value  = content.kc.question || ''
+    document.getElementById('ff-kc-correct').value   = content.kc.feedback_correct   || ''
+    document.getElementById('ff-kc-incorrect').value = content.kc.feedback_incorrect || ''
+    renderKCChoices(content.kc.choices || [], content.kc.correct_index || 0)
+  } else if (frame.frame_type === 'assessment') {
+    document.getElementById('ff-kc-question').value  = ''
+    document.getElementById('ff-kc-correct').value   = ''
+    document.getElementById('ff-kc-incorrect').value = ''
+    renderKCChoices([], 0)
+  }
+
+  var branchSection = document.getElementById('ff-branch-section')
+  branchSection.style.display = frame.frame_type === 'branch' ? 'block' : 'none'
+  if (frame.frame_type === 'branch' && content.branch) {
+    document.getElementById('ff-branch-condition').value = content.branch.condition   || ''
+    document.getElementById('ff-branch-true').value      = content.branch.true_label  || 'Yes'
+    document.getElementById('ff-false').value            = content.branch.false_label || 'No'
+  }
+
+  document.getElementById('ff-complete').checked = content.complete || false
+  document.getElementById('frame-form').style.display = 'block'
+
+  document.getElementById('btn-prev-frame').disabled = idx === 0
+  document.getElementById('btn-next-frame').disabled = idx === flatFrameList.length - 1
+}
+
+function prevFrame() {
+  if (currentFrameIdx > 0) { document.getElementById('frame-selector').value = currentFrameIdx - 1; loadFrameForEdit() }
+}
+function nextFrame() {
+  if (currentFrameIdx < flatFrameList.length - 1) { document.getElementById('frame-selector').value = currentFrameIdx + 1; loadFrameForEdit() }
+}
+
+var autoSaveTimer = null
+function autoSaveFrame() {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(function() {
+    saveCurrentFrame()
+    document.getElementById('ff-autosave-label').textContent = 'saved ✓'
+    setTimeout(function() { document.getElementById('ff-autosave-label').textContent = '' }, 1500)
+  }, 800)
+}
+
+function saveCurrentFrame() {
+  var idx = currentFrameIdx
+  var content = frameContent[idx] || {}
+  var frame = flatFrameList[idx] && flatFrameList[idx].frame
+  content.narration = document.getElementById('ff-narration').value
+  content.complete  = document.getElementById('ff-complete').checked
+  if (frame && frame.frame_type === 'assessment') {
+    content.kc = {
+      question:           document.getElementById('ff-kc-question').value,
+      choices:            getKCChoices().choices,
+      correct_index:      getKCChoices().correctIndex,
+      feedback_correct:   document.getElementById('ff-kc-correct').value,
+      feedback_incorrect: document.getElementById('ff-kc-incorrect').value,
+    }
+  }
+  if (frame && frame.frame_type === 'branch') {
+    content.branch = {
+      condition:   document.getElementById('ff-branch-condition').value,
+      true_label:  document.getElementById('ff-branch-true').value,
+      false_label: document.getElementById('ff-false').value,
+    }
+  }
+  frameContent[idx] = content
+}
+
+function renderMediaList(media) {
+  var list = document.getElementById('ff-media-list')
+  list.innerHTML = ''
+  if (media.length === 0) { list.innerHTML = '<p style="font-size:12px;color:var(--text3)">No media placeholders yet.</p>'; return }
+  media.forEach(function(m, i) {
+    var row = document.createElement('div')
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center'
+    row.innerHTML = `
+      <select onchange="updateMedia(${i},'kind',this.value)"
+        style="background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:var(--font);flex-shrink:0">
+        <option value="image" ${m.kind==='image'?'selected':''}>🖼 Image</option>
+        <option value="video" ${m.kind==='video'?'selected':''}>🎬 Video</option>
+        <option value="audio" ${m.kind==='audio'?'selected':''}>🎙 Audio</option>
+        <option value="oam"   ${m.kind==='oam'  ?'selected':''}>⚙ OAM</option>
+      </select>
+      <input type="text" value="${m.placeholder_label||''}" placeholder="Label e.g. nose_section_photo"
+        onchange="updateMedia(${i},'placeholder_label',this.value)" aria-label="Media placeholder label"
+        style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:var(--font)">
+      <input type="text" value="${m.caption||''}" placeholder="Caption (optional)"
+        onchange="updateMedia(${i},'caption',this.value)" aria-label="Media caption"
+        style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:var(--font)">
+      <button onclick="removeMedia(${i})" aria-label="Remove media placeholder"
+        style="background:none;border:none;color:#E87070;cursor:pointer;font-size:14px;padding:4px">✕</button>`
+    list.appendChild(row)
+  })
+}
+function addMediaPlaceholder() {
+  var content = frameContent[currentFrameIdx] || {}
+  content.media = content.media || []
+  content.media.push({ kind:'image', placeholder_label:'', caption:'' })
+  frameContent[currentFrameIdx] = content
+  renderMediaList(content.media); autoSaveFrame()
+}
+function updateMedia(idx, field, val) {
+  var content = frameContent[currentFrameIdx] || { media: [] }
+  if (content.media[idx]) content.media[idx][field] = val
+  frameContent[currentFrameIdx] = content; autoSaveFrame()
+}
+function removeMedia(idx) {
+  var content = frameContent[currentFrameIdx] || { media: [] }
+  content.media.splice(idx, 1); frameContent[currentFrameIdx] = content
+  renderMediaList(content.media); autoSaveFrame()
+}
+
+var WCN_COLORS = {
+  warning: { bg:'#C0392B', text:'#FF7070', border:'rgba(192,57,43,0.3)' },
+  caution: { bg:'#B87A1A', text:'#EF9F27', border:'rgba(184,122,26,0.3)' },
+  note:    { bg:'#185FA5', text:'#7EB8F0', border:'rgba(24,95,165,0.3)'  },
+}
+function renderWCNList(wcn) {
+  var list = document.getElementById('ff-wcn-list')
+  list.innerHTML = ''
+  if (!wcn || wcn.length === 0) { list.innerHTML = '<p style="font-size:12px;color:var(--text3)">No WCN blocks yet.</p>'; return }
+  wcn.forEach(function(w, i) {
+    var c = WCN_COLORS[w.type] || WCN_COLORS.note
+    var div = document.createElement('div')
+    div.style.cssText = `border:1px solid ${c.border};border-left:3px solid ${c.bg};border-radius:6px;padding:10px 12px;margin-bottom:8px;background:${c.border.replace('0.3','0.05')}`
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="background:${c.bg};color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:0.1em">${w.type.toUpperCase()}</span>
+        <input type="text" value="${w.title||''}" placeholder="Title" onchange="updateWCN(${i},'title',this.value)" aria-label="WCN title"
+          style="flex:1;background:var(--bg);color:${c.text};border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;font-weight:600;font-family:var(--font)">
+        <select onchange="updateWCN(${i},'modal',this.value==='true')" aria-label="WCN display mode"
+          style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:var(--font)">
+          <option value="false" ${!w.modal?'selected':''}>Inline</option>
+          <option value="true"  ${w.modal?'selected':''}>Modal (interrupt)</option>
+        </select>
+        <button onclick="removeWCN(${i})" aria-label="Remove WCN block"
+          style="background:none;border:none;color:#E87070;cursor:pointer;font-size:14px;padding:4px">✕</button>
+      </div>
+      <textarea onchange="updateWCN(${i},'text',this.value)" aria-label="WCN content text" rows="2" placeholder="Enter warning/caution/note text…"
+        style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:7px 8px;font-size:12px;font-family:var(--font);resize:vertical">${w.text||''}</textarea>`
+    list.appendChild(div)
+  })
+}
+function addWCN(type) {
+  var content = frameContent[currentFrameIdx] || {}
+  content.wcn = content.wcn || []
+  content.wcn.push({ type:type, title:'', text:'', modal:false })
+  frameContent[currentFrameIdx] = content
+  renderWCNList(content.wcn); autoSaveFrame()
+}
+function updateWCN(idx, field, val) {
+  var content = frameContent[currentFrameIdx] || {}
+  if (content.wcn && content.wcn[idx]) content.wcn[idx][field] = val
+  frameContent[currentFrameIdx] = content; autoSaveFrame()
+}
+function removeWCN(idx) {
+  var content = frameContent[currentFrameIdx] || {}
+  content.wcn.splice(idx, 1); frameContent[currentFrameIdx] = content
+  renderWCNList(content.wcn); autoSaveFrame()
+}
+
+var kcCorrectIndex = 0
+function renderKCChoices(choices, correctIndex) {
+  kcCorrectIndex = correctIndex || 0
+  var list = document.getElementById('ff-kc-choices')
+  list.innerHTML = ''
+  choices.forEach(function(choice, i) {
+    var row = document.createElement('div')
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center'
+    row.innerHTML = `
+      <button onclick="setKCCorrect(${i})" aria-label="Mark choice ${i+1} as correct"
+        style="width:22px;height:22px;border-radius:50%;border:2px solid ${i===kcCorrectIndex?'#3B8A4A':'var(--border)'};background:${i===kcCorrectIndex?'#3B8A4A':'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${i===kcCorrectIndex?'<span style="color:#fff;font-size:11px;font-weight:700">✓</span>':''}
+      </button>
+      <input type="text" value="${choice}" placeholder="Choice ${i+1}" onchange="updateKCChoice(${i},this.value)" aria-label="Choice ${i+1}"
+        style="flex:1;background:var(--bg3);color:var(--text);border:1px solid ${i===kcCorrectIndex?'#3B8A4A':'var(--border)'};border-radius:4px;padding:6px 8px;font-size:13px;font-family:var(--font)">
+      <button onclick="removeKCChoice(${i})" aria-label="Remove choice ${i+1}"
+        style="background:none;border:none;color:#E87070;cursor:pointer;font-size:14px;padding:4px">✕</button>`
+    list.appendChild(row)
+  })
+}
+function getKCChoices() {
+  var inputs = document.querySelectorAll('#ff-kc-choices input[type=text]')
+  var choices = Array.from(inputs).map(function(inp) { return inp.value })
+  return { choices: choices, correctIndex: kcCorrectIndex }
+}
+function setKCCorrect(idx) {
+  kcCorrectIndex = idx
+  renderKCChoices(getKCChoices().choices, idx); autoSaveFrame()
+}
+function addKCChoice() {
+  var choices = getKCChoices().choices; choices.push('')
+  renderKCChoices(choices, kcCorrectIndex)
+}
+function updateKCChoice(idx, val) { autoSaveFrame() }
+function removeKCChoice(idx) {
+  var choices = getKCChoices().choices; choices.splice(idx, 1)
+  if (kcCorrectIndex >= choices.length) kcCorrectIndex = choices.length - 1
+  renderKCChoices(choices, kcCorrectIndex); autoSaveFrame()
+}
+
+function downloadEnrichedJSON() {
+  saveCurrentFrame()
+  if (!parsedData) return
+  var enriched = JSON.parse(JSON.stringify(parsedData))
+  var flatIdx = 0
+  enriched.courses.forEach(function(course) {
+    ;(course.modules || []).forEach(function(mod) {
+      ;(mod.lessons || []).forEach(function(lesson) {
+        ;(lesson.frames || []).forEach(function(frame) {
+          var content = frameContent[flatIdx] || {}
+          frame.narration       = content.narration || null
+          frame.media           = content.media     || []
+          frame.wcn             = content.wcn       || []
+          frame.knowledge_check = content.kc        || null
+          frame.branch          = content.branch    || null
+          flatIdx++
+        })
+      })
+    })
+  })
+  delete enriched._meta
+  var blob = new Blob([JSON.stringify(enriched, null, 2)], { type: 'application/json' })
+  var url  = URL.createObjectURL(blob)
+  var filename = (parsedData.project_name || 'forgeblueprint').replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_enriched.json'
+  var a = document.createElement('a'); a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
 function resetTool() {
   parsedData = null
   hasErrors  = false
+  // Clear Frame Content tab state so a new import starts fresh
+  frameContent    = {}
+  flatFrameList   = []
+  currentFrameIdx = 0
   document.getElementById('results').style.display = 'none'
   document.getElementById('file-input').value = ''
   document.getElementById('report-summary').innerHTML = ''
   document.getElementById('report-list').innerHTML    = ''
   document.getElementById('tree-root').innerHTML      = ''
+  switchTab('structure')
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
