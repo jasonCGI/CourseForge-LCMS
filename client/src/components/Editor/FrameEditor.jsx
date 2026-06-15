@@ -8,6 +8,7 @@ import QuizBlock from './blocks/QuizBlock'
 import HotspotBlock from './blocks/HotspotBlock'
 import BranchBlock from './blocks/BranchBlock'
 import OamBlock from './blocks/OamBlock'
+import WCNBlock from './blocks/WCNBlock'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -17,6 +18,7 @@ const BLOCK_COMPONENTS = {
   hotspot: HotspotBlock,
   branch:  BranchBlock,
   oam:     OamBlock,
+  wcn:     WCNBlock,
 }
 
 export default function FrameEditor() {

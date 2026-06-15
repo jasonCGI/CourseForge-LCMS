@@ -163,6 +163,100 @@ def _render_blocks(blocks, scorm_bridge=False):
                 f'</div></div>'
             )
 
+        elif btype == 'wcn':
+            wcn_type  = data.get('wcn_type', 'note')
+            title     = data.get('title', '')
+            text      = data.get('text', '')
+            modal     = data.get('modal', False)
+            ack_label = data.get('ack_label', 'I understand — proceed')
+            block_id  = block.get('id', str(uuid.uuid4()))[:8]
+
+            # Icon SVGs
+            icons = {
+                'warning': '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,29 2,29" fill="#FF4D00"/><text x="16" y="24" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="14" fill="#1a0800">!</text></svg>',
+                'caution': '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,16 16,30 2,16" fill="#EF9F27"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="13" fill="#1a1000">!</text></svg>',
+                'note':    '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#185FA5"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#fff">i</text></svg>',
+            }
+
+            colors = {
+                'warning': {'tag':'#C0392B','border':'#C0392B','bg':'rgba(192,57,43,0.07)','title':'#FF7070','text':'#C4A0A0'},
+                'caution': {'tag':'#B87A1A','border':'#B87A1A','bg':'rgba(184,122,26,0.07)','title':'#EF9F27','text':'#C4A870'},
+                'note':    {'tag':'#185FA5','border':'#185FA5','bg':'rgba(24,95,165,0.07)', 'title':'#7EB8F0','text':'#8AAAC0'},
+            }
+
+            c    = colors.get(wcn_type, colors['note'])
+            icon = icons.get(wcn_type, icons['note'])
+            tag  = wcn_type.upper()
+
+            if modal:
+                btn_icon = icon.replace('width="32" height="32"', 'width="16" height="16"')
+                parts.append(f'''
+<div style="margin-bottom:20px">
+  <button
+    onclick="document.getElementById('wcn-modal-{block_id}').style.display='flex'"
+    style="padding:8px 16px;border-radius:4px;border:1px solid {c["border"]};
+           background:{c["bg"]};color:{c["title"]};cursor:pointer;
+           font-family:inherit;font-size:13px;font-weight:600"
+    aria-haspopup="dialog"
+  >
+    {btn_icon}
+    &nbsp;{tag}: {title or 'View ' + tag.title()}
+  </button>
+  <div id="wcn-modal-{block_id}" role="dialog" aria-modal="true"
+    aria-label="{tag}: {title}"
+    style="display:none;position:fixed;inset:0;background:rgba(4,44,83,0.75);
+           z-index:999;align-items:center;justify-content:center;padding:24px"
+    onclick="if(event.target===this)this.style.display='none'"
+  >
+    <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;overflow:hidden;
+                box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+      <div style="background:#1a0800;padding:14px 18px;display:flex;align-items:center;
+                  gap:12px;border-bottom:3px solid {c["border"]}">
+        {icon}
+        <div>
+          <div style="font-family:monospace;font-size:9px;font-weight:700;color:{c["title"]};
+                      letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
+          <div style="font-size:15px;font-weight:700;color:{c["title"]}">{title}</div>
+        </div>
+      </div>
+      <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">{text}</div>
+      <div style="padding:12px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;background:#f8f8f8">
+        <button
+          onclick="document.getElementById('wcn-modal-{block_id}').style.display='none'"
+          style="padding:8px 20px;background:{c["tag"]};color:#fff;border:none;
+                 border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"
+          aria-label="Acknowledge and close"
+        >✓ {ack_label}</button>
+      </div>
+    </div>
+  </div>
+</div>''')
+            else:
+                title_html = f'<span style="font-size:13px;font-weight:600;color:{c["title"]}">{title}</span>' if title else ''
+                parts.append(f'''
+<div role="note" aria-label="{tag}: {title}"
+  style="display:flex;border-radius:6px;overflow:hidden;border:1px solid {c["border"]};
+         border-left:4px solid {c["border"]};padding:14px 16px;gap:14px;
+         align-items:flex-start;background:{c["bg"]};margin-bottom:20px">
+  <div style="flex-shrink:0;margin-top:2px">{icon}</div>
+  <div style="flex:1">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="background:{c["tag"]};color:#fff;font-family:monospace;font-size:9px;
+                   font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:0.1em">{tag}</span>
+      {title_html}
+    </div>
+    <div style="font-size:13px;color:{c["text"]};line-height:1.65">{text}</div>
+    <button
+      onclick="this.style.display='none'"
+      style="margin-top:10px;padding:5px 14px;border-radius:4px;
+             border:1px solid {c["border"]};background:{c["bg"]};
+             color:{c["title"]};cursor:pointer;font-size:11px;
+             font-weight:600;font-family:inherit"
+      aria-label="Acknowledge {tag.lower()}"
+    >✓ {ack_label}</button>
+  </div>
+</div>''')
+
         elif btype == 'oam':
             asset_id = data.get('oam_asset_id', '')
             width    = data.get('width',  800)

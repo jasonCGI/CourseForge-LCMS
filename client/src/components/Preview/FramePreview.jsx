@@ -47,6 +47,7 @@ function PreviewBlock({ block }) {
     case 'quiz':    return <PreviewQuiz    block={block} />
     case 'hotspot': return <PreviewHotspot block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
+    case 'wcn':     return <PreviewWCN     block={block} />
     default:        return (
       <div style={previewBlockWrap}>
         <p style={{ color: '#888', fontSize: 13 }}>
@@ -299,6 +300,100 @@ function PreviewBranch({ block }) {
               : (block.data.false_frame_id || 'no frame set')}
           </strong>
         </p>
+      )}
+    </div>
+  )
+}
+
+function PreviewWCN({ block }) {
+  const [acknowledged, setAcknowledged] = React.useState(false)
+  const [modalOpen,    setModalOpen]    = React.useState(false)
+
+  const type = block.data.wcn_type || 'note'
+  const cfg  = {
+    warning: { tag:'WARNING', tagBg:'#C0392B', border:'#C0392B', bg:'rgba(192,57,43,0.07)', titleColor:'#8B1A0E', textColor:'#6B3030' },
+    caution: { tag:'CAUTION', tagBg:'#B87A1A', border:'#B87A1A', bg:'rgba(184,122,26,0.07)', titleColor:'#7A4800', textColor:'#5A3800' },
+    note:    { tag:'NOTE',    tagBg:'#185FA5', border:'#185FA5', bg:'rgba(24,95,165,0.07)',  titleColor:'#0E3A6A', textColor:'#1A3C5A' },
+  }[type]
+
+  const ackLabel = block.data.ack_label || 'I understand — proceed'
+
+  const InlineBlock = () => (
+    <div role="note" aria-label={`${cfg.tag}: ${block.data.title || ''}`}
+      style={{ display:'flex', border:`1px solid ${cfg.border}`, borderLeft:`4px solid ${cfg.border}`,
+               borderRadius:6, padding:'12px 14px', gap:12, alignItems:'flex-start',
+               background:cfg.bg, marginBottom:16 }}>
+      <div style={{ fontSize:24, flexShrink:0 }}>
+        {type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}
+      </div>
+      <div style={{ flex:1 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+          <span style={{ background:cfg.tagBg, color:'#fff', fontFamily:'monospace',
+                         fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:3,
+                         letterSpacing:'0.1em' }}>{cfg.tag}</span>
+          {block.data.title && (
+            <span style={{ fontSize:13, fontWeight:600, color:cfg.titleColor }}>{block.data.title}</span>
+          )}
+        </div>
+        <div style={{ fontSize:13, color:cfg.textColor, lineHeight:1.65 }}>{block.data.text}</div>
+        {!acknowledged && (
+          <button onClick={() => setAcknowledged(true)}
+            style={{ marginTop:8, padding:'5px 14px', borderRadius:4,
+                     border:`1px solid ${cfg.border}`, background:cfg.bg,
+                     color:cfg.titleColor, cursor:'pointer', fontSize:11,
+                     fontWeight:600, fontFamily:'inherit' }}>
+            ✓ {ackLabel}
+          </button>
+        )}
+        {acknowledged && (
+          <span style={{ fontSize:11, color:'#4CAF50', marginTop:6, display:'block' }}>✓ Acknowledged</span>
+        )}
+      </div>
+    </div>
+  )
+
+  if (!block.data.modal) return <InlineBlock/>
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <button onClick={() => setModalOpen(true)}
+        style={{ padding:'8px 16px', borderRadius:4, border:`1px solid ${cfg.border}`,
+                 background:cfg.bg, color:cfg.titleColor, cursor:'pointer',
+                 fontSize:13, fontWeight:600, fontFamily:'inherit' }}>
+        ⚠ {cfg.tag}: {block.data.title || 'View ' + type}
+      </button>
+      {modalOpen && (
+        <div role="dialog" aria-modal="true" aria-label={`${cfg.tag}: ${block.data.title}`}
+          style={{ position:'fixed', inset:0, background:'rgba(4,44,83,0.75)',
+                   zIndex:2000, display:'flex', alignItems:'center',
+                   justifyContent:'center', padding:24 }}>
+          <div style={{ background:'#fff', borderRadius:8, maxWidth:480, width:'100%',
+                        overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.4)' }}>
+            <div style={{ background:'#1a1000', padding:'14px 18px', display:'flex',
+                          alignItems:'center', gap:12, borderBottom:`3px solid ${cfg.border}` }}>
+              <span style={{ fontSize:28 }}>
+                {type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}
+              </span>
+              <div>
+                <div style={{ fontFamily:'monospace', fontSize:9, fontWeight:700,
+                               color:cfg.tagBg, letterSpacing:'0.12em', marginBottom:3 }}>{cfg.tag}</div>
+                <div style={{ fontSize:15, fontWeight:700, color:cfg.tagBg }}>{block.data.title}</div>
+              </div>
+            </div>
+            <div style={{ padding:'16px 18px', fontSize:13, lineHeight:1.65, color:'#1a1a1a' }}>
+              {block.data.text}
+            </div>
+            <div style={{ padding:'12px 18px', borderTop:'1px solid #eee',
+                          display:'flex', justifyContent:'flex-end', background:'#f8f8f8' }}>
+              <button onClick={() => { setModalOpen(false); setAcknowledged(true) }}
+                style={{ padding:'8px 20px', background:cfg.tagBg, color:'#fff',
+                         border:'none', borderRadius:4, fontSize:13, fontWeight:600,
+                         cursor:'pointer', fontFamily:'inherit' }}>
+                ✓ {ackLabel}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

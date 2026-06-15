@@ -188,6 +188,20 @@ def build_frame_content(frame_data: dict) -> dict:
             }
         })
 
+    # WCN blocks (Warning / Caution / Note) — from ForgeBlueprint enriched JSON
+    for wcn_item in (frame_data.get("wcn") or []):
+        blocks.append({
+            "id": str(uuid.uuid4()),
+            "type": "wcn",
+            "data": {
+                "wcn_type":  wcn_item.get("type", "note"),
+                "title":     wcn_item.get("title", ""),
+                "text":      wcn_item.get("text", ""),
+                "modal":     wcn_item.get("modal", False),
+                "ack_label": wcn_item.get("ack_label", "I understand — proceed"),
+            }
+        })
+
     return {"blocks": blocks}
 
 
