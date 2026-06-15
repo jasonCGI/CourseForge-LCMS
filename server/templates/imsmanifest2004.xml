@@ -34,12 +34,8 @@
       {% for item in items %}
       <item identifier="{{ item.item_id }}" identifierref="{{ item.res_id }}" isvisible="true">
         <title>{{ item.title }}</title>
+        <!-- Leaf node: no controlMode (Flow/Choice apply to cluster nodes only). -->
         <imsss:sequencing>
-          <imsss:controlMode
-            choice="true"
-            choiceExit="true"
-            flow="true"
-            forwardOnly="false"/>
           <imsss:completionThreshold
             minProgressMeasure="1.0"
             progressWeight="1.0"/>
@@ -47,13 +43,6 @@
             completionSetByContent="true"
             objectiveSetByContent="false"/>
         </imsss:sequencing>
-        <adlnav:presentation>
-          <adlnav:navigationInterface>
-            <adlnav:hideLMSUI>
-              <adlnav:suspendAll/>
-            </adlnav:hideLMSUI>
-          </adlnav:navigationInterface>
-        </adlnav:presentation>
       </item>
       {% endfor %}
 
@@ -64,17 +53,6 @@
           choiceExit="true"
           flow="true"
           forwardOnly="false"/>
-        <imsss:sequencingRules>
-          <imsss:exitConditionRule>
-            <imsss:ruleConditions conditionCombination="any">
-              <imsss:ruleCondition
-                referencedObjective="satisfiedByMeasure"
-                operator="not"
-                condition="satisfied"/>
-            </imsss:ruleConditions>
-            <imsss:ruleAction action="exitParent"/>
-          </imsss:exitConditionRule>
-        </imsss:sequencingRules>
         <imsss:rollupRules objectiveMeasureWeight="0">
           <imsss:rollupRule childActivitySet="all">
             <imsss:rollupConditions conditionCombination="any">

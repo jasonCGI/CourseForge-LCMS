@@ -91,8 +91,10 @@ def main():
     print(f"→ uploading {name} ({len(data)} bytes) as courseId={course_id}")
 
     # Create an async import job by uploading the zip (multipart).
+    # The /upload variant takes multipart form-data with a "file" part;
+    # the bare /courses/importJobs is for URL/no-upload (e.g. YouTube) imports.
     r = httpx.post(
-        f"{BASE}/courses/importJobs",
+        f"{BASE}/courses/importJobs/upload",
         params={"courseId": course_id, "mayCreateNewVersion": "false"},
         files={"file": (name, io.BytesIO(data), "application/zip")},
         auth=auth, timeout=300,
