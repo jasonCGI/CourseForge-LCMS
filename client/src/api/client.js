@@ -41,6 +41,10 @@ export const publishProject = (projectId, format) =>
 export const getPublishJobs = (projectId) =>
   api.get(`/publish/jobs/${projectId}`)
 
+// Validate a built package against SCORM Cloud (Rustici). format: scorm12 | scorm2004
+export const validateScormCloud = (projectId, format) =>
+  api.post('/validate', { project_id: projectId, format }, { timeout: 120000 })
+
 // ── Media ────────────────────────────────────────────────────────────────────
 export const uploadOam = (file, projectId) => {
   const form = new FormData()

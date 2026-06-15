@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { publishProject } from '../../api/client'
+import { publishProject, validateScormCloud } from '../../api/client'
 import useProjectStore from '../../store/projectStore'
 import AuditPanel from './AuditPanel'
 
@@ -16,6 +16,25 @@ export default function PublishModal({ onClose }) {
   const [error,       setError]    = useState(null)
   const [done,        setDone]     = useState(false)
   const [step,        setStep]     = useState('audit')   // 'audit' | 'publish'
+  const [validating,  setValidating] = useState(false)
+  const [validation,  setValidation] = useState(null)
+
+  const handleValidate = async () => {
+    if (!activeProject) return
+    setValidating(true); setValidation(null); setError(null)
+    try {
+      const res = await validateScormCloud(activeProject.id, format)
+      setValidation(res.data)
+    } catch (e) {
+      if (e.response?.status === 503) {
+        setValidation({ notConfigured: true, error: e.response?.data?.error })
+      } else {
+        setError(e.response?.data?.error || e.message || 'Validation failed')
+      }
+    } finally {
+      setValidating(false)
+    }
+  }
 
   const handlePublish = async () => {
     if (!activeProject) return
@@ -96,7 +115,7 @@ export default function PublishModal({ onClose }) {
             {FORMATS.map(f => (
               <div
                 key={f.id}
-                onClick={() => setFormat(f.id)}
+                onClick={() => { setFormat(f.id); setValidation(null); setDone(false) }}
                 style={{
                   padding: '14px 16px',
                   border: `2px solid ${format === f.id ? '#185FA5' : 'var(--color-border-tertiary)'}`,
@@ -145,6 +164,41 @@ export default function PublishModal({ onClose }) {
             </div>
           )}
 
+          {/* SCORM Cloud validation result */}
+          {validation && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 6, fontSize: 13, marginBottom: 16,
+              background: validation.notConfigured ? '#FFF3E0'
+                : validation.ok && (validation.warnings?.length || 0) === 0 ? '#EAF6EC'
+                : validation.status === 'ERROR' ? '#FDECEA' : '#FFF3E0',
+              border: `1px solid ${validation.notConfigured ? '#EF9F27'
+                : validation.ok && (validation.warnings?.length || 0) === 0 ? '#3B8A4A'
+                : validation.status === 'ERROR' ? '#C0392B' : '#EF9F27'}`,
+              color: validation.notConfigured ? '#8A4A00'
+                : validation.ok && (validation.warnings?.length || 0) === 0 ? '#1E7E34'
+                : validation.status === 'ERROR' ? '#C0392B' : '#8A4A00',
+            }}>
+              {validation.notConfigured ? (
+                <span>⚠ SCORM Cloud isn't configured on the server (RUSTICI_APP_ID / RUSTICI_SECRET_KEY).</span>
+              ) : validation.status === 'ERROR' ? (
+                <span>✕ SCORM Cloud import failed: {validation.message || 'unknown error'}</span>
+              ) : (validation.warnings?.length || 0) === 0 ? (
+                <span>✓ Imported clean on SCORM Cloud — 0 parser warnings.</span>
+              ) : (
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                    ⚠ Imported with {validation.warnings.length} parser warning{validation.warnings.length === 1 ? '' : 's'}:
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, maxHeight: 140, overflowY: 'auto' }}>
+                    {validation.warnings.map((w, i) => (
+                      <li key={i} style={{ marginBottom: 3 }}>{typeof w === 'string' ? w : JSON.stringify(w)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={{
@@ -156,6 +210,22 @@ export default function PublishModal({ onClose }) {
             }}>
               Cancel
             </button>
+            {format !== 'web' && (
+              <button
+                onClick={handleValidate}
+                disabled={validating || publishing || !activeProject}
+                title="Upload to SCORM Cloud and check for import/parser errors"
+                style={{
+                  padding: '8px 16px', background: 'transparent',
+                  border: '1px solid #185FA5',
+                  borderRadius: 4, color: 'var(--color-text-primary)',
+                  cursor: validating ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                {validating ? 'Validating…' : '☁ Validate'}
+              </button>
+            )}
             <button
               onClick={handlePublish}
               disabled={publishing || !activeProject}

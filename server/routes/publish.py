@@ -64,6 +64,49 @@ def publish():
         return jsonify({'error': str(e)}), 500
 
 
+@publish_bp.post('/api/validate')
+def validate_on_scorm_cloud():
+    """
+    Build a SCORM package and validate it against SCORM Cloud (Rustici).
+    Body: { "project_id": "...", "format": "scorm12" | "scorm2004" }
+    Returns the import result (status, parser warnings) or 503 if the server
+    has no SCORM Cloud credentials configured.
+    """
+    from ..services.scorm_cloud import (
+        validate_package, is_configured, SCORMCloudNotConfigured,
+    )
+
+    data       = request.get_json() or {}
+    project_id = data.get('project_id')
+    fmt        = data.get('format', 'scorm2004')
+
+    if not project_id:
+        return jsonify({'error': 'project_id required'}), 400
+    if fmt not in ('scorm12', 'scorm2004'):
+        return jsonify({'error': 'Validation supports scorm12 or scorm2004 only.'}), 400
+    if not is_configured():
+        return jsonify({
+            'configured': False,
+            'error': 'SCORM Cloud is not configured on this server. '
+                     'Set RUSTICI_APP_ID and RUSTICI_SECRET_KEY.',
+        }), 503
+
+    try:
+        if fmt == 'scorm12':
+            buf, _ = build_scorm12_package(project_id)
+        else:
+            buf, _ = build_scorm2004_package(project_id)
+
+        # Imports into a single reusable validation course slot (see service).
+        result = validate_package(buf.getvalue())
+        result['format'] = fmt
+        return jsonify(result)
+    except SCORMCloudNotConfigured as e:
+        return jsonify({'configured': False, 'error': str(e)}), 503
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @publish_bp.get('/api/publish/jobs/<project_id>')
 def list_jobs(project_id):
     """List publish history for a project."""
