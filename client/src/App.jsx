@@ -187,7 +187,7 @@ export default function App() {
           <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
 
             {/* Sidebar panel */}
-            <Panel defaultSize={22} minSize={16} maxSize={35}>
+            <Panel defaultSize={28} minSize={24} maxSize={55}>
               <div style={{
                 height: '100%',
                 background: 'var(--cf-sidebar-bg)',
@@ -224,7 +224,7 @@ export default function App() {
 
                 <ImportButton />
 
-                <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
                   <ContentTree />
                 </div>
               </div>

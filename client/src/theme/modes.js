@@ -52,7 +52,7 @@ export const MODES = {
     // Toggle
     '--cf-toggle-bg':       '#0e1320',
     '--cf-toggle-border':   '#2a3848',
-    '--cf-toggle-icon':     '#4A6A82',
+    '--cf-toggle-icon':     '#8AAAC8',
     '--cf-toggle-hover':    '#1a2430',
     '--cf-toggle-active-bg':'#1a3050',
     '--cf-toggle-active-icon':'#EF9F27',

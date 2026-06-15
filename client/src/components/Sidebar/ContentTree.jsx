@@ -131,6 +131,7 @@ function TreeRow({
         tabIndex={0}
         onClick={onClick}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } }}
+        title={label}
         style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none' }}
         className="cf-tree-row"
       >
@@ -174,11 +175,12 @@ function TreeRow({
           )}
 
           {/* Label */}
-          <span style={{
+          <span title={label} style={{
             fontSize: 12, color: textColor, fontWeight,
             flex: 1, whiteSpace: 'nowrap',
             overflow: 'hidden', textOverflow: 'ellipsis',
             fontFamily: 'var(--cf-font, Inter, system-ui, sans-serif)',
+            minWidth: 0,
           }}>
             {label}
           </span>

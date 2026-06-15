@@ -1,71 +1,75 @@
 import React from 'react'
 import { useTheme } from '../../theme/ThemeContext'
 
-// Sun icon
-function SunIcon({ color }) {
+function SunIcon({ color, size = 14 }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 14 14" aria-hidden="true">
       <circle cx="7" cy="7" r="3" fill={color}/>
       {[0,45,90,135,180,225,270,315].map((deg, i) => {
-        const rad = (deg * Math.PI) / 180
-        const x1 = 7 + Math.cos(rad) * 4.2
-        const y1 = 7 + Math.sin(rad) * 4.2
-        const x2 = 7 + Math.cos(rad) * 5.5
-        const y2 = 7 + Math.sin(rad) * 5.5
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+        const r  = (deg * Math.PI) / 180
+        const x1 = 7 + Math.cos(r) * 4.2
+        const y1 = 7 + Math.sin(r) * 4.2
+        const x2 = 7 + Math.cos(r) * 5.6
+        const y2 = 7 + Math.sin(r) * 5.6
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
       })}
     </svg>
   )
 }
 
-// Moon icon
-function MoonIcon({ color }) {
+function MoonIcon({ color, size = 14 }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 14 14" aria-hidden="true">
       <path d="M7 2 A5 5 0 1 0 7 12 A3.5 3.5 0 1 1 7 2 Z" fill={color}/>
     </svg>
   )
 }
 
-// High contrast icon — half-filled circle (de facto standard)
-function HCIcon({ color }) {
+function HCIcon({ color, size = 14, strokeWidth = 1.8 }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <circle cx="7" cy="7" r="6" fill="none" stroke={color} strokeWidth="1.5"/>
-      <path d="M7 1 A6 6 0 0 1 7 13 Z" fill={color}/>
+    <svg width={size} height={size} viewBox="0 0 14 14" aria-hidden="true">
+      <circle cx="7" cy="7" r="5.5" fill="none" stroke={color} strokeWidth={strokeWidth}/>
+      <path d="M7 1.5 A5.5 5.5 0 0 1 7 12.5 Z" fill={color}/>
     </svg>
   )
 }
 
 const BUTTONS = [
-  { mode: 'light', label: 'Light mode',         Icon: SunIcon  },
-  { mode: 'dark',  label: 'Dark mode',           Icon: MoonIcon },
-  { mode: 'hc',    label: 'High contrast mode',  Icon: HCIcon   },
+  { mode: 'light', label: 'Light mode',        Icon: SunIcon  },
+  { mode: 'dark',  label: 'Dark mode',          Icon: MoonIcon },
+  { mode: 'hc',    label: 'High contrast mode', Icon: HCIcon   },
 ]
 
 export default function ModeToggle() {
   const { mode, setMode } = useTheme()
 
-  const tgBg          = 'var(--cf-toggle-bg)'
-  const tgBorder      = 'var(--cf-toggle-border)'
-  const tgIcon        = 'var(--cf-toggle-icon)'
-  const tgActiveBg    = 'var(--cf-toggle-active-bg)'
-  const tgActiveIcon  = 'var(--cf-toggle-active-icon)'
-  const tgHover       = 'var(--cf-toggle-hover)'
+  // Inactive icons — bright enough to see on any bg (3:1+ vs dark bg)
+  const inactiveIcon   = mode === 'hc' ? '#FFFFFF' : '#8AAAC8'
+
+  // Active pill
+  const activePillBg     = mode === 'hc' ? '#EF9F27' : '#1B3A5C'
+  const activePillBorder = mode === 'hc' ? '#EF9F27' : '#2A5A8A'
+  const activeIconColor  = mode === 'hc' ? '#000000' : '#EF9F27'
+
+  // Group wrapper
+  const groupBg     = mode === 'hc' ? '#000000' : '#0e1320'
+  const groupBorder = mode === 'hc' ? '1px solid #FFFFFF' : '1px solid #2a3848'
 
   return (
     <div
       role="group"
       aria-label="Display mode"
       style={{
-        display: 'inline-flex',
+        display:      'inline-flex',
+        background:   groupBg,
+        border:       groupBorder,
         borderRadius: 6,
-        overflow: 'hidden',
-        border: `1px solid ${tgBorder}`,
-        background: tgBg,
+        padding:      3,
+        gap:          2,
       }}
     >
-      {BUTTONS.map(({ mode: m, label, Icon }, idx) => {
+      {BUTTONS.map(({ mode: m, label, Icon }) => {
         const isActive = mode === m
         return (
           <button
@@ -75,21 +79,24 @@ export default function ModeToggle() {
             aria-pressed={isActive}
             title={label}
             style={{
-              width: 32,
-              height: 28,
-              border: 'none',
-              borderLeft: idx > 0 ? `1px solid ${tgBorder}` : 'none',
-              background: isActive ? tgActiveBg : 'transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
+              width:        30,
+              height:       26,
+              border:       isActive ? `1px solid ${activePillBorder}` : '1px solid transparent',
+              borderRadius: 4,
+              background:   isActive ? activePillBg : 'transparent',
+              cursor:       'pointer',
+              display:      'flex',
+              alignItems:   'center',
               justifyContent: 'center',
-              transition: 'background 0.15s',
+              transition:   'background 0.15s, border-color 0.15s',
+              flexShrink:   0,
             }}
-            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = tgHover }}
-            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
           >
-            <Icon color={isActive ? tgActiveIcon : tgIcon} />
+            <Icon
+              color={isActive ? activeIconColor : inactiveIcon}
+              size={13}
+              strokeWidth={m === 'hc' && mode === 'hc' ? 2.5 : 1.8}
+            />
           </button>
         )
       })}
