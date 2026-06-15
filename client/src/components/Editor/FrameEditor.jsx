@@ -7,6 +7,7 @@ import MediaBlock from './blocks/MediaBlock'
 import QuizBlock from './blocks/QuizBlock'
 import HotspotBlock from './blocks/HotspotBlock'
 import BranchBlock from './blocks/BranchBlock'
+import OamBlock from './blocks/OamBlock'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -15,6 +16,7 @@ const BLOCK_COMPONENTS = {
   quiz:    QuizBlock,
   hotspot: HotspotBlock,
   branch:  BranchBlock,
+  oam:     OamBlock,
 }
 
 export default function FrameEditor() {

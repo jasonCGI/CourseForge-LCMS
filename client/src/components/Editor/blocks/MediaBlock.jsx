@@ -1,6 +1,9 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import useEditorStore from '../../../store/editorStore'
+import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './TextBlock'
+import MediaUploader from './MediaUploader'
+import { uploadMedia } from '../../../api/client'
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'oam']
 
@@ -28,6 +31,26 @@ export default function MediaBlock({ block }) {
   }, [block.id, updateBlock])
 
   const kind = block.data.kind || 'image'
+
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState(null)
+  const activeProject = useProjectStore(s => s.activeProject)
+
+  const handleUpload = async (file) => {
+    if (!activeProject?.id) { setUploadError('No project selected.'); return }
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const { data } = await uploadMedia(file, activeProject.id, kind)
+      update('asset_id', data.id)
+      update('serve_url', data.serve_url)
+      update('original_name', data.original_name)
+    } catch (e) {
+      setUploadError(e.response?.data?.error || 'Upload failed.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div style={{
@@ -96,24 +119,41 @@ export default function MediaBlock({ block }) {
           />
         </div>
 
-        {/* Placeholder preview */}
-        <div style={{
-          marginTop: 16,
-          border: `2px dashed ${KIND_COLOR[kind]}`,
-          borderRadius: 6,
-          padding: '24px 16px',
-          textAlign: 'center',
-          background: 'var(--color-background-secondary)',
-        }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>{KIND_ICON[kind]}</div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-            {block.data.placeholder_label
-              ? `[${kind}: ${block.data.placeholder_label}]`
-              : `[${kind} placeholder — no label set]`}
-          </div>
-          {block.data.asset_id && (
-            <div style={{ fontSize: 11, color: '#3B6D11', marginTop: 4 }}>
-              ✓ Asset linked: {block.data.asset_id}
+        {/* Upload / linked asset */}
+        <div style={{ marginTop: 16 }}>
+          {!block.data.asset_id ? (
+            <MediaUploader
+              accept={kind === 'image'
+                ? { 'image/*': ['.png','.jpg','.jpeg','.gif','.webp'] }
+                : kind === 'video'
+                  ? { 'video/*': ['.mp4','.mov','.webm'] }
+                  : { 'audio/*': ['.mp3','.wav','.ogg','.m4a'] }
+              }
+              label={`Drop ${kind} file here`}
+              onUpload={handleUpload}
+              uploading={uploading}
+              error={uploadError}
+            />
+          ) : (
+            <div style={{
+              padding: '16px', border: '1px solid var(--cf-border-secondary)',
+              borderRadius: 6, background: 'var(--cf-input-bg)',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 20 }}>{KIND_ICON[kind]}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: 'var(--cf-text-primary)', fontWeight: 500 }}>
+                  {block.data.original_name || block.data.placeholder_label}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--cf-text-tertiary)' }}>
+                  {block.data.asset_id}
+                </div>
+              </div>
+              <button
+                onClick={() => { update('asset_id', null); update('serve_url', null) }}
+                aria-label="Remove media asset"
+                style={{ background:'none', border:'none', color:'#E24B4A', cursor:'pointer', fontSize:14 }}
+              >✕</button>
             </div>
           )}
         </div>

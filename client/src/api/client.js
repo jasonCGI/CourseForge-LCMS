@@ -41,4 +41,30 @@ export const publishProject = (projectId, format) =>
 export const getPublishJobs = (projectId) =>
   api.get(`/publish/jobs/${projectId}`)
 
+// ── Media ────────────────────────────────────────────────────────────────────
+export const uploadOam = (file, projectId) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  return api.post('/media/oam', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const getOamAsset   = (id)  => api.get(`/media/oam/${id}`)
+export const getMediaAsset = (id)  => api.get(`/media/${id}`)
+
+export const uploadMedia = (file, projectId, kind) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  if (kind) form.append('kind', kind)
+  return api.post('/media', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const listProjectMedia = (projectId) =>
+  api.get(`/media/project/${projectId}`)
+
 export default api

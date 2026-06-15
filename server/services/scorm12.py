@@ -16,6 +16,7 @@ from datetime import datetime
 from flask import current_app, render_template
 
 from ..models.project import Project, Frame
+from ..models.media import OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 
 
@@ -125,11 +126,14 @@ def _render_blocks(blocks, scorm_bridge=False):
             width    = data.get('width',  800)
             height   = data.get('height', 600)
             entry    = data.get('entry_point', 'index.html')
+            # In SCORM package, OAM files are bundled at oam/{asset_id}/{entry}
+            src = f"oam/{asset_id}/{entry}" if asset_id else ''
             parts.append(
                 f'<iframe class="cf-oam-frame" '
-                f'src="oam/{asset_id}/{entry}" '
+                f'src="{src}" '
                 f'width="{width}" height="{height}" '
-                f'scrolling="no" allowfullscreen></iframe>'
+                f'scrolling="no" allowfullscreen '
+                f'title="Interactive animation"></iframe>'
             )
 
     return '\n'.join(parts)
@@ -207,6 +211,27 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 scorm_bridge=_has_oam_with_scorm(frame),
             )
             zf.writestr(fname, html)
+
+        # ── Bundle OAM assets ──────────────────────────────────────
+        bundled_oam_ids = set()
+        for idx, (frame, lesson, course) in enumerate(all_frames):
+            for block in frame.content.get('blocks', []):
+                if block.get('type') != 'oam':
+                    continue
+                oam_asset_id = block.get('data', {}).get('oam_asset_id')
+                if not oam_asset_id or oam_asset_id in bundled_oam_ids:
+                    continue
+                oam_asset = OamAsset.query.filter_by(media_asset_id=oam_asset_id).first()
+                if not oam_asset or not oam_asset.extracted_path:
+                    continue
+                extract_dir = Path(oam_asset.extracted_path)
+                if not extract_dir.exists():
+                    continue
+                for oam_file in extract_dir.rglob('*'):
+                    if oam_file.is_file():
+                        arc_path = f"oam/{oam_asset_id}/{oam_file.relative_to(extract_dir)}"
+                        zf.write(str(oam_file), arc_path)
+                bundled_oam_ids.add(oam_asset_id)
 
     buf.seek(0)
     safe_name = project.name.replace(' ', '_').lower()[:40]

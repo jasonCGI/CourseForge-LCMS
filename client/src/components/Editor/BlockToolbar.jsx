@@ -7,7 +7,7 @@ const BLOCK_TYPES = [
   { type: 'quiz',    label: 'Quiz',    icon: '?',   color: '#854F0B', available: true  },
   { type: 'hotspot', label: 'Hotspot', icon: '⊕',  color: '#533AB7', available: true  },
   { type: 'branch',  label: 'Branch',  icon: '⋔',  color: '#3C3489', available: true  },
-  { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: false },
+  { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: true  },
 ]
 
 export default function BlockToolbar() {
