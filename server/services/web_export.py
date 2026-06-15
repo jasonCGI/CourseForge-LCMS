@@ -16,6 +16,56 @@ from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks
 from ..version import VERSION, SCHEMA_VERSION
 
+# 508-compliant WCN modal controller (focus trap, Escape, focus return).
+# Shared by SCO templates; included here so WCN modal blocks work in the web
+# bundle too (the shared _render_blocks emits onclick="wcnOpenModal(...)").
+# Plain string (not an f-string) so the JS braces stay literal.
+WCN_SCRIPT = """
+  <script>
+  var wcnActiveModal = null, wcnTrigger = null;
+  function wcnOpenModal(modalId, triggerId) {
+    var modal = document.getElementById(modalId), trigger = document.getElementById(triggerId);
+    if (!modal) return;
+    wcnActiveModal = modal; wcnTrigger = trigger;
+    modal.removeAttribute('hidden'); modal.style.display = 'flex'; modal.setAttribute('aria-hidden', 'false');
+    var f = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (f.length > 0) f[0].focus();
+    document.body.style.overflow = 'hidden';
+  }
+  function wcnCloseModal(modalId) {
+    var modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true');
+    if (wcnTrigger) wcnTrigger.focus();
+    wcnActiveModal = null; wcnTrigger = null; document.body.style.overflow = '';
+  }
+  function wcnAcknowledge(modalId, ackBtnId) {
+    var b = document.getElementById(ackBtnId);
+    if (b) { b.textContent = '\\u2713 Acknowledged'; b.disabled = true; b.style.opacity = '0.6'; }
+    var trig = wcnTrigger;
+    wcnCloseModal(modalId);
+    if (trig) {
+      trig.style.display = 'none';
+      var a = document.createElement('span');
+      a.textContent = '\\u2713 ' + (trig.dataset.type || 'WCN') + ' acknowledged';
+      a.style.cssText = 'font-size:11px;color:#4CAF50;margin-left:4px';
+      trig.parentNode.insertBefore(a, trig.nextSibling);
+    }
+  }
+  document.addEventListener('keydown', function(e) {
+    if (!wcnActiveModal) return;
+    var f = wcnActiveModal.querySelectorAll('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var first = f[0], last = f[f.length - 1];
+    if (e.key === 'Escape') { e.preventDefault(); wcnCloseModal(wcnActiveModal.id); return; }
+    if (e.key === 'Tab') {
+      if (f.length === 0) { e.preventDefault(); return; }
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+  });
+  </script>
+"""
+
 
 def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
     """
@@ -210,6 +260,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
 
   render(0);
   </script>
+{WCN_SCRIPT}
 </body>
 </html>"""
 

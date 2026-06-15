@@ -316,5 +316,62 @@
   });
   </script>
 
+  <script>
+  // ── WCN Modal system — 508 compliant (focus trap, Esc, focus return) ──
+  var wcnActiveModal = null;
+  var wcnTrigger     = null;
+
+  function wcnOpenModal(modalId, triggerId) {
+    var modal   = document.getElementById(modalId);
+    var trigger = document.getElementById(triggerId);
+    if (!modal) return;
+    wcnActiveModal = modal;
+    wcnTrigger     = trigger;
+    modal.removeAttribute('hidden');
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    var focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length > 0) focusable[0].focus();
+    document.body.style.overflow = 'hidden';
+  }
+
+  function wcnCloseModal(modalId) {
+    var modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (wcnTrigger) wcnTrigger.focus();
+    wcnActiveModal = null;
+    wcnTrigger     = null;
+    document.body.style.overflow = '';
+  }
+
+  function wcnAcknowledge(modalId, ackBtnId) {
+    var ackBtn = document.getElementById(ackBtnId);
+    if (ackBtn) { ackBtn.textContent = '✓ Acknowledged'; ackBtn.disabled = true; ackBtn.style.opacity = '0.6'; }
+    var trig = wcnTrigger;   // capture before close clears it
+    wcnCloseModal(modalId);
+    if (trig) {
+      trig.style.display = 'none';
+      var acked = document.createElement('span');
+      acked.textContent = '✓ ' + (trig.dataset.type || 'WCN') + ' acknowledged';
+      acked.style.cssText = 'font-size:11px;color:#4CAF50;margin-left:4px';
+      trig.parentNode.insertBefore(acked, trig.nextSibling);
+    }
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (!wcnActiveModal) return;
+    var focusable = wcnActiveModal.querySelectorAll('button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.key === 'Escape') { e.preventDefault(); wcnCloseModal(wcnActiveModal.id); return; }
+    if (e.key === 'Tab') {
+      if (focusable.length === 0) { e.preventDefault(); return; }
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+  });
+  </script>
+
 </body>
 </html>

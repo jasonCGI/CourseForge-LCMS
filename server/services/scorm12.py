@@ -170,62 +170,88 @@ def _render_blocks(blocks, scorm_bridge=False):
             modal     = data.get('modal', False)
             ack_label = data.get('ack_label', 'I understand — proceed')
             block_id  = block.get('id', str(uuid.uuid4()))[:8]
+            modal_id   = f'wcn-modal-{block_id}'
+            trigger_id = f'wcn-trigger-{block_id}'
+            ack_btn_id = f'wcn-ack-{block_id}'
+            title_id   = f'wcn-title-{block_id}'
 
-            # Icon SVGs
             icons = {
                 'warning': '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,29 2,29" fill="#FF4D00"/><text x="16" y="24" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="14" fill="#1a0800">!</text></svg>',
                 'caution': '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,16 16,30 2,16" fill="#EF9F27"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="13" fill="#1a1000">!</text></svg>',
                 'note':    '<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#185FA5"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#fff">i</text></svg>',
             }
-
-            colors = {
-                'warning': {'tag':'#C0392B','border':'#C0392B','bg':'rgba(192,57,43,0.07)','title':'#FF7070','text':'#C4A0A0'},
-                'caution': {'tag':'#B87A1A','border':'#B87A1A','bg':'rgba(184,122,26,0.07)','title':'#EF9F27','text':'#C4A870'},
-                'note':    {'tag':'#185FA5','border':'#185FA5','bg':'rgba(24,95,165,0.07)', 'title':'#7EB8F0','text':'#8AAAC0'},
+            small_icons = {
+                'warning': '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,29 2,29" fill="#FF4D00"/><text x="16" y="24" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="14" fill="#1a0800">!</text></svg>',
+                'caution': '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="16,2 30,16 16,30 2,16" fill="#EF9F27"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="13" fill="#1a1000">!</text></svg>',
+                'note':    '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#185FA5"/><text x="16" y="21" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#fff">i</text></svg>',
             }
 
-            c    = colors.get(wcn_type, colors['note'])
-            icon = icons.get(wcn_type, icons['note'])
-            tag  = wcn_type.upper()
+            colors = {
+                'warning': {'tag':'#C0392B','border':'#C0392B','bg':'rgba(192,57,43,0.07)','title':'#FF7070','text':'#C4A0A0','header':'#1a0800'},
+                'caution': {'tag':'#B87A1A','border':'#B87A1A','bg':'rgba(184,122,26,0.07)','title':'#EF9F27','text':'#C4A870','header':'#1a1000'},
+                'note':    {'tag':'#185FA5','border':'#185FA5','bg':'rgba(24,95,165,0.07)', 'title':'#7EB8F0','text':'#8AAAC0','header':'#06080f'},
+            }
+
+            c     = colors.get(wcn_type, colors['note'])
+            icon  = icons.get(wcn_type, icons['note'])
+            sicon = small_icons.get(wcn_type, small_icons['note'])
+            tag   = wcn_type.upper()
 
             if modal:
-                btn_icon = icon.replace('width="32" height="32"', 'width="16" height="16"')
                 parts.append(f'''
 <div style="margin-bottom:20px">
   <button
-    onclick="document.getElementById('wcn-modal-{block_id}').style.display='flex'"
+    id="{trigger_id}"
+    data-type="{tag}"
+    onclick="wcnOpenModal('{modal_id}', '{trigger_id}')"
+    aria-haspopup="dialog"
     style="padding:8px 16px;border-radius:4px;border:1px solid {c["border"]};
            background:{c["bg"]};color:{c["title"]};cursor:pointer;
-           font-family:inherit;font-size:13px;font-weight:600"
-    aria-haspopup="dialog"
+           font-family:inherit;font-size:13px;font-weight:600;
+           display:inline-flex;align-items:center;gap:8px"
   >
-    {btn_icon}
-    &nbsp;{tag}: {title or 'View ' + tag.title()}
+    {sicon} {tag}{': ' + title if title else ''}
   </button>
-  <div id="wcn-modal-{block_id}" role="dialog" aria-modal="true"
-    aria-label="{tag}: {title}"
-    style="display:none;position:fixed;inset:0;background:rgba(4,44,83,0.75);
-           z-index:999;align-items:center;justify-content:center;padding:24px"
-    onclick="if(event.target===this)this.style.display='none'"
+  <div
+    id="{modal_id}"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="{title_id}"
+    aria-hidden="true"
+    style="display:none;position:fixed;inset:0;
+           background:rgba(4,44,83,0.75);z-index:999;
+           align-items:center;justify-content:center;padding:24px"
   >
-    <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;overflow:hidden;
-                box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-      <div style="background:#1a0800;padding:14px 18px;display:flex;align-items:center;
-                  gap:12px;border-bottom:3px solid {c["border"]}">
+    <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;
+                overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+      <div style="background:{c["header"]};padding:14px 18px;display:flex;
+                  align-items:center;gap:12px;border-bottom:3px solid {c["border"]}">
         {icon}
-        <div>
-          <div style="font-family:monospace;font-size:9px;font-weight:700;color:{c["title"]};
-                      letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
-          <div style="font-size:15px;font-weight:700;color:{c["title"]}">{title}</div>
+        <div style="flex:1">
+          <div style="font-family:monospace;font-size:9px;font-weight:700;
+                      color:{c["tag"]};letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
+          <div id="{title_id}" style="font-size:15px;font-weight:700;color:{c["tag"]}">{title or tag}</div>
         </div>
-      </div>
-      <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">{text}</div>
-      <div style="padding:12px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;background:#f8f8f8">
         <button
-          onclick="document.getElementById('wcn-modal-{block_id}').style.display='none'"
+          onclick="wcnCloseModal('{modal_id}')"
+          aria-label="Close dialog"
+          style="background:none;border:none;color:{c["tag"]};
+                 font-size:22px;cursor:pointer;padding:4px;line-height:1;
+                 margin-left:auto;flex-shrink:0"
+        >✕</button>
+      </div>
+      <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">
+        {text}
+      </div>
+      <div style="padding:12px 18px;border-top:1px solid #eee;
+                  display:flex;justify-content:flex-end;background:#f8f8f8">
+        <button
+          id="{ack_btn_id}"
+          onclick="wcnAcknowledge('{modal_id}', '{ack_btn_id}')"
+          aria-label="{ack_label} — closes dialog"
           style="padding:8px 20px;background:{c["tag"]};color:#fff;border:none;
-                 border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"
-          aria-label="Acknowledge and close"
+                 border-radius:4px;font-size:13px;font-weight:600;
+                 cursor:pointer;font-family:inherit"
         >✓ {ack_label}</button>
       </div>
     </div>
@@ -234,8 +260,8 @@ def _render_blocks(blocks, scorm_bridge=False):
             else:
                 title_html = f'<span style="font-size:13px;font-weight:600;color:{c["title"]}">{title}</span>' if title else ''
                 parts.append(f'''
-<div role="note" aria-label="{tag}: {title}"
-  style="display:flex;border-radius:6px;overflow:hidden;border:1px solid {c["border"]};
+<div role="note" aria-label="{tag}{': ' + title if title else ''}"
+  style="display:flex;border-radius:6px;border:1px solid {c["border"]};
          border-left:4px solid {c["border"]};padding:14px 16px;gap:14px;
          align-items:flex-start;background:{c["bg"]};margin-bottom:20px">
   <div style="flex-shrink:0;margin-top:2px">{icon}</div>
@@ -247,12 +273,12 @@ def _render_blocks(blocks, scorm_bridge=False):
     </div>
     <div style="font-size:13px;color:{c["text"]};line-height:1.65">{text}</div>
     <button
-      onclick="this.style.display='none'"
+      onclick="this.textContent='✓ Acknowledged';this.disabled=true;this.style.opacity='0.6'"
+      aria-label="Acknowledge {tag.lower()}"
       style="margin-top:10px;padding:5px 14px;border-radius:4px;
              border:1px solid {c["border"]};background:{c["bg"]};
              color:{c["title"]};cursor:pointer;font-size:11px;
              font-weight:600;font-family:inherit"
-      aria-label="Acknowledge {tag.lower()}"
     >✓ {ack_label}</button>
   </div>
 </div>''')
