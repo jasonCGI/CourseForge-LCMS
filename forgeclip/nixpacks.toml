@@ -1,0 +1,10 @@
+# Do NOT override the install phase — Nixpacks' auto Python venv+pip (and its
+# PATH wiring for gunicorn) must stay intact (a bare "pip install" fails on
+# Railway with "pip: command not found"). No FFmpeg needed for ForgeClip.
+# Start command comes from railway.toml.
+
+[phases.setup]
+nixPkgs = ["python3"]
+
+[start]
+cmd = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4"

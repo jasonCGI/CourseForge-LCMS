@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Single worker: the clip store is an in-memory dict (routes/clip.py), so all
+# requests for a clip must hit the same process. --threads gives concurrency.
+startCommand = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"

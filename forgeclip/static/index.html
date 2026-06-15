@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeClip · Interactive Video</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video-js.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #042C53;
+      --blue:    #185FA5;
+      --blue-lt: #B5D4F4;
+      --amber:   #EF9F27;
+      --bg:      #06080f;
+      --bg2:     #0d1017;
+      --bg3:     #131822;
+      --border:  #1c2a3a;
+      --text:    #C8D8E8;
+      --text2:   #7A90A8;
+      --text3:   #3A5A7A;
+      --radius:  6px;
+      --font:    'Inter', system-ui, sans-serif;
+      --mono:    'JetBrains Mono', Consolas, monospace;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      border-bottom: 2px solid var(--amber);
+      padding: 0 20px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: var(--font);
+      font-size: 16px;
+      display: flex;
+      align-items: baseline;
+    }
+
+    .logo-f  { font-weight: 100; color: var(--blue-lt); }
+    .logo-sl { font-weight: 100; color: var(--amber); }
+    .logo-c  { font-weight: 200; color: #fff; }
+    .logo-cur {
+      display: inline-block; width: 8px; height: 2px;
+      background: var(--amber); margin-left: 2px; margin-bottom: 1px;
+      border-radius: 1px; animation: blink 1.05s step-end infinite;
+    }
+
+    .header-tag {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text2); padding: 2px 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; letter-spacing: 0.06em;
+    }
+
+    /* ── Main layout ── */
+    .workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .top-row {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Video player panel ── */
+    .video-panel {
+      flex: 1;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #player-video {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+
+    .overlay-item {
+      position: absolute;
+      z-index: 20;
+      pointer-events: all;
+    }
+
+    .hotspot-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(239,159,39,0.3);
+      border: 2px solid var(--amber);
+      cursor: pointer;
+      animation: pulse 1.5s ease-in-out infinite;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,159,39,0.4); }
+      50%       { box-shadow: 0 0 0 10px rgba(239,159,39,0); }
+    }
+
+    .annotation-label {
+      background: rgba(4,44,83,0.85);
+      color: var(--blue-lt);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--blue);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .upload-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--text2);
+      font-size: 14px;
+      height: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .upload-state .icon { font-size: 48px; opacity: 0.4; }
+
+    /* ── Interaction panel ── */
+    .interaction-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .add-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .add-btn {
+      padding: 7px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text2);
+      font-family: var(--font);
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .add-btn:hover { border-color: var(--blue); color: var(--blue-lt); }
+    .add-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+    .interaction-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .interaction-item {
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: border-color 0.15s;
+    }
+
+    .interaction-item:hover { border-color: var(--blue); }
+    .interaction-item.selected { border-color: var(--amber); background: rgba(239,159,39,0.05); }
+
+    .int-tc {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--amber); flex-shrink: 0; width: 44px;
+    }
+
+    .int-type-badge {
+      font-size: 8px; font-weight: 700; padding: 1px 5px;
+      border-radius: 3px; text-transform: uppercase;
+      letter-spacing: 0.06em; flex-shrink: 0;
+    }
+
+    .int-label {
+      font-size: 11px; color: var(--text); flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .int-delete {
+      background: none; border: none; color: #E87070;
+      cursor: pointer; font-size: 12px; padding: 2px 4px;
+      flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s;
+    }
+    .int-delete:hover { opacity: 1; }
+
+    /* ── Timeline ── */
+    .timeline-row {
+      height: 120px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .timeline-header {
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .timeline-controls { display: flex; align-items: center; gap: 8px; }
+
+    .tc-btn {
+      padding: 4px 10px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text2); font-family: var(--font); font-size: 11px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tc-btn:hover { border-color: var(--blue); color: var(--blue-lt); }
+    .tc-btn:focus-visible { outline: 2px solid var(--amber); }
+
+    .timecode-display {
+      font-family: var(--mono); font-size: 13px;
+      color: var(--amber); min-width: 70px; text-align: center;
+    }
+
+    .timeline-track-wrap {
+      flex: 1;
+      position: relative;
+      padding: 8px 14px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .timeline-track {
+      position: relative;
+      height: 40px;
+      background: var(--bg3);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      min-width: 100%;
+    }
+
+    .timeline-fill {
+      position: absolute;
+      top: 0; left: 0; height: 100%;
+      background: rgba(24,95,165,0.3);
+      border-radius: 4px 0 0 4px;
+      pointer-events: none;
+      transition: width 0.1s linear;
+    }
+
+    .timeline-playhead {
+      position: absolute;
+      top: -4px; bottom: -4px;
+      width: 2px;
+      background: var(--amber);
+      cursor: ew-resize;
+      z-index: 10;
+    }
+
+    .timeline-playhead::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -4px;
+      width: 10px; height: 10px;
+      background: var(--amber);
+      border-radius: 50%;
+    }
+
+    .timeline-marker {
+      position: absolute;
+      top: 4px; bottom: 4px;
+      width: 3px;
+      border-radius: 2px;
+      cursor: pointer;
+      z-index: 5;
+    }
+
+    .timeline-marker::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg);
+      color: var(--text2);
+      font-size: 9px;
+      font-family: var(--mono);
+      padding: 2px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      margin-bottom: 3px;
+    }
+
+    .timeline-marker:hover::after { opacity: 1; }
+
+    /* ── Properties panel ── */
+    .properties-row {
+      height: 200px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      overflow: hidden;
+    }
+
+    .props-panel {
+      flex: 1;
+      padding: 14px 16px;
+      overflow-y: auto;
+    }
+
+    .props-title {
+      font-size: 11px; font-weight: 600; color: var(--text2);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .prop-row {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .prop-label { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+    .prop-input {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 5px 8px;
+      color: var(--text); font-family: var(--font); font-size: 12px;
+      width: 100%;
+    }
+
+    .prop-input:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
+
+    .export-row {
+      width: 220px; flex-shrink: 0;
+      border-left: 1px solid var(--border);
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 14px; border-radius: var(--radius);
+      border: none; font-family: var(--font); font-size: 12px;
+      font-weight: 600; cursor: pointer; text-align: center;
+      transition: opacity 0.15s; display: block; width: 100%;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .btn-amber  { background: var(--amber);  color: var(--navy); }
+    .btn-blue   { background: var(--blue);   color: #fff; }
+    .btn-outline { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+
+    .vjs-default-skin .vjs-control-bar { background: rgba(4,44,83,0.9); }
+    .vjs-default-skin .vjs-play-progress { background: var(--amber); }
+
+    .badge-hotspot    { background:#0C3668; color:#90C0F0; }
+    .badge-quiz       { background:#4A2800; color:#F0B84A; }
+    .badge-branch     { background:#2A1F60; color:#C8C0FF; }
+    .badge-wcn        { background:#3A0A0A; color:#FF7070; }
+    .badge-annotation { background:#1A2A1A; color:#90C890; }
+
+    .marker-hotspot    { background:#185FA5; }
+    .marker-quiz       { background:#B87A1A; }
+    .marker-branch     { background:#7A3A9A; }
+    .marker-wcn        { background:#C0392B; }
+    .marker-annotation { background:#3B8A4A; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+    <rect x="3" y="17" width="22" height="4" rx="2" fill="#185FA5" opacity="0.3"/>
+    <line x1="3" y1="19" x2="13" y2="19" stroke="#185FA5" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+    <rect x="12.5" y="15" width="2" height="8" rx="1" fill="#EF9F27"/>
+    <circle cx="13.5" cy="15" r="3" fill="#EF9F27"/>
+    <rect x="19" y="17" width="1.5" height="4" fill="#EF9F27" opacity="0.5"/>
+    <rect x="22" y="17" width="1.5" height="4" fill="#EF9F27" opacity="0.3"/>
+    <polygon points="6,5 22,14 6,23" fill="#185FA5"/>
+    <polygon points="8,8 19,14 8,20" fill="#2A7ACA" opacity="0.5"/>
+  </svg>
+
+  <div class="logo">
+    <span class="logo-f">Forge</span>
+    <span class="logo-sl">/</span>
+    <span class="logo-c">Clip</span>
+    <span class="logo-cur"></span>
+  </div>
+  <span class="header-tag">Interactive Video · v1.0</span>
+
+  <div style="flex:1"></div>
+
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="autosave-label" style="font-size:10px;color:var(--text3);font-family:var(--mono)"></span>
+    <button class="btn btn-outline" style="width:auto;padding:5px 12px;font-size:11px"
+      onclick="importClip()" aria-label="Import existing .clip.json">↑ Import</button>
+    <button class="btn btn-amber" style="width:auto;padding:5px 14px;font-size:11px"
+      onclick="exportClip()" id="btn-export" disabled aria-label="Export .clip.json">⬇ Export .clip.json</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <div class="top-row">
+
+    <div class="video-panel" id="video-panel">
+      <div class="upload-state" id="upload-state">
+        <div class="icon">🎬</div>
+        <div>
+          <strong style="color:var(--text)">No video loaded</strong><br>
+          <span style="font-size:13px">Upload a processed video from ForgePack to begin</span>
+        </div>
+        <button class="btn btn-blue" style="width:auto;padding:8px 20px"
+          onclick="document.getElementById('video-file-input').click()"
+          aria-label="Upload video file">↑ Upload Video</button>
+        <input type="file" id="video-file-input" accept=".mp4,.webm,.mov"
+          onchange="handleVideoUpload(event)" style="display:none">
+        <p style="font-size:11px;color:var(--text3);font-family:var(--mono)">
+          .mp4 .webm accepted · process first with ForgePack
+        </p>
+      </div>
+
+      <div class="video-wrap" id="video-wrap" style="display:none">
+        <video id="player-video" class="video-js" preload="auto" aria-label="Course video"></video>
+        <div id="overlays" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:20"></div>
+      </div>
+    </div>
+
+    <div class="interaction-panel" role="complementary" aria-label="Interactions">
+      <div class="panel-header">
+        <span>Interactions</span>
+        <span id="int-count" style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)">0</span>
+      </div>
+      <div class="panel-body">
+        <div class="add-btns" id="add-btns">
+          <button class="add-btn" onclick="addInteraction('hotspot')" aria-label="Add hotspot at current timecode">⊕ Hotspot</button>
+          <button class="add-btn" onclick="addInteraction('quiz')" aria-label="Add quiz at current timecode">? Quiz</button>
+          <button class="add-btn" onclick="addInteraction('branch')" aria-label="Add branch at current timecode">⋔ Branch</button>
+          <button class="add-btn" onclick="addInteraction('wcn')" aria-label="Add WCN at current timecode">⚠ WCN</button>
+          <button class="add-btn" onclick="addInteraction('annotation')" aria-label="Add annotation at current timecode" style="grid-column:span 2">✎ Annotation</button>
+        </div>
+        <p style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:10px">
+          // interactions added at current timecode
+        </p>
+        <div class="interaction-list" id="interaction-list" role="list" aria-label="Interactions list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-row" role="region" aria-label="Timeline">
+    <div class="timeline-header">
+      <div class="timeline-controls">
+        <button class="tc-btn" id="btn-play" onclick="togglePlay()" aria-label="Play/pause video">▶ Play</button>
+        <button class="tc-btn" onclick="seekRelative(-5)" aria-label="Seek back 5 seconds">← 5s</button>
+        <button class="tc-btn" onclick="seekRelative(5)" aria-label="Seek forward 5 seconds">5s →</button>
+      </div>
+      <span class="timecode-display" id="timecode-display" aria-live="polite">00:00.0</span>
+      <span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="duration-display"></span>
+      <div style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)">
+        // click timeline to seek · drag markers to adjust timecode
+      </div>
+    </div>
+    <div class="timeline-track-wrap">
+      <div class="timeline-track" id="timeline-track"
+        onclick="timelineClick(event)"
+        role="slider" aria-label="Video timeline"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+        tabindex="0" onkeydown="timelineKeydown(event)">
+        <div class="timeline-fill" id="timeline-fill" style="width:0%"></div>
+        <div class="timeline-playhead" id="timeline-playhead" style="left:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="properties-row" id="properties-row">
+    <div class="props-panel">
+      <div class="props-title" id="props-title">Select an interaction to edit</div>
+      <div id="props-content">
+        <p style="font-size:12px;color:var(--text3)">
+          Click an interaction in the list or timeline to edit its properties.
+        </p>
+      </div>
+    </div>
+    <div class="export-row">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Export</div>
+      <button class="btn btn-amber" onclick="exportClip()" id="export-btn-2" disabled aria-label="Export .clip.json file">⬇ .clip.json</button>
+      <button class="btn btn-outline" onclick="importClip()" aria-label="Import .clip.json">↑ Import</button>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px;line-height:1.5">
+        Drop .clip.json + video into CourseForge ivideo block to publish.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+var state = {
+  clipId: null, clip: null, player: null,
+  duration: 0, currentTime: 0, selectedId: null,
+  videoAssetId: null, videoFilename: null, dirty: false,
+}
+var autoSaveTimer = null
+
+// ── Video upload ───────────────────────────────────────────────
+function handleVideoUpload(e) {
+  var file = e.target.files[0]
+  if (!file) return
+  var form = new FormData()
+  form.append('file', file)
+  fetch('/api/media/video', { method:'POST', body:form })
+    .then(r => r.json())
+    .then(function(data) {
+      state.videoAssetId  = data.asset_id
+      state.videoFilename = data.filename
+      initPlayer(data.serve_url, data.filename)
+    })
+    .catch(function(err) { alert('Upload failed: ' + err.message) })
+}
+
+function initPlayer(url, filename) {
+  document.getElementById('upload-state').style.display = 'none'
+  document.getElementById('video-wrap').style.display   = 'flex'
+  state.player = videojs('player-video', {
+    controls: true, fluid: true, sources: [{ src: url, type: 'video/mp4' }],
+  })
+  state.player.ready(function() {
+    state.player.on('timeupdate', onTimeUpdate)
+    state.player.on('loadedmetadata', function() {
+      state.duration = state.player.duration()
+      document.getElementById('duration-display').textContent = '/ ' + formatTC(state.duration)
+      createClipSession(filename, state.duration)
+    })
+  })
+}
+
+// ── Clip session ───────────────────────────────────────────────
+function createClipSession(filename, duration) {
+  fetch('/api/clip', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ filename: filename, duration: duration, video_asset_id: state.videoAssetId }),
+  })
+    .then(r => r.json())
+    .then(function(clip) {
+      state.clipId = clip.id
+      state.clip   = clip
+      document.getElementById('btn-export').disabled   = false
+      document.getElementById('export-btn-2').disabled = false
+      renderInteractionList()
+      renderTimelineMarkers()
+    })
+}
+
+// ── Playback ───────────────────────────────────────────────────
+function togglePlay() {
+  if (!state.player) return
+  if (state.player.paused()) { state.player.play(); document.getElementById('btn-play').textContent = '⏸ Pause' }
+  else { state.player.pause(); document.getElementById('btn-play').textContent = '▶ Play' }
+}
+
+function seekRelative(secs) {
+  if (!state.player) return
+  var t = Math.max(0, Math.min(state.duration, state.player.currentTime() + secs))
+  state.player.currentTime(t)
+}
+
+function onTimeUpdate() {
+  if (!state.player) return
+  var t = state.player.currentTime()
+  state.currentTime = t
+  var pct = state.duration > 0 ? (t / state.duration) * 100 : 0
+  document.getElementById('timecode-display').textContent = formatTC(t)
+  document.getElementById('timeline-fill').style.width    = pct + '%'
+  document.getElementById('timeline-playhead').style.left = pct + '%'
+  document.getElementById('timeline-track').setAttribute('aria-valuenow', Math.round(pct))
+  renderOverlays(t)
+}
+
+// ── Timeline interaction ───────────────────────────────────────
+function timelineClick(e) {
+  if (!state.player || !state.duration) return
+  var track = document.getElementById('timeline-track')
+  var rect  = track.getBoundingClientRect()
+  var pct   = (e.clientX - rect.left) / rect.width
+  var t     = pct * state.duration
+  state.player.currentTime(Math.max(0, Math.min(state.duration, t)))
+}
+
+function timelineKeydown(e) {
+  if (!state.player) return
+  var step = e.shiftKey ? 10 : 1
+  if      (e.key === 'ArrowLeft')  seekRelative(-step)
+  else if (e.key === 'ArrowRight') seekRelative(step)
+  else if (e.key === ' ')          { e.preventDefault(); togglePlay() }
+}
+
+// ── Interactions ───────────────────────────────────────────────
+var INT_COLORS = {
+  hotspot:    { badge:'badge-hotspot',    marker:'marker-hotspot',    label:'Hotspot'    },
+  quiz:       { badge:'badge-quiz',       marker:'marker-quiz',       label:'Quiz'       },
+  branch:     { badge:'badge-branch',     marker:'marker-branch',     label:'Branch'     },
+  wcn:        { badge:'badge-wcn',        marker:'marker-wcn',        label:'WCN'        },
+  annotation: { badge:'badge-annotation', marker:'marker-annotation', label:'Annotation' },
+}
+
+function addInteraction(type) {
+  if (!state.clip) return
+  var defaults = {
+    hotspot:    { x:50, y:50, label:'New Hotspot', description:'' },
+    quiz:       { question:'', choices:['Option A','Option B','Option C'], correct_index:0, feedback_correct:'', feedback_incorrect:'', resume_on_correct:true, resume_on_incorrect:false },
+    branch:     { prompt:'', true_label:'Yes', false_label:'No', true_timecode:0, false_timecode:0 },
+    wcn:        { wcn_type:'note', title:'', text:'', modal:false },
+    annotation: { x:50, y:30, text:'Label', style:'label' },
+  }
+  var interaction = {
+    type: type,
+    timecode: parseFloat(state.currentTime.toFixed(2)),
+    end_timecode: (type === 'annotation' || type === 'hotspot' || type === 'wcn')
+                    ? parseFloat((state.currentTime + 5).toFixed(2)) : null,
+    pause_on_reach: type === 'quiz' || type === 'branch',
+    data: defaults[type] || {},
+  }
+  fetch(`/api/clip/${state.clipId}/interaction`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(interaction),
+  })
+    .then(r => r.json())
+    .then(function(saved) {
+      state.clip.interactions.push(saved)
+      state.selectedId = saved.id
+      renderInteractionList()
+      renderTimelineMarkers()
+      renderProperties(saved)
+      scheduleAutoSave()
+    })
+}
+
+function deleteInteraction(id) {
+  if (!state.clip) return
+  fetch(`/api/clip/${state.clipId}/interaction/${id}`, { method:'DELETE' })
+    .then(function() {
+      state.clip.interactions = state.clip.interactions.filter(i => i.id !== id)
+      if (state.selectedId === id) { state.selectedId = null; clearProperties() }
+      renderInteractionList()
+      renderTimelineMarkers()
+      scheduleAutoSave()
+    })
+}
+
+function selectInteraction(id) {
+  state.selectedId = id
+  var int = state.clip.interactions.find(i => i.id === id)
+  if (int) {
+    renderProperties(int)
+    if (state.player) state.player.currentTime(int.timecode)
+  }
+  renderInteractionList()
+}
+
+// ── Render interaction list ────────────────────────────────────
+function renderInteractionList() {
+  var list = document.getElementById('interaction-list')
+  var ints = (state.clip && state.clip.interactions || []).slice().sort((a,b) => a.timecode - b.timecode)
+  document.getElementById('int-count').textContent = ints.length
+  if (ints.length === 0) {
+    list.innerHTML = '<p style="font-size:11px;color:var(--text3)">No interactions yet.<br>Add one above at the current timecode.</p>'
+    return
+  }
+  list.innerHTML = ints.map(function(i) {
+    var c     = INT_COLORS[i.type] || INT_COLORS.annotation
+    var label = i.data.label || i.data.question || i.data.title || i.data.text || i.data.prompt || i.type
+    var isSelected = i.id === state.selectedId
+    return `<div class="interaction-item${isSelected ? ' selected' : ''}" role="listitem"
+      onclick="selectInteraction('${i.id}')" tabindex="0"
+      aria-label="${c.label} at ${formatTC(i.timecode)}: ${label}"
+      onkeydown="if(event.key==='Enter'||event.key===' ')selectInteraction('${i.id}')">
+      <span class="int-tc">${formatTC(i.timecode)}</span>
+      <span class="int-type-badge ${c.badge}">${c.label}</span>
+      <span class="int-label">${label}</span>
+      <button class="int-delete" onclick="event.stopPropagation();deleteInteraction('${i.id}')" aria-label="Delete ${c.label}">✕</button>
+    </div>`
+  }).join('')
+}
+
+// ── Render timeline markers ────────────────────────────────────
+function renderTimelineMarkers() {
+  var track = document.getElementById('timeline-track')
+  track.querySelectorAll('.timeline-marker').forEach(function(el) { el.remove() })
+  var ints = state.clip && state.clip.interactions || []
+  ints.forEach(function(i) {
+    if (!state.duration) return
+    var pct = (i.timecode / state.duration) * 100
+    var c   = INT_COLORS[i.type] || INT_COLORS.annotation
+    var el  = document.createElement('div')
+    el.className   = `timeline-marker ${c.marker}`
+    el.style.left  = pct + '%'
+    el.setAttribute('data-label', formatTC(i.timecode) + ' ' + c.label)
+    el.setAttribute('role', 'button')
+    el.setAttribute('tabindex', '0')
+    el.setAttribute('aria-label', `${c.label} at ${formatTC(i.timecode)}`)
+    el.onclick   = function(e) { e.stopPropagation(); selectInteraction(i.id) }
+    el.onkeydown = function(e) { if(e.key==='Enter'||e.key===' ') selectInteraction(i.id) }
+    track.appendChild(el)
+  })
+}
+
+// ── Render overlays ────────────────────────────────────────────
+function renderOverlays(currentTime) {
+  var container = document.getElementById('overlays')
+  container.innerHTML = ''
+  if (!state.clip) return
+  state.clip.interactions.forEach(function(i) {
+    var inRange = currentTime >= i.timecode && (!i.end_timecode || currentTime <= i.end_timecode)
+    if (!inRange) return
+    if (i.type === 'hotspot' && i.data.x != null) {
+      var el = document.createElement('div')
+      el.className = 'overlay-item'
+      el.style.left = i.data.x + '%'
+      el.style.top  = i.data.y + '%'
+      el.style.transform = 'translate(-50%, -50%)'
+      el.innerHTML = `<div class="hotspot-dot" title="${i.data.label}" aria-label="${i.data.label}" role="button" tabindex="0"></div>`
+      container.appendChild(el)
+    }
+    if (i.type === 'annotation' && i.data.x != null) {
+      var el = document.createElement('div')
+      el.className = 'overlay-item'
+      el.style.left = i.data.x + '%'
+      el.style.top  = i.data.y + '%'
+      el.innerHTML  = `<div class="annotation-label">${i.data.text}</div>`
+      container.appendChild(el)
+    }
+  })
+}
+
+// ── Properties panel ───────────────────────────────────────────
+function renderProperties(int) {
+  var c = INT_COLORS[int.type] || INT_COLORS.annotation
+  document.getElementById('props-title').textContent = `${c.label} · ${formatTC(int.timecode)}`
+  var commonFields = `
+    <div class="prop-row">
+      <label class="prop-label" for="prop-tc">Timecode</label>
+      <input class="prop-input" id="prop-tc" type="number" step="0.1" min="0"
+        value="${int.timecode}" onchange="updateProp(null,'timecode',parseFloat(this.value))"
+        aria-label="Interaction timecode in seconds">
+    </div>
+    <div class="prop-row">
+      <label class="prop-label" for="prop-pause">Pause video</label>
+      <input type="checkbox" id="prop-pause" ${int.pause_on_reach?'checked':''}
+        onchange="updateProp(null,'pause_on_reach',this.checked)"
+        aria-label="Pause video when interaction is reached">
+    </div>`
+  var typeFields = ''
+  if (int.type === 'hotspot') {
+    typeFields = `
+      <div class="prop-row"><label class="prop-label">Label</label>
+        <input class="prop-input" value="${int.data.label||''}" onchange="updateProp('data','label',this.value)" aria-label="Hotspot label"></div>
+      <div class="prop-row"><label class="prop-label">Description</label>
+        <input class="prop-input" value="${int.data.description||''}" onchange="updateProp('data','description',this.value)" aria-label="Hotspot description"></div>
+      <div class="prop-row"><label class="prop-label">X position %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.x||50}" onchange="updateProp('data','x',parseFloat(this.value))" aria-label="Hotspot X position"></div>
+      <div class="prop-row"><label class="prop-label">Y position %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.y||50}" onchange="updateProp('data','y',parseFloat(this.value))" aria-label="Hotspot Y position"></div>
+      <div class="prop-row"><label class="prop-label">End timecode</label>
+        <input class="prop-input" type="number" step="0.1" value="${int.end_timecode||''}" onchange="updateProp(null,'end_timecode',parseFloat(this.value))" aria-label="End timecode"></div>`
+  }
+  else if (int.type === 'quiz') {
+    typeFields = `
+      <div class="prop-row"><label class="prop-label">Question</label>
+        <input class="prop-input" value="${int.data.question||''}" onchange="updateProp('data','question',this.value)" aria-label="Quiz question"></div>
+      <div class="prop-row"><label class="prop-label">Choice A</label>
+        <input class="prop-input" value="${(int.data.choices||[])[0]||''}" onchange="updateChoice(0,this.value)" aria-label="Choice A"></div>
+      <div class="prop-row"><label class="prop-label">Choice B</label>
+        <input class="prop-input" value="${(int.data.choices||[])[1]||''}" onchange="updateChoice(1,this.value)" aria-label="Choice B"></div>
+      <div class="prop-row"><label class="prop-label">Choice C</label>
+        <input class="prop-input" value="${(int.data.choices||[])[2]||''}" onchange="updateChoice(2,this.value)" aria-label="Choice C"></div>
+      <div class="prop-row"><label class="prop-label">Correct (0-2)</label>
+        <input class="prop-input" type="number" min="0" max="2" value="${int.data.correct_index||0}" onchange="updateProp('data','correct_index',parseInt(this.value))" aria-label="Correct answer index"></div>`
+  }
+  else if (int.type === 'branch') {
+    typeFields = `
+      <div class="prop-row"><label class="prop-label">Prompt</label>
+        <input class="prop-input" value="${int.data.prompt||''}" onchange="updateProp('data','prompt',this.value)" aria-label="Branch prompt"></div>
+      <div class="prop-row"><label class="prop-label">Yes label</label>
+        <input class="prop-input" value="${int.data.true_label||'Yes'}" onchange="updateProp('data','true_label',this.value)" aria-label="True path label"></div>
+      <div class="prop-row"><label class="prop-label">No label</label>
+        <input class="prop-input" value="${int.data.false_label||'No'}" onchange="updateProp('data','false_label',this.value)" aria-label="False path label"></div>
+      <div class="prop-row"><label class="prop-label">Yes → timecode</label>
+        <input class="prop-input" type="number" step="0.1" value="${int.data.true_timecode||0}" onchange="updateProp('data','true_timecode',parseFloat(this.value))" aria-label="True path timecode"></div>
+      <div class="prop-row"><label class="prop-label">No → timecode</label>
+        <input class="prop-input" type="number" step="0.1" value="${int.data.false_timecode||0}" onchange="updateProp('data','false_timecode',parseFloat(this.value))" aria-label="False path timecode"></div>`
+  }
+  else if (int.type === 'wcn') {
+    typeFields = `
+      <div class="prop-row"><label class="prop-label">Type</label>
+        <select class="prop-input" onchange="updateProp('data','wcn_type',this.value)" aria-label="WCN type">
+          <option value="warning"  ${int.data.wcn_type==='warning' ?'selected':''}>Warning</option>
+          <option value="caution"  ${int.data.wcn_type==='caution' ?'selected':''}>Caution</option>
+          <option value="note"     ${int.data.wcn_type==='note'    ?'selected':''}>Note</option>
+        </select></div>
+      <div class="prop-row"><label class="prop-label">Title</label>
+        <input class="prop-input" value="${int.data.title||''}" onchange="updateProp('data','title',this.value)" aria-label="WCN title"></div>
+      <div class="prop-row"><label class="prop-label">Text</label>
+        <input class="prop-input" value="${int.data.text||''}" onchange="updateProp('data','text',this.value)" aria-label="WCN text"></div>
+      <div class="prop-row"><label class="prop-label">End timecode</label>
+        <input class="prop-input" type="number" step="0.1" value="${int.end_timecode||''}" onchange="updateProp(null,'end_timecode',parseFloat(this.value))" aria-label="WCN end timecode"></div>`
+  }
+  else if (int.type === 'annotation') {
+    typeFields = `
+      <div class="prop-row"><label class="prop-label">Text</label>
+        <input class="prop-input" value="${int.data.text||''}" onchange="updateProp('data','text',this.value)" aria-label="Annotation text"></div>
+      <div class="prop-row"><label class="prop-label">X position %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.x||50}" onchange="updateProp('data','x',parseFloat(this.value))" aria-label="Annotation X"></div>
+      <div class="prop-row"><label class="prop-label">Y position %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.y||30}" onchange="updateProp('data','y',parseFloat(this.value))" aria-label="Annotation Y"></div>
+      <div class="prop-row"><label class="prop-label">End timecode</label>
+        <input class="prop-input" type="number" step="0.1" value="${int.end_timecode||''}" onchange="updateProp(null,'end_timecode',parseFloat(this.value))" aria-label="Annotation end timecode"></div>`
+  }
+  document.getElementById('props-content').innerHTML = commonFields + typeFields
+}
+
+function clearProperties() {
+  document.getElementById('props-title').textContent = 'Select an interaction to edit'
+  document.getElementById('props-content').innerHTML = '<p style="font-size:12px;color:var(--text3)">Click an interaction in the list or timeline.</p>'
+}
+
+function updateProp(scope, field, value) {
+  if (!state.selectedId || !state.clip) return
+  var int = state.clip.interactions.find(i => i.id === state.selectedId)
+  if (!int) return
+  if (scope === 'data') int.data[field] = value
+  else                  int[field]      = value
+  renderInteractionList()
+  renderTimelineMarkers()
+  scheduleAutoSave()
+}
+
+function updateChoice(idx, value) {
+  if (!state.selectedId || !state.clip) return
+  var int = state.clip.interactions.find(i => i.id === state.selectedId)
+  if (!int || !int.data.choices) return
+  int.data.choices[idx] = value
+  scheduleAutoSave()
+}
+
+// ── Autosave ───────────────────────────────────────────────────
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(autoSave, 1200)
+}
+
+function autoSave() {
+  if (!state.clipId || !state.clip) return
+  document.getElementById('autosave-label').textContent = 'saving…'
+  fetch(`/api/clip/${state.clipId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(state.clip),
+  })
+    .then(r => r.json())
+    .then(function(saved) {
+      state.clip = saved
+      document.getElementById('autosave-label').textContent = 'saved ✓'
+      setTimeout(function() { document.getElementById('autosave-label').textContent = '' }, 1500)
+    })
+    .catch(function() { document.getElementById('autosave-label').textContent = '⚠ save failed' })
+}
+
+// ── Export ─────────────────────────────────────────────────────
+function exportClip() {
+  if (!state.clipId) return
+  fetch(`/api/clip/${state.clipId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(state.clip),
+  }).then(function() { window.location.href = `/api/clip/${state.clipId}/export` })
+}
+
+// ── Import ─────────────────────────────────────────────────────
+function importClip() {
+  var input = document.createElement('input')
+  input.type   = 'file'
+  input.accept = '.clip.json,.json'
+  input.onchange = function(e) {
+    var file = e.target.files[0]
+    if (!file) return
+    var reader = new FileReader()
+    reader.onload = function(ev) {
+      try {
+        var clip = JSON.parse(ev.target.result)
+        fetch('/api/clip', {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(clip.video || {}),
+        })
+          .then(r => r.json())
+          .then(function(newClip) {
+            state.clipId = newClip.id
+            state.clip = Object.assign(newClip, { interactions: clip.interactions || [] })
+            return fetch(`/api/clip/${state.clipId}`, {
+              method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state.clip),
+            })
+          })
+          .then(r => r.json())
+          .then(function(saved) {
+            state.clip = saved
+            renderInteractionList()
+            renderTimelineMarkers()
+            document.getElementById('btn-export').disabled   = false
+            document.getElementById('export-btn-2').disabled = false
+            alert(`Imported ${saved.interactions.length} interactions.\nLoad the video file to preview them on the timeline.`)
+          })
+      } catch(err) { alert('Invalid .clip.json file: ' + err.message) }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+// ── Utilities ──────────────────────────────────────────────────
+function formatTC(secs) {
+  if (!secs && secs !== 0) return '--:--.--'
+  var m  = Math.floor(secs / 60)
+  var s  = Math.floor(secs % 60)
+  var ds = Math.floor((secs % 1) * 10)
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${ds}`
+}
+</script>
+
+</body>
+</html>
