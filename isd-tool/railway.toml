@@ -1,0 +1,12 @@
+# Config for the isd-tool Railway service. Read automatically once the
+# service's Root Directory is set to "isd-tool". This isolates the static
+# tool from the Flask app's root railway.toml (which has a gunicorn start
+# command, a `flask db upgrade` preDeploy, and an /api/health healthcheck —
+# none of which apply here). No healthcheck: the deploy is healthy once the
+# http.server container starts listening on $PORT.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"

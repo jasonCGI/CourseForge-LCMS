@@ -28,27 +28,28 @@ python3 -m http.server 8000 --directory isd-tool
 
 ## Deploy to Railway (python http.server)
 
-This tool is deployed as its **own Railway service**, separate from the Flask
-app, serving the static `index.html` via Python's built-in HTTP server
-(`python3 -m http.server`) in a tiny container.
+Deployed as its **own Railway service**, separate from the Flask app, serving
+the static files via Python's built-in HTTP server (`python3 -m http.server`)
+in a tiny container.
 
-Because both services live in one repo, the isd-tool service uses a dedicated
-`isd-tool/Dockerfile` instead of the repo-root nixpacks build (which is the
-Flask app). The service variable `RAILWAY_DOCKERFILE_PATH=isd-tool/Dockerfile`
-tells Railway to build with it; the Dockerfile copies only `isd-tool/` and runs
-`python3 -m http.server $PORT --bind 0.0.0.0`.
+Because both services share one repo, the isd-tool service sets its **Root
+Directory = isd-tool**. Railway then builds from this folder and reads
+`isd-tool/railway.toml` (which selects `isd-tool/Dockerfile`), ignoring the
+repo-root config (the Flask app's gunicorn / `flask db upgrade` / `/api/health`
+healthcheck — none of which apply here).
 
-Set up (already scripted via the Railway CLI):
+Setup:
 
 ```
-railway add --service isd-tool
-railway variables --set "RAILWAY_DOCKERFILE_PATH=isd-tool/Dockerfile" --service isd-tool
-railway up --service isd-tool        # builds with the Dockerfile, deploys
+railway add --service isd-tool       # create the service (CLI)
+# Dashboard: isd-tool service -> Settings -> Root Directory = isd-tool
+railway up --service isd-tool        # build + deploy
 railway domain --service isd-tool    # generate a public URL
 ```
 
-No `DATABASE_URL` or other variables are required — the tool is 100%
-client-side; SheetJS loads from CDN.
+The Dockerfile runs `python3 -m http.server $PORT --bind 0.0.0.0`. No
+`DATABASE_URL` or other variables are required — the tool is 100% client-side
+(SheetJS via CDN).
 
 ## Column schema (locked)
 
