@@ -44,13 +44,15 @@ const BUTTONS = [
 export default function ModeToggle() {
   const { mode, setMode } = useTheme()
 
-  // Inactive icons — bright enough to see on any bg (3:1+ vs dark bg)
-  const inactiveIcon   = mode === 'hc' ? '#FFFFFF' : '#8AAAC8'
+  // Inactive icons — adapt per mode so they stay visible on each header bg
+  const inactiveIcon =
+    mode === 'light' ? '#90C0E8'   // visible on navy #1B3A5C header
+    : mode === 'hc'  ? '#CCCCCC'   // grey on black, doesn't compete with amber
+    :                  '#8AAAC8'   // dark mode
 
   // Active pill
   const activePillBg     = mode === 'hc' ? '#EF9F27' : '#1B3A5C'
   const activePillBorder = mode === 'hc' ? '#EF9F27' : '#2A5A8A'
-  const activeIconColor  = mode === 'hc' ? '#000000' : '#EF9F27'
 
   // Group wrapper
   const groupBg     = mode === 'hc' ? '#000000' : '#0e1320'
@@ -71,6 +73,9 @@ export default function ModeToggle() {
     >
       {BUTTONS.map(({ mode: m, label, Icon }) => {
         const isActive = mode === m
+        // Literal hex only — never a CSS var (var() doesn't resolve as an SVG fill attribute).
+        // HC active stays black (amber-on-amber pill would be invisible).
+        const iconColor = isActive ? (mode === 'hc' ? '#000000' : '#EF9F27') : inactiveIcon
         return (
           <button
             key={m}
@@ -93,7 +98,7 @@ export default function ModeToggle() {
             }}
           >
             <Icon
-              color={isActive ? activeIconColor : inactiveIcon}
+              color={iconColor}
               size={13}
               strokeWidth={m === 'hc' && mode === 'hc' ? 2.5 : 1.8}
             />
