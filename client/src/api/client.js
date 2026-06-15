@@ -34,4 +34,11 @@ export const deleteFrame = (id) => api.delete(`/frames/${id}`)
 // ── Reorder ──────────────────────────────────────────────────────────────────
 export const reorder = (type, items) => api.post('/reorder', { type, items })
 
+// ── Publish ──────────────────────────────────────────────────────────────────
+export const publishProject = (projectId, format) =>
+  api.post('/publish', { project_id: projectId, format }, { responseType: 'blob' })
+
+export const getPublishJobs = (projectId) =>
+  api.get(`/publish/jobs/${projectId}`)
+
 export default api

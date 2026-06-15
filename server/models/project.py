@@ -12,6 +12,9 @@ class Project(db.Model):
     description = db.Column(db.Text)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    theme_id        = db.Column(db.String(36), db.ForeignKey('gui_themes.id'), nullable=True)
+    theme_overrides = db.Column(db.JSON, default=dict)
+    theme           = db.relationship('GUITheme', back_populates='projects')
     courses     = db.relationship('Course', back_populates='project', cascade='all, delete-orphan', order_by='Course.order_index')
 
 class Course(db.Model):

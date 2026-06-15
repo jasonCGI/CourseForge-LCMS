@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
 import FrameEditor from './components/Editor/FrameEditor'
+import PublishModal from './components/Publish/PublishModal'
 import useProjectStore from './store/projectStore'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -11,6 +12,7 @@ const DEMO_AUTOLOAD = true
 
 export default function App() {
   const { projects, fetchProjects, fetchProject, autoloadDemo, loading } = useProjectStore()
+  const [showPublish, setShowPublish] = useState(false)
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
 
@@ -130,6 +132,26 @@ export default function App() {
             letterSpacing: '0.08em',
           }}>loading…</span>
         )}
+
+        {/* Publish */}
+        <button
+          onClick={() => setShowPublish(true)}
+          style={{
+            marginLeft: 12,
+            padding: '5px 14px',
+            background: '#EF9F27',
+            color: '#042C53',
+            border: 'none',
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: "'SF Mono', Consolas, monospace",
+            letterSpacing: '0.04em',
+          }}
+        >
+          ⬇ Publish
+        </button>
       </div>
 
       {/* Main split pane */}
@@ -196,6 +218,8 @@ export default function App() {
         </Panel>
 
       </PanelGroup>
+
+      {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
     </div>
   )
 }

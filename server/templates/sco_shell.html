@@ -3,40 +3,332 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ frame.name }}</title>
+  <title>{{ frame_name }}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #fff; }
-    .frame-container { max-width: 960px; margin: 0 auto; padding: 24px; }
-    .oam-frame { border: none; display: block; }
+    /* ── Resolved theme tokens ── */
+    {{ theme_css }}
+
+    /* ── SCO base styles ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--cf-font, Inter, system-ui, sans-serif);
+      font-size: var(--cf-font-size, 16px);
+      background: var(--cf-bg, #ffffff);
+      color: var(--cf-text, #1a1a1a);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Nav */
+    .cf-nav {
+      background: var(--cf-nav-bg, #042C53);
+      color: var(--cf-nav-text, #B5D4F4);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .cf-nav-title { font-size: 15px; font-weight: 500; flex: 1; }
+
+    .cf-nav-btn {
+      padding: 6px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--cf-radius, 6px);
+      background: transparent;
+      color: var(--cf-nav-text, #B5D4F4);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .cf-nav-btn:hover { background: rgba(255,255,255,0.1); }
+    .cf-nav-btn:disabled { opacity: 0.3; cursor: default; }
+
+    /* Progress bar */
+    .cf-progress {
+      height: 3px;
+      background: rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+    .cf-progress-fill {
+      height: 100%;
+      background: var(--cf-accent, #EF9F27);
+      transition: width 0.3s ease;
+    }
+
+    /* Content */
+    .cf-content {
+      flex: 1;
+      padding: 32px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .cf-frame-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--cf-secondary, #042C53);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--cf-accent, #EF9F27);
+    }
+
+    /* Text block */
+    .cf-text { margin-bottom: 20px; line-height: 1.7; }
+    .cf-narration {
+      padding: 10px 14px;
+      background: #F0F6FF;
+      border-left: 3px solid var(--cf-primary, #185FA5);
+      border-radius: 0 4px 4px 0;
+      font-style: italic;
+      color: var(--cf-primary, #185FA5);
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    /* Media placeholder */
+    .cf-media {
+      padding: 32px;
+      border: 2px dashed var(--cf-primary, #185FA5);
+      border-radius: var(--cf-radius, 6px);
+      text-align: center;
+      background: #F8FBFF;
+      color: var(--cf-primary, #185FA5);
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    /* Quiz */
+    .cf-quiz { margin-bottom: 20px; }
+    .cf-quiz-question {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--cf-secondary, #042C53);
+      margin-bottom: 16px;
+    }
+    .cf-choice {
+      display: block;
+      width: 100%;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      border: 2px solid #ddd;
+      border-radius: var(--cf-radius, 6px);
+      background: #fff;
+      font-size: 15px;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .cf-choice:hover  { border-color: var(--cf-primary, #185FA5); background: #F0F6FF; }
+    .cf-choice.correct   { border-color: #3B8A4A; background: #EAF6EC; color: #1E7E34; }
+    .cf-choice.incorrect { border-color: #C0392B; background: #FDECEA; color: #C0392B; }
+    .cf-submit {
+      padding: 10px 24px;
+      background: var(--cf-primary, #185FA5);
+      color: #fff;
+      border: none;
+      border-radius: var(--cf-radius, 6px);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 8px;
+    }
+    .cf-feedback {
+      padding: 12px 16px;
+      border-radius: var(--cf-radius, 6px);
+      margin-top: 12px;
+      font-weight: 500;
+      display: none;
+    }
+    .cf-feedback.correct   { background: #EAF6EC; color: #1E7E34; border: 1px solid #3B8A4A; }
+    .cf-feedback.incorrect { background: #FDECEA; color: #C0392B; border: 1px solid #C0392B; }
+
+    /* Hotspot */
+    .cf-hotspot-wrap {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%;
+      background: #E8F0F8;
+      border: 1px solid #B5D4F4;
+      border-radius: var(--cf-radius, 6px);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .cf-hotspot-region {
+      position: absolute;
+      border: 2px solid var(--cf-primary, #185FA5);
+      background: rgba(24,95,165,0.1);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cf-hotspot-region:hover {
+      background: rgba(239,159,39,0.2);
+      border-color: var(--cf-accent, #EF9F27);
+    }
+    .cf-hotspot-label {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: var(--cf-secondary, #042C53);
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px 4px 0 0;
+      white-space: nowrap;
+    }
+    .cf-hotspot-region:hover .cf-hotspot-label { display: block; }
+
+    /* Branch */
+    .cf-branch { margin-bottom: 20px; }
+    .cf-branch-condition {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--cf-secondary, #042C53);
+      margin-bottom: 16px;
+    }
+    .cf-branch-btns { display: flex; gap: 12px; }
+    .cf-branch-btn {
+      flex: 1;
+      padding: 14px 20px;
+      border: 2px solid;
+      border-radius: var(--cf-radius, 6px);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .cf-branch-btn.true  { border-color: #3B8A4A; color: #3B8A4A; background: #fff; }
+    .cf-branch-btn.false { border-color: #C0392B; color: #C0392B; background: #fff; }
+    .cf-branch-btn.true:hover  { background: #3B8A4A; color: #fff; }
+    .cf-branch-btn.false:hover { background: #C0392B; color: #fff; }
+
+    /* OAM iframe */
+    .cf-oam-frame {
+      width: 100%;
+      border: none;
+      display: block;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
-  <div class="frame-container">
-    <!-- Blocks rendered here by publish service -->
-    {% block content %}{% endblock %}
+
+  <!-- Navigation -->
+  <nav class="cf-nav">
+    <span class="cf-nav-title">{{ lesson_name }}</span>
+    <button class="cf-nav-btn" id="btn-prev" onclick="cfNavigate('prev')" disabled>← Back</button>
+    <span style="font-size:12px; opacity:0.6;">{{ frame_index + 1 }} / {{ total_frames }}</span>
+    <button class="cf-nav-btn" id="btn-next" onclick="cfNavigate('next')">Next →</button>
+  </nav>
+
+  <!-- Progress bar -->
+  <div class="cf-progress">
+    <div class="cf-progress-fill" style="width: {{ progress_pct }}%"></div>
   </div>
 
-  <!-- SCORM bridge — injected when OAM has_scorm_calls = true -->
-  {% if scorm_bridge %}
-  <script>
-  (function() {
-    var API = window.API || window.parent.API;
-    var API_1484_11 = window.API_1484_11 || window.parent.API_1484_11;
-    window.addEventListener('message', function(e) {
-      if (!e.data || e.data.source !== 'oam_scorm_bridge') return;
-      var fn = e.data.fn;
-      var args = e.data.args || [];
-      var result = null;
-      if (API && typeof API[fn] === 'function') result = API[fn].apply(API, args);
-      else if (API_1484_11 && typeof API_1484_11[fn] === 'function') result = API_1484_11[fn].apply(API_1484_11, args);
-      e.source.postMessage({ source: 'oam_scorm_bridge_response', fn: fn, result: result }, '*');
-    });
-  })();
-  </script>
-  {% endif %}
+  <!-- Frame content -->
+  <div class="cf-content">
+    <h1 class="cf-frame-title">{{ frame_name }}</h1>
+    {{ blocks_html|safe }}
+  </div>
 
-  <!-- SCORM 1.2 API init stub — replaced by publish service -->
-  {% block scorm_api %}{% endblock %}
+  <!-- SCORM 1.2 API -->
+  <script>
+  // ── SCORM 1.2 wrapper ──────────────────────────────────────────
+  var scorm = {
+    api: null,
+    found: false,
+    init: function() {
+      this.api = this._findAPI(window);
+      if (this.api) {
+        this.found = true;
+        this.api.LMSInitialize('');
+        this.setValue('cmi.core.lesson_status', 'incomplete');
+      }
+    },
+    _findAPI: function(win) {
+      var attempts = 0;
+      while (!win.API && win.parent && win.parent !== win && attempts < 7) {
+        win = win.parent; attempts++;
+      }
+      return win.API || null;
+    },
+    setValue: function(key, val) {
+      if (this.api) this.api.LMSSetValue(key, val);
+    },
+    complete: function() {
+      this.setValue('cmi.core.lesson_status', 'completed');
+      this.setValue('cmi.core.exit', '');
+      if (this.api) this.api.LMSFinish('');
+    }
+  };
+
+  // ── Navigation ────────────────────────────────────────────────
+  var frameIndex  = {{ frame_index }};
+  var totalFrames = {{ total_frames }};
+  var frameMap    = {{ frame_map_json|safe }};  // {index: "sco_filename.html"}
+
+  function cfNavigate(dir) {
+    var next = dir === 'next' ? frameIndex + 1 : frameIndex - 1;
+    if (next < 0 || next >= totalFrames) return;
+    if (next === totalFrames - 1) scorm.complete();
+    window.location.href = frameMap[next];
+  }
+
+  document.getElementById('btn-prev').disabled = (frameIndex === 0);
+  document.getElementById('btn-next').disabled = (frameIndex === totalFrames - 1);
+
+  // ── Quiz logic ────────────────────────────────────────────────
+  function cfSubmitQuiz(blockId, correctIndex) {
+    var selected = document.querySelector(
+      '#quiz-' + blockId + ' .cf-choice.selected'
+    );
+    if (!selected) return;
+    var idx = parseInt(selected.getAttribute('data-index'));
+    var choices = document.querySelectorAll('#quiz-' + blockId + ' .cf-choice');
+    choices.forEach(function(btn) { btn.disabled = true; });
+    choices[correctIndex].classList.add('correct');
+    if (idx !== correctIndex) selected.classList.add('incorrect');
+    var fb = document.getElementById('feedback-' + blockId);
+    fb.style.display = 'block';
+    fb.classList.add(idx === correctIndex ? 'correct' : 'incorrect');
+    // Report score to SCORM
+    scorm.setValue('cmi.core.score.raw', idx === correctIndex ? '100' : '0');
+  }
+
+  function cfSelectChoice(blockId, btn) {
+    document.querySelectorAll('#quiz-' + blockId + ' .cf-choice')
+      .forEach(function(b) { b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    btn.style.borderColor = 'var(--cf-primary)';
+    btn.style.background  = '#F0F6FF';
+  }
+
+  // ── OAM SCORM bridge ─────────────────────────────────────────
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.source !== 'oam_scorm_bridge') return;
+    var fn = e.data.fn, args = e.data.args || [], result = null;
+    if (scorm.api && typeof scorm.api[fn] === 'function') {
+      result = scorm.api[fn].apply(scorm.api, args);
+    }
+    e.source.postMessage({
+      source: 'oam_scorm_bridge_response', fn: fn, result: result
+    }, '*');
+  });
+
+  // ── Init ─────────────────────────────────────────────────────
+  scorm.init();
+  </script>
+
 </body>
 </html>

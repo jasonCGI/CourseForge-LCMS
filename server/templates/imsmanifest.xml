@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="{{ manifest_id }}"
+  version="1.2"
+  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2
+    imscp_rootv1p1p2.xsd
+    http://www.adlnet.org/xsd/adlcp_rootv1p2
+    adlcp_rootv1p2.xsd">
+
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+
+  <organizations default="{{ org_id }}">
+    <organization identifier="{{ org_id }}">
+      <title>{{ project_name }}</title>
+      {% for item in items %}
+      <item identifier="{{ item.item_id }}" identifierref="{{ item.res_id }}">
+        <title>{{ item.title }}</title>
+      </item>
+      {% endfor %}
+    </organization>
+  </organizations>
+
+  <resources>
+    {% for res in resources %}
+    <resource identifier="{{ res.res_id }}"
+      type="webcontent"
+      adlcp:scormtype="sco"
+      href="{{ res.href }}">
+      <file href="{{ res.href }}"/>
+      {% for dep in res.dependencies %}
+      <file href="{{ dep }}"/>
+      {% endfor %}
+    </resource>
+    {% endfor %}
+  </resources>
+
+</manifest>

@@ -1,10 +1,219 @@
-"""Standalone web export.
-
-Renders a project into a self-contained static website (no LMS runtime).
-Implemented in a later sprint.
+"""
+Standalone Web HTML Bundle Builder
+Single self-contained HTML file — no LMS required.
+All frames rendered as sections, JS handles navigation.
 """
 
+import uuid
+import json
+from io import BytesIO
+import zipfile
+from datetime import datetime
+from flask import render_template
 
-def export_web(project, output_dir):
-    """Export a project as a standalone website. Stub — implemented later."""
-    raise NotImplementedError("export_web is implemented in a later sprint")
+from ..models.project import Project
+from ..services.theme_resolver import resolve_theme, tokens_to_css
+from ..services.scorm12 import _render_blocks
+
+
+def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
+    """
+    Build a standalone web ZIP containing index.html + assets.
+    Returns (BytesIO zip buffer, suggested filename).
+    """
+    project = Project.query.get_or_404(project_id)
+    tokens  = resolve_theme(project)
+    css     = tokens_to_css(tokens)
+
+    all_frames = []
+    for course in sorted(project.courses, key=lambda c: c.order_index):
+        for mod in sorted(course.modules, key=lambda m: m.order_index):
+            for lesson in sorted(mod.lessons, key=lambda l: l.order_index):
+                for frame in sorted(lesson.frames, key=lambda f: f.order_index):
+                    all_frames.append((frame, lesson, course))
+
+    total = len(all_frames)
+
+    # Build frames data for JS
+    frames_data = []
+    for idx, (frame, lesson, course) in enumerate(all_frames):
+        frames_data.append({
+            'id':       frame.id,
+            'name':     frame.name,
+            'lesson':   lesson.name,
+            'course':   course.name,
+            'html':     _render_blocks(frame.content.get('blocks', [])),
+            'progress': round((idx / max(total - 1, 1)) * 100),
+        })
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{project.name}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;400;600&display=swap" rel="stylesheet">
+  <style>
+    {css}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: var(--cf-font, Inter, system-ui, sans-serif);
+      background: var(--cf-bg, #fff);
+      color: var(--cf-text, #1a1a1a);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }}
+    .cf-nav {{
+      background: var(--cf-nav-bg, #042C53);
+      color: var(--cf-nav-text, #B5D4F4);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }}
+    .cf-nav-title {{ font-size: 15px; font-weight: 500; flex: 1; }}
+    .cf-nav-btn {{
+      padding: 6px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--cf-radius, 6px);
+      background: transparent;
+      color: var(--cf-nav-text, #B5D4F4);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }}
+    .cf-nav-btn:hover {{ background: rgba(255,255,255,0.1); }}
+    .cf-nav-btn:disabled {{ opacity: 0.3; cursor: default; }}
+    .cf-progress {{ height: 3px; background: rgba(255,255,255,0.15); }}
+    .cf-progress-fill {{
+      height: 100%;
+      background: var(--cf-accent, #EF9F27);
+      transition: width 0.3s ease;
+    }}
+    .cf-content {{
+      flex: 1;
+      padding: 32px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }}
+    .cf-frame-title {{
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--cf-secondary, #042C53);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--cf-accent, #EF9F27);
+    }}
+    .cf-text {{ margin-bottom: 20px; line-height: 1.7; }}
+    .cf-media {{
+      padding: 32px; border: 2px dashed var(--cf-primary, #185FA5);
+      border-radius: var(--cf-radius, 6px); text-align: center;
+      background: #F8FBFF; color: var(--cf-primary, #185FA5);
+      margin-bottom: 20px;
+    }}
+    .cf-quiz {{ margin-bottom: 20px; }}
+    .cf-quiz-question {{ font-size:16px; font-weight:600; margin-bottom:16px; }}
+    .cf-choice {{
+      display:block; width:100%; padding:12px 16px; margin-bottom:8px;
+      border:2px solid #ddd; border-radius:var(--cf-radius,6px);
+      background:#fff; font-size:15px; text-align:left; cursor:pointer;
+      font-family:inherit; transition:all 0.15s;
+    }}
+    .cf-choice:hover {{ border-color:var(--cf-primary,#185FA5); background:#F0F6FF; }}
+    .cf-choice.correct   {{ border-color:#3B8A4A; background:#EAF6EC; color:#1E7E34; }}
+    .cf-choice.incorrect {{ border-color:#C0392B; background:#FDECEA; color:#C0392B; }}
+    .cf-submit {{
+      padding:10px 24px; background:var(--cf-primary,#185FA5); color:#fff;
+      border:none; border-radius:var(--cf-radius,6px); font-size:14px;
+      font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px;
+    }}
+    .cf-feedback {{
+      padding:12px 16px; border-radius:var(--cf-radius,6px);
+      margin-top:12px; font-weight:500; display:none;
+    }}
+    .cf-feedback.correct   {{ background:#EAF6EC; color:#1E7E34; border:1px solid #3B8A4A; }}
+    .cf-feedback.incorrect {{ background:#FDECEA; color:#C0392B; border:1px solid #C0392B; }}
+    .cf-branch-btns {{ display:flex; gap:12px; }}
+    .cf-branch-btn {{
+      flex:1; padding:14px 20px; border:2px solid;
+      border-radius:var(--cf-radius,6px); font-size:15px;
+      font-weight:600; cursor:pointer; font-family:inherit;
+    }}
+    .cf-branch-btn.true  {{ border-color:#3B8A4A; color:#3B8A4A; background:#fff; }}
+    .cf-branch-btn.false {{ border-color:#C0392B; color:#C0392B; background:#fff; }}
+    .cf-branch-condition {{ font-size:16px; font-weight:600; margin-bottom:16px; }}
+  </style>
+</head>
+<body>
+  <nav class="cf-nav">
+    <span class="cf-nav-title" id="nav-title"></span>
+    <button class="cf-nav-btn" id="btn-prev" onclick="navigate(-1)">← Back</button>
+    <span id="nav-count" style="font-size:12px;opacity:0.6;"></span>
+    <button class="cf-nav-btn" id="btn-next" onclick="navigate(1)">Next →</button>
+  </nav>
+  <div class="cf-progress">
+    <div class="cf-progress-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+  <div class="cf-content" id="main-content"></div>
+
+  <script>
+  var frames = {json.dumps(frames_data, ensure_ascii=False)};
+  var current = 0;
+
+  function render(idx) {{
+    var f = frames[idx];
+    document.getElementById('nav-title').textContent = f.lesson;
+    document.getElementById('nav-count').textContent = (idx+1) + ' / ' + frames.length;
+    document.getElementById('progress-fill').style.width = f.progress + '%';
+    document.getElementById('btn-prev').disabled = idx === 0;
+    document.getElementById('btn-next').disabled = idx === frames.length - 1;
+    document.getElementById('main-content').innerHTML =
+      '<h1 class="cf-frame-title">' + f.name + '</h1>' + f.html;
+    current = idx;
+    window.scrollTo(0, 0);
+  }}
+
+  function navigate(dir) {{
+    var next = current + dir;
+    if (next >= 0 && next < frames.length) render(next);
+  }}
+
+  // Quiz functions
+  function cfSelectChoice(blockId, btn) {{
+    document.querySelectorAll('#quiz-' + blockId + ' .cf-choice')
+      .forEach(function(b) {{ b.classList.remove('selected'); b.style.borderColor=''; b.style.background=''; }});
+    btn.classList.add('selected');
+    btn.style.borderColor = 'var(--cf-primary)';
+    btn.style.background  = '#F0F6FF';
+  }}
+
+  function cfSubmitQuiz(blockId, correctIndex) {{
+    var selected = document.querySelector('#quiz-' + blockId + ' .cf-choice.selected');
+    if (!selected) return;
+    var idx = parseInt(selected.getAttribute('data-index'));
+    document.querySelectorAll('#quiz-' + blockId + ' .cf-choice')
+      .forEach(function(b) {{ b.disabled = true; }});
+    document.querySelectorAll('#quiz-' + blockId + ' .cf-choice')[correctIndex].classList.add('correct');
+    if (idx !== correctIndex) selected.classList.add('incorrect');
+    var fb = document.getElementById('feedback-' + blockId);
+    fb.style.display = 'block';
+    fb.classList.add(idx === correctIndex ? 'correct' : 'incorrect');
+  }}
+
+  render(0);
+  </script>
+</body>
+</html>"""
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('index.html', html)
+
+    buf.seek(0)
+    safe_name = project.name.replace(' ', '_').lower()[:40]
+    filename  = f"{safe_name}_web_{datetime.utcnow().strftime('%Y%m%d')}.zip"
+    return buf, filename
