@@ -7,7 +7,7 @@ Bump rules:
   PATCH — encoding tweak, UI fix, performance improvement
 """
 
-VERSION    = "1.0.0"
+VERSION    = "1.1.0"
 BUILD_DATE = "2026-06-15"
 
 # Processing modules available in this version
