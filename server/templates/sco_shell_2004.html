@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ frame_name }}</title>
+
+  <!-- Video.js — bundled -->
+  <link href="assets/video-js/video-js.min.css" rel="stylesheet">
+  <script src="assets/video-js/video.min.js"></script>
+
+  <style>
+    {{ theme_css }}
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--cf-font, Inter, system-ui, sans-serif);
+      font-size: var(--cf-font-size, 16px);
+      background: var(--cf-bg, #ffffff);
+      color: var(--cf-text, #1a1a1a);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cf-nav {
+      background: var(--cf-nav-bg, #042C53);
+      color: var(--cf-nav-text, #B5D4F4);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .cf-nav-title   { font-size: 15px; font-weight: 500; flex: 1; }
+
+    .cf-nav-btn {
+      padding: 6px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--cf-radius, 6px);
+      background: transparent;
+      color: var(--cf-nav-text, #B5D4F4);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .cf-nav-btn:hover    { background: rgba(255,255,255,0.1); }
+    .cf-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cf-nav-btn:focus-visible {
+      outline: 2px solid var(--cf-accent, #EF9F27);
+      outline-offset: 2px;
+    }
+
+    .cf-progress      { height: 3px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+    .cf-progress-fill {
+      height: 100%;
+      background: var(--cf-accent, #EF9F27);
+      transition: width 0.3s ease;
+    }
+
+    .cf-content {
+      flex: 1;
+      padding: 32px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .cf-frame-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--cf-secondary, #042C53);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--cf-accent, #EF9F27);
+    }
+
+    /* Block styles — same as SCORM 1.2 */
+    .cf-text         { margin-bottom: 20px; line-height: 1.7; }
+    .cf-narration    {
+      padding: 10px 14px;
+      background: #F0F6FF;
+      border-left: 3px solid var(--cf-primary, #185FA5);
+      font-style: italic;
+      color: var(--cf-primary, #185FA5);
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .cf-media        { padding: 32px; border: 2px dashed var(--cf-primary, #185FA5); border-radius: var(--cf-radius, 6px); text-align: center; background: #F8FBFF; color: var(--cf-primary, #185FA5); margin-bottom: 20px; font-size: 14px; }
+    .cf-quiz         { margin-bottom: 20px; }
+    .cf-quiz-question { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .cf-choice       { display:block; width:100%; padding:12px 16px; margin-bottom:8px; border:2px solid #ddd; border-radius:var(--cf-radius,6px); background:#fff; font-size:15px; text-align:left; cursor:pointer; font-family:inherit; transition:all 0.15s; }
+    .cf-choice:hover { border-color:var(--cf-primary,#185FA5); background:#F0F6FF; }
+    .cf-choice.correct   { border-color:#3B8A4A; background:#EAF6EC; color:#1E7E34; }
+    .cf-choice.incorrect { border-color:#C0392B; background:#FDECEA; color:#C0392B; }
+    .cf-submit       { padding:10px 24px; background:var(--cf-primary,#185FA5); color:#fff; border:none; border-radius:var(--cf-radius,6px); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:8px; }
+    .cf-feedback     { padding:12px 16px; border-radius:var(--cf-radius,6px); margin-top:12px; font-weight:500; display:none; }
+    .cf-feedback.correct   { background:#EAF6EC; color:#1E7E34; border:1px solid #3B8A4A; }
+    .cf-feedback.incorrect { background:#FDECEA; color:#C0392B; border:1px solid #C0392B; }
+    .cf-hotspot-wrap { position:relative; width:100%; padding-bottom:56.25%; background:#E8F0F8; border:1px solid #B5D4F4; border-radius:var(--cf-radius,6px); overflow:hidden; margin-bottom:20px; }
+    .cf-hotspot-region { position:absolute; border:2px solid var(--cf-primary,#185FA5); background:rgba(24,95,165,0.1); cursor:pointer; transition:all 0.15s; }
+    .cf-hotspot-region:hover { background:rgba(239,159,39,0.2); border-color:var(--cf-accent,#EF9F27); }
+    .cf-hotspot-label { display:none; position:absolute; bottom:100%; left:0; background:var(--cf-secondary,#042C53); color:#fff; font-size:11px; padding:4px 8px; border-radius:4px 4px 0 0; white-space:nowrap; }
+    .cf-hotspot-region:hover .cf-hotspot-label { display:block; }
+    .cf-branch       { margin-bottom:20px; }
+    .cf-branch-condition { font-size:16px; font-weight:600; margin-bottom:16px; }
+    .cf-branch-btns  { display:flex; gap:12px; }
+    .cf-branch-btn   { flex:1; padding:14px 20px; border:2px solid; border-radius:var(--cf-radius,6px); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s; }
+    .cf-branch-btn.true  { border-color:#3B8A4A; color:#3B8A4A; background:#fff; }
+    .cf-branch-btn.false { border-color:#C0392B; color:#C0392B; background:#fff; }
+    .cf-branch-btn.true:hover  { background:#3B8A4A; color:#fff; }
+    .cf-branch-btn.false:hover { background:#C0392B; color:#fff; }
+    .cf-oam-frame    { width:100%; border:none; display:block; margin-bottom:20px; }
+
+    /* Video.js CF skin */
+    .cf-video-player .vjs-control-bar { background:var(--cf-nav-bg,#042C53); }
+    .cf-video-player .vjs-play-progress,
+    .cf-video-player .vjs-volume-level { background:var(--cf-accent,#EF9F27); }
+    .cf-video-player .vjs-big-play-button { background:var(--cf-accent,#EF9F27); border:none; border-radius:50%; width:60px; height:60px; margin-top:-30px; margin-left:-30px; }
+    .cf-video-player .vjs-big-play-button .vjs-icon-placeholder::before { color:#000; font-size:28px; line-height:60px; }
+  </style>
+</head>
+<body>
+
+  <nav class="cf-nav" role="navigation" aria-label="Course navigation">
+    <span class="cf-nav-title">{{ lesson_name }}</span>
+    <button class="cf-nav-btn" id="btn-prev"
+      onclick="cfNavigate('prev')" disabled
+      aria-label="Previous frame">← Back</button>
+    <span style="font-size:12px;opacity:0.6" aria-live="polite">
+      {{ frame_index + 1 }} / {{ total_frames }}
+    </span>
+    <button class="cf-nav-btn" id="btn-next"
+      onclick="cfNavigate('next')"
+      aria-label="Next frame">Next →</button>
+  </nav>
+
+  <div class="cf-progress" role="progressbar"
+    aria-valuenow="{{ progress_pct }}"
+    aria-valuemin="0" aria-valuemax="100"
+    aria-label="Course progress">
+    <div class="cf-progress-fill" style="width:{{ progress_pct }}%"></div>
+  </div>
+
+  <main class="cf-content" id="main-content">
+    <h1 class="cf-frame-title">{{ frame_name }}</h1>
+    {{ blocks_html|safe }}
+  </main>
+
+  <!-- SCORM 2004 3rd Edition API -->
+  <script>
+  // ── SCORM 2004 wrapper ──────────────────────────────────────
+  var scorm2004 = {
+    api:   null,
+    found: false,
+    initialized: false,
+
+    init: function() {
+      this.api = this._findAPI(window);
+      if (this.api) {
+        this.found = true;
+        var result = this.api.Initialize('');
+        if (result === 'true' || result === true) {
+          this.initialized = true;
+          this.setValue('cmi.completion_status', 'incomplete');
+          this.setValue('cmi.success_status',    'unknown');
+        }
+      }
+    },
+
+    _findAPI: function(win) {
+      var attempts = 0;
+      while (!win.API_1484_11 && win.parent && win.parent !== win && attempts < 7) {
+        win = win.parent;
+        attempts++;
+      }
+      return win.API_1484_11 || null;
+    },
+
+    setValue: function(key, val) {
+      if (this.api && this.initialized) {
+        this.api.SetValue(key, val);
+        this.api.Commit('');
+      }
+    },
+
+    getValue: function(key) {
+      if (this.api && this.initialized) {
+        return this.api.GetValue(key);
+      }
+      return '';
+    },
+
+    setScore: function(raw, min, max) {
+      if (!this.initialized) return;
+      var scaled = (raw - min) / (max - min);
+      this.setValue('cmi.score.raw',    String(raw));
+      this.setValue('cmi.score.min',    String(min));
+      this.setValue('cmi.score.max',    String(max));
+      this.setValue('cmi.score.scaled', String(scaled.toFixed(4)));
+    },
+
+    complete: function() {
+      this.setValue('cmi.completion_status', 'completed');
+      this.setValue('cmi.success_status',    'passed');
+      if (this.api && this.initialized) {
+        this.api.Terminate('');
+      }
+    },
+
+    suspend: function() {
+      this.setValue('cmi.completion_status', 'incomplete');
+      if (this.api && this.initialized) {
+        this.api.Terminate('');
+      }
+    }
+  };
+
+  // ── Navigation ──────────────────────────────────────────────
+  var frameIndex  = {{ frame_index }};
+  var totalFrames = {{ total_frames }};
+  var frameMap    = {{ frame_map_json|safe }};
+
+  function cfNavigate(dir) {
+    var next = dir === 'next' ? frameIndex + 1 : frameIndex - 1;
+    if (next < 0 || next >= totalFrames) return;
+
+    // Last frame — complete the SCO
+    if (next === totalFrames - 1) {
+      scorm2004.complete();
+    } else {
+      scorm2004.suspend();
+    }
+
+    window.location.href = frameMap[next];
+  }
+
+  document.getElementById('btn-prev').disabled = (frameIndex === 0);
+  document.getElementById('btn-next').disabled = (frameIndex === totalFrames - 1);
+
+  // ── Quiz logic ──────────────────────────────────────────────
+  function cfSubmitQuiz(blockId, correctIndex) {
+    var selected = document.querySelector(
+      '#quiz-' + blockId + ' .cf-choice.selected'
+    );
+    if (!selected) return;
+
+    var idx = parseInt(selected.getAttribute('data-index'));
+    var choices = document.querySelectorAll('#quiz-' + blockId + ' .cf-choice');
+    choices.forEach(function(btn) { btn.disabled = true; });
+    choices[correctIndex].classList.add('correct');
+    if (idx !== correctIndex) selected.classList.add('incorrect');
+
+    var isCorrect = idx === correctIndex;
+    var fb = document.getElementById('feedback-' + blockId);
+    fb.style.display = 'block';
+    fb.classList.add(isCorrect ? 'correct' : 'incorrect');
+
+    // Report score via SCORM 2004
+    scorm2004.setScore(isCorrect ? 100 : 0, 0, 100);
+    if (isCorrect) {
+      scorm2004.setValue('cmi.success_status', 'passed');
+    }
+  }
+
+  function cfSelectChoice(blockId, btn) {
+    document.querySelectorAll('#quiz-' + blockId + ' .cf-choice')
+      .forEach(function(b) {
+        b.classList.remove('selected');
+        b.style.borderColor = '';
+        b.style.background  = '';
+      });
+    btn.classList.add('selected');
+    btn.style.borderColor = 'var(--cf-primary)';
+    btn.style.background  = '#F0F6FF';
+  }
+
+  // ── OAM SCORM 2004 bridge ───────────────────────────────────
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.source !== 'oam_scorm_bridge') return;
+    var fn   = e.data.fn;
+    var args = e.data.args || [];
+
+    // Map SCORM 1.2 calls from OAM to SCORM 2004 equivalents
+    var map12to2004 = {
+      'LMSInitialize': 'Initialize',
+      'LMSSetValue':   'SetValue',
+      'LMSGetValue':   'GetValue',
+      'LMSCommit':     'Commit',
+      'LMSFinish':     'Terminate',
+    };
+
+    var fn2004 = map12to2004[fn] || fn;
+    var result = null;
+
+    if (scorm2004.api && typeof scorm2004.api[fn2004] === 'function') {
+      result = scorm2004.api[fn2004].apply(scorm2004.api, args);
+    }
+
+    e.source.postMessage({
+      source: 'oam_scorm_bridge_response',
+      fn:     fn,
+      result: result,
+    }, '*');
+  });
+
+  // ── Init ────────────────────────────────────────────────────
+  scorm2004.init();
+
+  // ── Unload handler ──────────────────────────────────────────
+  window.addEventListener('beforeunload', function() {
+    scorm2004.suspend();
+  });
+  </script>
+
+</body>
+</html>

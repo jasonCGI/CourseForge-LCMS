@@ -3,6 +3,7 @@ from ..models.project import Project
 from ..models.publish_job import PublishJob
 from ..extensions import db
 from ..services.scorm12 import build_scorm12_package
+from ..services.scorm2004 import build_scorm2004_package
 from ..services.web_export import build_web_bundle
 from datetime import datetime
 
@@ -35,6 +36,8 @@ def publish():
     try:
         if fmt == 'scorm12':
             buf, filename = build_scorm12_package(project_id)
+        elif fmt == 'scorm2004':
+            buf, filename = build_scorm2004_package(project_id)
         elif fmt == 'web':
             buf, filename = build_web_bundle(project_id)
         else:

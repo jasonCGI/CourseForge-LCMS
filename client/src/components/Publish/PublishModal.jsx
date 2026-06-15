@@ -4,8 +4,9 @@ import useProjectStore from '../../store/projectStore'
 import AuditPanel from './AuditPanel'
 
 const FORMATS = [
-  { id: 'scorm12', label: 'SCORM 1.2', desc: 'Compatible with all LMS platforms including ADLS', icon: '📦' },
-  { id: 'web',     label: 'Web Bundle', desc: 'Standalone HTML — no LMS required, host anywhere', icon: '🌐' },
+  { id: 'scorm12',   label: 'SCORM 1.2',          desc: 'Compatible with all LMS platforms including ADLS and legacy systems', icon: '📦' },
+  { id: 'scorm2004', label: 'SCORM 2004 (3rd Ed)', desc: 'Modern LMS platforms — sequencing, flow control, richer tracking', icon: '📦' },
+  { id: 'web',       label: 'Web Bundle',          desc: 'Standalone HTML — no LMS required, host anywhere', icon: '🌐' },
 ]
 
 export default function PublishModal({ onClose }) {
@@ -24,7 +25,7 @@ export default function PublishModal({ onClose }) {
       const res  = await publishProject(activeProject.id, format)
       const url  = URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }))
       const a    = document.createElement('a')
-      const ext  = format === 'scorm12' ? 'scorm12' : 'web'
+      const ext  = format === 'web' ? 'web' : format
       a.href     = url
       a.download = `${activeProject.name.replace(/\s+/g,'_')}_${ext}.zip`
       a.click()

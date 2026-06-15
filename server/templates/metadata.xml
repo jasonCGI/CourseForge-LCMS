@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lom xmlns="http://ltsc.ieee.org/xsd/LOM"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://ltsc.ieee.org/xsd/LOM
+       http://ltsc.ieee.org/xsd/lomv1.0/lom.xsd">
+  <general>
+    <title>
+      <string language="en-US">{{ project_name }}</string>
+    </title>
+    <language>en-US</language>
+    <description>
+      <string language="en-US">{{ project_description }}</string>
+    </description>
+  </general>
+  <technical>
+    <format>text/html</format>
+    <requirement>
+      <orComposite>
+        <type>
+          <source><string language="en-US">LOMv1.0</string></source>
+          <value><string language="en-US">Browser</string></value>
+        </type>
+      </orComposite>
+    </requirement>
+  </technical>
+  <educational>
+    <interactivityType>
+      <source><string language="en-US">LOMv1.0</string></source>
+      <value><string language="en-US">mixed</string></value>
+    </interactivityType>
+  </educational>
+</lom>
