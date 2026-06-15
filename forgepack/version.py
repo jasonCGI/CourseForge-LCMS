@@ -7,11 +7,11 @@ Bump rules:
   PATCH — encoding tweak, UI fix, performance improvement
 """
 
-VERSION    = "1.2.0"
+VERSION    = "1.3.0"
 BUILD_DATE = "2026-06-15"
 
 # Processing modules available in this version
-MODULES = ["video", "audio"]  # image — future
+MODULES = ["video", "audio", "image"]
 
 def version_info() -> dict:
     return {

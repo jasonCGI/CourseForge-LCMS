@@ -380,6 +380,7 @@
 <div class="module-tabs" role="tablist" aria-label="ForgePack modules">
   <button class="module-tab active" id="mod-video-btn" role="tab" aria-selected="true" aria-controls="mod-video" onclick="switchModule('video')">🎬 Video</button>
   <button class="module-tab" id="mod-audio-btn" role="tab" aria-selected="false" aria-controls="mod-audio" onclick="switchModule('audio')">🎙 Audio</button>
+  <button class="module-tab" id="mod-image-btn" role="tab" aria-selected="false" aria-controls="mod-image" onclick="switchModule('image')">🖼 Image</button>
 </div>
 
 <div id="mod-video" role="tabpanel" aria-labelledby="mod-video-btn">
@@ -577,6 +578,87 @@
   </main>
 </div>
 
+<div id="mod-image" role="tabpanel" aria-labelledby="mod-image-btn" style="display:none">
+  <main class="body">
+    <div class="hero">
+      <h1>Process images for <strong>CourseForge</strong></h1>
+      <p>Upload raw images — ForgePack outputs WebP, PNG, retina, thumbnail,
+         and OG variants, ready to drop into CourseForge.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">01</span>
+        Select output preset
+      </div>
+      <div class="section-body"><div class="preset-grid" id="image-preset-grid"></div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">02</span>
+        Upload source image
+      </div>
+      <div class="section-body">
+        <div class="drop-zone" id="image-drop-zone" role="button" tabindex="0"
+          aria-label="Drop image file or click to browse"
+          onclick="document.getElementById('image-file-input').click()"
+          ondragover="imageDragOver(event)" ondragleave="imageDragLeave(event)" ondrop="imageDrop(event)"
+          onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('image-file-input').click()">
+          <div class="drop-zone-icon" id="image-dz-icon">🖼</div>
+          <h3 id="image-dz-title">Drop image file here</h3>
+          <p id="image-dz-sub">.png .jpg .tiff .webp .bmp accepted</p>
+        </div>
+        <input type="file" id="image-file-input"
+          accept=".png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.gif" onchange="imageFileSelect(event)">
+        <!-- WYSIWYG preview of the dropped image -->
+        <div id="image-preview-wrap" style="display:none;margin-top:14px;text-align:center">
+          <img id="image-preview" alt="Source image preview"
+            style="max-width:100%;max-height:320px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3)">
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-amber" id="image-btn-process" onclick="startImageProcessing()" disabled>⚙ Process Image</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="image-step-progress" style="display:none">
+      <div class="section-header">
+        <span style="color:var(--amber);font-family:var(--mono);font-size:12px">03</span>
+        Processing
+      </div>
+      <div class="section-body">
+        <div class="progress-wrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="image-progress-fill" style="width:0%"></div></div>
+          <div class="progress-label"><span id="image-progress-msg">Starting…</span><span id="image-progress-pct">0%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="image-step-output" style="display:none">
+      <div class="section-header">
+        <span style="color:#4CAF50;font-family:var(--mono);font-size:12px">✓</span>
+        Output ready
+      </div>
+      <div class="section-body">
+        <div id="image-output-card" class="output-card" style="margin-bottom:14px"></div>
+        <div id="image-info-card" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="resetImage()">↺ Process another</button>
+          <button class="btn btn-green" onclick="downloadImage()">⬇ Download ZIP</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="image-error" style="display:none" class="alert alert-error">
+      <strong>Processing failed:</strong> <span id="image-error-msg"></span>
+      <div style="margin-top:8px">
+        <button class="btn btn-outline" style="font-size:11px;padding:5px 12px" onclick="resetImage()">Try again</button>
+      </div>
+    </div>
+  </main>
+</div>
+
 <footer>
   ForgePack · Video module · Part of the CourseForge ecosystem &nbsp;·&nbsp;
   // video · audio · image processing
@@ -600,7 +682,7 @@ applyMode(document.documentElement.getAttribute('data-mode') || 'dark');
 
 // ── Module switcher ─────────────────────────────────────────────
 function switchModule(name) {
-  ['video','audio'].forEach(function(m) {
+  ['video','audio','image'].forEach(function(m) {
     var panel = document.getElementById('mod-' + m)
     var btn   = document.getElementById('mod-' + m + '-btn')
     if (panel) panel.style.display = m === name ? 'block' : 'none'
@@ -714,6 +796,122 @@ function resetAudio() {
   document.getElementById('audio-dz-title').textContent        = 'Drop audio file here'
   document.getElementById('audio-dz-sub').textContent          = '.wav .aiff .flac .mp3 .m4a .aac .ogg accepted'
   document.getElementById('audio-file-input').value            = ''
+}
+
+// ── Image module ────────────────────────────────────────────────
+var imageFile = null, imagePreset = 'web_standard', imageJobId = null, imagePoll = null, imagePreviewUrl = null
+
+fetch('/api/image/presets').then(r => r.json()).then(function(presets) {
+  var grid = document.getElementById('image-preset-grid'); if (!grid) return
+  presets.forEach(function(p) {
+    var card = document.createElement('div')
+    card.className = 'preset-card' + (p.key === imagePreset ? ' selected' : '')
+    card.setAttribute('role','radio'); card.setAttribute('aria-checked', p.key === imagePreset ? 'true':'false')
+    card.setAttribute('tabindex','0'); card.setAttribute('aria-label', p.label + ' — ' + p.description)
+    card.innerHTML = '<div class="preset-radio"></div><div><div class="preset-label">'+p.label+'</div><div class="preset-desc">'+p.description+'</div></div>'
+    card.onclick = function(){ selectImagePreset(p.key) }
+    card.onkeydown = function(e){ if(e.key==='Enter'||e.key===' ') selectImagePreset(p.key) }
+    grid.appendChild(card)
+  })
+}).catch(function(){})
+
+function selectImagePreset(key) {
+  imagePreset = key
+  var cards = document.querySelectorAll('#image-preset-grid .preset-card')
+  fetch('/api/image/presets').then(r=>r.json()).then(function(presets){
+    presets.forEach(function(p, i){
+      if (!cards[i]) return
+      var sel = p.key === key
+      cards[i].className = 'preset-card' + (sel ? ' selected' : '')
+      cards[i].setAttribute('aria-checked', sel ? 'true' : 'false')
+    })
+  })
+}
+
+function imageDragOver(e){ e.preventDefault(); document.getElementById('image-drop-zone').classList.add('drag-over') }
+function imageDragLeave(e){ document.getElementById('image-drop-zone').classList.remove('drag-over') }
+function imageDrop(e){ e.preventDefault(); document.getElementById('image-drop-zone').classList.remove('drag-over'); var f=e.dataTransfer.files[0]; if(f) setImageFile(f) }
+function imageFileSelect(e){ var f=e.target.files[0]; if(f) setImageFile(f) }
+function setImageFile(file) {
+  imageFile = file
+  document.getElementById('image-dz-icon').textContent  = '✓'
+  document.getElementById('image-dz-title').textContent = file.name
+  document.getElementById('image-dz-sub').textContent   = (file.size/1024/1024).toFixed(1) + ' MB · Click to change'
+  document.getElementById('image-btn-process').disabled = false
+  // WYSIWYG preview of the source image
+  if (imagePreviewUrl) { URL.revokeObjectURL(imagePreviewUrl) }
+  imagePreviewUrl = URL.createObjectURL(file)
+  document.getElementById('image-preview').src = imagePreviewUrl
+  document.getElementById('image-preview-wrap').style.display = 'block'
+}
+
+function startImageProcessing() {
+  if (!imageFile) return
+  var form = new FormData(); form.append('file', imageFile); form.append('preset', imagePreset)
+  document.getElementById('image-step-progress').style.display = 'block'
+  document.getElementById('image-btn-process').disabled = true
+  document.getElementById('image-error').style.display = 'none'
+  fetch('/api/image/upload', { method:'POST', body:form })
+    .then(function(r){ if(!r.ok) return r.json().then(function(d){ throw new Error(d.error||'Upload failed') }); return r.json() })
+    .then(function(data){ imageJobId = data.job_id; imagePoll = setInterval(pollImageStatus, 1000) })
+    .catch(function(err){ showImageError(err.message) })
+}
+
+function pollImageStatus() {
+  if (!imageJobId) return
+  fetch('/api/image/status/' + imageJobId).then(r=>r.json()).then(function(job){
+    document.getElementById('image-progress-fill').style.width = job.progress + '%'
+    document.getElementById('image-progress-msg').textContent  = job.message || ''
+    document.getElementById('image-progress-pct').textContent  = job.progress + '%'
+    if (job.status === 'complete') { clearInterval(imagePoll); showImageOutput(job) }
+    else if (job.status === 'failed') { clearInterval(imagePoll); showImageError(job.error || 'Processing failed.') }
+  }).catch(function(){})
+}
+
+function showImageOutput(job) {
+  document.getElementById('image-step-progress').style.display = 'none'
+  document.getElementById('image-step-output').style.display   = 'block'
+  var files = [
+    { ext:'WEBP',  color:'#185FA5', bg:'#0C3060', label:'Primary — WebP, web-optimized ('+(job.webp_kb||'?')+'KB)' },
+    { ext:'PNG',   color:'#1A7A5E', bg:'#0a2a1a', label:'Lossless fallback — PNG' },
+    { ext:'@2x',   color:'#7A3A9A', bg:'#1E1060', label:'Retina/HiDPI — higher quality WebP' },
+    { ext:'THUMB', color:'#B87A1A', bg:'#2a1a00', label:'Thumbnail — 256px longest edge, JPEG' },
+    { ext:'OG',    color:'#3A5A7A', bg:'#0a1828', label:'Social/OG — 1200×630 smart crop, JPEG' },
+  ]
+  document.getElementById('image-output-card').innerHTML = files.map(function(f){
+    return '<div class="output-file"><span class="output-ext" style="background:'+f.bg+';color:'+f.color+';width:52px">'+f.ext+'</span><span style="font-size:12px;color:var(--text2);flex:1">'+f.label+'</span></div>'
+  }).join('')
+  if (job.original_w && job.output_w) {
+    var resized = (job.original_w !== job.output_w || job.original_h !== job.output_h)
+    document.getElementById('image-info-card').innerHTML =
+      '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:11px"><div style="display:flex;gap:20px;flex-wrap:wrap">'+
+      '<div><span style="color:var(--text3)">Source</span><span style="color:var(--text);margin-left:8px">'+job.original_w+' × '+job.original_h+'px</span></div>'+
+      '<div><span style="color:var(--text3)">Output</span><span style="color:'+(resized?'#EF9F27':'var(--amber)')+';margin-left:8px">'+job.output_w+' × '+job.output_h+'px'+(resized?' (resized)':'')+'</span></div>'+
+      '<div><span style="color:var(--text3)">WebP size</span><span style="color:var(--text);margin-left:8px">'+(job.webp_kb||'?')+'KB</span></div>'+
+      '<div><span style="color:var(--text3)">EXIF</span><span style="color:#4CAF50;margin-left:8px">Stripped ✓</span></div>'+
+      '</div></div>'
+  }
+}
+
+function downloadImage(){ if(imageJobId) window.location.href = '/api/image/download/' + imageJobId }
+function showImageError(msg) {
+  document.getElementById('image-step-progress').style.display = 'none'
+  document.getElementById('image-error').style.display = 'block'
+  document.getElementById('image-error-msg').textContent = msg
+}
+function resetImage() {
+  clearInterval(imagePoll); imageJobId = null; imageFile = null
+  if (imagePreviewUrl) { URL.revokeObjectURL(imagePreviewUrl); imagePreviewUrl = null }
+  document.getElementById('image-step-progress').style.display = 'none'
+  document.getElementById('image-step-output').style.display   = 'none'
+  document.getElementById('image-error').style.display         = 'none'
+  document.getElementById('image-preview-wrap').style.display  = 'none'
+  document.getElementById('image-preview').src                 = ''
+  document.getElementById('image-btn-process').disabled        = true
+  document.getElementById('image-dz-icon').textContent         = '🖼'
+  document.getElementById('image-dz-title').textContent        = 'Drop image file here'
+  document.getElementById('image-dz-sub').textContent          = '.png .jpg .tiff .webp .bmp accepted'
+  document.getElementById('image-file-input').value            = ''
 }
 
 // ── State ──────────────────────────────────────────────────────
