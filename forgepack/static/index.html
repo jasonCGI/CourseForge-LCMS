@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgePack · Video Processor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:     #042C53;
+      --blue:     #185FA5;
+      --blue-lt:  #B5D4F4;
+      --amber:    #EF9F27;
+      --amber-dk: #BA7517;
+      --bg:       #06080f;
+      --bg2:      #0d1017;
+      --bg3:      #131822;
+      --border:   #1c2a3a;
+      --text:     #C8D8E8;
+      --text2:    #7A90A8;
+      --text3:    #3A5A7A;
+      --radius:   6px;
+      --font:     'Inter', system-ui, sans-serif;
+      --mono:     'JetBrains Mono', Consolas, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      border-bottom: 2px solid var(--amber);
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo { font-family: var(--font); font-size: 20px; display: flex; align-items: baseline; }
+    .logo-f  { font-weight: 100; color: var(--blue-lt); letter-spacing: -0.02em; }
+    .logo-sl { font-weight: 100; color: var(--amber); }
+    .logo-p  { font-weight: 200; color: #fff; letter-spacing: -0.02em; }
+    .logo-cur {
+      display: inline-block; width: 12px; height: 2px;
+      background: var(--amber); margin-left: 3px; margin-bottom: 2px;
+      border-radius: 1px; vertical-align: baseline;
+      animation: blink 1.05s step-end infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .header-tag {
+      margin-left: 8px;
+      padding: 2px 10px;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--blue-lt);
+      letter-spacing: 0.08em;
+      font-family: var(--mono);
+    }
+
+    /* ── Mark ── */
+    .mark { flex-shrink: 0; }
+
+    /* ── Body ── */
+    .body {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+      width: 100%;
+    }
+
+    .hero { text-align: center; padding: 32px 0 28px; }
+    .hero h1 { font-size: 26px; font-weight: 300; color: var(--text); margin-bottom: 10px; }
+    .hero h1 strong { font-weight: 600; color: var(--amber); }
+    .hero p  { font-size: 14px; color: var(--text2); max-width: 480px; margin: 0 auto; line-height: 1.6; }
+
+    /* ── Section ── */
+    .section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .section-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .section-body { padding: 18px; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--bg3);
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--blue);
+      background: rgba(24,95,165,0.06);
+    }
+
+    .drop-zone-icon { font-size: 36px; margin-bottom: 12px; }
+    .drop-zone h3   { font-size: 16px; font-weight: 400; margin-bottom: 6px; }
+    .drop-zone p    { font-size: 13px; color: var(--text2); }
+
+    /* ── Preset selector ── */
+    .preset-grid { display: flex; flex-direction: column; gap: 8px; }
+
+    .preset-card {
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .preset-card:hover { border-color: var(--blue); }
+    .preset-card.selected {
+      border-color: var(--amber);
+      background: rgba(239,159,39,0.06);
+    }
+
+    .preset-radio {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--border);
+      flex-shrink: 0; margin-top: 2px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .preset-card.selected .preset-radio {
+      border-color: var(--amber);
+      background: var(--amber);
+    }
+
+    .preset-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+    .preset-desc  { font-size: 11px; color: var(--text2); }
+
+    /* ── Progress ── */
+    .progress-wrap { margin-bottom: 12px; }
+    .progress-bar-bg {
+      height: 6px; background: var(--bg3);
+      border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+    }
+    .progress-bar-fill {
+      height: 100%; background: var(--amber);
+      border-radius: 3px; transition: width 0.3s ease;
+    }
+    .progress-label {
+      font-family: var(--mono); font-size: 11px; color: var(--text2);
+      display: flex; justify-content: space-between;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 20px; border-radius: var(--radius);
+      border: none; font-family: var(--font);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      text-decoration: none; transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+    .btn-amber   { background: var(--amber); color: var(--navy); }
+    .btn-blue    { background: var(--blue);  color: #fff; }
+    .btn-outline { background: transparent; color: var(--blue-lt); border: 1px solid var(--blue); }
+    .btn-green   { background: #1E7E34; color: #fff; }
+
+    /* ── Output card ── */
+    .output-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+
+    .output-file {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .output-file:last-child { border-bottom: none; }
+    .output-ext {
+      font-family: var(--mono); font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 3px;
+      width: 46px; text-align: center; flex-shrink: 0;
+    }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: 10px 14px; border-radius: var(--radius);
+      font-size: 13px; margin-bottom: 12px;
+    }
+
+    .alert-warn {
+      background: rgba(239,159,39,0.1);
+      border: 1px solid rgba(239,159,39,0.3);
+      color: var(--amber);
+    }
+
+    .alert-error {
+      background: rgba(194,57,52,0.1);
+      border: 1px solid rgba(194,57,52,0.3);
+      color: #E87070;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--text3);
+      font-size: 11px;
+      font-family: var(--mono);
+      border-top: 1px solid var(--border);
+    }
+
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <!-- ForgePack mark D — layer stack -->
+  <svg class="mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+    <rect x="3"  y="18" width="22" height="5" rx="2" fill="#185FA5" opacity="0.4"/>
+    <rect x="3"  y="12" width="22" height="5" rx="2" fill="#185FA5" opacity="0.65"/>
+    <rect x="3"  y="6"  width="22" height="5" rx="2" fill="#185FA5"/>
+    <polygon points="14,0 19,6 9,6" fill="#EF9F27"/>
+  </svg>
+
+  <div class="logo">
+    <span class="logo-f">Forge</span>
+    <span class="logo-sl">/</span>
+    <span class="logo-p">Pack</span>
+    <span class="logo-cur"></span>
+  </div>
+  <span class="header-tag">Video · v1.0</span>
+  <span style="
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    margin-left: auto;
+    opacity: 0.6;
+  " id="fp-version">v1.0.0</span>
+</header>
+
+<main class="body">
+
+  <div class="hero">
+    <h1>Process video for <strong>CourseForge</strong></h1>
+    <p>Upload a raw video file — ForgePack outputs an optimized MP4, WebM fallback, poster image, and caption placeholder, ready to drop into CourseForge.</p>
+  </div>
+
+  <!-- ── Step 1: Preset ── -->
+  <div class="section" id="step-preset">
+    <div class="section-header">
+      <span style="color:var(--amber);font-family:var(--mono);font-size:12px">01</span>
+      Select quality preset
+    </div>
+    <div class="section-body">
+      <div class="preset-grid" id="preset-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Upload ── -->
+  <div class="section" id="step-upload">
+    <div class="section-header">
+      <span style="color:var(--amber);font-family:var(--mono);font-size:12px">02</span>
+      Upload source video
+    </div>
+    <div class="section-body">
+      <div
+        class="drop-zone"
+        id="drop-zone"
+        role="button"
+        tabindex="0"
+        aria-label="Drop video file or click to browse"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave(event)"
+        ondrop="handleDrop(event)"
+        onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('file-input').click()"
+      >
+        <div class="drop-zone-icon" id="dz-icon">🎬</div>
+        <h3 id="dz-title">Drop video file here</h3>
+        <p id="dz-sub">or click to browse · .mov .mp4 .avi .mts .mkv .wmv .m4v accepted</p>
+      </div>
+      <input type="file" id="file-input" accept=".mov,.mp4,.avi,.mts,.m2ts,.mkv,.wmv,.flv,.webm,.m4v" onchange="handleFileSelect(event)">
+
+      <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-amber" id="btn-process" onclick="startProcessing()" disabled>
+          ⚙ Process Video
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Progress ── -->
+  <div class="section" id="step-progress" style="display:none">
+    <div class="section-header">
+      <span style="color:var(--amber);font-family:var(--mono);font-size:12px">03</span>
+      Processing
+    </div>
+    <div class="section-body">
+      <div class="progress-wrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-label">
+          <span id="progress-msg">Starting…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text3);font-family:var(--mono)">
+        // Processing runs server-side · do not close this tab
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Step 4: Output ── -->
+  <div class="section" id="step-output" style="display:none">
+    <div class="section-header">
+      <span style="color:#4CAF50;font-family:var(--mono);font-size:12px">✓</span>
+      Output ready
+    </div>
+    <div class="section-body">
+      <div class="output-card" id="output-card" style="margin-bottom:14px">
+        <!-- Populated by JS -->
+      </div>
+
+      <div id="audio-warning" style="display:none" class="alert alert-warn">
+        ⚠ No audio stream detected in source file. The .vtt caption placeholder notes
+        that captions may not be required — verify with the content author before publishing.
+      </div>
+
+      <div id="caption-reminder" style="display:none" class="alert alert-warn">
+        ⚠ Audio detected. The .vtt file is a placeholder only.
+        Replace it with real captions before importing to CourseForge — required for 508 compliance (WCAG 1.2.2).
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="resetTool()">↺ Process another</button>
+        <button class="btn btn-green" id="btn-download" onclick="downloadOutput()">
+          ⬇ Download ZIP
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Error ── -->
+  <div id="error-section" style="display:none" class="alert alert-error">
+    <strong>Processing failed:</strong> <span id="error-msg"></span>
+    <div style="margin-top:8px">
+      <button class="btn btn-outline" style="font-size:11px;padding:5px 12px" onclick="resetTool()">Try again</button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  ForgePack · Video module · Part of the CourseForge ecosystem &nbsp;·&nbsp;
+  // video · audio · image processing
+</footer>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+var selectedFile   = null;
+var selectedPreset = 'training_standard';
+var currentJobId   = null;
+var pollInterval   = null;
+
+// ── Init: load version ──────────────────────────────────────────
+fetch('/api/version')
+  .then(r => r.json())
+  .then(function(data) {
+    var el = document.getElementById('fp-version');
+    if (el) el.textContent = 'v' + data.version;
+  })
+  .catch(function() {}); // silent — version display is non-critical
+
+// ── Init: load presets ─────────────────────────────────────────
+fetch('/api/video/presets')
+  .then(r => r.json())
+  .then(presets => {
+    var grid = document.getElementById('preset-grid');
+    presets.forEach(function(p) {
+      var card = document.createElement('div');
+      card.className = 'preset-card' + (p.key === selectedPreset ? ' selected' : '');
+      card.setAttribute('role', 'radio');
+      card.setAttribute('aria-checked', p.key === selectedPreset ? 'true' : 'false');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', p.label + ' — ' + p.description);
+      card.innerHTML = `
+        <div class="preset-radio"></div>
+        <div>
+          <div class="preset-label">${p.label}</div>
+          <div class="preset-desc">${p.description}</div>
+        </div>`;
+      card.onclick = function() { selectPreset(p.key); };
+      card.onkeydown = function(e) { if(e.key==='Enter'||e.key===' ') selectPreset(p.key); };
+      grid.appendChild(card);
+    });
+  })
+  .catch(function() {
+    document.getElementById('preset-grid').innerHTML =
+      '<p style="color:var(--text3);font-size:13px">Could not load presets.</p>';
+  });
+
+function selectPreset(key) {
+  selectedPreset = key;
+  document.querySelectorAll('.preset-card').forEach(function(c) {
+    var isSelected = c.querySelector('.preset-label').textContent.toLowerCase().includes(key.replace('_',' ').split(' ')[0].toLowerCase());
+    // Better: use data-key attribute
+  });
+  // Re-render
+  document.querySelectorAll('.preset-card').forEach(function(c, i) {
+    // Compare by order
+  });
+  // Simplest approach: reload
+  fetch('/api/video/presets').then(r=>r.json()).then(function(presets) {
+    presets.forEach(function(p, i) {
+      var cards = document.querySelectorAll('.preset-card');
+      if (!cards[i]) return;
+      var isSelected = p.key === key;
+      cards[i].className = 'preset-card' + (isSelected ? ' selected' : '');
+      cards[i].setAttribute('aria-checked', isSelected ? 'true' : 'false');
+    });
+    selectedPreset = key;
+  });
+}
+
+// ── Drag and drop ──────────────────────────────────────────────
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  document.getElementById('drop-zone').classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+}
+
+function handleFileSelect(e) {
+  var file = e.target.files[0];
+  if (file) setFile(file);
+}
+
+function setFile(file) {
+  selectedFile = file;
+  var mb = (file.size / 1024 / 1024).toFixed(1);
+  document.getElementById('dz-icon').textContent  = '✓';
+  document.getElementById('dz-title').textContent = file.name;
+  document.getElementById('dz-sub').textContent   = mb + ' MB · Click to change';
+  document.getElementById('btn-process').disabled = false;
+}
+
+// ── Upload + process ───────────────────────────────────────────
+function startProcessing() {
+  if (!selectedFile) return;
+
+  var form = new FormData();
+  form.append('file',   selectedFile);
+  form.append('preset', selectedPreset);
+
+  document.getElementById('step-progress').style.display = 'block';
+  document.getElementById('btn-process').disabled = true;
+  document.getElementById('error-section').style.display = 'none';
+
+  fetch('/api/video/upload', { method: 'POST', body: form })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Upload failed'); });
+      return r.json();
+    })
+    .then(function(data) {
+      currentJobId = data.job_id;
+      pollInterval = setInterval(pollStatus, 1500);
+    })
+    .catch(function(err) {
+      showError(err.message);
+    });
+}
+
+function pollStatus() {
+  if (!currentJobId) return;
+  fetch('/api/video/status/' + currentJobId)
+    .then(r => r.json())
+    .then(function(job) {
+      document.getElementById('progress-fill').style.width = job.progress + '%';
+      document.getElementById('progress-msg').textContent  = job.message || '';
+      document.getElementById('progress-pct').textContent  = job.progress + '%';
+
+      if (job.status === 'complete') {
+        clearInterval(pollInterval);
+        showOutput(job);
+      } else if (job.status === 'failed') {
+        clearInterval(pollInterval);
+        showError(job.error || 'Processing failed.');
+      }
+    })
+    .catch(function() { /* ignore poll errors */ });
+}
+
+function showOutput(job) {
+  document.getElementById('step-progress').style.display = 'none';
+  document.getElementById('step-output').style.display   = 'block';
+
+  var baseName = currentJobId; // fallback
+  var card = document.getElementById('output-card');
+  var files = [
+    { ext: 'MP4',  color: '#185FA5', bg: '#0C3060', label: 'Primary video — H.264, web-optimized' },
+    { ext: 'WEBM', color: '#1A7A5E', bg: '#0a2a1a', label: 'Fallback video — VP9, restricted browsers' },
+    { ext: 'JPG',  color: '#B87A1A', bg: '#2a1a00', label: 'Poster / thumbnail image' },
+    { ext: 'VTT',  color: job.has_audio ? '#E87070' : '#7A90A8',
+      bg: job.has_audio ? '#2a0d0d' : '#131822',
+      label: job.has_audio ? 'Caption placeholder — REPLACE before publishing' : 'Caption placeholder — no audio detected' },
+  ];
+
+  card.innerHTML = files.map(function(f) {
+    return `<div class="output-file">
+      <span class="output-ext" style="background:${f.bg};color:${f.color}">${f.ext}</span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${f.label}</span>
+    </div>`;
+  }).join('');
+
+  if (job.has_audio === false) {
+    document.getElementById('audio-warning').style.display   = 'block';
+    document.getElementById('caption-reminder').style.display = 'none';
+  } else if (job.has_audio === true) {
+    document.getElementById('audio-warning').style.display   = 'none';
+    document.getElementById('caption-reminder').style.display = 'block';
+  }
+}
+
+function downloadOutput() {
+  if (!currentJobId) return;
+  window.location.href = '/api/video/download/' + currentJobId;
+}
+
+function showError(msg) {
+  document.getElementById('step-progress').style.display = 'none';
+  document.getElementById('error-section').style.display = 'block';
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function resetTool() {
+  clearInterval(pollInterval);
+  currentJobId  = null;
+  selectedFile  = null;
+  document.getElementById('step-progress').style.display = 'none';
+  document.getElementById('step-output').style.display   = 'none';
+  document.getElementById('error-section').style.display = 'none';
+  document.getElementById('btn-process').disabled = true;
+  document.getElementById('dz-icon').textContent  = '🎬';
+  document.getElementById('dz-title').textContent = 'Drop video file here';
+  document.getElementById('dz-sub').textContent   = 'or click to browse · .mov .mp4 .avi .mts .mkv .wmv .m4v accepted';
+  document.getElementById('file-input').value     = '';
+  document.getElementById('audio-warning').style.display    = 'none';
+  document.getElementById('caption-reminder').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
