@@ -1,9 +1,0 @@
-# Railway deploy for the ISD Structure Tool — a static single-file site served
-# by Python's built-in HTTP server (no build step, no app code).
-# Deploy as a separate Railway service with Root Directory = isd-tool.
-
-[phases.setup]
-nixPkgs = ["python3"]
-
-[start]
-cmd = "python3 -m http.server $PORT --bind 0.0.0.0"
