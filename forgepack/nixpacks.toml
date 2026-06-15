@@ -1,8 +1,11 @@
-[phases.setup]
-nixPkgs = ["ffmpeg", "python311"]
+# Railway build for ForgePack. Add ffmpeg to the setup phase alongside Python.
+# Do NOT override the install phase — Nixpacks' auto-generated Python venv + pip
+# install (and its PATH wiring so gunicorn is found) must stay intact. A bare
+# "pip install" override fails on Railway with "pip: command not found" because
+# the venv is never created/activated. Start command comes from railway.toml.
 
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
+[phases.setup]
+nixPkgs = ["python3", "ffmpeg"]
 
 [start]
-cmd = "gunicorn app:create_app() --bind 0.0.0.0:$PORT --timeout 300"
+cmd = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 300 --workers 2"
