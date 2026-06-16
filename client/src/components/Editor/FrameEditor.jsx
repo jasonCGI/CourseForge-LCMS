@@ -10,6 +10,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import useClipboardStore from '../../store/clipboardStore'
+import { countWords, formatTime } from '../../utils/wordCount'
 import FrameHeader from './FrameHeader'
 import FrameNotes from './FrameNotes'
 import BlockToolbar from './BlockToolbar'
@@ -107,6 +108,23 @@ function SortableBlock({ block }) {
   )
 }
 
+function FrameTotals({ blocks }) {
+  const texts = (blocks || []).filter(b => b.type === 'text')
+  const body = texts.reduce((a, b) => a + countWords(b.data?.body || '').words, 0)
+  const script = texts.reduce((a, b) => a + countWords(b.data?.narrator_script || '').words, 0)
+  if (!body && !script) return null
+  return (
+    <div style={{ marginTop: 16, padding: '8px 12px', background: 'var(--cf-input-bg, #060810)',
+      border: '1px solid var(--cf-border-tertiary)', borderRadius: 6, display: 'flex', gap: 16,
+      flexWrap: 'wrap', fontFamily: 'var(--forge-font, monospace)', fontSize: 9,
+      color: 'var(--cf-text-tertiary)', letterSpacing: '0.04em' }}>
+      <span style={{ fontWeight: 600, color: 'var(--cf-text-secondary)' }}>Frame totals</span>
+      {body > 0 && <span>📄 {body} words · ~{formatTime(Math.round((body / 230) * 60))} read</span>}
+      {script > 0 && <span>🎙 {script} words · ~{formatTime(Math.round((script / 150) * 60))} narrate</span>}
+    </div>
+  )
+}
+
 export default function FrameEditor() {
   const activeFrame   = useEditorStore(s => s.activeFrame)
   const previewOpen   = useEditorStore(s => s.previewOpen)
@@ -177,6 +195,8 @@ export default function FrameEditor() {
             {blocks.map(block => <SortableBlock key={block.id} block={block} />)}
           </SortableContext>
         </DndContext>
+
+        <FrameTotals blocks={blocks} />
       </div>
 
       <BlockToolbar />

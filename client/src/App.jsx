@@ -15,6 +15,7 @@ import ShortcutHelp from './components/UI/ShortcutHelp'
 import CourseShellModal from './components/UI/CourseShellModal'
 import PublishHistory from './components/Publish/PublishHistory'
 import FrameSearch from './components/UI/FrameSearch'
+import SaveIndicator from './components/UI/SaveIndicator'
 import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -162,6 +163,9 @@ export default function App() {
           }}>
             v{VERSION}
           </span>
+
+          {/* Autosave status */}
+          <SaveIndicator />
 
           {/* Spacer */}
           <div style={{ flex: 1 }}/>

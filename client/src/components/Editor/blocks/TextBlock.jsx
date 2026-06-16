@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import useEditorStore from '../../../store/editorStore'
+import { countWords, formatTime } from '../../../utils/wordCount'
 
 export default function TextBlock({ block }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
@@ -81,7 +82,21 @@ export default function TextBlock({ block }) {
             boxSizing: 'border-box',
           }}
         />
+        <WordCount body={block.data.body} script={block.data.narrator_script} />
       </div>
+    </div>
+  )
+}
+
+function WordCount({ body, script }) {
+  const b = countWords(body), s = countWords(script)
+  if (!b.words && !s.words) return null
+  return (
+    <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap',
+      fontFamily: 'var(--forge-font, monospace)', fontSize: 9,
+      color: 'var(--cf-text-tertiary, #7a7a90)', letterSpacing: '0.04em' }}>
+      {b.words > 0 && <span title="On-screen text — estimated read time">📄 {b.words}w · ~{formatTime(b.readSeconds)} read</span>}
+      {s.words > 0 && <span title="Narrator script — estimated narration time">🎙 {s.words}w · ~{formatTime(s.narrateSeconds)} narrate</span>}
     </div>
   )
 }

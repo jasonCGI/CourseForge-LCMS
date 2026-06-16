@@ -136,6 +136,9 @@ textarea:focus-visible,
   filter: brightness(1.12);
 }
 
+/* ── Autosave indicator pulse (Sprint D) ── */
+@keyframes pulse-save { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
 /* ── Block drag handle (Sprint A) — visible on block hover / focus ── */
 .drag-handle { opacity: 0; transition: opacity 0.15s; }
 [data-block-wrapper]:hover .drag-handle { opacity: 0.45; }

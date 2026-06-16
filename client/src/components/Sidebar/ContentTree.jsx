@@ -3,6 +3,14 @@ import useProjectStore from '../../store/projectStore'
 import useEditorStore  from '../../store/editorStore'
 import { duplicateFrame, createFrame } from '../../api/client'
 import TemplateLibrary from '../UI/TemplateLibrary'
+import { getFrameCompletion } from '../../utils/frameCompletion'
+
+const COMPLETION_DOT = {
+  complete:   { color: '#4CAF50', title: 'All blocks complete' },
+  incomplete: { color: 'var(--forge-amber)', title: 'Missing required assets or content' },
+  empty:      { color: '#3A5A7A', title: 'No blocks in frame' },
+  optional:   { color: '#5A7AA8', title: 'Optional — excluded from completion count' },
+}
 
 // ── SVG helpers ──────────────────────────────────────────────────
 
@@ -77,7 +85,8 @@ const LEVELS = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, note, onClick, onContextMenu, children, rowIndex = 0
+  frameType, note, completion, itemId, tabIndex, onKeyDown,
+  onClick, onContextMenu, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
@@ -109,16 +118,20 @@ function TreeRow({
   return (
     <div>
       <div
+        id={itemId ? `tree-item-${itemId}` : undefined}
         role="treeitem"
+        aria-level={depth + 1}
         aria-expanded={!isFrame ? isOpen : undefined}
+        aria-selected={isFrame ? (isCurrent ? 'true' : 'false') : undefined}
         aria-current={isCurrent ? 'true' : undefined}
-        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
-        tabIndex={0}
+        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${completion === 'optional' ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
+        tabIndex={tabIndex != null ? tabIndex : 0}
         onClick={onClick}
         onContextMenu={onContextMenu}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } }}
+        onKeyDown={onKeyDown || (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } })}
         title={label}
-        style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none' }}
+        style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none',
+          opacity: completion === 'optional' ? 0.6 : 1 }}
         className="cf-tree-row"
       >
         {/* Level tab */}
@@ -145,6 +158,13 @@ function TreeRow({
           }} aria-hidden="true">
             {isFrame ? '' : isOpen ? '▾' : '▸'}
           </span>
+
+          {/* Completion dot (frames only) */}
+          {isFrame && completion && COMPLETION_DOT[completion] && (
+            <span title={COMPLETION_DOT[completion].title} aria-hidden="true"
+              style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                background: COMPLETION_DOT[completion].color, display: 'inline-block' }} />
+          )}
 
           {/* Glyph — folder for hierarchy, play for frame */}
           {isFrame ? (
@@ -253,6 +273,10 @@ export default function ContentTree() {
   const [templateLibOpen,     setTemplateLibOpen]     = useState(false)
   const [templateTargetLesson, setTemplateTargetLesson] = useState(null)
 
+  // ── Sprint D: completion filter + keyboard nav ─────────────────────
+  const [completionFilter, setCompletionFilter] = useState('all') // all|complete|incomplete|empty|optional
+  const [focusedId, setFocusedId] = useState(null)
+
   const refreshProject = () => activeProject && fetchProject(activeProject.id)
 
   const assignNewBlockIds = (content) => {
@@ -353,7 +377,89 @@ export default function ContentTree() {
 
   const courses = [...(activeProject.courses || [])].sort((a, b) => a.order_index - b.order_index)
 
+  // ── Sprint D: completion filter + keyboard navigation ──────────────
+  const frameVisible = (frame) =>
+    completionFilter === 'all' || getFrameCompletion(frame) === completionFilter
+
+  const courseOpenOf = (id) => openCourses[id] !== false
+  const moduleOpenOf = (id) => openModules[id] !== false
+  const lessonOpenOf = (id) => openLessons[id] !== false
+
+  // Flat, render-order list of navigable items respecting open state + filter.
+  const flatItems = [{ id: activeProject.id, type: 'project', parentId: null }]
+  for (const co of courses) {
+    flatItems.push({ id: co.id, type: 'course', parentId: activeProject.id })
+    if (!courseOpenOf(co.id)) continue
+    for (const mo of [...(co.modules || [])].sort((a, b) => a.order_index - b.order_index)) {
+      flatItems.push({ id: mo.id, type: 'module', parentId: co.id })
+      if (!moduleOpenOf(mo.id)) continue
+      for (const le of [...(mo.lessons || [])].sort((a, b) => a.order_index - b.order_index)) {
+        flatItems.push({ id: le.id, type: 'lesson', parentId: mo.id })
+        if (!lessonOpenOf(le.id)) continue
+        for (const fr of [...(le.frames || [])].sort((a, b) => a.order_index - b.order_index)) {
+          if (frameVisible(fr)) flatItems.push({ id: fr.id, type: 'frame', parentId: le.id })
+        }
+      }
+    }
+  }
+
+  const focusItem = (id) => { setFocusedId(id); setTimeout(() => document.getElementById(`tree-item-${id}`)?.focus(), 0) }
+  const setOpen = (type, id, val) => {
+    const setter = type === 'course' ? setOpenCourses : type === 'module' ? setOpenModules : setOpenLessons
+    setter(prev => ({ ...prev, [id]: val }))
+  }
+  const isOpenOf = (type, id) => type === 'course' ? courseOpenOf(id) : type === 'module' ? moduleOpenOf(id) : lessonOpenOf(id)
+
+  const handleTreeKeyDown = (e, item) => {
+    const i = flatItems.findIndex(x => x.id === item.id)
+    if (i < 0) return
+    const container = item.type !== 'frame' && item.type !== 'project'
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); if (flatItems[i + 1]) focusItem(flatItems[i + 1].id); break
+      case 'ArrowUp':   e.preventDefault(); if (flatItems[i - 1]) focusItem(flatItems[i - 1].id); break
+      case 'ArrowRight':
+        e.preventDefault()
+        if (container && !isOpenOf(item.type, item.id)) setOpen(item.type, item.id, true)
+        else if (flatItems[i + 1] && flatItems[i + 1].parentId === item.id) focusItem(flatItems[i + 1].id)
+        break
+      case 'ArrowLeft':
+        e.preventDefault()
+        if (container && isOpenOf(item.type, item.id)) setOpen(item.type, item.id, false)
+        else if (item.parentId) focusItem(item.parentId)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (item.type === 'frame') loadFrame(item.id)
+        else if (container) setOpen(item.type, item.id, !isOpenOf(item.type, item.id))
+        break
+      case 'Home': e.preventDefault(); if (flatItems[0]) focusItem(flatItems[0].id); break
+      case 'End':  e.preventDefault(); if (flatItems.length) focusItem(flatItems[flatItems.length - 1].id); break
+      default: break
+    }
+  }
+  const rovingTab = (id) => (focusedId ? (focusedId === id ? 0 : -1) : (id === flatItems[0]?.id ? 0 : -1))
+  const FILTERS = ['all', 'complete', 'incomplete', 'optional', 'empty']
+
   return (
+    <div>
+    <div style={{ display: 'flex', gap: 4, padding: '6px 10px', borderBottom: '1px solid var(--cf-border-tertiary)',
+      alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+        letterSpacing: '0.06em', textTransform: 'uppercase' }}>Filter</span>
+      {FILTERS.map(f => {
+        const on = completionFilter === f
+        const col = (COMPLETION_DOT[f] && COMPLETION_DOT[f].color) || 'var(--cf-accent)'
+        return (
+          <button key={f} onClick={() => setCompletionFilter(f)}
+            style={{ padding: '2px 7px', borderRadius: 20, fontSize: 9, cursor: 'pointer',
+              fontFamily: 'var(--forge-font)', letterSpacing: '0.06em', textTransform: 'uppercase',
+              background: on ? `color-mix(in srgb, ${col} 18%, transparent)` : 'transparent',
+              border: `1px solid ${on ? col : 'var(--cf-border-tertiary)'}`,
+              color: on ? col : 'var(--cf-text-tertiary)' }}>{f}</button>
+        )
+      })}
+    </div>
     <div role="tree" aria-label={`Project: ${activeProject.name}`} style={{ outline: 'none' }}>
 
       {/* Project root */}
@@ -362,6 +468,9 @@ export default function ContentTree() {
         depth={0}
         label={activeProject.name}
         isOpen={true}
+        itemId={activeProject.id}
+        tabIndex={rovingTab(activeProject.id)}
+        onKeyDown={e => handleTreeKeyDown(e, { id: activeProject.id, type: 'project', parentId: null })}
         onClick={() => {}}
       >
 
@@ -377,6 +486,9 @@ export default function ContentTree() {
               label={course.name}
               count={`${modules.length}m`}
               isOpen={courseOpen}
+              itemId={course.id}
+              tabIndex={rovingTab(course.id)}
+              onKeyDown={e => handleTreeKeyDown(e, { id: course.id, type: 'course', parentId: activeProject.id })}
               onClick={() => toggle(setOpenCourses, course.id)}
             >
               {modules.map(mod => {
@@ -391,11 +503,16 @@ export default function ContentTree() {
                     label={mod.name}
                     count={`${lessons.length}l`}
                     isOpen={modOpen}
+                    itemId={mod.id}
+                    tabIndex={rovingTab(mod.id)}
+                    onKeyDown={e => handleTreeKeyDown(e, { id: mod.id, type: 'module', parentId: course.id })}
                     onClick={() => toggle(setOpenModules, mod.id)}
                   >
                     {lessons.map(lesson => {
                       const lessonOpen = openLessons[lesson.id] !== false
-                      const frames = [...(lesson.frames || [])].sort((a, b) => a.order_index - b.order_index)
+                      const frames = [...(lesson.frames || [])]
+                        .sort((a, b) => a.order_index - b.order_index)
+                        .filter(frameVisible)
 
                       return (
                         <TreeRow
@@ -405,6 +522,9 @@ export default function ContentTree() {
                           label={lesson.name}
                           count={`${frames.length}f`}
                           isOpen={lessonOpen}
+                          itemId={lesson.id}
+                          tabIndex={rovingTab(lesson.id)}
+                          onKeyDown={e => handleTreeKeyDown(e, { id: lesson.id, type: 'lesson', parentId: mod.id })}
                           onClick={() => toggle(setOpenLessons, lesson.id)}
                         >
                           {frames.map((frame, fi) => (
@@ -418,6 +538,10 @@ export default function ContentTree() {
                               isFrame={true}
                               isCurrent={frame.id === activeFrameId}
                               note={!!(frame.notes && frame.notes.trim())}
+                              completion={getFrameCompletion(frame)}
+                              itemId={frame.id}
+                              tabIndex={rovingTab(frame.id)}
+                              onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}
                               onClick={() => loadFrame(frame.id)}
                               onContextMenu={(e) => {
                                 e.preventDefault()
@@ -543,6 +667,7 @@ export default function ContentTree() {
         onClose={() => { setTemplateLibOpen(false); setTemplateTargetLesson(null) }}
         onSelect={handleTemplateSelect}
       />
+    </div>
     </div>
   )
 }

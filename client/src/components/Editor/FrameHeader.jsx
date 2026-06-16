@@ -9,7 +9,7 @@ const FRAME_TYPE_COLOR = {
 }
 
 export default function FrameHeader({ onPreview }) {
-  const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName } = useEditorStore()
+  const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName, setOptional } = useEditorStore()
   const activeProject = useProjectStore(s => s.activeProject)
 
   if (!activeFrame) return null
@@ -63,6 +63,16 @@ export default function FrameHeader({ onPreview }) {
       }}>
         {activeFrame.frame_type}
       </span>
+
+      {/* Optional toggle — excluded from completion count */}
+      <label title="Optional frames are excluded from the completion count"
+        style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+          fontSize: 11, color: activeFrame.optional ? 'var(--forge-amber)' : 'var(--color-text-secondary)',
+          cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+        <input type="checkbox" checked={!!activeFrame.optional}
+          onChange={e => setOptional(e.target.checked)} aria-label="Mark frame optional" />
+        Optional
+      </label>
 
       {/* Save status */}
       <span style={{

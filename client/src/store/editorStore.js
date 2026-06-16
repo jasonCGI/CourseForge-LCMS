@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { getFrame, updateFrame } from '../api/client'
 
 let autosaveTimer = null
+let saveStatusTimer = null
 const AUTOSAVE_DELAY = 1200
 
 const useEditorStore = create((set, get) => ({
@@ -15,6 +16,7 @@ const useEditorStore = create((set, get) => ({
   activeBlockId: null,        // last-focused/clicked block (for keyboard shortcuts)
   previewOpen: false,         // preview modal flag (so global shortcuts can open it)
   _undoStack: [],             // snapshots of blocks arrays (most recent first)
+  saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
 
   // Load a frame by ID
   loadFrame: async (frameId) => {
@@ -169,6 +171,15 @@ const useEditorStore = create((set, get) => ({
     await get()._doSave()
   },
 
+  // Toggle "optional" (excluded from completion count) — persisted separately
+  // from the content autosave.
+  setOptional: (val) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    set({ activeFrame: { ...activeFrame, optional: val } })
+    updateFrame(activeFrame.id, { optional: val }).catch(() => {})
+  },
+
   // Update frame name
   updateFrameName: (name) => {
     const { activeFrame } = get()
@@ -186,6 +197,7 @@ const useEditorStore = create((set, get) => ({
   // Internal: schedule autosave
   _scheduleAutosave: () => {
     if (autosaveTimer) clearTimeout(autosaveTimer)
+    set({ saveStatus: 'saving' })
     autosaveTimer = setTimeout(() => get()._doSave(), AUTOSAVE_DELAY)
   },
 
@@ -193,15 +205,19 @@ const useEditorStore = create((set, get) => ({
   _doSave: async () => {
     const { activeFrame } = get()
     if (!activeFrame) return
-    set({ isSaving: true, saveError: null })
+    set({ isSaving: true, saveError: null, saveStatus: 'saving' })
     try {
       await updateFrame(activeFrame.id, {
         name: activeFrame.name,
         content: activeFrame.content
       })
-      set({ isDirty: false, isSaving: false, lastSaved: new Date() })
+      set({ isDirty: false, isSaving: false, lastSaved: new Date(), saveStatus: 'saved' })
+      clearTimeout(saveStatusTimer)
+      saveStatusTimer = setTimeout(() => set({ saveStatus: 'idle' }), 2000)
     } catch (e) {
-      set({ isSaving: false, saveError: e.message })
+      set({ isSaving: false, saveError: e.message, saveStatus: 'error' })
+      clearTimeout(saveStatusTimer)
+      saveStatusTimer = setTimeout(() => set({ saveStatus: 'idle' }), 4000)
     }
   },
 }))
