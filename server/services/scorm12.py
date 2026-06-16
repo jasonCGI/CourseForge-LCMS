@@ -344,6 +344,8 @@ def _render_blocks(blocks, scorm_bridge=False):
             height   = data.get('viewer_height', 400)
             bg_color = data.get('bg_color', '#0d1017')
             block_id = bid[:8]
+            annotations = data.get('annotations', [])
+            ann_json = json.dumps(annotations).replace('</', '<\\/')
 
             if not model_id:
                 parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
@@ -359,6 +361,7 @@ def _render_blocks(blocks, scorm_bridge=False):
 <div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
   <canvas id="canvas3d-{block_id}" tabindex="0" role="img" aria-label="{aria}"
     style="width:100%;height:{height}px;display:block;border-radius:8px;cursor:grab;outline:none;touch-action:none"></canvas>
+  <div id="annoverlay-{block_id}" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:8px"></div>
   <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color};border-radius:8px">
     <div style="text-align:center">
       <div class="cf-spin3d" style="width:28px;height:28px;border-radius:50%;border:3px solid #1c2a3a;border-top-color:#F59E0B;animation:spin3d 0.8s linear infinite;margin:0 auto 8px"></div>
@@ -372,24 +375,35 @@ def _render_blocks(blocks, scorm_bridge=False):
 </div>
 <style>
   @keyframes spin3d {{ to {{ transform: rotate(360deg); }} }}
-  @media (prefers-reduced-motion: reduce) {{ .cf-spin3d {{ animation: none !important; }} }}
+  @keyframes annFadeIn {{ from {{ opacity:0; transform:translateY(-3px); }} to {{ opacity:1; transform:translateY(0); }} }}
+  #viewer3d-{block_id} .ann-dot {{ position:absolute; width:14px; height:14px; border-radius:50%; background:#F59E0B; border:2px solid rgba(255,255,255,0.9); box-shadow:0 0 0 3px rgba(245,158,11,0.25),0 2px 8px rgba(0,0,0,0.4); transform:translate(-50%,-50%); cursor:pointer; pointer-events:all; transition:transform 0.15s; }}
+  #viewer3d-{block_id} .ann-dot:hover {{ transform:translate(-50%,-50%) scale(1.3); }}
+  #viewer3d-{block_id} .ann-dot:focus-visible {{ outline:2px solid #F59E0B; outline-offset:3px; }}
+  #viewer3d-{block_id} .ann-popover {{ position:absolute; background:#0d1017; border:1px solid #1c2a3a; border-left:3px solid #F59E0B; border-radius:6px; padding:10px 14px; min-width:200px; max-width:280px; box-shadow:0 8px 32px rgba(0,0,0,0.5); animation:annFadeIn 0.15s ease; z-index:40; pointer-events:all; }}
+  #viewer3d-{block_id} .ann-popover-title {{ font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:700; color:#F59E0B; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px; }}
+  #viewer3d-{block_id} .ann-popover-body {{ font-size:12px; color:#8AAAC0; line-height:1.55; }}
+  #viewer3d-{block_id} .ann-popover-close {{ position:absolute; top:6px; right:8px; background:none; border:none; color:#3A5A7A; font-size:12px; cursor:pointer; padding:2px 4px; }}
+  @media (prefers-reduced-motion: reduce) {{ .cf-spin3d, #viewer3d-{block_id} .ann-dot, #viewer3d-{block_id} .ann-popover {{ animation: none !important; transition: none !important; }} }}
 </style>
 <script>
 (function() {{
   var THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   var GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  var ANNOTATIONS = {ann_json};
   function loadScript(src, cb) {{
     if (document.querySelector('script[src="' + src + '"]')) {{ cb(); return; }}
     var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s);
   }}
   loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{
-    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height});
+    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS);
   }}); }});
 
-  function init3DViewer(blockId, modelSrc, bgColor, height) {{
+  function init3DViewer(blockId, modelSrc, bgColor, height, annotations) {{
     var THREE = window.THREE;
     var canvas = document.getElementById('canvas3d-' + blockId);
     var loading = document.getElementById('loading3d-' + blockId);
+    var overlay = document.getElementById('annoverlay-' + blockId);
+    var activePopover = null;
     if (!canvas || !THREE) return;
     var w = canvas.clientWidth || 800;
     var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
@@ -406,6 +420,43 @@ def _render_blocks(blocks, scorm_bridge=False):
       camera.lookAt(0,0,0);
     }}
     updateCamera();
+
+    var dotEls = [];
+    (annotations || []).forEach(function(ann) {{
+      var dot = document.createElement('div');
+      dot.className = 'ann-dot'; dot.tabIndex = 0; dot.style.display = 'none';
+      dot.setAttribute('role', 'button');
+      dot.setAttribute('aria-label', ann.label + ' — press Enter for details');
+      dot.setAttribute('aria-haspopup', 'true');
+      var pop = document.createElement('div');
+      pop.className = 'ann-popover'; pop.style.display = 'none'; pop.setAttribute('role', 'tooltip');
+      pop.innerHTML = '<button class="ann-popover-close" aria-label="Close">✕</button><div class="ann-popover-title"></div>' + (ann.description ? '<div class="ann-popover-body"></div>' : '');
+      pop.querySelector('.ann-popover-title').textContent = ann.label;
+      if (ann.description) pop.querySelector('.ann-popover-body').textContent = ann.description;
+      function closePop() {{ pop.style.display = 'none'; if (activePopover === pop) activePopover = null; }}
+      function openPop() {{ if (activePopover && activePopover !== pop) activePopover.style.display = 'none'; pop.style.display = 'block'; activePopover = pop; }}
+      pop.querySelector('.ann-popover-close').addEventListener('click', function(e) {{ e.stopPropagation(); closePop(); }});
+      dot.addEventListener('click', function(e) {{ e.stopPropagation(); if (pop.style.display === 'block') closePop(); else openPop(); }});
+      dot.addEventListener('keydown', function(e) {{ if (e.key === 'Enter' || e.key === ' ') {{ e.preventDefault(); openPop(); }} if (e.key === 'Escape') closePop(); }});
+      dot.appendChild(pop); if (overlay) overlay.appendChild(dot);
+      dotEls.push({{ dot: dot, pop: pop, ann: ann }});
+    }});
+
+    var _v3 = new THREE.Vector3();
+    function projectDots() {{
+      if (!overlay) return;
+      var cw = canvas.clientWidth, ch = canvas.clientHeight;
+      dotEls.forEach(function(it) {{
+        _v3.set(it.ann.position.x, it.ann.position.y, it.ann.position.z);
+        var ndc = _v3.clone().project(camera);
+        if (ndc.z >= 1.0) {{ it.dot.style.display = 'none'; return; }}
+        var sx = (ndc.x * 0.5 + 0.5) * cw, sy = (-ndc.y * 0.5 + 0.5) * ch;
+        it.dot.style.display = 'block'; it.dot.style.left = sx + 'px'; it.dot.style.top = sy + 'px';
+        it.pop.style.left = sx > cw * 0.6 ? 'auto' : '18px';
+        it.pop.style.right = sx > cw * 0.6 ? '18px' : 'auto';
+      }});
+    }}
+
     new THREE.GLTFLoader().load(modelSrc, function(gltf) {{
       var model = gltf.scene;
       var box = new THREE.Box3().setFromObject(model);
@@ -417,7 +468,7 @@ def _render_blocks(blocks, scorm_bridge=False):
     }}, undefined, function() {{
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
     }});
-    (function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); }})();
+    (function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); projectDots(); }})();
     var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w; renderer.setSize(w2, height); camera.aspect = w2/height; camera.updateProjectionMatrix(); }});
     ro.observe(canvas);
     canvas.addEventListener('pointerdown', function(e) {{ if (e.button !== 0) return; orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); }});
@@ -433,6 +484,7 @@ def _render_blocks(blocks, scorm_bridge=False):
       else if (e.key === '+' || e.key === '=') orbit.radius = Math.max(orbit.minRadius, orbit.radius - 0.2);
       else if (e.key === '-') orbit.radius = Math.min(orbit.maxRadius, orbit.radius + 0.2);
       else if (e.key === 'r' || e.key === 'R') {{ orbit.theta = 0; orbit.phi = Math.PI/4; orbit.radius = 3; }}
+      else if (e.key === 'Escape') {{ if (activePopover) {{ activePopover.style.display = 'none'; activePopover = null; }} return; }}
       else return;
       e.preventDefault(); updateCamera();
     }});
