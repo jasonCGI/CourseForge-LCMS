@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ForgeGUI · GUI Shell Authoring</title>
+  <!-- Anti-flash: apply saved mode before first paint -->
+  <script>(function(){try{var m=localStorage.getItem('fgui_mode');
+    document.documentElement.setAttribute('data-mode', m||'dark');
+  }catch(e){document.documentElement.setAttribute('data-mode','dark');}})();</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
@@ -11,8 +15,9 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --navy:   #042C53;
-      --blue:   #185FA5;
+      --navy:    #042C53;
+      --blue:    #185FA5;
+      --blue-lt: #B5D4F4;
       /* Brand amber inherits the ecosystem token (forge-tokens.css, data-mode=dark -> #F59E0B) */
       --amber:  var(--forge-amber, #F59E0B);
       --bg:     #06080f;
@@ -26,6 +31,65 @@
       --font:   'Inter', system-ui, sans-serif;
       --mono:   var(--forge-font, 'IBM Plex Mono', Consolas, monospace);
     }
+
+    /* ── Viewing modes — dark is the :root default above (matches the other tools) ── */
+    html[data-mode="light"] {
+      --navy:    #042C53;   /* day-mode header bar stays the global dark navy */
+      --bg:      #F0F4F8;
+      --bg2:     #FFFFFF;
+      --bg3:     #EEF4FA;
+      --border:  #C8D4DC;
+      --text:    #0E2030;
+      --text2:   #3A5A78;
+      --text3:   #6A8AA8;
+    }
+    html[data-mode="hc"] {
+      --navy:    #000000;
+      --blue:    #4DA3FF;
+      --blue-lt: #FFFFFF;
+      --bg:      #000000;
+      --bg2:     #000000;
+      --bg3:     #000000;
+      --border:  #FFFFFF;
+      --text:    #FFFFFF;
+      --text2:   #DDDDDD;
+      --text3:   #AAAAAA;
+    }
+
+    /* ── 508: visible focus on every interactive element ── */
+    a:focus-visible, button:focus-visible, input:focus-visible,
+    select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid var(--amber);
+      outline-offset: 2px;
+    }
+
+    /* ── 508: skip to content ── */
+    .skip-link {
+      position: absolute; left: 8px; top: -120px;
+      background: var(--amber); color: #042C53; font-weight: 700;
+      padding: 8px 16px; border-radius: 4px; z-index: 9999;
+      font-family: var(--font); font-size: 14px; transition: top 0.12s;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 8px; }
+
+    /* ── Mode toggle (matches CourseForge / ForgePack / ForgeClip) ── */
+    .mode-toggle {
+      display: inline-flex; gap: 2px; margin-left: 16px;
+      background: #0e1320; border: 1px solid #2a3848;
+      border-radius: 6px; padding: 3px;
+    }
+    html[data-mode="hc"] .mode-toggle { background: #000; border-color: #fff; }
+    .mode-btn {
+      width: 30px; height: 26px; padding: 0; cursor: pointer;
+      border: 1px solid transparent; border-radius: 4px; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      color: #8AAAC8; transition: background .15s, border-color .15s;
+    }
+    html[data-mode="light"] .mode-btn { color: #90C0E8; }
+    html[data-mode="hc"]    .mode-btn { color: #CCCCCC; }
+    .mode-btn[aria-pressed="true"] { background: #1B3A5C; border-color: #2A5A8A; color: var(--amber); }
+    html[data-mode="hc"] .mode-btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #000; }
 
     body {
       font-family: var(--font);
@@ -51,15 +115,20 @@
 
     .mark { flex-shrink: 0; }
 
+    /* Pill label — same color/contrast treatment as the other tools'
+       header-tag (light blue on navy passes WCAG AA). */
     .header-tag {
       font-family:    var(--mono);
-      font-size:      10px;
-      color:          var(--text2);
-      padding:        2px 8px;
+      margin-left:    8px;
+      padding:        2px 10px;
+      background:     rgba(0,0,0,0.2);
       border:         1px solid rgba(255,255,255,0.1);
       border-radius:  20px;
-      letter-spacing: 0.06em;
+      font-size:      11px;
+      color:          var(--blue-lt);
+      letter-spacing: 0.08em;
     }
+    html[data-mode="light"] .header-tag { color: var(--blue-lt); }
 
     /* -- Main layout: sidebar + canvas area -- */
     .workspace {
@@ -355,6 +424,8 @@
 </head>
 <body>
 
+<a href="#workspace-main" class="skip-link">Skip to content</a>
+
 <!-- Header -->
 <header class="header">
   <!-- ForgeGUI mark — stage frame with corner brackets + crosshair origin -->
@@ -380,6 +451,18 @@
     aria-label="Export GUI shell as ZIP">
     ⬇ Export ZIP
   </button>
+
+  <div class="mode-toggle" role="group" aria-label="Display mode">
+    <button class="mode-btn" id="mode-light" aria-label="Light mode" aria-pressed="false" title="Light" onclick="setMode('light')">
+      <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="11.2" y1="7" x2="12.6" y2="7"/><line x1="9.97" y1="9.97" x2="10.96" y2="10.96"/><line x1="7" y1="11.2" x2="7" y2="12.6"/><line x1="4.03" y1="9.97" x2="3.04" y2="10.96"/><line x1="2.8" y1="7" x2="1.4" y2="7"/><line x1="4.03" y1="4.03" x2="3.04" y2="3.04"/><line x1="7" y1="2.8" x2="7" y2="1.4"/><line x1="9.97" y1="4.03" x2="10.96" y2="3.04"/></g></svg>
+    </button>
+    <button class="mode-btn" id="mode-dark" aria-label="Dark mode" aria-pressed="false" title="Dark" onclick="setMode('dark')">
+      <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><defs><mask id="fgui-moon"><rect width="14" height="14" fill="white"/><circle cx="9.7" cy="5" r="4.6" fill="black"/></mask></defs><circle cx="6.6" cy="7" r="5" fill="currentColor" mask="url(#fgui-moon)"/></svg>
+    </button>
+    <button class="mode-btn" id="mode-hc" aria-label="High contrast mode" aria-pressed="false" title="High contrast" onclick="setMode('hc')">
+      <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 1.5 A5.5 5.5 0 0 1 7 12.5 Z" fill="currentColor"/></svg>
+    </button>
+  </div>
 </header>
 
 <div class="workspace">
@@ -722,7 +805,7 @@
   </aside>
 
   <!-- Canvas area -->
-  <main class="canvas-area">
+  <main class="canvas-area" id="workspace-main">
     <div class="canvas-toolbar">
       <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">
         Stage preview — click elements to select and configure
@@ -794,6 +877,21 @@
 </div><!-- end workspace -->
 
 <script>
+// -- Display mode (light / dark / hc) — matches the other tools -----
+function applyMode(mode) {
+  document.documentElement.setAttribute('data-mode', mode)
+  ;['light','dark','hc'].forEach(function(m) {
+    var btn = document.getElementById('mode-' + m)
+    if (btn) btn.setAttribute('aria-pressed', String(m === mode))
+  })
+}
+function setMode(mode) {
+  applyMode(mode)
+  try { localStorage.setItem('fgui_mode', mode) } catch (e) {}
+}
+// Sync toggle buttons to the mode the anti-flash head script already applied
+applyMode(document.documentElement.getAttribute('data-mode') || 'dark')
+
 // -- State -----------------------------------------------------
 var guiId       = null
 var gui         = null
