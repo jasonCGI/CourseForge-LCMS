@@ -1508,6 +1508,12 @@ function loadGuiIntoUI(g) {
   document.getElementById('empty-state').style.display   = 'none'
   document.getElementById('stage-preview').style.display = 'block'
   document.getElementById('stage-bg').src = gui.stage.background_url || ''
+  // Reflect a loaded background in the sidebar panel (import path).
+  if (gui.stage.background_url) {
+    document.getElementById('bg-icon').textContent  = '✓'
+    document.getElementById('bg-label').textContent = gui.stage.background_file || 'background'
+    document.getElementById('bg-dims').textContent  = gui.stage.width + ' × ' + gui.stage.height + 'px'
+  }
   renderStage(); renderButtonList(); renderZoneList()
   document.getElementById('btn-export').disabled     = false
   document.getElementById('btn-export-2').disabled   = false
