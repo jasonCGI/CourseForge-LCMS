@@ -146,6 +146,23 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
+  // Paste a copied block ({type, data}) to the end of the active frame
+  pasteBlock: (payload) => {
+    const { activeFrame } = get()
+    if (!activeFrame || !payload) return
+    get()._pushUndo()
+    const blk = {
+      id: crypto.randomUUID(), type: payload.type,
+      data: JSON.parse(JSON.stringify(payload.data || {})),
+    }
+    const next = [...(activeFrame.content?.blocks || []), blk]
+    set({
+      activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks: next } },
+      isDirty: true, activeBlockId: blk.id,
+    })
+    get()._scheduleAutosave()
+  },
+
   // Force an immediate save (Ctrl/Cmd+S)
   flushSave: async () => {
     if (autosaveTimer) clearTimeout(autosaveTimer)

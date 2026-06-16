@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import useProjectStore from '../../store/projectStore'
 import useEditorStore  from '../../store/editorStore'
-import { duplicateFrame } from '../../api/client'
+import { duplicateFrame, createFrame } from '../../api/client'
+import TemplateLibrary from '../UI/TemplateLibrary'
 
 // ── SVG helpers ──────────────────────────────────────────────────
 
@@ -242,7 +243,34 @@ export default function ContentTree() {
   const [contextMenu,        setContextMenu]        = useState(null) // {frameId, x, y}
   const [copyToLessonFrameId, setCopyToLessonFrameId] = useState(null)
 
+  // ── Sprint B: template library for new frames ──────────────────────
+  const [templateLibOpen,     setTemplateLibOpen]     = useState(false)
+  const [templateTargetLesson, setTemplateTargetLesson] = useState(null)
+
   const refreshProject = () => activeProject && fetchProject(activeProject.id)
+
+  const assignNewBlockIds = (content) => {
+    const c = JSON.parse(JSON.stringify(content || { blocks: [] }))
+    for (const b of (c.blocks || [])) b.id = crypto.randomUUID()
+    return c
+  }
+
+  const handleTemplateSelect = async (template) => {
+    if (!templateTargetLesson) return
+    try {
+      const { data: nf } = await createFrame(templateTargetLesson, {
+        name: template.name === 'Blank Frame' ? 'New Frame' : template.name,
+        frame_type: template.frame_type || 'content',
+        content: assignNewBlockIds(template.content),
+      })
+      await refreshProject()
+      if (nf?.id) loadFrame(nf.id)
+    } catch (e) {
+      alert('Could not create frame: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setTemplateLibOpen(false); setTemplateTargetLesson(null)
+    }
+  }
 
   // Flatten all lessons (with module name) for the copy-to-lesson picker.
   const allLessons = []
@@ -390,6 +418,18 @@ export default function ContentTree() {
                               }}
                             />
                           ))}
+                          <button
+                            onClick={() => { setTemplateTargetLesson(lesson.id); setTemplateLibOpen(true) }}
+                            aria-label={`Add frame to ${lesson.name}`}
+                            style={{
+                              display: 'block', width: '100%', textAlign: 'left',
+                              padding: '5px 10px 5px 74px', background: 'none', border: 'none',
+                              color: 'var(--cf-text-tertiary)', fontSize: 11, cursor: 'pointer',
+                              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.color = 'var(--forge-amber)'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'var(--cf-text-tertiary)'}
+                          >+ frame</button>
                         </TreeRow>
                       )
                     })}
@@ -490,6 +530,12 @@ export default function ContentTree() {
           </div>
         </div>
       )}
+
+      <TemplateLibrary
+        open={templateLibOpen}
+        onClose={() => { setTemplateLibOpen(false); setTemplateTargetLesson(null) }}
+        onSelect={handleTemplateSelect}
+      />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
+import useClipboardStore from '../../store/clipboardStore'
 import FrameHeader from './FrameHeader'
 import BlockToolbar from './BlockToolbar'
 import TextBlock from './blocks/TextBlock'
@@ -39,6 +40,8 @@ const BLOCK_COMPONENTS = {
 function SortableBlock({ block }) {
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
   const activeBlockId  = useEditorStore(s => s.activeBlockId)
+  const activeFrameId  = useEditorStore(s => s.activeFrame?.id)
+  const copyBlock      = useClipboardStore(s => s.copyBlock)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.id })
 
@@ -86,6 +89,18 @@ function SortableBlock({ block }) {
           padding: 2, userSelect: 'none', lineHeight: 1,
         }}
       >⠿</div>
+      {/* Copy block — visible on hover (same .drag-handle reveal) */}
+      <button
+        className="drag-handle"
+        aria-label="Copy block to clipboard"
+        title="Copy block (paste in any frame)"
+        onClick={() => copyBlock(block, activeFrameId)}
+        style={{
+          position: 'absolute', left: -3, top: 36,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--cf-text-tertiary, #3A5A7A)', fontSize: 13, padding: 2, lineHeight: 1,
+        }}
+      >⧉</button>
       <Block block={block} />
     </div>
   )
@@ -96,6 +111,9 @@ export default function FrameEditor() {
   const previewOpen   = useEditorStore(s => s.previewOpen)
   const setPreviewOpen = useEditorStore(s => s.setPreviewOpen)
   const reorderBlocks = useEditorStore(s => s.reorderBlocks)
+  const pasteBlock    = useEditorStore(s => s.pasteBlock)
+  const copiedBlock   = useClipboardStore(s => s.copiedBlock)
+  const clearClipboard = useClipboardStore(s => s.clearClipboard)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -130,6 +148,23 @@ export default function FrameEditor() {
       <FrameHeader onPreview={() => setPreviewOpen(true)} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {copiedBlock && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px',
+            background: 'color-mix(in srgb, var(--forge-amber) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--forge-amber) 25%, transparent)',
+            borderRadius: 6, marginBottom: 12, fontSize: 11,
+          }}>
+            <span style={{ fontFamily: 'var(--forge-font)', fontSize: 9, fontWeight: 600,
+              color: 'var(--forge-amber)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>clipboard</span>
+            <span style={{ flex: 1, color: 'var(--cf-text-secondary)', fontSize: 11 }}>{copiedBlock.label}</span>
+            <button onClick={() => pasteBlock(copiedBlock)} aria-label="Paste copied block"
+              style={{ padding: '4px 12px', background: 'var(--forge-amber)', color: '#042C53',
+                border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>⧉ Paste</button>
+            <button onClick={clearClipboard} aria-label="Clear clipboard"
+              style={{ background: 'none', border: 'none', color: 'var(--cf-text-tertiary)', fontSize: 12, cursor: 'pointer', padding: '2px 4px' }}>✕</button>
+          </div>
+        )}
         {blocks.length === 0 && (
           <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
             No blocks yet — use the toolbar below to add content.

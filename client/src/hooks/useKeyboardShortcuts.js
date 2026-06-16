@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import useEditorStore from '../store/editorStore'
+import useClipboardStore from '../store/clipboardStore'
 
 /**
  * Global keyboard shortcuts. Mount once in App.jsx.
@@ -53,6 +54,11 @@ export function useKeyboardShortcuts({ onSave, onPreview, onCloseModal, onShowHe
         case 'z':
           if (!isTyping) { e.preventDefault(); st.undo() }
           break
+        case 'v': {
+          const cb = useClipboardStore.getState().copiedBlock
+          if (!isTyping && cb) { e.preventDefault(); st.pasteBlock(cb) }
+          break
+        }
         case 'arrowup':
           if (!isTyping && activeId) { e.preventDefault(); st.moveBlock(activeId, 'up') }
           break

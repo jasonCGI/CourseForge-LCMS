@@ -28,6 +28,7 @@ def create_app(config_name=None):
     from .routes.publish import publish_bp
     from .routes.themes import themes_bp
     from .routes.gui_block import gui_block_bp
+    from .routes.templates import templates_bp
 
     app.register_blueprint(projects_bp)
     app.register_blueprint(import_bp)
@@ -35,6 +36,7 @@ def create_app(config_name=None):
     app.register_blueprint(publish_bp)
     app.register_blueprint(themes_bp)
     app.register_blueprint(gui_block_bp)
+    app.register_blueprint(templates_bp)
 
     # Health check
     @app.route('/api/health')
@@ -75,6 +77,11 @@ def create_app(config_name=None):
                 seed_demo()
         except Exception as e:
             print(f'[demo_seed] Warning: seed failed: {e}')
+        try:
+            from .template_seed import seed_builtin_templates
+            seed_builtin_templates()
+        except Exception as e:
+            print(f'[template_seed] Warning: {e}')
 
     # Serve React SPA for all non-API routes (production)
     @app.route('/', defaults={'path': ''})

@@ -37,6 +37,11 @@ export const duplicateFrame = (frameId, targetLessonId = null) =>
 // ── Reorder ──────────────────────────────────────────────────────────────────
 export const reorder = (type, items) => api.post('/reorder', { type, items })
 
+// ── Frame templates ───────────────────────────────────────────────────────────
+export const getTemplates   = (tag = null) => api.get('/templates' + (tag ? `?tag=${tag}` : ''))
+export const saveTemplate   = (data)       => api.post('/templates', data)
+export const deleteTemplate = (id)         => api.delete(`/templates/${id}`)
+
 // ── Publish ──────────────────────────────────────────────────────────────────
 export const publishProject = (projectId, format) =>
   api.post('/publish', { project_id: projectId, format }, { responseType: 'blob' })
