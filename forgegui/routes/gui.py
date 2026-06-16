@@ -44,6 +44,100 @@ def create_gui():
     return jsonify(gui), 201
 
 
+@gui_bp.post('/api/gui/import-zip')
+def import_gui_zip():
+    """
+    Re-import a ForgeGUI export ZIP for editing. Extracts gui_shell.json +
+    assets/, re-saves the background and button sprites with fresh asset IDs
+    (so they serve correctly again), and creates a new session.
+    """
+    import shutil
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided.'}), 400
+    f = request.files['file']
+    if not f.filename or not f.filename.lower().endswith('.zip'):
+        return jsonify({'error': 'File must be a ForgeGUI ZIP (.zip).'}), 400
+
+    upload_root = Path(current_app.config['UPLOAD_FOLDER'])
+    tmp = upload_root / 'imports' / str(uuid.uuid4())
+    tmp.mkdir(parents=True, exist_ok=True)
+    zpath = tmp / 'in.zip'
+    f.save(str(zpath))
+    try:
+        with zipfile.ZipFile(zpath, 'r') as zf:
+            dest = tmp.resolve()
+            for member in zf.namelist():
+                if not str((dest / member).resolve()).startswith(str(dest)):
+                    raise ValueError('unsafe zip path')
+            zf.extractall(str(tmp))
+    except (zipfile.BadZipFile, ValueError):
+        shutil.rmtree(str(tmp), ignore_errors=True)
+        return jsonify({'error': 'Invalid or unsafe ZIP file.'}), 422
+
+    json_files = list(tmp.glob('*.json'))
+    if not json_files:
+        shutil.rmtree(str(tmp), ignore_errors=True)
+        return jsonify({'error': 'ZIP has no gui_shell.json — is this a ForgeGUI export?'}), 422
+    try:
+        cfg = json.loads(json_files[0].read_text(encoding='utf-8'))
+    except Exception:
+        shutil.rmtree(str(tmp), ignore_errors=True)
+        return jsonify({'error': 'Could not parse gui_shell.json.'}), 422
+    if cfg.get('tool') != 'ForgeGUI':
+        shutil.rmtree(str(tmp), ignore_errors=True)
+        return jsonify({'error': 'This ZIP does not appear to be a ForgeGUI export.'}), 422
+
+    bg_dir  = upload_root / 'backgrounds'; bg_dir.mkdir(parents=True, exist_ok=True)
+    spr_dir = upload_root / 'sprites';     spr_dir.mkdir(parents=True, exist_ok=True)
+
+    def resave(filename, dest_dir, url_prefix):
+        if not filename:
+            return None, None
+        src = tmp / 'assets' / filename
+        if not src.exists():
+            src = tmp / filename
+        if not src.exists():
+            return None, None
+        aid = str(uuid.uuid4())
+        ext = src.suffix or '.png'
+        shutil.copy(str(src), str(dest_dir / f'{aid}{ext}'))
+        return aid, f'{url_prefix}/{aid}{ext}'
+
+    stage = cfg.get('stage', {})
+    if stage.get('background_file'):
+        aid, url = resave(stage['background_file'], bg_dir, '/api/assets/background')
+        if aid:
+            stage['background_asset_id'] = aid
+            stage['background_url'] = url
+
+    for b in cfg.get('buttons', []):
+        if b.get('asset_mode') == 'spritesheet' and b.get('sprite_file'):
+            aid, url = resave(b['sprite_file'], spr_dir, '/api/assets/sprite')
+            if aid:
+                b['sprite_asset_id'] = aid
+                b['sprite_url'] = url
+        for info in (b.get('files') or {}).values():
+            aid, url = resave(info.get('filename'), spr_dir, '/api/assets/sprite')
+            if aid:
+                info['asset_id'] = aid
+                info['serve_url'] = url
+
+    shutil.rmtree(str(tmp), ignore_errors=True)
+
+    gid = str(uuid.uuid4())
+    gui = {
+        'id': gid, 'name': cfg.get('name', 'Imported Shell'),
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'updated_at': datetime.utcnow().isoformat() + 'Z',
+        'stage': stage,
+        'content_area': cfg.get('content_area', {}),
+        'buttons': cfg.get('buttons', []),
+        'zones': cfg.get('zones', []),
+    }
+    GUIS[gid] = gui
+    return jsonify(gui), 201
+
+
 @gui_bp.get('/api/gui/<gui_id>')
 def get_gui(gui_id):
     if gui_id not in GUIS:

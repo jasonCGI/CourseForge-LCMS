@@ -1441,10 +1441,20 @@ function saveGUI(cb) {
 // -- Import -----------------------------------------------------
 function importGUI() {
   var input = document.createElement('input')
-  input.type = 'file'; input.accept = '.json'
+  input.type = 'file'; input.accept = '.json,.zip,application/zip'
   input.onchange = function(e) {
     var file = e.target.files[0]
     if (!file) return
+    // A ForgeGUI export ZIP — restore via the server (re-saves assets).
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      var form = new FormData(); form.append('file', file)
+      document.getElementById('autosave-label').textContent = 'importing…'
+      fetch('/api/gui/import-zip', { method: 'POST', body: form })
+        .then(async function(r) { var b = await r.json(); if (!r.ok) throw new Error(b.error || ('HTTP ' + r.status)); return b })
+        .then(function(g) { loadGuiIntoUI(g); document.getElementById('autosave-label').textContent = ''; saveGUI() })
+        .catch(function(err) { document.getElementById('autosave-label').textContent = ''; alert('Import failed: ' + err.message) })
+      return
+    }
     var reader = new FileReader()
     reader.onload = function(ev) {
       try {
