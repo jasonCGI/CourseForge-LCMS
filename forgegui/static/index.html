@@ -443,6 +443,10 @@
   <div style="flex:1"></div>
   <span id="autosave-label"></span>
   <button class="btn btn-outline btn-sm"
+    onclick="importFigma()" aria-label="Import layout from Figma">
+    ⬉ Figma
+  </button>
+  <button class="btn btn-outline btn-sm"
     onclick="importGUI()" aria-label="Import existing GUI shell">
     ↑ Import
   </button>
@@ -1489,6 +1493,52 @@ function importGUI() {
     reader.readAsText(file)
   }
   input.click()
+}
+
+// -- Figma import ----------------------------------------------
+function loadGuiIntoUI(g) {
+  guiId = g.id; gui = g
+  document.getElementById('gui-name').value = gui.name || ''
+  document.getElementById('stage-w').value  = gui.stage.width
+  document.getElementById('stage-h').value  = gui.stage.height
+  document.getElementById('ca-x').value = gui.content_area.x
+  document.getElementById('ca-y').value = gui.content_area.y
+  document.getElementById('ca-w').value = gui.content_area.width
+  document.getElementById('ca-h').value = gui.content_area.height
+  document.getElementById('empty-state').style.display   = 'none'
+  document.getElementById('stage-preview').style.display = 'block'
+  document.getElementById('stage-bg').src = gui.stage.background_url || ''
+  renderStage(); renderButtonList(); renderZoneList()
+  document.getElementById('btn-export').disabled     = false
+  document.getElementById('btn-export-2').disabled   = false
+  document.getElementById('btn-export-bar').disabled = false
+}
+
+function importFigma() {
+  var url = prompt('Paste the Figma file URL.\nThe frame should use the naming convention: '
+    + 'bg / content-area / btn-<action> / zone-<type>.')
+  if (!url) return
+  document.getElementById('autosave-label').textContent = 'importing from Figma…'
+  fetch('/api/figma/import', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_url: url }),
+  })
+  .then(async function(r) { var b = await r.json(); if (!r.ok) throw new Error(b.error || ('HTTP ' + r.status)); return b })
+  .then(function(g) {
+    loadGuiIntoUI(g)
+    document.getElementById('autosave-label').textContent = ''
+    var imp = g.imported || {}
+    var msg = 'Imported Figma frame "' + g.frame_name + '": '
+      + imp.buttons + ' button(s), ' + imp.zones + ' zone(s), background '
+      + (imp.has_background ? '✓' : '—') + '.'
+    if (g.warnings && g.warnings.length) msg += '\n\nNotes:\n- ' + g.warnings.join('\n- ')
+    alert(msg)
+    saveGUI()
+  })
+  .catch(function(e) {
+    document.getElementById('autosave-label').textContent = ''
+    alert('Figma import failed: ' + e.message)
+  })
 }
 
 // -- Zoom -------------------------------------------------------

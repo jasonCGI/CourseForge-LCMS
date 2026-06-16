@@ -23,8 +23,10 @@ def create_app(config_name=None):
 
     from routes.gui    import gui_bp
     from routes.assets import assets_bp
+    from routes.figma  import figma_bp
     app.register_blueprint(gui_bp)
     app.register_blueprint(assets_bp)
+    app.register_blueprint(figma_bp)
 
     @app.route('/api/health')
     def health():
