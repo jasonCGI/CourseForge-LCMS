@@ -125,18 +125,33 @@ export default function MediaBlock({ block }) {
         {/* Upload / linked asset */}
         <div style={{ marginTop: 16 }}>
           {!block.data.asset_id ? (
-            <MediaUploader
-              accept={kind === 'image'
-                ? { 'image/*': ['.png','.jpg','.jpeg','.gif','.webp'] }
-                : kind === 'video'
-                  ? { 'video/*': ['.mp4','.mov','.webm'] }
-                  : { 'audio/*': ['.mp3','.wav','.ogg','.m4a'] }
-              }
-              label={`Drop ${kind} file here`}
-              onUpload={handleUpload}
-              uploading={uploading}
-              error={uploadError}
-            />
+            <>
+              {/* Placeholder preview — shown until a real asset is uploaded.
+                  Demo blocks seed an SVG data-URI in serve_url; render it so the
+                  block reads as "here's what goes here" rather than an empty box. */}
+              {block.data.serve_url && (kind === 'image' || kind === 'video') && (
+                <img
+                  src={block.data.serve_url}
+                  alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
+                  style={{
+                    width: '100%', display: 'block', borderRadius: 6, marginBottom: 12,
+                    border: '1px solid var(--cf-border-tertiary)',
+                  }}
+                />
+              )}
+              <MediaUploader
+                accept={kind === 'image'
+                  ? { 'image/*': ['.png','.jpg','.jpeg','.gif','.webp'] }
+                  : kind === 'video'
+                    ? { 'video/*': ['.mp4','.mov','.webm'] }
+                    : { 'audio/*': ['.mp3','.wav','.ogg','.m4a'] }
+                }
+                label={`Drop ${kind} file here`}
+                onUpload={handleUpload}
+                uploading={uploading}
+                error={uploadError}
+              />
+            </>
           ) : (
             <div style={{
               padding: '16px', border: '1px solid var(--cf-border-secondary)',

@@ -107,7 +107,18 @@ export default function HotspotBlock({ block }) {
             overflow: 'hidden',
           }}
         >
-          {!block.data.image_id && (
+          {/* Placeholder/asset backdrop — demo blocks seed an SVG data-URI in
+              background_url. Shows the hotspot canvas with its regions in place. */}
+          {block.data.background_url && (
+            <img
+              src={block.data.background_url}
+              alt={block.data.alt_text || 'Hotspot background'}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', pointerEvents: 'none' }}
+            />
+          )}
+
+          {!block.data.image_id && !block.data.background_url && (
             <div style={{
               position: 'absolute', inset: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',

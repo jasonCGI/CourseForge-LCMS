@@ -67,27 +67,9 @@ const LEVELS = {
   },
 }
 
-// Frame badge styles using CSS vars
-const BADGE_STYLE = {
-  content: {
-    background: cssVar('--cf-badge-ctn-bg'),
-    color:      cssVar('--cf-badge-ctn-text'),
-    border:     cssVar('--cf-badge-border'),
-    borderColor:cssVar('--cf-badge-ctn-text'),
-  },
-  assessment: {
-    background: cssVar('--cf-badge-kc-bg'),
-    color:      cssVar('--cf-badge-kc-text'),
-    border:     cssVar('--cf-badge-border'),
-    borderColor:cssVar('--cf-badge-kc-text'),
-  },
-  branch: {
-    background: cssVar('--cf-badge-br-bg'),
-    color:      cssVar('--cf-badge-br-text'),
-    border:     cssVar('--cf-badge-border'),
-    borderColor:cssVar('--cf-badge-br-text'),
-  },
-}
+// Frame-type badges (CTN/KC/BR) were removed 2026-06-16 — to revisit with a
+// clearer visual frame-type indicator later. frameType is still threaded
+// through TreeRow for that future use.
 
 // ── Tree row component ────────────────────────────────────────────
 
@@ -121,9 +103,6 @@ function TreeRow({
   const fontWeight = isCurrent
     ? cssVar('--cf-level-frame-active-fw')
     : isFrame ? cssVar('--cf-level-frame-fw') : lv?.fw
-
-  const badge = frameType && BADGE_STYLE[frameType]
-  const badgeLabel = { content: 'ctn', assessment: 'kc', branch: 'br' }
 
   return (
     <div>
@@ -197,21 +176,6 @@ function TreeRow({
               opacity: 0.8,
             }}>
               {count}
-            </span>
-          )}
-
-          {/* Frame type badge */}
-          {badge && (
-            <span
-              aria-label={`${frameType} frame`}
-              style={{
-                fontSize: 9, fontWeight: 600,
-                padding: '2px 5px', borderRadius: 3,
-                textTransform: 'uppercase', letterSpacing: '0.04em',
-                flexShrink: 0, ...badge,
-              }}
-            >
-              {badgeLabel[frameType]}
             </span>
           )}
         </div>

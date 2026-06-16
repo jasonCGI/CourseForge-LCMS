@@ -90,6 +90,25 @@ function PreviewText({ block }) {
 
 function PreviewMedia({ block }) {
   const icons = { image: '🖼', video: '🎬', audio: '🎙', oam: '⚙' }
+  const kind = block.data.kind
+
+  // If a placeholder/asset image is available (demo blocks seed an SVG data-URI
+  // in serve_url), render it so the preview shows the intended media slot.
+  if (block.data.serve_url && (kind === 'image' || kind === 'video')) {
+    return (
+      <div style={{ ...previewBlockWrap, textAlign: 'center' }}>
+        <img
+          src={block.data.serve_url}
+          alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
+          style={{ maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
+        />
+        {block.data.caption && (
+          <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{block.data.caption}</div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ ...previewBlockWrap, textAlign: 'center' }}>
       <div style={{
@@ -99,9 +118,9 @@ function PreviewMedia({ block }) {
         background: '#F8FBFF',
         color: '#185FA5',
       }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>{icons[block.data.kind] || '📎'}</div>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>{icons[kind] || '📎'}</div>
         <div style={{ fontSize: 13, fontWeight: 500 }}>
-          [{block.data.kind}: {block.data.placeholder_label || 'no label'}]
+          [{kind}: {block.data.placeholder_label || 'no label'}]
         </div>
         {block.data.caption && (
           <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{block.data.caption}</div>
@@ -210,7 +229,15 @@ function PreviewHotspot({ block }) {
         borderRadius: 6,
         overflow: 'hidden',
       }}>
-        {!block.data.image_id && (
+        {block.data.background_url && (
+          <img
+            src={block.data.background_url}
+            alt={block.data.alt_text || 'Hotspot background'}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
+
+        {!block.data.image_id && !block.data.background_url && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
