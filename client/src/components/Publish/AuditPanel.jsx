@@ -143,11 +143,11 @@ export default function AuditPanel({ onProceed, onCancel }) {
       }}>
         <div style={{
           width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-          background: score >= 80 ? 'rgba(59,138,74,0.15)' : score >= 50 ? 'color-mix(in srgb, var(--forge-brand) 15%, transparent)' : 'rgba(194,57,52,0.15)',
-          border: `2px solid ${score >= 80 ? '#4CAF50' : score >= 50 ? 'var(--forge-brand)' : '#E87070'}`,
+          background: score >= 80 ? 'rgba(59,138,74,0.15)' : score >= 50 ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'rgba(194,57,52,0.15)',
+          border: `2px solid ${score >= 80 ? '#4CAF50' : score >= 50 ? 'var(--forge-amber)' : '#E87070'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 16, fontWeight: 700,
-          color: score >= 80 ? '#4CAF50' : score >= 50 ? 'var(--forge-brand)' : '#E87070',
+          color: score >= 80 ? '#4CAF50' : score >= 50 ? 'var(--forge-amber)' : '#E87070',
         }}>
           {score}
         </div>
@@ -184,7 +184,7 @@ export default function AuditPanel({ onProceed, onCancel }) {
       {/* Warnings */}
       {warnings.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--forge-brand)', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--forge-amber)', marginBottom: 8 }}>
             Warnings — recommended fixes
           </div>
           {warnings.map(w => (
@@ -229,9 +229,9 @@ export default function AuditPanel({ onProceed, onCancel }) {
 function AuditItem({ item, type }) {
   const [open, setOpen] = React.useState(false)
   const isError = type === 'error'
-  const color   = isError ? '#E87070' : 'var(--forge-brand)'
-  const bg      = isError ? 'rgba(194,57,52,0.08)' : 'color-mix(in srgb, var(--forge-brand) 8%, transparent)'
-  const border  = isError ? 'rgba(194,57,52,0.25)' : 'color-mix(in srgb, var(--forge-brand) 25%, transparent)'
+  const color   = isError ? '#E87070' : 'var(--forge-amber)'
+  const bg      = isError ? 'rgba(194,57,52,0.08)' : 'color-mix(in srgb, var(--forge-amber) 8%, transparent)'
+  const border  = isError ? 'rgba(194,57,52,0.25)' : 'color-mix(in srgb, var(--forge-amber) 25%, transparent)'
 
   return (
     <div style={{

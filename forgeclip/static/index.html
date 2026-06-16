@@ -25,7 +25,7 @@
       --navy:    #042C53;
       --blue:    #185FA5;
       --blue-lt: #B5D4F4;
-      --amber:    #F59E0B;
+      --amber:    var(--forge-amber);
       --bg:      #06080f;
       --bg2:     #0d1017;
       --bg3:     #131822;
@@ -35,12 +35,11 @@
       --text3:   #3A5A7A;
       --radius:  6px;
       --font:    'Inter', system-ui, sans-serif;
-      --mono:    'JetBrains Mono', Consolas, monospace;
+      --mono:     var(--forge-font);
     }
 
     /* ── Viewing modes — dark is the :root default above ── */
     html[data-mode="light"] {
-      --amber: #D4820A;
       --navy:    #1B3A5C;   /* header stays a deep brand bar */
       --bg:      #F0F4F8;
       --bg2:     #FFFFFF;
@@ -180,7 +179,7 @@
     .hotspot-dot {
       width: 28px; height: 28px;
       border-radius: 50%;
-      background: rgba(239,159,39,0.3);
+      background: color-mix(in srgb, var(--forge-amber) 30%, transparent);
       border: 2px solid var(--amber);
       cursor: pointer;
       animation: pulse 1.5s ease-in-out infinite;
@@ -188,8 +187,8 @@
     }
 
     @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,159,39,0.4); }
-      50%       { box-shadow: 0 0 0 10px rgba(239,159,39,0); }
+      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--forge-amber) 40%, transparent); }
+      50%       { box-shadow: 0 0 0 10px transparent; }
     }
 
     .annotation-label {
@@ -286,7 +285,7 @@
     }
 
     .interaction-item:hover { border-color: var(--blue); }
-    .interaction-item.selected { border-color: var(--amber); background: rgba(239,159,39,0.05); }
+    .interaction-item.selected { border-color: var(--amber); background: color-mix(in srgb, var(--forge-amber) 5%, transparent); }
 
     .int-tc {
       font-family: var(--mono); font-size: 10px;
@@ -519,12 +518,7 @@
     <polygon points="8,8 19,14 8,20" fill="#2A7ACA" opacity="0.5"/>
   </svg>
 
-  <span class="forge-path forge-path--md forge-path--bar">
-    <span class="forge-path__mid">Forge</span>
-    <span class="forge-path__slash">/</span>
-    <span class="forge-path__tool">Clip</span>
-    <span class="forge-path__cursor">_</span>
-  </span>
+  <span class="forge-path forge-path--md forge-path--bar"><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Clip</span><span class="forge-path__cursor">_</span></span>
   <span class="header-tag">Interactive Video · v1.0</span>
 
   <div style="flex:1"></div>

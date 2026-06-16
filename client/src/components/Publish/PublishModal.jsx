@@ -171,9 +171,9 @@ export default function PublishModal({ onClose }) {
               background: validation.notConfigured ? '#FFF3E0'
                 : validation.ok && (validation.warnings?.length || 0) === 0 ? '#EAF6EC'
                 : validation.status === 'ERROR' ? '#FDECEA' : '#FFF3E0',
-              border: `1px solid ${validation.notConfigured ? 'var(--forge-brand)'
+              border: `1px solid ${validation.notConfigured ? 'var(--forge-amber)'
                 : validation.ok && (validation.warnings?.length || 0) === 0 ? '#3B8A4A'
-                : validation.status === 'ERROR' ? '#C0392B' : 'var(--forge-brand)'}`,
+                : validation.status === 'ERROR' ? '#C0392B' : 'var(--forge-amber)'}`,
               color: validation.notConfigured ? '#8A4A00'
                 : validation.ok && (validation.warnings?.length || 0) === 0 ? '#1E7E34'
                 : validation.status === 'ERROR' ? '#C0392B' : '#8A4A00',

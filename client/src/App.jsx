@@ -50,6 +50,7 @@ export default function App() {
         {/* ── App header ── */}
         <div style={{
           height: 48,
+          boxSizing: 'border-box',   /* 48 total incl. border — matches the other tools (no double-count) */
           background: 'var(--cf-header-bg)',
           borderBottom: '2px solid var(--cf-header-border)',
           display: 'flex',
@@ -67,7 +68,7 @@ export default function App() {
             <path d="M0,14 L-3,3 L0,0 Z"    fill="#0C3A6E" opacity="0.6"/>
             <path d="M-14,0 L-3,-3 L0,0 Z"  fill="#0C3A6E" opacity="0.6"/>
             <g transform="rotate(22.5)">
-              <path d="M0,-7 L1.6,-1.6 L7,0 L1.6,1.6 L0,7 L-1.6,1.6 L-7,0 L-1.6,-1.6 Z" fill="var(--forge-brand)"/>
+              <path d="M0,-7 L1.6,-1.6 L7,0 L1.6,1.6 L0,7 L-1.6,1.6 L-7,0 L-1.6,-1.6 Z" fill="var(--forge-amber)"/>
             </g>
             <circle cx="0" cy="0" r="2.5" fill="#FAC775"/>
             <circle cx="0" cy="0" r="1.1" fill="white" opacity="0.88"/>
@@ -84,7 +85,7 @@ export default function App() {
 
           {/* Version */}
           <span style={{
-            fontFamily: "'JetBrains Mono', Consolas, monospace",
+            fontFamily: "var(--forge-font)",
             fontSize: 9,
             color: 'var(--cf-text-tertiary)',
             letterSpacing: '0.06em',
@@ -101,7 +102,7 @@ export default function App() {
           {/* Status indicator */}
           {loading && (
             <span style={{
-              fontFamily: "'SF Mono', Consolas, monospace",
+              fontFamily: "var(--forge-font)",
               fontSize: 10,
               color: 'var(--cf-text-tertiary)',
               letterSpacing: '0.08em',
@@ -127,7 +128,7 @@ export default function App() {
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
-              fontFamily: "'SF Mono', Consolas, monospace",
+              fontFamily: "var(--forge-font)",
               letterSpacing: '0.04em',
             }}
           >

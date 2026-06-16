@@ -59,8 +59,8 @@ export default function ModeToggle() {
     :                  '#8AAAC8'   // dark mode
 
   // Active pill
-  const activePillBg     = mode === 'hc' ? 'var(--forge-brand)' : '#1B3A5C'
-  const activePillBorder = mode === 'hc' ? 'var(--forge-brand)' : '#2A5A8A'
+  const activePillBg     = mode === 'hc' ? 'var(--forge-amber)' : '#1B3A5C'
+  const activePillBorder = mode === 'hc' ? 'var(--forge-amber)' : '#2A5A8A'
 
   // Group wrapper
   const groupBg     = mode === 'hc' ? '#000000' : '#0e1320'
@@ -83,7 +83,7 @@ export default function ModeToggle() {
         const isActive = mode === m
         // Literal hex only — never a CSS var (var() doesn't resolve as an SVG fill attribute).
         // HC active stays black (amber-on-amber pill would be invisible).
-        const iconColor = isActive ? (mode === 'hc' ? '#000000' : 'var(--forge-brand)') : inactiveIcon
+        const iconColor = isActive ? (mode === 'hc' ? '#000000' : 'var(--forge-amber)') : inactiveIcon
         return (
           <button
             key={m}

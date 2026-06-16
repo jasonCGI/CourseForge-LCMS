@@ -124,14 +124,14 @@ export default function HotspotBlock({ block }) {
               position: 'absolute',
               left: `${r.x}%`, top: `${r.y}%`,
               width: `${r.w}%`, height: `${r.h}%`,
-              border: '2px solid var(--forge-brand)',
-              background: 'color-mix(in srgb, var(--forge-brand) 15%, transparent)',
+              border: '2px solid var(--forge-amber)',
+              background: 'color-mix(in srgb, var(--forge-amber) 15%, transparent)',
               borderRadius: 2,
               boxSizing: 'border-box',
             }}>
               <span style={{
                 position: 'absolute', top: 2, left: 4,
-                fontSize: 10, color: 'var(--forge-brand)', fontWeight: 600,
+                fontSize: 10, color: 'var(--forge-amber)', fontWeight: 600,
                 whiteSpace: 'nowrap',
               }}>{r.label}</span>
             </div>
@@ -143,8 +143,8 @@ export default function HotspotBlock({ block }) {
               position: 'absolute',
               left: `${draft.x}%`, top: `${draft.y}%`,
               width: `${draft.w}%`, height: `${draft.h}%`,
-              border: '2px dashed var(--forge-brand)',
-              background: 'color-mix(in srgb, var(--forge-brand) 10%, transparent)',
+              border: '2px dashed var(--forge-amber)',
+              background: 'color-mix(in srgb, var(--forge-amber) 10%, transparent)',
               borderRadius: 2,
               pointerEvents: 'none',
             }}/>
@@ -159,7 +159,7 @@ export default function HotspotBlock({ block }) {
               <div key={r.id} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                 <div style={{
                   width: 12, height: 12, borderRadius: 2,
-                  border: '2px solid var(--forge-brand)', flexShrink: 0,
+                  border: '2px solid var(--forge-amber)', flexShrink: 0,
                 }}/>
                 <input
                   value={r.label}

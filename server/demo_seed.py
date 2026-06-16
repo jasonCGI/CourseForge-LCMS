@@ -26,7 +26,7 @@ def _svg_placeholder(label, color, icon, width=800, height=450):
   <text x="{width//2}" y="{height//2 + 20}" text-anchor="middle" font-size="18" font-weight="600"
     fill="{color}" opacity="0.9" letter-spacing="0.05em">{label}</text>
   <text x="{width//2}" y="{height//2 + 48}" text-anchor="middle" font-size="12" fill="#3A5A7A"
-    font-family="'JetBrains Mono', Consolas, monospace">{width} &#215; {height} px &#183; placeholder</text>
+    font-family="'IBM Plex Mono', 'Courier New', monospace">{width} &#215; {height} px &#183; placeholder</text>
 </svg>"""
     encoded = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
     return f"data:image/svg+xml;base64,{encoded}"

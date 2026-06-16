@@ -193,7 +193,7 @@ function TreeRow({
           {count && !isFrame && (
             <span style={{
               fontSize: 10, color: lv?.tab, flexShrink: 0,
-              fontFamily: 'var(--cf-mono, SF Mono, Consolas, monospace)',
+              fontFamily: 'var(--forge-font)',
               opacity: 0.8,
             }}>
               {count}
@@ -257,7 +257,7 @@ export default function ContentTree() {
         padding: 16,
         color: 'var(--cf-text-tertiary)',
         fontSize: 12,
-        fontFamily: 'var(--cf-mono, SF Mono, Consolas, monospace)',
+        fontFamily: 'var(--forge-font)',
         lineHeight: 1.6,
         display: 'flex',
         flexDirection: 'column',

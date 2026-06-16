@@ -13,7 +13,7 @@
   --color-border-secondary:     var(--cf-border-secondary, #3a3a5a);
   --color-border-tertiary:      var(--cf-border-tertiary, #2a2a4a);
   --font-sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  --font-mono: var(--forge-font);
 }
 
 html, body, #root { height: 100%; }
@@ -70,27 +70,20 @@ body { margin: 0; font-family: var(--font-sans); }
 :root {
   --cf-app-bg:          #06080f;
   --cf-header-bg:       #06080f;
-  --cf-header-border:   var(--forge-brand);
+  --cf-header-border:   var(--forge-amber);
   --cf-text-primary:    #E0E8F0;
   --cf-text-secondary:  #7A90A8;
   --cf-text-tertiary:   #3A5A7A;
-  --cf-accent:          var(--forge-brand);
+  --cf-accent:          var(--forge-amber);
   --cf-border-primary:  #1c1c2c;
   --cf-border-tertiary: rgba(255,255,255,0.04);
   --cf-font:            Inter, system-ui, sans-serif;
-  --cf-mono:            'SF Mono', 'JetBrains Mono', Consolas, monospace;
+  --cf-mono:            var(--forge-font);
 }
 
-/* ── Forge brand alias ───────────────────────────────────────────────────────
-   --forge-brand is an interim alias used by modes.js + block components (from the
-   earlier /src sweep). The forge token system now lives in /static/css (loaded
-   via main.jsx); the .forge-path component is provided by forge-components.css —
-   no local copy here. Unifying --forge-brand → --forge-amber is held for the
-   audit pass. */
-:root                  { --forge-brand: #F59E0B; }   /* dark-first default   */
-[data-cf-mode="light"] { --forge-brand: #D4820A; }   /* light = spec amber   */
-[data-cf-mode="dark"]  { --forge-brand: #F59E0B; }   /* dark  = lifted amber */
-[data-cf-mode="hc"]    { --forge-brand: #F59E0B; }   /* hc    = lifted amber */
+/* --forge-amber (and all amber) now resolves from /static/css/forge-tokens.css
+   via the data-cf-mode bridge, loaded in main.jsx. The interim --forge-brand
+   alias was retired in the audit pass — modes.js + components use var(--forge-amber). */
 
 /* ── Focus indicators — 508 required on all interactive elements ── */
 .cf-tree-row:focus-visible,
@@ -99,7 +92,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex="0"]:focus-visible {
-  outline: var(--cf-focus-outline, 2px solid var(--forge-brand)) !important;
+  outline: var(--cf-focus-outline, 2px solid var(--forge-amber)) !important;
   outline-offset: -2px;
   z-index: 10;
   position: relative;
@@ -109,7 +102,7 @@ textarea:focus-visible,
 [data-cf-mode="hc"] .cf-tree-row:focus-visible,
 [data-cf-mode="hc"] button:focus-visible,
 [data-cf-mode="hc"] [tabindex="0"]:focus-visible {
-  outline: 3px solid var(--forge-brand) !important;
+  outline: 3px solid var(--forge-amber) !important;
   outline-offset: -1px;
 }
 
@@ -124,7 +117,7 @@ textarea:focus-visible,
   top: -100px;
   left: 8px;
   padding: 8px 16px;
-  background: var(--forge-brand);
+  background: var(--forge-amber);
   color: #000;
   font-weight: 700;
   border-radius: 4px;

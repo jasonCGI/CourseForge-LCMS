@@ -13,7 +13,7 @@ from ..models.theme import GUITheme
 SYSTEM_FALLBACK = {
     "primary_color":       "#185FA5",
     "secondary_color":     "#042C53",
-    "accent_color":        "#EF9F27",
+    "accent_color":        "#D4820A",
     "text_color":          "#1a1a1a",
     "text_light":          "#ffffff",
     "bg_color":            "#ffffff",

@@ -84,7 +84,7 @@ export default function PreviewModal({ onClose }) {
           <span style={{
             fontSize: 11,
             color: '#378ADD',
-            fontFamily: 'SF Mono, Consolas, monospace',
+            fontFamily: 'var(--forge-font)',
             marginRight: 8,
           }}>
             ESC to close

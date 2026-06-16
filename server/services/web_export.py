@@ -144,7 +144,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
     .cf-progress {{ height: 3px; background: rgba(255,255,255,0.15); }}
     .cf-progress-fill {{
       height: 100%;
-      background: var(--cf-accent, #EF9F27);
+      background: var(--cf-accent, #D4820A);
       transition: width 0.3s ease;
     }}
     .cf-content {{
@@ -160,7 +160,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
       color: var(--cf-secondary, #042C53);
       margin-bottom: 24px;
       padding-bottom: 12px;
-      border-bottom: 3px solid var(--cf-accent, #EF9F27);
+      border-bottom: 3px solid var(--cf-accent, #D4820A);
     }}
     .cf-text {{ margin-bottom: 20px; line-height: 1.7; }}
     .cf-media {{
