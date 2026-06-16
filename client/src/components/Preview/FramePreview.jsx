@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import Model3DViewer from './Model3DViewer'
+import GUIShellRenderer from './GUIShellRenderer'
 
 const FRAME_BG = '#ffffff'
 
@@ -8,6 +9,27 @@ export default function FramePreview({ frame }) {
   if (!frame) return null
 
   const blocks = frame.content?.blocks || []
+
+  // GUI-shell frame: the shell is the whole canvas; all other blocks are
+  // injected into its content area. Render it instead of the normal stack.
+  const guiBlock = blocks.find(b => b.type === 'gui')
+  if (guiBlock) {
+    const contentBlocks = blocks.filter(b => b.type !== 'gui')
+    return (
+      <div style={{
+        background: FRAME_BG, color: '#1a1a1a',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        minHeight: '100%', padding: '32px 40px', boxSizing: 'border-box',
+      }}>
+        <h1 style={{
+          fontSize: 22, fontWeight: 600, color: '#042C53',
+          marginBottom: 24, paddingBottom: 12,
+          borderBottom: '2px solid var(--forge-amber)',
+        }}>{frame.name}</h1>
+        <PreviewGUI guiBlock={guiBlock} contentBlocks={contentBlocks} frameName={frame.name} />
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -40,6 +62,71 @@ export default function FramePreview({ frame }) {
       ))}
     </div>
   )
+}
+
+function PreviewGUI({ guiBlock, contentBlocks, frameName }) {
+  const [action, setAction] = useState(null)
+
+  if (!guiBlock.data.gui_asset_id) {
+    return (
+      <div style={{
+        padding: 32, textAlign: 'center',
+        border: '2px dashed #3A5A8A', borderRadius: 8, color: '#3A5A8A',
+        background: 'rgba(58,90,138,0.05)', marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>▣</div>
+        <div style={{ fontSize: 13 }}>GUI Shell — upload a ForgeGUI ZIP to preview</div>
+      </div>
+    )
+  }
+
+  const frameHtml = (contentBlocks || []).map(renderBlockToHTML).join('')
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <GUIShellRenderer
+        shellUrl={guiBlock.data.html_serve_url}
+        frameHtml={frameHtml}
+        frameData={{
+          frameIndex: 1, totalFrames: 1,
+          lessonTitle: 'Preview', sectionTitle: 'Preview',
+          frameTitle: frameName || 'Frame Preview',
+          prompt: frameName || '',
+          isFirst: true, isLast: true,
+        }}
+        onAction={(a) => setAction(a)}
+        height={Math.round((guiBlock.data.stage_height || 768) * 0.6)}
+      />
+      <div style={{
+        marginTop: 8, fontSize: 11, color: '#888',
+        fontFamily: 'IBM Plex Mono, monospace',
+      }}>
+        {action
+          ? `// shell action: ${action} (navigation handled by CourseForge in published output)`
+          : '// preview — click shell buttons to test actions'}
+      </div>
+    </div>
+  )
+}
+
+// Minimal block-to-HTML renderer for injecting into the GUI shell preview.
+function renderBlockToHTML(block) {
+  switch (block.type) {
+    case 'text':
+      return `<div class="cf-injected-text">${block.data.body || ''}</div>`
+    case 'media':
+      if (block.data.kind === 'image' && block.data.serve_url) {
+        return `<img src="${block.data.serve_url}" alt="${block.data.alt_text || ''}" `
+             + `style="max-width:100%;height:auto;display:block">`
+      }
+      return `<div style="padding:20px;text-align:center;color:#3A5A7A;`
+           + `font-family:'IBM Plex Mono',monospace;font-size:11px">`
+           + `[${block.data.kind || 'media'} block]</div>`
+    default:
+      return `<div style="padding:12px;border:1px dashed #1c2a3a;border-radius:4px;`
+           + `color:#3A5A7A;font-family:'IBM Plex Mono',monospace;font-size:10px;`
+           + `margin-bottom:8px">[${block.type} block]</div>`
+  }
 }
 
 function PreviewBlock({ block }) {

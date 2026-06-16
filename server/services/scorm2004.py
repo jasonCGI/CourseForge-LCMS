@@ -191,10 +191,14 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             elif asset.kind == 'model3d':
                 _w(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
 
-            # Companion files
+            # Companion files. Only the known companion-ID keys are asset IDs;
+            # other kinds (e.g. 'gui') store metadata dicts/strings here, so
+            # restrict to the keys we actually bundle and require a string id.
             companions = asset.companion_files or {}
             for key, companion_id in companions.items():
-                if not companion_id:
+                if key not in ('vtt_asset_id', 'poster_asset_id', 'webm_asset_id'):
+                    continue
+                if not companion_id or not isinstance(companion_id, str):
                     continue
                 companion = MediaAsset.query.get(companion_id)
                 if not companion:

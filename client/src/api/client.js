@@ -94,6 +94,16 @@ export const uploadModel = (file, projectId) => {
   })
 }
 
+// ForgeGUI shell (.zip) upload
+export const uploadGUI = (file, projectId) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  return api.post('/media/gui', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 // ── Themes ───────────────────────────────────────────────────────────────────
 export const getThemes   = ()                => api.get('/themes')
 export const createTheme  = (data)           => api.post('/themes', data)

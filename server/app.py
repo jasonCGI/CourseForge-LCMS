@@ -27,12 +27,14 @@ def create_app(config_name=None):
     from .routes.media import media_bp
     from .routes.publish import publish_bp
     from .routes.themes import themes_bp
+    from .routes.gui_block import gui_block_bp
 
     app.register_blueprint(projects_bp)
     app.register_blueprint(import_bp)
     app.register_blueprint(media_bp)
     app.register_blueprint(publish_bp)
     app.register_blueprint(themes_bp)
+    app.register_blueprint(gui_block_bp)
 
     # Health check
     @app.route('/api/health')

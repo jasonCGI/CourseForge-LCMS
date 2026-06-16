@@ -42,6 +42,20 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
     )
 
 
+def _frame_has_gui(frame) -> bool:
+    """True if a frame contains a GUI shell block."""
+    return any(b.get('type') == 'gui'
+               for b in (frame.content or {}).get('blocks', []))
+
+
+def _get_gui_block(frame):
+    """Return the first GUI block in a frame, or None."""
+    for b in (frame.content or {}).get('blocks', []):
+        if b.get('type') == 'gui':
+            return b
+    return None
+
+
 def _render_blocks(blocks, scorm_bridge=False):
     """Convert block list to HTML string."""
     parts = []
@@ -49,6 +63,20 @@ def _render_blocks(blocks, scorm_bridge=False):
         btype = block.get('type')
         data  = block.get('data', {})
         bid   = block.get('id', str(uuid.uuid4()))
+
+        if btype == 'gui':
+            # GUI shell blocks only render as the SCO page in SCORM 1.2 (handled
+            # in build_scorm12_package). When a gui block reaches _render_blocks
+            # (SCORM 2004 / Web Bundle), show a clear notice instead of nothing.
+            parts.append(
+                '<div style="padding:24px;border:2px dashed #3A5A8A;border-radius:8px;'
+                'background:rgba(58,90,138,0.06);color:#3A5A8A;text-align:center;'
+                'font-family:\'IBM Plex Mono\',monospace;font-size:13px;margin-bottom:16px">'
+                '&#x2B22; This frame uses a ForgeGUI shell. '
+                'Publish as <strong>SCORM 1.2</strong> for the full interactive shell.'
+                '</div>'
+            )
+            continue
 
         if btype == 'text':
             html = f'<div class="cf-text">{data.get("body","")}</div>'
@@ -495,6 +523,141 @@ def _render_blocks(blocks, scorm_bridge=False):
     return '\n'.join(parts)
 
 
+def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
+                     frame_map, cf_version):
+    """
+    Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
+    page. Returns (patched_html, gui_asset_id) or (None, None).
+
+    The shell's relative `assets/...` refs are namespaced to
+    `gui_assets/<asset_id>/...` (avoids collisions between multiple shells),
+    and a CourseForge runtime is injected that:
+      - injects the frame's non-GUI blocks into #fgui-content
+      - populates the shell text zones
+      - maps NEXT/PREV/SUBMIT/MENU to the real frame filenames (frame_map)
+      - reports SCORM completion on the last frame
+    """
+    gui_block = _get_gui_block(frame)
+    if not gui_block:
+        return None, None
+    asset_id = gui_block.get('data', {}).get('gui_asset_id', '')
+    if not asset_id:
+        return None, None
+
+    asset = MediaAsset.query.get(asset_id)
+    if not asset or not asset.stored_path:
+        return None, None
+
+    gui_dir   = Path(asset.stored_path)
+    html_file = (asset.companion_files or {}).get('html_file', '')
+    html_path = gui_dir / html_file
+    if not html_path.exists():
+        candidates = list(gui_dir.glob('*.html'))
+        if not candidates:
+            return None, None
+        html_path = candidates[0]
+
+    shell_html = html_path.read_text(encoding='utf-8')
+
+    # Namespace asset references so multiple shells never collide in the ZIP.
+    shell_html = shell_html.replace('assets/', f'gui_assets/{asset_id}/')
+
+    # Injected content = the frame's non-GUI blocks rendered to HTML (a string).
+    non_gui_blocks = [b for b in (frame.content or {}).get('blocks', [])
+                      if b.get('type') != 'gui']
+    injected_html = _render_blocks(non_gui_blocks)
+
+    is_first  = frame_idx == 0
+    is_last   = frame_idx == total_frames - 1
+    prev_href = frame_map.get(frame_idx - 1, '')
+    next_href = frame_map.get(frame_idx + 1, '')
+
+    cf_runtime = f"""
+<script>
+// CourseForge GUI Runtime — injected by CourseForge v{cf_version} at publish time
+(function() {{
+  var FRAME_HTML = {json.dumps(injected_html)};
+  var FRAME_DATA = {{
+    frameIndex:   {frame_idx + 1},
+    totalFrames:  {total_frames},
+    lessonTitle:  {json.dumps(lesson_name or '')},
+    sectionTitle: {json.dumps(section_name or '')},
+    frameTitle:   {json.dumps(frame.name or '')},
+    prompt:       {json.dumps(frame.name or '')},
+    isFirst:      {'true' if is_first else 'false'},
+    isLast:       {'true' if is_last else 'false'}
+  }};
+  var NEXT_HREF = {json.dumps(next_href)};
+  var PREV_HREF = {json.dumps(prev_href)};
+
+  function reportComplete() {{
+    try {{
+      if (window.API) {{
+        window.API.LMSSetValue('cmi.core.lesson_status', 'completed');
+        window.API.LMSSetValue('cmi.core.score.raw', '100');
+        window.API.LMSCommit('');
+      }}
+      if (window.API_1484_11) {{
+        window.API_1484_11.SetValue('cmi.completion_status', 'completed');
+        window.API_1484_11.SetValue('cmi.success_status', 'passed');
+        window.API_1484_11.Commit('');
+      }}
+    }} catch(e) {{}}
+  }}
+
+  function inject() {{
+    if (!window.fgui) {{ setTimeout(inject, 100); return; }}
+    window.fgui.injectContent(FRAME_HTML);
+    window.fgui.setFrameData(FRAME_DATA);
+    window.fgui.onAction = function(action) {{
+      switch(action) {{
+        case 'NEXT':
+        case 'CONTINUE':
+          if (FRAME_DATA.isLast) {{ reportComplete(); }}
+          else if (NEXT_HREF) {{ window.location.href = NEXT_HREF; }}
+          break;
+        case 'PREVIOUS':
+          if (!FRAME_DATA.isFirst && PREV_HREF) {{ window.location.href = PREV_HREF; }}
+          break;
+        case 'SUBMIT':
+          reportComplete();
+          if (!FRAME_DATA.isLast && NEXT_HREF) {{ window.location.href = NEXT_HREF; }}
+          break;
+        case 'MENU':
+          window.location.href = {json.dumps(frame_map.get(0, ''))};
+          break;
+        case 'REPLAY':
+          window.location.reload();
+          break;
+      }}
+    }};
+  }}
+
+  // Style the injected CourseForge content inside the shell content area.
+  var style = document.createElement('style');
+  style.textContent =
+    '#fgui-content{{font-family:\\'IBM Plex Mono\\',\\'Inter\\',system-ui,sans-serif;' +
+    'font-size:14px;color:#C8D8E8;line-height:1.6;padding:12px;box-sizing:border-box;' +
+    'overflow-y:auto;height:100%}}' +
+    '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
+    '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
+    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto;border-radius:4px}}';
+  document.head.appendChild(style);
+
+  window.addEventListener('load', inject);
+  if (document.readyState === 'complete') inject();
+}})();
+</script>
+"""
+
+    if '</body>' in shell_html:
+        shell_html = shell_html.replace('</body>', cf_runtime + '\n</body>')
+    else:
+        shell_html += cf_runtime
+
+    return shell_html, asset_id
+
+
 def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
     """
     Build a SCORM 1.2 ZIP package for the given project.
@@ -557,8 +720,31 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
         zf.writestr('imsmanifest.xml', manifest_xml)
 
         # SCO HTML files
+        comment = (
+            f"<!-- CourseForge v{VERSION} | schema {SCHEMA_VERSION} | "
+            f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n"
+        )
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
+
+            # GUI frame: the ForgeGUI shell IS the SCO page.
+            if _frame_has_gui(frame):
+                gui_html, gui_aid = _build_gui_frame(
+                    frame, idx, total, lesson.name, course.name, frame_map, VERSION,
+                )
+                if gui_html:
+                    zf.writestr(fname, comment + gui_html)
+                    # Bundle this shell's assets under gui_assets/<asset_id>/.
+                    gasset = MediaAsset.query.get(gui_aid)
+                    if gasset and gasset.stored_path:
+                        adir = Path(gasset.stored_path) / 'assets'
+                        if adir.exists():
+                            for af in adir.iterdir():
+                                if af.is_file():
+                                    zf.write(str(af), f'gui_assets/{gui_aid}/{af.name}')
+                    continue
+                # else fall through to a normal render (shell asset missing)
+
             html  = build_frame_html(
                 frame=frame,
                 lesson=lesson,
@@ -568,11 +754,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 theme_css=css,
                 scorm_bridge=_has_oam_with_scorm(frame),
             )
-            html = (
-                f"<!-- CourseForge v{VERSION} | schema {SCHEMA_VERSION} | "
-                f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n" + html
-            )
-            zf.writestr(fname, html)
+            zf.writestr(fname, comment + html)
 
         # ── Bundle OAM assets ──────────────────────────────────────
         bundled_oam_ids = set()

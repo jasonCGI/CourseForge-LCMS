@@ -11,6 +11,7 @@ const BLOCK_TYPES = [
   { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: true  },
   { type: 'ivideo',  label: 'iVideo',  icon: '▶⊕', color: '#7A3A9A', available: true  },
   { type: 'model3d', label: '3D Model', icon: '⬡', color: '#2A5A8A', available: true  },
+  { type: 'gui',     label: 'GUI Shell', icon: '▣', color: '#3A5A8A', available: true  },
 ]
 
 export default function BlockToolbar() {
@@ -18,6 +19,9 @@ export default function BlockToolbar() {
   const activeFrame  = useEditorStore(s => s.activeFrame)
 
   if (!activeFrame) return null
+
+  // Only one GUI shell per frame — it becomes the SCO page on publish.
+  const hasGui = (activeFrame.content?.blocks || []).some(b => b.type === 'gui')
 
   return (
     <div style={{
@@ -38,32 +42,41 @@ export default function BlockToolbar() {
       }}>
         Add block
       </span>
-      {BLOCK_TYPES.map(({ type, label, icon, color, available }) => (
-        <button
-          key={type}
-          onClick={() => available && addBlock(type)}
-          aria-label={`Add ${label} block`}
-          title={available ? `Add ${label} block` : `${label} — available in Sprint 4`}
-          style={{
-            padding: '5px 12px',
-            borderRadius: 4,
-            border: `1px solid ${available ? color : 'var(--color-border-tertiary)'}`,
-            background: 'transparent',
-            color: available ? color : 'var(--color-text-secondary)',
-            fontSize: 12,
-            cursor: available ? 'pointer' : 'not-allowed',
-            opacity: available ? 1 : 0.4,
-            fontFamily: 'var(--font-sans)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-          }}
-        >
-          <span>{icon}</span>
-          <span>{label}</span>
-          {!available && <span style={{ fontSize: 9, opacity: 0.7 }}>S4</span>}
-        </button>
-      ))}
+      {BLOCK_TYPES.map(({ type, label, icon, color, available }) => {
+        // GUI shell is limited to one per frame.
+        const guiBlocked = type === 'gui' && hasGui
+        const enabled    = available && !guiBlocked
+        const title = guiBlocked
+          ? 'Frame already has a GUI shell'
+          : available ? `Add ${label} block` : `${label} — available in Sprint 4`
+        return (
+          <button
+            key={type}
+            onClick={() => enabled && addBlock(type)}
+            disabled={!enabled}
+            aria-label={`Add ${label} block`}
+            title={title}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 4,
+              border: `1px solid ${enabled ? color : 'var(--color-border-tertiary)'}`,
+              background: 'transparent',
+              color: enabled ? color : 'var(--color-text-secondary)',
+              fontSize: 12,
+              cursor: enabled ? 'pointer' : 'not-allowed',
+              opacity: enabled ? 1 : 0.4,
+              fontFamily: 'var(--font-sans)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <span>{icon}</span>
+            <span>{label}</span>
+            {!available && <span style={{ fontSize: 9, opacity: 0.7 }}>S4</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
