@@ -73,25 +73,14 @@ export default function App() {
             <circle cx="0" cy="0" r="1.1" fill="white" opacity="0.88"/>
           </svg>
 
-          {/* Wordmark — shared Forge path mark (IBM Plex Mono 600) */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
-            {/* Prompt */}
-            <span style={{
-              fontFamily: "'IBM Plex Mono', Consolas, monospace",
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--forge-brand)',
-              marginRight: 8,
-              alignSelf: 'center',
-            }}>❯</span>
-
-            <span className="forge-path">
-              <span className="forge-path__root">Course</span>
-              <span className="forge-path__slash">/</span>
-              <span className="forge-path__tool">Forge</span>
-              <span className="forge-path__cursor">_</span>
-            </span>
-          </div>
+          {/* Wordmark — Forge path mark (legible, not recessive). Flagship keeps
+              "Course/Forge"; Course via __mid so it stays readable on the bar. */}
+          <span className="forge-path forge-path--md forge-path--bar">
+            <span className="forge-path__mid">Course</span>
+            <span className="forge-path__slash">/</span>
+            <span className="forge-path__tool">Forge</span>
+            <span className="forge-path__cursor">_</span>
+          </span>
 
           {/* Version */}
           <span style={{

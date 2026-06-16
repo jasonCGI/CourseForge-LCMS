@@ -1,0 +1,119 @@
+/* ============================================================
+   COURSE FORGE — Component Classes
+   ============================================================ */
+
+/* ── Cursor blink ────────────────────────────────────────── */
+@keyframes forge-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-path__cursor { animation: none !important; opacity: 1; }
+}
+
+/* ── Path wrapper ────────────────────────────────────────── */
+.forge-path {
+  font-family:  var(--forge-font);
+  font-weight:  var(--forge-weight-semibold);
+  line-height:  1.2;
+  letter-spacing: -0.01em;
+  white-space:  nowrap;
+}
+
+/* Size modifiers */
+.forge-path--xl { font-size: var(--forge-path-xl); }
+.forge-path--lg { font-size: var(--forge-path-lg); }
+.forge-path--md { font-size: var(--forge-path-md); }
+.forge-path--sm { font-size: var(--forge-path-sm); }
+.forge-path--xs { font-size: var(--forge-path-xs); }
+
+/* Segments */
+.forge-path__root  { color: var(--forge-path-root);  }
+.forge-path__mid   { color: var(--forge-path-mid);   }
+.forge-path__tool  { color: var(--forge-path-tool);  }
+.forge-path__slash { color: var(--forge-path-slash); margin: 0 1px; }
+
+/* Cursor */
+.forge-path__cursor {
+  color:     var(--forge-path-cursor);
+  display:   inline-block;
+  animation: forge-blink var(--forge-blink-duration) step-start infinite;
+}
+
+/* ── Nav-bar variant ─────────────────────────────────────────
+   App header / nav bars stay dark (navy / black) in EVERY mode, so the
+   surface-relative path grays (which go dark in light mode) become illegible
+   there. .forge-path--bar pins the prefix to a legible light tone on the dark
+   bar across all modes; the tool segment + cursor stay amber. Use ONLY on the
+   nav bars — the full recessive hierarchy is for display marks + the demo. */
+.forge-path--bar .forge-path__root,
+.forge-path--bar .forge-path__mid   { color: #9CA3AF; }
+.forge-path--bar .forge-path__slash { color: #4B5563; }
+
+/* ── Sub-label beneath path ──────────────────────────────── */
+.forge-path__label {
+  font-family:    var(--forge-font);
+  font-size:      11px;
+  font-weight:    var(--forge-weight-semibold);
+  color:          var(--forge-text-tertiary);
+  margin-top:     6px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Badges ──────────────────────────────────────────────── */
+.forge-badge {
+  display:        inline-block;
+  font-family:    var(--forge-font);
+  font-size:      12px;
+  font-weight:    var(--forge-weight-semibold);
+  padding:        4px 12px;
+  border-radius:  var(--forge-radius-badge);
+  border:         0.5px solid transparent;
+  letter-spacing: 0.02em;
+  white-space:    nowrap;
+}
+
+/* Brand badge — amber tint, for Course/Forge master mark */
+.forge-badge--brand {
+  color:            var(--forge-amber);
+  background-color: var(--forge-amber-bg);
+  border-color:     var(--forge-amber-border);
+}
+
+/* Tool badge — neutral, for sub-tools */
+.forge-badge--tool {
+  color:            var(--forge-text-secondary);
+  background-color: var(--forge-surface);
+  border-color:     var(--forge-border);
+}
+
+/* ── Cards ───────────────────────────────────────────────── */
+.forge-card {
+  background:    var(--forge-surface-raised);
+  border:        0.5px solid var(--forge-border);
+  border-radius: var(--forge-radius-card);
+  padding:       24px 32px;
+}
+
+.forge-card--dark {
+  background:    var(--forge-surface);
+  border:        0.5px solid var(--forge-border);
+  border-radius: var(--forge-radius-card);
+  padding:       24px 32px;
+}
+
+/* ── Section / variant labels (used in UI chrome) ────────── */
+.forge-label {
+  font-family:    var(--forge-font);
+  font-size:      10px;
+  font-weight:    var(--forge-weight-semibold);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color:          var(--forge-text-tertiary);
+}
+
+/* ── Utility: amber text ─────────────────────────────────── */
+.text-forge  { color: var(--forge-amber) !important; }
+.bg-forge    { background-color: var(--forge-amber-bg) !important; }
+.border-forge { border-color: var(--forge-amber-border) !important; }

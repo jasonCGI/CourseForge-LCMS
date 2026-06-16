@@ -1,0 +1,32 @@
+/* ============================================================
+   COURSE FORGE — Motion
+   Disable everything here via prefers-reduced-motion
+   ============================================================ */
+
+@keyframes forge-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes forge-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes forge-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+.forge-animate-fade    { animation: forge-fade-in  0.25s ease forwards; }
+.forge-animate-slide   { animation: forge-slide-in 0.25s ease forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-path__cursor,
+  .forge-animate-fade,
+  .forge-animate-slide {
+    animation: none !important;
+    opacity:   1    !important;
+    transform: none !important;
+  }
+}

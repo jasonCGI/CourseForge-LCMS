@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mode="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,7 +14,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -116,20 +116,7 @@
       gap: 12px;
     }
 
-    /* ── Forge path mark — shared component (mirrors /tokens/forge-components.css) ── */
-    .forge-path {
-      display: inline-flex; align-items: baseline;
-      font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
-      font-weight: 600; font-size: 22px; line-height: 1;
-      letter-spacing: -0.01em; white-space: nowrap; user-select: none;
-    }
-    .forge-path__root   { color: var(--blue-lt); }
-    .forge-path__tool   { color: #fff; }
-    .forge-path__slash  { color: var(--amber); margin: 0 .04em; }
-    .forge-path__cursor { color: var(--amber); margin-left: .06em;
-      animation: forge-cursor-blink 1.1s step-start infinite; }
-    @keyframes forge-cursor-blink { 50% { opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) { .forge-path__cursor { animation: none; opacity: 1; } }
+    /* .forge-path provided by /static/forge-components.css (linked after this style block) */
 
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
@@ -339,6 +326,10 @@
 
     input[type="file"] { display: none; }
   </style>
+  <!-- Forge design system (no Bootstrap) -->
+  <link rel="stylesheet" href="/static/forge-tokens.css">
+  <link rel="stylesheet" href="/static/forge-motion.css">
+  <link rel="stylesheet" href="/static/forge-components.css">
 </head>
 <body>
 
@@ -353,8 +344,8 @@
     <polygon points="14,0 19,6 9,6" fill="var(--amber)"/>
   </svg>
 
-  <span class="forge-path">
-    <span class="forge-path__root">Forge</span>
+  <span class="forge-path forge-path--md forge-path--bar">
+    <span class="forge-path__mid">Forge</span>
     <span class="forge-path__slash">/</span>
     <span class="forge-path__tool">Pack</span>
     <span class="forge-path__cursor">_</span>

@@ -1,0 +1,167 @@
+/* ============================================================
+   COURSE FORGE — Design Token System
+   IBM Plex Mono 600 · Amber hierarchy · Path logo system
+   ============================================================ */
+
+:root {
+
+  /* ── Typography ─────────────────────────────────────── */
+  --forge-font:            'IBM Plex Mono', 'Courier New', monospace;
+  --forge-weight-light:    300;
+  --forge-weight-regular:  400;
+  --forge-weight-semibold: 600;
+
+  /* ── Brand amber — light mode ───────────────────────── */
+  --forge-amber:           #D4820A;
+  --forge-amber-bg:        rgba(212, 130, 10, 0.10);
+  --forge-amber-border:    rgba(212, 130, 10, 0.30);
+
+  /* ── Path color hierarchy — light mode ─────────────── */
+  --forge-path-root:       #6B7280;   /* Course — recedes */
+  --forge-path-mid:        #374151;   /* Forge  — midground */
+  --forge-path-tool:       #D4820A;   /* Tool   — destination, amber */
+  --forge-path-slash:      #D1D5DB;   /* /      — near invisible */
+  --forge-path-cursor:     #D4820A;   /* _      — matches tool */
+
+  /* ── Surface & border ───────────────────────────────── */
+  --forge-surface:         #F9FAFB;
+  --forge-surface-raised:  #FFFFFF;
+  --forge-border:          #E5E7EB;
+  --forge-border-subtle:   #F3F4F6;
+
+  /* ── Text ───────────────────────────────────────────── */
+  --forge-text-primary:    #111827;
+  --forge-text-secondary:  #374151;
+  --forge-text-tertiary:   #6B7280;
+  --forge-text-muted:      #9CA3AF;
+
+  /* ── Radius ─────────────────────────────────────────── */
+  --forge-radius-card:     12px;
+  --forge-radius-badge:    6px;
+  --forge-radius-sm:       4px;
+
+  /* ── Path size scale ────────────────────────────────── */
+  --forge-path-xl:         38px;
+  --forge-path-lg:         28px;
+  --forge-path-md:         20px;
+  --forge-path-sm:         14px;
+  --forge-path-xs:         11px;
+
+  /* ── Cursor animation ───────────────────────────────── */
+  --forge-blink-duration:  1.1s;
+}
+
+/* ── Dark mode overrides (Bootstrap convention) ──────────── */
+[data-bs-theme="dark"] {
+
+  /* Brand amber — lifted for dark backgrounds */
+  --forge-amber:           #F59E0B;
+  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
+  --forge-amber-border:    rgba(245, 158, 11, 0.25);
+
+  /* Path hierarchy — dark */
+  --forge-path-root:       #2A2A2A;   /* Course — nearly invisible */
+  --forge-path-mid:        #4B5563;   /* Forge  — subtle */
+  --forge-path-tool:       #F59E0B;   /* Tool   — amber lifted */
+  --forge-path-slash:      #1E1E1E;   /* /      — ghost */
+  --forge-path-cursor:     #F59E0B;
+
+  /* Surface & border */
+  --forge-surface:         #0D1117;
+  --forge-surface-raised:  #161B22;
+  --forge-border:          rgba(255, 255, 255, 0.07);
+  --forge-border-subtle:   rgba(255, 255, 255, 0.04);
+
+  /* Text */
+  --forge-text-primary:    #F0F0F0;
+  --forge-text-secondary:  #9CA3AF;
+  --forge-text-tertiary:   #4B5563;
+  --forge-text-muted:      #2A2A2A;
+}
+
+/* ── Bridge: CourseForge uses data-cf-mode ─────────────── */
+[data-cf-mode="dark"] {
+  --forge-amber:           #F59E0B;
+  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
+  --forge-amber-border:    rgba(245, 158, 11, 0.25);
+  --forge-path-root:       #2A2A2A;
+  --forge-path-mid:        #4B5563;
+  --forge-path-tool:       #F59E0B;
+  --forge-path-slash:      #1E1E1E;
+  --forge-path-cursor:     #F59E0B;
+  --forge-surface:         #0D1117;
+  --forge-surface-raised:  #161B22;
+  --forge-border:          rgba(255, 255, 255, 0.07);
+  --forge-border-subtle:   rgba(255, 255, 255, 0.04);
+  --forge-text-primary:    #F0F0F0;
+  --forge-text-secondary:  #9CA3AF;
+  --forge-text-tertiary:   #4B5563;
+  --forge-text-muted:      #2A2A2A;
+}
+
+[data-cf-mode="light"] {
+  /* Same as :root defaults — no overrides needed */
+}
+
+[data-cf-mode="hc"] {
+  --forge-amber:           #F59E0B;
+  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
+  --forge-amber-border:    rgba(245, 158, 11, 0.50);
+  --forge-path-root:       #FFFFFF;
+  --forge-path-mid:        #FFFFFF;
+  --forge-path-tool:       #F59E0B;
+  --forge-path-slash:      #666666;
+  --forge-path-cursor:     #F59E0B;
+  --forge-surface:         #000000;
+  --forge-surface-raised:  #000000;
+  --forge-border:          #FFFFFF;
+  --forge-border-subtle:   #444444;
+  --forge-text-primary:    #FFFFFF;
+  --forge-text-secondary:  #DDDDDD;
+  --forge-text-tertiary:   #AAAAAA;
+  --forge-text-muted:      #666666;
+}
+
+/* ── Bridge: ForgePack / ForgeBlueprint / ForgeClip use data-mode ── */
+[data-mode="dark"] {
+  --forge-amber:           #F59E0B;
+  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
+  --forge-amber-border:    rgba(245, 158, 11, 0.25);
+  --forge-path-root:       #2A2A2A;
+  --forge-path-mid:        #4B5563;
+  --forge-path-tool:       #F59E0B;
+  --forge-path-slash:      #1E1E1E;
+  --forge-path-cursor:     #F59E0B;
+  --forge-surface:         #06080f;
+  --forge-surface-raised:  #0d1017;
+  --forge-border:          rgba(255, 255, 255, 0.07);
+  --forge-border-subtle:   rgba(255, 255, 255, 0.04);
+  --forge-text-primary:    #C8D8E8;
+  --forge-text-secondary:  #7A90A8;
+  --forge-text-tertiary:   #3A5A7A;
+  --forge-text-muted:      #1c2a3a;
+}
+
+[data-mode="light"] {
+  /* Same as :root defaults */
+}
+
+[data-mode="hc"] {
+  /* Same as [data-cf-mode="hc"] */
+  --forge-amber:           #F59E0B;
+  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
+  --forge-amber-border:    rgba(245, 158, 11, 0.50);
+  --forge-path-root:       #FFFFFF;
+  --forge-path-mid:        #FFFFFF;
+  --forge-path-tool:       #F59E0B;
+  --forge-path-slash:      #666666;
+  --forge-path-cursor:     #F59E0B;
+  --forge-surface:         #000000;
+  --forge-surface-raised:  #000000;
+  --forge-border:          #FFFFFF;
+  --forge-border-subtle:   #444444;
+  --forge-text-primary:    #FFFFFF;
+  --forge-text-secondary:  #DDDDDD;
+  --forge-text-tertiary:   #AAAAAA;
+  --forge-text-muted:      #666666;
+}

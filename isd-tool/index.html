@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mode="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* ── Reset + Base ───────────────────────────────────────────────── */
@@ -164,20 +164,7 @@
       align-self: center;
     }
 
-    /* ── Forge path mark — shared component (mirrors /tokens/forge-components.css) ── */
-    .forge-path {
-      display: inline-flex; align-items: baseline;
-      font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
-      font-weight: 600; font-size: 22px; line-height: 1;
-      letter-spacing: -0.01em; white-space: nowrap; user-select: none;
-    }
-    .forge-path__root   { color: var(--blue-lt); }
-    .forge-path__tool   { color: #fff; }
-    .forge-path__slash  { color: var(--amber); margin: 0 .04em; }
-    .forge-path__cursor { color: var(--amber); margin-left: .06em;
-      animation: forge-cursor-blink 1.1s step-start infinite; }
-    @keyframes forge-cursor-blink { 50% { opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) { .forge-path__cursor { animation: none; opacity: 1; } }
+    /* .forge-path provided by /static/forge-components.css (linked after this style block) */
 
     @keyframes cf-blink {
       0%, 100% { opacity: 1; }
@@ -547,6 +534,10 @@
       .stat       { min-width: 50%; border-right: none; border-bottom: 1px solid var(--border); }
     }
   </style>
+  <!-- Forge design system (no Bootstrap) -->
+  <link rel="stylesheet" href="/static/forge-tokens.css">
+  <link rel="stylesheet" href="/static/forge-motion.css">
+  <link rel="stylesheet" href="/static/forge-components.css">
 </head>
 <body>
 
@@ -570,10 +561,8 @@
     <circle cx="0" cy="0" r="1.3" fill="white" opacity="0.88"/>
   </svg>
 
-  <!-- Wordmark -->
-  <div class="wordmark">
-    <span class="wm-prompt">❯</span><span class="forge-path"><span class="forge-path__root">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Blueprint</span><span class="forge-path__cursor">_</span></span>
-  </div>
+  <!-- Wordmark — mark + path mark only, no chevron (matches the other tools) -->
+  <span class="forge-path forge-path--md forge-path--bar"><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Blueprint</span><span class="forge-path__cursor">_</span></span>
 
   <span style="
     font-family: 'SF Mono', 'JetBrains Mono', Consolas, monospace;

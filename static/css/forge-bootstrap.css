@@ -1,0 +1,98 @@
+/* ============================================================
+   COURSE FORGE — Bootstrap 5 Variable Overrides
+   Import order: bootstrap.css → forge-bootstrap.css → forge-components.css
+   ============================================================ */
+
+:root {
+  /* Remap Bootstrap primary to forge amber */
+  --bs-primary:             #D4820A;
+  --bs-primary-rgb:         212, 130, 10;
+
+  /* Body */
+  --bs-body-font-family:    var(--forge-font);
+  --bs-body-font-weight:    var(--forge-weight-semibold);
+  --bs-body-color:          var(--forge-text-primary);
+  --bs-body-bg:             var(--forge-surface);
+
+  /* Links */
+  --bs-link-color:          var(--forge-amber);
+  --bs-link-hover-color:    #B86D08;
+
+  /* Borders */
+  --bs-border-color:        var(--forge-border);
+  --bs-border-radius:       var(--forge-radius-sm);
+  --bs-border-radius-lg:    var(--forge-radius-card);
+  --bs-border-radius-pill:  var(--forge-radius-badge);
+
+  /* Cards */
+  --bs-card-bg:             var(--forge-surface-raised);
+  --bs-card-border-color:   var(--forge-border);
+  --bs-card-border-radius:  var(--forge-radius-card);
+  --bs-card-cap-bg:         var(--forge-surface);
+
+  /* Navs */
+  --bs-nav-link-color:      var(--forge-text-secondary);
+  --bs-nav-link-hover-color: var(--forge-amber);
+  --bs-nav-tabs-border-color: var(--forge-border);
+
+  /* Navbar */
+  --bs-navbar-color:        var(--forge-text-secondary);
+  --bs-navbar-active-color: var(--forge-amber);
+  --bs-navbar-brand-color:  var(--forge-text-primary);
+  --bs-navbar-brand-hover-color: var(--forge-amber);
+
+  /* Buttons */
+  --bs-btn-font-family:     var(--forge-font);
+  --bs-btn-font-weight:     var(--forge-weight-semibold);
+  --bs-btn-border-radius:   var(--forge-radius-badge);
+
+  /* Forms */
+  --bs-input-font-family:   var(--forge-font);
+  --bs-input-bg:            var(--forge-surface-raised);
+  --bs-input-border-color:  var(--forge-border);
+  --bs-input-focus-border-color: var(--forge-amber);
+  --bs-input-focus-box-shadow: 0 0 0 0.2rem var(--forge-amber-bg);
+
+  /* Tables */
+  --bs-table-bg:            transparent;
+  --bs-table-border-color:  var(--forge-border);
+  --bs-table-striped-bg:    var(--forge-surface);
+
+  /* Dropdowns */
+  --bs-dropdown-bg:         var(--forge-surface-raised);
+  --bs-dropdown-border-color: var(--forge-border);
+  --bs-dropdown-link-color: var(--forge-text-secondary);
+  --bs-dropdown-link-hover-color: var(--forge-text-primary);
+  --bs-dropdown-link-hover-bg: var(--forge-amber-bg);
+  --bs-dropdown-link-active-bg: var(--forge-amber);
+
+  /* Modals */
+  --bs-modal-bg:            var(--forge-surface-raised);
+  --bs-modal-content-border-color: var(--forge-border);
+  --bs-modal-header-border-color: var(--forge-border);
+
+  /* Toasts */
+  --bs-toast-bg:            var(--forge-surface-raised);
+  --bs-toast-border-color:  var(--forge-border);
+
+  /* Badges */
+  --bs-badge-font-family:   var(--forge-font);
+  --bs-badge-font-weight:   var(--forge-weight-semibold);
+
+  /* Code */
+  --bs-code-color:          var(--forge-amber);
+}
+
+[data-bs-theme="dark"] {
+  --bs-primary:             #F59E0B;
+  --bs-primary-rgb:         245, 158, 11;
+  --bs-link-color:          #F59E0B;
+  --bs-link-hover-color:    #D4820A;
+  --bs-body-bg:             var(--forge-surface);
+  --bs-body-color:          var(--forge-text-primary);
+  --bs-border-color:        var(--forge-border);
+  --bs-card-bg:             var(--forge-surface-raised);
+  --bs-input-bg:            var(--forge-surface-raised);
+  --bs-dropdown-bg:         var(--forge-surface-raised);
+  --bs-modal-bg:            var(--forge-surface-raised);
+}
