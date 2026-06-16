@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
+import Model3DViewer from './Model3DViewer'
 
 const FRAME_BG = '#ffffff'
 
@@ -50,6 +51,7 @@ function PreviewBlock({ block }) {
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
     case 'ivideo':  return <PreviewIVideo  block={block} />
+    case 'model3d': return <PreviewModel3D block={block} />
     default:        return (
       <div style={previewBlockWrap}>
         <p style={{ color: '#888', fontSize: 13 }}>
@@ -489,6 +491,31 @@ function PreviewIVideo({ block }) {
       {block.data.caption && (
         <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{block.data.caption}</p>
       )}
+    </div>
+  )
+}
+
+function PreviewModel3D({ block }) {
+  if (!block.data.model_serve_url) {
+    return (
+      <div style={{
+        ...previewBlockWrap, padding: 32, textAlign: 'center',
+        border: '2px dashed #2A5A8A', borderRadius: 8, color: '#2A5A8A',
+        background: 'rgba(42,90,138,0.05)',
+      }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>⬡</div>
+        <div style={{ fontSize: 13 }}>3D Model — upload a .glb file to preview</div>
+      </div>
+    )
+  }
+  return (
+    <div style={previewBlockWrap}>
+      <Model3DViewer
+        modelUrl={block.data.model_serve_url}
+        caption={block.data.caption}
+        height={block.data.viewer_height || 400}
+        bgColor={block.data.bg_color || '#0d1017'}
+      />
     </div>
   )
 }

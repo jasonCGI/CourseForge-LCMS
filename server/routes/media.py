@@ -15,6 +15,7 @@ ALLOWED_VIDEO   = {'mp4', 'mov', 'avi', 'webm', 'mkv'}
 ALLOWED_AUDIO   = {'mp3', 'wav', 'ogg', 'm4a', 'aac'}
 ALLOWED_CAPTION = {'vtt', 'srt'}
 ALLOWED_OAM     = {'oam'}
+ALLOWED_3D      = {'glb', 'gltf'}
 
 
 def allowed_ext(filename, allowed_set):
@@ -313,6 +314,59 @@ def serve_clip(asset_id):
     if not asset.stored_path or not Path(asset.stored_path).exists():
         return jsonify({'error': 'File not found.'}), 404
     return send_file(asset.stored_path, mimetype='application/json')
+
+
+# ── 3D Model (.glb / .gltf) Upload ────────────────────────────────────────────
+
+@media_bp.post('/api/media/model')
+def upload_model():
+    """Upload a .glb / .gltf file for a model3d block. Form: file, project_id."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided.'}), 400
+    f          = request.files['file']
+    project_id = request.form.get('project_id')
+    if not f.filename:
+        return jsonify({'error': 'No filename.'}), 400
+    if not allowed_ext(f.filename, ALLOWED_3D):
+        return jsonify({'error': 'File must be .glb or .gltf.'}), 400
+    if not project_id:
+        return jsonify({'error': 'project_id is required.'}), 400
+
+    asset_id  = str(uuid.uuid4())
+    suffix    = '.' + f.filename.rsplit('.', 1)[-1].lower()
+    model_dir = get_upload_root() / 'models'
+    model_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = str(model_dir / f"{asset_id}{suffix}")
+    f.save(stored_path)
+    file_size = os.path.getsize(stored_path)
+
+    asset = MediaAsset(
+        id=asset_id, project_id=project_id, kind='model3d',
+        original_name=secure_filename(f.filename), stored_path=stored_path,
+        file_size=file_size,
+        mime_type='model/gltf-binary' if suffix == '.glb' else 'model/gltf+json',
+        companion_files={},
+    )
+    db.session.add(asset)
+    db.session.commit()
+
+    return jsonify({
+        'id': asset_id, 'project_id': project_id, 'kind': 'model3d',
+        'original_name': asset.original_name, 'file_size': file_size,
+        'file_size_mb': round(file_size / 1024 / 1024, 2),
+        'serve_url': f'/api/media/model/{asset_id}{suffix}',
+    }), 201
+
+
+@media_bp.get('/api/media/model/<path:filename>')
+def serve_model(filename):
+    """Serve a .glb / .gltf file (traversal-guarded)."""
+    base   = (get_upload_root() / 'models').resolve()
+    target = (base / filename).resolve()
+    if not str(target).startswith(str(base)) or not target.exists():
+        return jsonify({'error': 'Model not found.'}), 404
+    mime = 'model/gltf-binary' if target.suffix.lower() == '.glb' else 'model/gltf+json'
+    return send_file(str(target), mimetype=mime)
 
 
 @media_bp.get('/api/media/project/<project_id>')

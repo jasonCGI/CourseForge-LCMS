@@ -96,6 +96,13 @@ def _ivideo_block(label='Interactive Video'):
         'width': 800, 'height': 450}}
 
 
+def _model3d_block(caption=''):
+    return {'id': str(uuid.uuid4()), 'type': 'model3d', 'data': {
+        'model_asset_id': None, 'model_filename': None, 'model_serve_url': None,
+        'file_size_mb': None, 'viewer_height': 400, 'bg_color': '#0d1017',
+        'caption': caption or '3D model placeholder — upload a .glb file to activate'}}
+
+
 # ── Frame definitions ──────────────────────────────────────────────────────────
 DEMO_FRAMES = [
     {'name': 'Introduction to CourseForge', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
@@ -203,6 +210,14 @@ DEMO_FRAMES = [
                     'export the .clip.json, and upload it here alongside the video.</p>',
                     'Interactive Video blocks combine video playback with timecode-triggered interactions from ForgeClip.'),
         _ivideo_block('ForgeClip Interactive Video'),
+    ]},
+    {'name': '3D Model Viewer', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
+        _text_block('<h2>3D Model Block</h2><p>Upload a .glb file exported from 3ds Max, Blender, or any '
+                    'GLTF-compatible tool. The Three.js viewer supports orbit and zoom. Keyboard accessible: '
+                    'arrow keys orbit, +/- zoom, R resets the camera.</p>',
+                    'The 3D Model block renders interactive GLB files in the frame. Learners can orbit and zoom '
+                    'to examine the model from any angle.'),
+        _model3d_block(),
     ]},
 ]
 

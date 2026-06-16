@@ -338,6 +338,108 @@ def _render_blocks(blocks, scorm_bridge=False):
 }})();
 </script>''')
 
+        elif btype == 'model3d':
+            model_id = data.get('model_asset_id', '')
+            caption  = data.get('caption', '')
+            height   = data.get('viewer_height', 400)
+            bg_color = data.get('bg_color', '#0d1017')
+            block_id = bid[:8]
+
+            if not model_id:
+                parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
+            else:
+                m_ext = '.glb'
+                m_asset = MediaAsset.query.get(model_id)
+                if m_asset and m_asset.stored_path:
+                    m_ext = Path(m_asset.stored_path).suffix.lower()
+                model_src = f'media/models/{model_id}{m_ext}'
+                cap_html = f'<p style="font-size:12px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+                aria = caption or '3D model viewer — use arrow keys to rotate, plus/minus to zoom, R to reset'
+                parts.append(f'''
+<div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
+  <canvas id="canvas3d-{block_id}" tabindex="0" role="img" aria-label="{aria}"
+    style="width:100%;height:{height}px;display:block;border-radius:8px;cursor:grab;outline:none;touch-action:none"></canvas>
+  <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color};border-radius:8px">
+    <div style="text-align:center">
+      <div class="cf-spin3d" style="width:28px;height:28px;border-radius:50%;border:3px solid #1c2a3a;border-top-color:#F59E0B;animation:spin3d 0.8s linear infinite;margin:0 auto 8px"></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#3A5A7A;letter-spacing:0.08em">Loading model…</span>
+    </div>
+  </div>
+  <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);color:#3A5A7A;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;border-radius:4px;letter-spacing:0.06em" aria-hidden="true">
+    arrows orbit · +/- zoom · R reset
+  </div>
+  {cap_html}
+</div>
+<style>
+  @keyframes spin3d {{ to {{ transform: rotate(360deg); }} }}
+  @media (prefers-reduced-motion: reduce) {{ .cf-spin3d {{ animation: none !important; }} }}
+</style>
+<script>
+(function() {{
+  var THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  var GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  function loadScript(src, cb) {{
+    if (document.querySelector('script[src="' + src + '"]')) {{ cb(); return; }}
+    var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s);
+  }}
+  loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{
+    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height});
+  }}); }});
+
+  function init3DViewer(blockId, modelSrc, bgColor, height) {{
+    var THREE = window.THREE;
+    var canvas = document.getElementById('canvas3d-' + blockId);
+    var loading = document.getElementById('loading3d-' + blockId);
+    if (!canvas || !THREE) return;
+    var w = canvas.clientWidth || 800;
+    var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
+    renderer.setSize(w, height); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    var scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor);
+    var camera = new THREE.PerspectiveCamera(45, w / height, 0.01, 1000);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    var key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(5, 8, 5); scene.add(key);
+    var fill = new THREE.DirectionalLight(0x8AAAC8, 0.4); fill.position.set(-5, 2, -5); scene.add(fill);
+    var orbit = {{ dragging:false, lastX:0, lastY:0, theta:0, phi:Math.PI/4, radius:3, minRadius:0.5, maxRadius:20, minPhi:0.1, maxPhi:Math.PI-0.1 }};
+    function updateCamera() {{
+      camera.position.set(orbit.radius*Math.sin(orbit.phi)*Math.sin(orbit.theta), orbit.radius*Math.cos(orbit.phi), orbit.radius*Math.sin(orbit.phi)*Math.cos(orbit.theta));
+      camera.lookAt(0,0,0);
+    }}
+    updateCamera();
+    new THREE.GLTFLoader().load(modelSrc, function(gltf) {{
+      var model = gltf.scene;
+      var box = new THREE.Box3().setFromObject(model);
+      var center = box.getCenter(new THREE.Vector3());
+      var size = box.getSize(new THREE.Vector3());
+      var scale = 2.0 / Math.max(size.x, size.y, size.z);
+      model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
+      scene.add(model); if (loading) loading.style.display = 'none';
+    }}, undefined, function() {{
+      if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
+    }});
+    (function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); }})();
+    var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w; renderer.setSize(w2, height); camera.aspect = w2/height; camera.updateProjectionMatrix(); }});
+    ro.observe(canvas);
+    canvas.addEventListener('pointerdown', function(e) {{ if (e.button !== 0) return; orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); }});
+    canvas.addEventListener('pointermove', function(e) {{ if (!orbit.dragging) return; orbit.theta -= (e.clientX-orbit.lastX)*0.01; orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi + (e.clientY-orbit.lastY)*0.01)); orbit.lastX = e.clientX; orbit.lastY = e.clientY; updateCamera(); }});
+    canvas.addEventListener('pointerup', function(e) {{ orbit.dragging = false; try {{ canvas.releasePointerCapture(e.pointerId); }} catch(x) {{}} }});
+    canvas.addEventListener('wheel', function(e) {{ e.preventDefault(); orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius + e.deltaY*0.01)); updateCamera(); }}, {{ passive:false }});
+    canvas.addEventListener('keydown', function(e) {{
+      var step = 0.05;
+      if (e.key === 'ArrowLeft') orbit.theta -= step;
+      else if (e.key === 'ArrowRight') orbit.theta += step;
+      else if (e.key === 'ArrowUp') orbit.phi = Math.max(orbit.minPhi, orbit.phi - step);
+      else if (e.key === 'ArrowDown') orbit.phi = Math.min(orbit.maxPhi, orbit.phi + step);
+      else if (e.key === '+' || e.key === '=') orbit.radius = Math.max(orbit.minRadius, orbit.radius - 0.2);
+      else if (e.key === '-') orbit.radius = Math.min(orbit.maxRadius, orbit.radius + 0.2);
+      else if (e.key === 'r' || e.key === 'R') {{ orbit.theta = 0; orbit.phi = Math.PI/4; orbit.radius = 3; }}
+      else return;
+      e.preventDefault(); updateCamera();
+    }});
+  }}
+}})();
+</script>''')
+
     return '\n'.join(parts)
 
 
@@ -491,6 +593,11 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
         for asset in MediaAsset.query.filter_by(project_id=project_id, kind='clip').all():
             if asset.stored_path and Path(asset.stored_path).exists():
                 _bundle_media(asset.stored_path, f'media/clips/{asset.id}.clip.json')
+
+        # ── Bundle 3D models (.glb / .gltf) ────────────────────────
+        for asset in MediaAsset.query.filter_by(project_id=project_id, kind='model3d').all():
+            if asset.stored_path and Path(asset.stored_path).exists():
+                _bundle_media(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
 
     buf.seek(0)
     safe_name = project.name.replace(' ', '_').lower()[:40]

@@ -84,6 +84,16 @@ export const uploadClip = (file, projectId, videoAssetId) => {
 
 export const getClipAsset = (id) => api.get(`/media/clip/${id}`)
 
+// 3D model (.glb / .gltf) upload
+export const uploadModel = (file, projectId) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  return api.post('/media/model', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 // ── Themes ───────────────────────────────────────────────────────────────────
 export const getThemes   = ()                => api.get('/themes')
 export const createTheme  = (data)           => api.post('/themes', data)

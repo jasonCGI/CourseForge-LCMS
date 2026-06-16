@@ -10,6 +10,7 @@ import BranchBlock from './blocks/BranchBlock'
 import OamBlock from './blocks/OamBlock'
 import WCNBlock from './blocks/WCNBlock'
 import IVideoBlock from './blocks/IVideoBlock'
+import Model3DBlock from './blocks/Model3DBlock'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -21,6 +22,7 @@ const BLOCK_COMPONENTS = {
   oam:     OamBlock,
   wcn:     WCNBlock,
   ivideo:  IVideoBlock,
+  model3d: Model3DBlock,
 }
 
 export default function FrameEditor() {

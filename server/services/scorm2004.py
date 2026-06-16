@@ -188,6 +188,8 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 _w(asset.stored_path, f'media/{subdir}/{asset.id}.{ext}')
             elif asset.kind == 'clip':
                 _w(asset.stored_path, f'media/clips/{asset.id}.clip.json')
+            elif asset.kind == 'model3d':
+                _w(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
 
             # Companion files
             companions = asset.companion_files or {}
