@@ -48,6 +48,18 @@ def create_app(config_name=None):
         info['environment'] = os.environ.get('FLASK_ENV', 'production')
         return jsonify(info)
 
+    # ── Demo reset — delete and re-create the built-in demo course ──
+    @app.route('/api/demo/reset', methods=['GET'])
+    def demo_reset():
+        try:
+            from .demo_seed import reset_demo
+            pid = reset_demo()
+            return jsonify({'status': 'ok', 'project_id': pid,
+                            'message': 'Demo reset to defaults.'})
+        except Exception as e:
+            print(f'[demo_seed] Reset failed: {e}')
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
     # ── Auto-seed demo on first launch (only if the DB is empty) ──
     @app.before_request
     def _auto_seed_once():

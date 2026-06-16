@@ -244,6 +244,30 @@ export default function ContentTree() {
     }
   }
 
+  const resetDemo = async () => {
+    if (!confirm('Reset the demo course to defaults? Any edits to the demo project will be lost.')) return
+    try {
+      const res = await fetch('/api/demo/reset')
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body.status !== 'ok') {
+        throw new Error(body.message || `HTTP ${res.status}`)
+      }
+      await fetchProjects()
+      const list = useProjectStore.getState().projects || []
+      const demo = list.find(p => p.name === 'CourseForge Demo')
+      if (demo) await fetchProject(demo.id)
+    } catch (e) {
+      alert('Could not reset demo: ' + (e.message || 'Unknown error'))
+    }
+  }
+
+  // Shared style for the subtle "reset demo" text link.
+  const resetLinkStyle = {
+    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+    color: 'var(--cf-text-tertiary)', fontSize: 10, fontFamily: 'var(--forge-font)',
+    letterSpacing: '0.04em', textDecoration: 'underline', textUnderlineOffset: 2,
+  }
+
   const [openCourses,  setOpenCourses]  = useState({})
   const [openModules,  setOpenModules]  = useState({})
   const [openLessons,  setOpenLessons]  = useState({})
@@ -285,6 +309,10 @@ export default function ContentTree() {
           }}
         >
           ▶ Load Demo Course
+        </button>
+        <button onClick={resetDemo} aria-label="Reset the demo course to defaults"
+          style={{ ...resetLinkStyle, alignSelf: 'flex-start' }}>
+          ↺ Reset demo to defaults
         </button>
       </div>
     )
@@ -370,6 +398,14 @@ export default function ContentTree() {
         })}
 
       </TreeRow>
+
+      {activeProject.name === 'CourseForge Demo' && (
+        <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--cf-border-tertiary)', marginTop: 6 }}>
+          <button onClick={resetDemo} aria-label="Reset the demo course to defaults" style={resetLinkStyle}>
+            ↺ Reset demo to defaults
+          </button>
+        </div>
+      )}
     </div>
   )
 }
