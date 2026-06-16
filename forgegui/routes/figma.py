@@ -77,19 +77,22 @@ def _figma_get(path: str, token: str):
 
 
 def _find_target_frame(document: dict):
-    """First frame named stage/gui/shell, else the first non-empty FRAME."""
-    named, first = None, None
+    """Prefer a frame named stage/gui/shell; else the first frame WITH layers;
+    else the first frame of any kind (so an empty frame is still detected)."""
+    named = with_children = any_frame = None
     for page in document.get('children', []):
         if page.get('type') != 'CANVAS':
             continue
         for node in page.get('children', []):
-            if node.get('type') not in ('FRAME', 'COMPONENT', 'GROUP'):
+            if node.get('type') not in ('FRAME', 'COMPONENT', 'GROUP', 'SECTION'):
                 continue
-            if first is None and node.get('children'):
-                first = node
-            if _norm(node.get('name')) in ('stage', 'gui', 'shell'):
+            if any_frame is None:
+                any_frame = node
+            if with_children is None and node.get('children'):
+                with_children = node
+            if named is None and _norm(node.get('name')) in ('stage', 'gui', 'shell'):
                 named = node
-    return named or first
+    return named or with_children or any_frame
 
 
 def _color_hex(node):
@@ -207,6 +210,18 @@ def import_from_figma():
                                  'btn-* / zone-* layers.'}), 422
 
     layout = map_layout(frame)
+
+    # Frame found but no recognized layers -> clearer guidance than a generic error.
+    ca = layout['content_area']
+    layers_empty = (not layout['bg_node_id'] and not layout['buttons']
+                    and not layout['zones']
+                    and ca['x'] == 0 and ca['y'] == 0
+                    and ca['width'] == layout['stage']['width']
+                    and ca['height'] == layout['stage']['height'])
+    if layers_empty:
+        return jsonify({'error': f"Frame '{frame.get('name')}' has no recognized layers. "
+                                 "Add layers named bg / content-area / btn-<action> / "
+                                 "zone-<type> inside it, then re-import."}), 422
 
     # 2. Export images for bg + each button (one Figma call)
     export_ids = [layout['bg_node_id']] if layout['bg_node_id'] else []
