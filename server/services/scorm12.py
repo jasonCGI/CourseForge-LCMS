@@ -557,15 +557,35 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
             return None, None
         html_path = candidates[0]
 
-    shell_html = html_path.read_text(encoding='utf-8')
+    injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
+                                    if b.get('type') != 'gui'])
+    html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
+                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version)
+    return html, asset_id
 
+
+def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
+                               section_name, frame_map, cf_version):
+    """Per-project GuiShell -> SCO page (ALL frame blocks injected)."""
+    sdir = Path(shell.stored_path)
+    html_path = sdir / (shell.html_file or '')
+    if not html_path.exists():
+        cands = list(sdir.glob('*.html'))
+        if not cands:
+            return None, None
+        html_path = cands[0]
+    injected_html = _render_blocks((frame.content or {}).get('blocks', []))
+    html = _patch_shell(html_path.read_text(encoding='utf-8'), shell.id, injected_html,
+                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version)
+    return html, shell.id
+
+
+def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
+                 lesson_name, section_name, frame_map, cf_version):
+    """Namespace a shell's assets to gui_assets/<ns_id>/ and inject the
+    CourseForge runtime (content injection + zones + nav + completion)."""
     # Namespace asset references so multiple shells never collide in the ZIP.
-    shell_html = shell_html.replace('assets/', f'gui_assets/{asset_id}/')
-
-    # Injected content = the frame's non-GUI blocks rendered to HTML (a string).
-    non_gui_blocks = [b for b in (frame.content or {}).get('blocks', [])
-                      if b.get('type') != 'gui']
-    injected_html = _render_blocks(non_gui_blocks)
+    shell_html = shell_html.replace('assets/', f'gui_assets/{ns_id}/')
 
     is_first  = frame_idx == 0
     is_last   = frame_idx == total_frames - 1
@@ -655,7 +675,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     else:
         shell_html += cf_runtime
 
-    return shell_html, asset_id
+    return shell_html
 
 
 def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
@@ -724,26 +744,48 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             f"<!-- CourseForge v{VERSION} | schema {SCHEMA_VERSION} | "
             f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n"
         )
+        bundled_shell_ids = set()
+
+        def _bundle_shell_assets(stored_path, ns_id):
+            if not stored_path or ns_id in bundled_shell_ids:
+                return
+            adir = Path(stored_path) / 'assets'
+            if adir.exists():
+                for af in adir.iterdir():
+                    if af.is_file():
+                        zf.write(str(af), f'gui_assets/{ns_id}/{af.name}')
+            bundled_shell_ids.add(ns_id)
+
+        # Per-project shell (applied to every frame that has no per-frame GUI block).
+        project_shell = None
+        if project.gui_shell_id:
+            from ..models.gui_shell import GuiShell
+            project_shell = GuiShell.query.get(project.gui_shell_id)
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
 
-            # GUI frame: the ForgeGUI shell IS the SCO page.
+            # 1) Per-frame GUI block override — the ForgeGUI shell IS the SCO page.
             if _frame_has_gui(frame):
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
-                    # Bundle this shell's assets under gui_assets/<asset_id>/.
                     gasset = MediaAsset.query.get(gui_aid)
-                    if gasset and gasset.stored_path:
-                        adir = Path(gasset.stored_path) / 'assets'
-                        if adir.exists():
-                            for af in adir.iterdir():
-                                if af.is_file():
-                                    zf.write(str(af), f'gui_assets/{gui_aid}/{af.name}')
+                    _bundle_shell_assets(gasset.stored_path if gasset else None, gui_aid)
                     continue
-                # else fall through to a normal render (shell asset missing)
+                # else fall through
+
+            # 2) Per-project shell — wrap the whole frame in the chosen shell.
+            if project_shell and project_shell.stored_path:
+                ph, sid = _build_project_shell_frame(
+                    project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
+                )
+                if ph:
+                    zf.writestr(fname, comment + ph)
+                    _bundle_shell_assets(project_shell.stored_path, sid)
+                    continue
 
             html  = build_frame_html(
                 frame=frame,

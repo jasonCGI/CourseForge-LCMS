@@ -15,6 +15,9 @@ class Project(db.Model):
     theme_id        = db.Column(db.String(36), db.ForeignKey('gui_themes.id'), nullable=True)
     theme_overrides = db.Column(db.JSON, default=dict)
     theme           = db.relationship('GUITheme', back_populates='projects')
+    # Per-project GUI shell (from the GuiShell library). Plain id (no FK
+    # constraint) — publish + serializer tolerate a missing/deleted shell.
+    gui_shell_id    = db.Column(db.String(36), nullable=True)
     courses     = db.relationship('Course', back_populates='project', cascade='all, delete-orphan', order_by='Course.order_index')
 
 class Course(db.Model):

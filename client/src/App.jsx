@@ -12,6 +12,7 @@ import useProjectStore from './store/projectStore'
 import useEditorStore from './store/editorStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import ShortcutHelp from './components/UI/ShortcutHelp'
+import CourseShellModal from './components/UI/CourseShellModal'
 import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -19,12 +20,13 @@ import { VERSION } from './version'
 const DEMO_AUTOLOAD = true
 
 export default function App() {
-  const { projects, fetchProjects, fetchProject, autoloadDemo, loading } = useProjectStore()
+  const { projects, fetchProjects, fetchProject, autoloadDemo, loading, activeProject } = useProjectStore()
   const [showPublish, setShowPublish] = useState(false)
   const [showThemeEditor, setShowThemeEditor] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
+  const [showShell, setShowShell] = useState(false)
 
   useKeyboardShortcuts({
     onSave:    () => useEditorStore.getState().flushSave(),
@@ -33,6 +35,7 @@ export default function App() {
       setShowPublish(false)
       setShowThemeEditor(false)
       setShowShortcutHelp(false)
+      setShowShell(false)
       useEditorStore.getState().setPreviewOpen(false)
     },
     onShowHelp: () => setShowShortcutHelp(true),
@@ -175,6 +178,22 @@ export default function App() {
 
           {/* Theme editor — header trigger hidden for now (feature kept; see ThemeEditorModal) */}
 
+          {/* Course shell (per-project GUI skin) */}
+          <button
+            onClick={() => setShowShell(true)}
+            disabled={!activeProject}
+            aria-label="Course shell"
+            title="Course shell — apply a ForgeGUI skin to the whole project"
+            className="cf-hide-mobile"
+            style={{
+              marginLeft: 10, padding: '5px 12px', background: 'transparent',
+              border: `1px solid ${activeProject?.gui_shell_id ? 'var(--forge-amber)' : 'rgba(255,255,255,0.15)'}`,
+              borderRadius: 4, color: activeProject?.gui_shell_id ? 'var(--forge-amber)' : 'var(--cf-text-secondary)',
+              fontSize: 12, cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
+              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
+            }}
+          >▣ Shell</button>
+
           {/* Publish */}
           <button
             onClick={() => setShowPublish(true)}
@@ -223,6 +242,13 @@ export default function App() {
         {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
         {showThemeEditor && <ThemeEditorModal onClose={() => setShowThemeEditor(false)} />}
         <ShortcutHelp open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
+        <CourseShellModal
+          open={showShell}
+          onClose={() => setShowShell(false)}
+          projectId={activeProject?.id}
+          currentShellId={activeProject?.gui_shell_id}
+          onChanged={() => { if (activeProject) fetchProject(activeProject.id) }}
+        />
       </div>
     </ThemeProvider>
   )

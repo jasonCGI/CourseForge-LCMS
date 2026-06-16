@@ -42,6 +42,16 @@ export const getTemplates   = (tag = null) => api.get('/templates' + (tag ? `?ta
 export const saveTemplate   = (data)       => api.post('/templates', data)
 export const deleteTemplate = (id)         => api.delete(`/templates/${id}`)
 
+// ── GUI shell library (per-project course skins) ───────────────────────────────
+export const getGuiShells   = ()   => api.get('/gui-shells')
+export const deleteGuiShell = (id) => api.delete(`/gui-shells/${id}`)
+export const uploadGuiShell = (file, name) => {
+  const form = new FormData()
+  form.append('file', file)
+  if (name) form.append('name', name)
+  return api.post('/gui-shells', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+
 // ── Publish ──────────────────────────────────────────────────────────────────
 export const publishProject = (projectId, format) =>
   api.post('/publish', { project_id: projectId, format }, { responseType: 'blob' })

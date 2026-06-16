@@ -38,12 +38,13 @@ class CourseSchema(Schema):
     updated_at  = fields.DateTime(dump_only=True)
 
 class ProjectSchema(Schema):
-    id          = fields.Str(dump_only=True)
-    name        = fields.Str(required=True)
-    description = fields.Str()
-    courses     = fields.List(fields.Nested(CourseSchema), dump_only=True)
-    created_at  = fields.DateTime(dump_only=True)
-    updated_at  = fields.DateTime(dump_only=True)
+    id           = fields.Str(dump_only=True)
+    name         = fields.Str(required=True)
+    description  = fields.Str()
+    gui_shell_id = fields.Str(allow_none=True)
+    courses      = fields.List(fields.Nested(CourseSchema), dump_only=True)
+    created_at   = fields.DateTime(dump_only=True)
+    updated_at   = fields.DateTime(dump_only=True)
 
 class ProjectListSchema(Schema):
     id          = fields.Str(dump_only=True)

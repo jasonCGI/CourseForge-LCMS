@@ -3,3 +3,4 @@ from .media import MediaAsset, OamAsset
 from .publish_job import PublishJob, User
 from .theme import GUITheme
 from .template import FrameTemplate
+from .gui_shell import GuiShell

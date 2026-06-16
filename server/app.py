@@ -29,6 +29,7 @@ def create_app(config_name=None):
     from .routes.themes import themes_bp
     from .routes.gui_block import gui_block_bp
     from .routes.templates import templates_bp
+    from .routes.gui_shells import gui_shells_bp
 
     app.register_blueprint(projects_bp)
     app.register_blueprint(import_bp)
@@ -37,6 +38,7 @@ def create_app(config_name=None):
     app.register_blueprint(themes_bp)
     app.register_blueprint(gui_block_bp)
     app.register_blueprint(templates_bp)
+    app.register_blueprint(gui_shells_bp)
 
     # Health check
     @app.route('/api/health')

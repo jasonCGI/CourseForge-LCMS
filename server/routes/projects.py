@@ -50,6 +50,8 @@ def update_project(project_id):
         project.name = data['name']
     if 'description' in data:
         project.description = data['description']
+    if 'gui_shell_id' in data:
+        project.gui_shell_id = data['gui_shell_id'] or None
     db.session.commit()
     return jsonify(project_schema.dump(project))
 
