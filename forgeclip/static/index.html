@@ -574,10 +574,10 @@
         <button class="btn btn-blue" style="width:auto;padding:8px 20px"
           onclick="document.getElementById('video-file-input').click()"
           aria-label="Upload video file">↑ Upload Video</button>
-        <input type="file" id="video-file-input" accept=".mp4,.webm,.mov"
+        <input type="file" id="video-file-input" accept=".mp4,.webm,.mov,.zip"
           onchange="handleVideoUpload(event)" style="display:none">
         <p style="font-size:11px;color:var(--text3);font-family:var(--mono)">
-          .mp4 .webm accepted · process first with ForgePack
+          .mp4 / .webm · or a ForgePack .zip (mp4 + webm + poster + vtt)
         </p>
       </div>
 
@@ -644,7 +644,8 @@
     </div>
     <div class="export-row">
       <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Export</div>
-      <button class="btn btn-amber" onclick="exportClip()" id="export-btn-2" disabled aria-label="Export .clip.json file">⬇ .clip.json</button>
+      <button class="btn btn-amber" onclick="exportPackage()" id="export-pkg-2" disabled aria-label="Export package zip (media + clip.json)">⬇ Package (.zip)</button>
+      <button class="btn btn-blue" onclick="exportClip()" id="export-btn-2" disabled aria-label="Export .clip.json file">⬇ .clip.json only</button>
       <button class="btn btn-outline" onclick="importClip()" aria-label="Import .clip.json">↑ Import</button>
       <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px;line-height:1.5">
         Drop .clip.json + video into CourseForge ivideo block to publish.
@@ -681,13 +682,15 @@ var autoSaveTimer = null
 function handleVideoUpload(e) {
   var file = e.target.files[0]
   if (!file) return
+  var isZip = /\.zip$/i.test(file.name)
   var form = new FormData()
   form.append('file', file)
-  fetch('/api/media/video', { method:'POST', body:form })
-    .then(r => r.json())
+  fetch(isZip ? '/api/media/zip' : '/api/media/video', { method:'POST', body:form })
+    .then(function(r) { if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'Upload failed') }); return r.json() })
     .then(function(data) {
       state.videoAssetId  = data.asset_id
       state.videoFilename = data.filename
+      state.companions    = data.companions || {}
       initPlayer(data.serve_url, data.filename)
     })
     .catch(function(err) { alert('Upload failed: ' + err.message) })
@@ -721,6 +724,7 @@ function createClipSession(filename, duration) {
       state.clip   = clip
       document.getElementById('btn-export').disabled   = false
       document.getElementById('export-btn-2').disabled = false
+      document.getElementById('export-pkg-2').disabled = false
       renderInteractionList()
       renderTimelineMarkers()
     })
@@ -1043,6 +1047,14 @@ function exportClip() {
   fetch(`/api/clip/${state.clipId}`, {
     method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(state.clip),
   }).then(function() { window.location.href = `/api/clip/${state.clipId}/export` })
+}
+
+// Export a single drop-in package: media files + injected .clip.json
+function exportPackage() {
+  if (!state.clipId) return
+  fetch(`/api/clip/${state.clipId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(state.clip),
+  }).then(function() { window.location.href = `/api/clip/${state.clipId}/package` })
 }
 
 // ── Import ─────────────────────────────────────────────────────

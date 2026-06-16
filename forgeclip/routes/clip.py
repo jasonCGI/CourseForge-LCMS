@@ -1,5 +1,7 @@
+import io
 import json
 import uuid
+import zipfile
 from pathlib import Path
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file, current_app
@@ -116,3 +118,43 @@ def export_clip(clip_id):
         as_attachment=True,
         download_name=f"{safe_name}.clip.json",
     )
+
+
+@clip_bp.get('/api/clip/<clip_id>/package')
+def export_package(clip_id):
+    """
+    Export a single drop-in package (.zip) = the uploaded media files (mp4 +
+    webm + poster + captions) with the injected <name>.clip.json interaction
+    layer. One artifact for the CourseForge ivideo block.
+    """
+    if clip_id not in CLIPS:
+        return jsonify({'error': 'Clip not found.'}), 404
+    clip      = CLIPS[clip_id]
+    filename  = (clip['video'].get('filename') or 'clip').rsplit('.', 1)[0]
+    safe_name = ''.join(c for c in filename if c.isalnum() or c in '-_')[:40] or 'clip'
+
+    asset_id = clip['video'].get('video_asset_id')
+    media_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'videos' / str(asset_id or '')
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # media files from the per-asset dir
+        if asset_id and media_dir.exists():
+            for fp in sorted(media_dir.iterdir()):
+                if fp.is_file():
+                    zf.write(str(fp), fp.name)
+        # injected interaction layer
+        zf.writestr(f"{safe_name}.clip.json", json.dumps(clip, indent=2))
+        # import note
+        zf.writestr('README.txt',
+            "ForgeClip Interactive Video package\n"
+            "===================================\n"
+            f"Clip: {clip['video'].get('filename') or '(no video)'}\n"
+            f"Interactions: {len(clip.get('interactions', []))}\n\n"
+            "Drop this folder's contents (video files + .clip.json) into a\n"
+            "CourseForge ivideo block. CourseForge auto-pairs them by name and\n"
+            "executes the interactions at their timecodes during playback.\n")
+
+    buf.seek(0)
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f"{safe_name}_clip_package.zip")
