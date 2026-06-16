@@ -219,6 +219,41 @@ def delete_frame(frame_id):
     return jsonify({'deleted': frame_id})
 
 
+@projects_bp.post('/api/frames/<frame_id>/duplicate')
+def duplicate_frame(frame_id):
+    """
+    Duplicate a frame within the same lesson, or into another lesson via
+    body { target_lesson_id }. Blocks get fresh IDs so nothing collides.
+    """
+    import copy as _copy
+    import uuid as _uuid
+
+    frame = Frame.query.get_or_404(frame_id)
+    data  = request.get_json(silent=True) or {}
+    target_lesson_id = data.get('target_lesson_id') or frame.lesson_id
+    Lesson.query.get_or_404(target_lesson_id)
+
+    last = (Frame.query.filter_by(lesson_id=target_lesson_id)
+            .order_by(Frame.order_index.desc()).first())
+    next_order = (last.order_index + 1) if last else 0
+
+    content = _copy.deepcopy(frame.content or {'blocks': []})
+    for block in content.get('blocks', []):
+        block['id'] = str(_uuid.uuid4())
+
+    same_lesson = target_lesson_id == frame.lesson_id
+    new_frame = Frame(
+        lesson_id=target_lesson_id,
+        name=(frame.name + ' (copy)') if same_lesson else frame.name,
+        frame_type=frame.frame_type,
+        order_index=next_order,
+        content=content,
+    )
+    db.session.add(new_frame)
+    db.session.commit()
+    return jsonify(frame_schema.dump(new_frame)), 201
+
+
 # ── Reorder (drag-and-drop support) ─────────────────────────────────────────
 
 @projects_bp.post('/api/reorder')

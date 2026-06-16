@@ -1,4 +1,13 @@
-import React, { useState } from 'react'
+import React from 'react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates,
+  verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import FrameHeader from './FrameHeader'
 import BlockToolbar from './BlockToolbar'
@@ -27,32 +36,98 @@ const BLOCK_COMPONENTS = {
   gui:     GUIBlock,
 }
 
+function SortableBlock({ block }) {
+  const setActiveBlock = useEditorStore(s => s.setActiveBlock)
+  const activeBlockId  = useEditorStore(s => s.activeBlockId)
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: block.id })
+
+  const Block = BLOCK_COMPONENTS[block.type]
+  const isActive = activeBlockId === block.id
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+    zIndex: isDragging ? 10 : 'auto',
+    paddingLeft: 18,
+    borderLeft: `2px solid ${isActive ? 'var(--forge-amber)' : 'transparent'}`,
+    borderRadius: 4,
+  }
+
+  if (!Block) {
+    return (
+      <div style={{
+        padding: '12px 16px', border: '1px dashed var(--color-border-tertiary)',
+        borderRadius: 6, marginBottom: 12, fontSize: 12, color: 'var(--color-text-secondary)',
+      }}>Block type <strong>{block.type}</strong> — no editor</div>
+    )
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-block-wrapper
+      onPointerDownCapture={() => setActiveBlock(block.id)}
+      onFocusCapture={() => setActiveBlock(block.id)}
+    >
+      {/* Drag handle — visible on hover (see index.css .drag-handle) */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="drag-handle"
+        aria-label="Drag to reorder block"
+        style={{
+          position: 'absolute', left: -2, top: 14,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          color: 'var(--cf-text-tertiary, #3A5A7A)', fontSize: 15,
+          padding: 2, userSelect: 'none', lineHeight: 1,
+        }}
+      >⠿</div>
+      <Block block={block} />
+    </div>
+  )
+}
+
 export default function FrameEditor() {
-  const activeFrame  = useEditorStore(s => s.activeFrame)
-  const [showPreview, setShowPreview] = useState(false)
+  const activeFrame   = useEditorStore(s => s.activeFrame)
+  const previewOpen   = useEditorStore(s => s.previewOpen)
+  const setPreviewOpen = useEditorStore(s => s.setPreviewOpen)
+  const reorderBlocks = useEditorStore(s => s.reorderBlocks)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   if (!activeFrame) {
     return (
       <div style={{
-        flex: 1, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', flexDirection: 'column',
-        gap: 10, color: 'var(--color-text-secondary)',
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: 10, color: 'var(--color-text-secondary)',
       }}>
         <div style={{ fontSize: 32, opacity: 0.3 }}>🎞</div>
         <p style={{ fontSize: 14, margin: 0 }}>Select a frame from the sidebar</p>
-        <p style={{ fontSize: 12, margin: 0, opacity: 0.6 }}>
-          Or import a JSON project to get started
-        </p>
+        <p style={{ fontSize: 12, margin: 0, opacity: 0.6 }}>Or import a JSON project to get started</p>
       </div>
     )
   }
 
   const blocks = activeFrame.content?.blocks || []
 
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIdx = blocks.findIndex(b => b.id === active.id)
+    const newIdx = blocks.findIndex(b => b.id === over.id)
+    if (oldIdx < 0 || newIdx < 0) return
+    reorderBlocks(arrayMove(blocks, oldIdx, newIdx))
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-
-      <FrameHeader onPreview={() => setShowPreview(true)} />
+      <FrameHeader onPreview={() => setPreviewOpen(true)} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {blocks.length === 0 && (
@@ -60,26 +135,16 @@ export default function FrameEditor() {
             No blocks yet — use the toolbar below to add content.
           </div>
         )}
-        {blocks.map(block => {
-          const BlockComponent = BLOCK_COMPONENTS[block.type]
-          if (!BlockComponent) {
-            return (
-              <div key={block.id} style={{
-                padding: '12px 16px', border: '1px dashed var(--color-border-tertiary)',
-                borderRadius: 6, marginBottom: 12, fontSize: 12,
-                color: 'var(--color-text-secondary)',
-              }}>
-                Block type <strong>{block.type}</strong> — editor coming in Sprint 5
-              </div>
-            )
-          }
-          return <BlockComponent key={block.id} block={block} />
-        })}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+            {blocks.map(block => <SortableBlock key={block.id} block={block} />)}
+          </SortableContext>
+        </DndContext>
       </div>
 
       <BlockToolbar />
 
-      {showPreview && <PreviewModal onClose={() => setShowPreview(false)} />}
+      {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)} />}
     </div>
   )
 }

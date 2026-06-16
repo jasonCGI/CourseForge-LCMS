@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import useProjectStore from '../../store/projectStore'
 import useEditorStore  from '../../store/editorStore'
+import { duplicateFrame } from '../../api/client'
 
 // ── SVG helpers ──────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ const LEVELS = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, onClick, children, rowIndex = 0
+  frameType, onClick, onContextMenu, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
@@ -113,6 +114,7 @@ function TreeRow({
         aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
         tabIndex={0}
         onClick={onClick}
+        onContextMenu={onContextMenu}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } }}
         title={label}
         style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none' }}
@@ -236,6 +238,39 @@ export default function ContentTree() {
   const [openModules,  setOpenModules]  = useState({})
   const [openLessons,  setOpenLessons]  = useState({})
 
+  // ── Sprint A: frame context menu + copy-to-lesson ──────────────────
+  const [contextMenu,        setContextMenu]        = useState(null) // {frameId, x, y}
+  const [copyToLessonFrameId, setCopyToLessonFrameId] = useState(null)
+
+  const refreshProject = () => activeProject && fetchProject(activeProject.id)
+
+  // Flatten all lessons (with module name) for the copy-to-lesson picker.
+  const allLessons = []
+  for (const c of (activeProject?.courses || [])) {
+    for (const m of (c.modules || [])) {
+      for (const l of (m.lessons || [])) {
+        allLessons.push({ id: l.id, name: l.name, module_name: m.name })
+      }
+    }
+  }
+
+  const doDuplicate = async (frameId, targetLessonId = null) => {
+    try {
+      await duplicateFrame(frameId, targetLessonId)
+      await refreshProject()
+    } catch (e) {
+      alert('Could not duplicate frame: ' + (e.response?.data?.error || e.message))
+    }
+  }
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('scroll', close, true) }
+  }, [contextMenu])
+
   const toggle = (setter, id) =>
     setter(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -349,6 +384,10 @@ export default function ContentTree() {
                               isFrame={true}
                               isCurrent={frame.id === activeFrameId}
                               onClick={() => loadFrame(frame.id)}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                                setContextMenu({ frameId: frame.id, x: e.clientX, y: e.clientY })
+                              }}
                             />
                           ))}
                         </TreeRow>
@@ -368,6 +407,87 @@ export default function ContentTree() {
           <button onClick={resetDemo} aria-label="Reset the demo course to defaults" style={resetLinkStyle}>
             ↺ Reset demo to defaults
           </button>
+        </div>
+      )}
+
+      {/* Frame context menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed', top: contextMenu.y, left: contextMenu.x,
+            background: 'var(--cf-block-bg, #0d1017)',
+            border: '1px solid var(--cf-border-secondary, #3a3a5a)',
+            borderRadius: 6, zIndex: 500, minWidth: 170,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)', overflow: 'hidden',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {[
+            { label: '⧉ Duplicate frame', action: async () => { await doDuplicate(contextMenu.frameId); setContextMenu(null) } },
+            { label: '→ Copy to lesson…',  action: () => { setCopyToLessonFrameId(contextMenu.frameId); setContextMenu(null) } },
+          ].map((item, i) => (
+            <button key={i} onClick={item.action}
+              style={{
+                display: 'block', width: '100%', padding: '9px 14px',
+                background: 'none', border: 'none', textAlign: 'left',
+                fontSize: 12, color: 'var(--cf-text-secondary)', cursor: 'pointer',
+                fontFamily: 'var(--cf-font)',
+                borderBottom: i < 1 ? '1px solid var(--cf-border-tertiary)' : 'none',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--cf-input-bg)'; e.currentTarget.style.color = 'var(--cf-text-primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--cf-text-secondary)' }}
+            >{item.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Copy frame to lesson modal */}
+      {copyToLessonFrameId && (
+        <div role="dialog" aria-modal="true" aria-label="Copy frame to lesson"
+          onClick={e => { if (e.target === e.currentTarget) setCopyToLessonFrameId(null) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(4,44,83,0.75)',
+            zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}>
+          <div style={{
+            background: 'var(--cf-block-bg, #0d1017)',
+            border: '1px solid var(--cf-border-secondary, #3a3a5a)',
+            borderRadius: 10, width: 360, overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '12px 16px', borderBottom: '1px solid var(--cf-border-tertiary)',
+              fontFamily: 'var(--forge-font)', fontSize: 11, fontWeight: 600,
+              color: 'var(--cf-text-primary)', letterSpacing: '0.04em',
+            }}>Copy frame to lesson</div>
+            <div style={{ padding: 12, maxHeight: 300, overflowY: 'auto' }}>
+              {allLessons.map(lesson => (
+                <button key={lesson.id}
+                  onClick={async () => { await doDuplicate(copyToLessonFrameId, lesson.id); setCopyToLessonFrameId(null) }}
+                  style={{
+                    display: 'block', width: '100%', padding: '9px 12px',
+                    background: 'none', border: 'none', textAlign: 'left', fontSize: 12,
+                    color: 'var(--cf-text-secondary)', cursor: 'pointer', borderRadius: 4,
+                    marginBottom: 4, fontFamily: 'var(--cf-font)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--cf-input-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  <span style={{
+                    fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+                    display: 'block', marginBottom: 2,
+                  }}>{lesson.module_name}</span>
+                  {lesson.name}
+                </button>
+              ))}
+            </div>
+            <div style={{ padding: '10px 12px', borderTop: '1px solid var(--cf-border-tertiary)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setCopyToLessonFrameId(null)}
+                style={{
+                  padding: '6px 14px', background: 'transparent',
+                  border: '1px solid var(--cf-border-secondary)', borderRadius: 4,
+                  fontSize: 12, color: 'var(--cf-text-secondary)', cursor: 'pointer', fontFamily: 'var(--cf-font)',
+                }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

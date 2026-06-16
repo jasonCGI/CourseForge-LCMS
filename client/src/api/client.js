@@ -30,6 +30,9 @@ export const updateFrame = (id, data) => api.patch(`/frames/${id}`, data)
 export const createFrame = (lessonId, data) =>
   api.post(`/lessons/${lessonId}/frames`, data)
 export const deleteFrame = (id) => api.delete(`/frames/${id}`)
+export const duplicateFrame = (frameId, targetLessonId = null) =>
+  api.post(`/frames/${frameId}/duplicate`,
+    targetLessonId ? { target_lesson_id: targetLessonId } : {})
 
 // ── Reorder ──────────────────────────────────────────────────────────────────
 export const reorder = (type, items) => api.post('/reorder', { type, items })

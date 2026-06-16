@@ -12,6 +12,9 @@ const useEditorStore = create((set, get) => ({
   isSaving: false,
   lastSaved: null,
   saveError: null,
+  activeBlockId: null,        // last-focused/clicked block (for keyboard shortcuts)
+  previewOpen: false,         // preview modal flag (so global shortcuts can open it)
+  _undoStack: [],             // snapshots of blocks arrays (most recent first)
 
   // Load a frame by ID
   loadFrame: async (frameId) => {
@@ -62,6 +65,7 @@ const useEditorStore = create((set, get) => ({
   removeBlock: (blockId) => {
     const { activeFrame } = get()
     if (!activeFrame) return
+    get()._pushUndo()
 
     const updatedFrame = {
       ...activeFrame,
@@ -83,12 +87,69 @@ const useEditorStore = create((set, get) => ({
     if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= blocks.length) return
+    get()._pushUndo()
     ;[blocks[idx], blocks[swapIdx]] = [blocks[swapIdx], blocks[idx]]
     set({
       activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks } },
       isDirty: true
     })
     get()._scheduleAutosave()
+  },
+
+  // ── Sprint A: selection, undo, duplicate, reorder, flush ──────────────
+  setActiveBlock: (id) => set({ activeBlockId: id }),
+  setPreviewOpen: (v) => set({ previewOpen: v }),
+
+  _pushUndo: () => {
+    const { activeFrame, _undoStack } = get()
+    if (!activeFrame) return
+    const snap = JSON.parse(JSON.stringify(activeFrame.content?.blocks || []))
+    set({ _undoStack: [snap, ..._undoStack].slice(0, 20) })
+  },
+
+  undo: () => {
+    const { activeFrame, _undoStack } = get()
+    if (!activeFrame || !_undoStack.length) return
+    const [prev, ...rest] = _undoStack
+    set({
+      activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks: prev } },
+      _undoStack: rest, isDirty: true,
+    })
+    get()._scheduleAutosave()
+  },
+
+  duplicateBlock: (blockId) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    const blocks = activeFrame.content?.blocks || []
+    const idx = blocks.findIndex(b => b.id === blockId)
+    if (idx < 0) return
+    get()._pushUndo()
+    const copy = { ...JSON.parse(JSON.stringify(blocks[idx])), id: crypto.randomUUID() }
+    const next = [...blocks]
+    next.splice(idx + 1, 0, copy)
+    set({
+      activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks: next } },
+      isDirty: true, activeBlockId: copy.id,
+    })
+    get()._scheduleAutosave()
+  },
+
+  reorderBlocks: (newBlocks) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    get()._pushUndo()
+    set({
+      activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks: newBlocks } },
+      isDirty: true,
+    })
+    get()._scheduleAutosave()
+  },
+
+  // Force an immediate save (Ctrl/Cmd+S)
+  flushSave: async () => {
+    if (autosaveTimer) clearTimeout(autosaveTimer)
+    await get()._doSave()
   },
 
   // Update frame name

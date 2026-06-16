@@ -9,6 +9,9 @@ import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import EcosystemTray from './components/UI/EcosystemTray'
 import useProjectStore from './store/projectStore'
+import useEditorStore from './store/editorStore'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import ShortcutHelp from './components/UI/ShortcutHelp'
 import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -21,6 +24,19 @@ export default function App() {
   const [showThemeEditor, setShowThemeEditor] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false)
+
+  useKeyboardShortcuts({
+    onSave:    () => useEditorStore.getState().flushSave(),
+    onPreview: () => { if (useEditorStore.getState().activeFrame) useEditorStore.getState().setPreviewOpen(true) },
+    onCloseModal: () => {
+      setShowPublish(false)
+      setShowThemeEditor(false)
+      setShowShortcutHelp(false)
+      useEditorStore.getState().setPreviewOpen(false)
+    },
+    onShowHelp: () => setShowShortcutHelp(true),
+  })
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
 
@@ -206,6 +222,7 @@ export default function App() {
 
         {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
         {showThemeEditor && <ThemeEditorModal onClose={() => setShowThemeEditor(false)} />}
+        <ShortcutHelp open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
       </div>
     </ThemeProvider>
   )
