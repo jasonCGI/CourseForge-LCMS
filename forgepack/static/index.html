@@ -329,6 +329,22 @@
   <link rel="stylesheet" href="/static/forge-tokens.css">
   <link rel="stylesheet" href="/static/forge-motion.css">
   <link rel="stylesheet" href="/static/forge-components.css">
+  <style>
+    /* Mobile (demo readiness) */
+    html, body { overflow-x: hidden; max-width: 100vw; }
+    @media (max-width: 767px) {
+      body { font-size: 14px; }
+      .header { padding: 0 14px; flex-wrap: wrap; height: auto; min-height: 48px; gap: 6px; }
+      #fp-version { display: none; }
+      .module-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 0 16px; }
+      .module-tabs::-webkit-scrollbar { display: none; }
+      .module-tab { flex-shrink: 0; }
+      .body { padding: 16px; max-width: 100%; }
+      .hero h1 { font-size: 18px; } .hero p { font-size: 13px; }
+      .preset-grid, .preset-cards { grid-template-columns: 1fr !important; }
+      .drop-zone { padding: 24px 16px; }
+    }
+  </style>
 </head>
 <body>
 

@@ -135,3 +135,13 @@ textarea:focus-visible,
 .cf-tree-row:hover > div:last-child {
   filter: brightness(1.12);
 }
+
+/* ── Mobile (demo readiness) ───────────────────────────────────────────────── */
+html, body { overflow-x: hidden; max-width: 100vw; }
+@media (max-width: 767px) {
+  body { font-size: 14px; }
+  .tray-label { display: none; }            /* ecosystem tray: marks only */
+  .cf-hide-mobile { display: none !important; }  /* "Course/", version, Publish label */
+  .cf-app-header { padding: 0 8px !important; gap: 4px !important; }
+  .forge-path--md { font-size: 16px; }       /* shrink header wordmark to fit */
+}

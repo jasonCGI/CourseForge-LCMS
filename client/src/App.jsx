@@ -19,8 +19,16 @@ export default function App() {
   const { projects, fetchProjects, fetchProject, autoloadDemo, loading } = useProjectStore()
   const [showPublish, setShowPublish] = useState(false)
   const [showThemeEditor, setShowThemeEditor] = useState(false)
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // Inject blink keyframe once
   if (typeof document !== 'undefined' && !document.getElementById('cf-blink-style')) {
@@ -34,6 +42,27 @@ export default function App() {
     `
     document.head.appendChild(style)
   }
+
+  const sidebarInner = (
+    <div style={{ height: '100%', background: 'var(--cf-sidebar-bg)', borderRight: '1px solid var(--cf-border-primary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {projects.length > 0 && (
+        <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)' }}>
+          <select onChange={e => fetchProject(e.target.value)} defaultValue="" aria-label="Select a project"
+            style={{ width: '100%', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)', border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--cf-font)' }}>
+            <option value="" disabled>Select a project…</option>
+            {projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          </select>
+        </div>
+      )}
+      <ImportButton />
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}><ContentTree /></div>
+    </div>
+  )
+  const editorInner = (
+    <div style={{ height: '100%', background: 'var(--cf-editor-bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <FrameEditor />
+    </div>
+  )
 
   return (
     <ThemeProvider>
@@ -49,7 +78,7 @@ export default function App() {
       }}>
 
         {/* ── App header ── */}
-        <div style={{
+        <div className="cf-app-header" style={{
           height: 48,
           boxSizing: 'border-box',   /* 48 total incl. border — matches the other tools (no double-count) */
           background: 'var(--cf-header-bg)',
@@ -60,6 +89,15 @@ export default function App() {
           gap: 0,
           flexShrink: 0,
         }}>
+          {/* Hamburger — mobile only */}
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(o => !o)}
+              aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+              style={{ width: 32, height: 32, marginRight: 10, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 4, color: 'var(--cf-text-secondary)', fontSize: 16, cursor: 'pointer', flexShrink: 0 }}>☰</button>
+          )}
+
           {/* Fire core mark */}
           <svg width="28" height="28" viewBox="-16 -16 32 32" style={{ flexShrink: 0, marginRight: 12 }}>
             <path d="M0,-16 L3.5,-3.5 L16,0 L3.5,3.5 L0,16 L-3.5,3.5 L-16,0 L-3.5,-3.5 Z" fill="#031E3A"/>
@@ -78,14 +116,14 @@ export default function App() {
           {/* Wordmark — Forge path mark (legible, not recessive). Flagship keeps
               "Course/Forge"; Course via __mid so it stays readable on the bar. */}
           <span className="forge-path forge-path--md forge-path--bar">
-            <span className="forge-path__mid">Course</span>
-            <span className="forge-path__slash">/</span>
+            <span className="forge-path__mid cf-hide-mobile">Course</span>
+            <span className="forge-path__slash cf-hide-mobile">/</span>
             <span className="forge-path__tool">Forge</span>
             <span className="forge-path__cursor">_</span>
           </span>
 
           {/* Version */}
-          <span style={{
+          <span className="cf-hide-mobile" style={{
             fontFamily: "var(--forge-font)",
             fontSize: 9,
             color: 'var(--cf-text-tertiary)',
@@ -136,82 +174,32 @@ export default function App() {
               letterSpacing: '0.04em',
             }}
           >
-            ⬇ Publish
+            ⬇ <span className="cf-hide-mobile">Publish</span>
           </button>
         </div>
 
         {/* Main split pane */}
-        <div id="main-content" style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-          <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
-
-            {/* Sidebar panel */}
-            <Panel defaultSize={28} minSize={24} maxSize={55}>
-              <div style={{
-                height: '100%',
-                background: 'var(--cf-sidebar-bg)',
-                borderRight: '1px solid var(--cf-border-primary)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}>
-                {/* Project selector */}
-                {projects.length > 0 && (
-                  <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)' }}>
-                    <select
-                      onChange={e => fetchProject(e.target.value)}
-                      defaultValue=""
-                      aria-label="Select a project"
-                      style={{
-                        width: '100%',
-                        background: 'var(--cf-input-bg)',
-                        color: 'var(--cf-input-text)',
-                        border: '1px solid var(--cf-input-border)',
-                        borderRadius: 4,
-                        padding: '6px 8px',
-                        fontSize: 13,
-                        fontFamily: 'var(--cf-font)',
-                      }}
-                    >
-                      <option value="" disabled>Select a project…</option>
-                      {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <ImportButton />
-
-                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-                  <ContentTree />
-                </div>
+        <div id="main-content" style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative' }}>
+          {isMobile ? (
+            <>
+              <div style={{ flex: 1, overflow: 'hidden' }}>{editorInner}</div>
+              {sidebarOpen && (
+                <div onClick={() => setSidebarOpen(false)} aria-hidden="true"
+                  style={{ position: 'fixed', top: 48, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 199 }} />
+              )}
+              <div style={{ position: 'fixed', top: 48, left: 0, bottom: 0, width: 280, zIndex: 200,
+                transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
+                boxShadow: sidebarOpen ? '4px 0 20px rgba(0,0,0,0.4)' : 'none' }}>
+                {sidebarInner}
               </div>
-            </Panel>
-
-            {/* Drag handle */}
-            <PanelResizeHandle style={{
-              width: 4,
-              background: 'var(--cf-border-primary)',
-              cursor: 'col-resize',
-              transition: 'background 0.15s',
-            }}
-              onDragging={(isDragging) => {}}
-            />
-
-            {/* Editor panel */}
-            <Panel minSize={40}>
-              <div style={{
-                height: '100%',
-                background: 'var(--cf-editor-bg)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}>
-                <FrameEditor />
-              </div>
-            </Panel>
-
-          </PanelGroup>
+            </>
+          ) : (
+            <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
+              <Panel defaultSize={28} minSize={24} maxSize={55}>{sidebarInner}</Panel>
+              <PanelResizeHandle style={{ width: 4, background: 'var(--cf-border-primary)', cursor: 'col-resize', transition: 'background 0.15s' }} />
+              <Panel minSize={40}>{editorInner}</Panel>
+            </PanelGroup>
+          )}
         </div>
 
         {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}

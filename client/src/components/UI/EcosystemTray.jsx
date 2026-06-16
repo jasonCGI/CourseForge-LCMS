@@ -75,7 +75,7 @@ export default function EcosystemTray() {
               e.currentTarget.style.color = 'var(--cf-text-tertiary)'
             }}>
             <tool.mark size={16}/>
-            <span style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', color: 'inherit' }}>
+            <span className="tray-label" style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', color: 'inherit' }}>
               {tool.label}
             </span>
           </a>
