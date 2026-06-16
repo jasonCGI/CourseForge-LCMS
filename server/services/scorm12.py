@@ -333,8 +333,8 @@ def _render_blocks(blocks, scorm_bridge=False):
 </div>
 <script>
 (function() {{
-  var clip = {clip_json};
-  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clip && clip.interactions) || [], {{}});
+  var clipData = {clip_json};
+  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clipData && clipData.interactions) || [], {{}});
 }})();
 </script>''')
 
