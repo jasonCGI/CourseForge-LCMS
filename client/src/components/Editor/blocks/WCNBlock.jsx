@@ -24,11 +24,11 @@ const WCN_CONFIG = {
     tagColor:   '#fff',
     border:     '#B87A1A',
     bg:         'rgba(184,122,26,0.07)',
-    titleColor: '#EF9F27',
+    titleColor: 'var(--forge-brand)',
     textColor:  '#C4A870',
     icon:       (s=32) => (
       <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden="true">
-        <polygon points={`${s/2},${s*0.06} ${s*0.94},${s/2} ${s/2},${s*0.94} ${s*0.06},${s/2}`} fill="#EF9F27"/>
+        <polygon points={`${s/2},${s*0.06} ${s*0.94},${s/2} ${s/2},${s*0.94} ${s*0.06},${s/2}`} fill="var(--forge-brand)"/>
         <text x={s/2} y={s/2+s*0.16} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight="900" fontSize={s*0.42} fill="#1a1000">!</text>
       </svg>
     ),

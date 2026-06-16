@@ -1,0 +1,88 @@
+/* ============================================================================
+   CourseForge LCMS — Component classes
+   ----------------------------------------------------------------------------
+   Path marks + badges. Static appearance only — the cursor blink animation
+   lives in forge-motion.css so motion can be governed in one place.
+   Load order: forge-tokens.css → bootstrap.css → forge-bootstrap.css →
+               forge-components.css → forge-motion.css
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   Path mark
+   Markup:
+     <span class="forge-path forge-path--lg">
+       <span class="forge-path__root">Course</span><!--
+    --><span class="forge-path__slash">/</span><!--
+    --><span class="forge-path__tool">Forge</span><!--
+    --><span class="forge-path__cursor">_</span>
+     </span>
+   3-level:  root /slash mid /slash tool cursor
+   ---------------------------------------------------------------------------- */
+.forge-path {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--forge-font);
+  font-weight: var(--forge-font-weight);
+  font-size: var(--forge-size-md);          /* default = md */
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.forge-path__root  { color: var(--forge-path-root); }
+.forge-path__mid   { color: var(--forge-path-forge); }
+.forge-path__tool  { color: var(--forge-path-tool); }
+.forge-path__slash {
+  color: var(--forge-path-slash);
+  margin: 0 0.08em;
+}
+
+.forge-path__cursor {
+  color: var(--forge-cursor);
+  margin-left: 0.04em;
+  /* animation applied in forge-motion.css */
+}
+
+/* Size modifiers */
+.forge-path--xl { font-size: var(--forge-size-xl); }
+.forge-path--lg { font-size: var(--forge-size-lg); }
+.forge-path--md { font-size: var(--forge-size-md); }
+.forge-path--sm { font-size: var(--forge-size-sm); }
+.forge-path--xs { font-size: var(--forge-size-xs); }
+
+/* ----------------------------------------------------------------------------
+   Badge / tag
+   ---------------------------------------------------------------------------- */
+.forge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: var(--forge-font);
+  font-weight: var(--forge-font-weight);
+  font-size: var(--forge-size-xs);
+  line-height: 1;
+  padding: 0.4em 0.7em;
+  border-radius: var(--forge-radius-badge);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Brand pill — amber tinted, for the master mark */
+.forge-badge--brand {
+  color: var(--forge-brand);
+  background: color-mix(in srgb, var(--forge-brand) 14%, transparent);
+  border-color: color-mix(in srgb, var(--forge-brand) 34%, transparent);
+}
+
+/* Tool pill — neutral, for sub-tools */
+.forge-badge--tool {
+  color: var(--forge-path-forge);
+  background: var(--forge-bg-secondary);
+  border-color: var(--forge-path-slash);
+}
+
+[data-bs-theme="dark"] .forge-badge--tool {
+  color: #e5e7eb;
+  border-color: var(--forge-path-forge);
+}

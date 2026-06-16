@@ -6,7 +6,7 @@ import useProjectStore from '../../store/projectStore'
 const DEFAULT_TOKENS = {
   primary_color:       '#185FA5',
   secondary_color:     '#042C53',
-  accent_color:        '#EF9F27',
+  accent_color:        '#D4820A',  /* forge brand (light) — concrete hex: persisted + baked into published output */
   text_color:          '#1a1a1a',
   bg_color:            '#ffffff',
   bg_secondary:        '#F0F4F8',

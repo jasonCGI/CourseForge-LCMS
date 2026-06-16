@@ -20,7 +20,7 @@ export const MODES = {
     // App shell
     '--cf-app-bg':          '#06080f',
     '--cf-header-bg':       '#06080f',
-    '--cf-header-border':   '#EF9F27',
+    '--cf-header-border':   'var(--forge-brand)',
     '--cf-panel-bg':        '#0a0c14',
     '--cf-sidebar-bg':      '#06080f',
     '--cf-editor-bg':       '#0d1017',
@@ -36,18 +36,18 @@ export const MODES = {
     '--cf-text-tertiary':   '#3A5A7A',
 
     // Accent
-    '--cf-accent':          '#EF9F27',
-    '--cf-accent-dim':      'rgba(239,159,39,0.08)',
-    '--cf-accent-outline':  'rgba(239,159,39,0.30)',
+    '--cf-accent':          'var(--forge-brand)',
+    '--cf-accent-dim':      'color-mix(in srgb, var(--forge-brand) 8%, transparent)',
+    '--cf-accent-outline':  'color-mix(in srgb, var(--forge-brand) 30%, transparent)',
 
     // Logo
     '--cf-logo-course':     '#7EB8F0',
-    '--cf-logo-slash':      '#EF9F27',
+    '--cf-logo-slash':      'var(--forge-brand)',
     '--cf-logo-forge':      '#FFFFFF',
 
     // Focus indicator — 508 required
-    '--cf-focus-ring':      '0 0 0 2px #EF9F27',
-    '--cf-focus-outline':   '2px solid #EF9F27',
+    '--cf-focus-ring':      '0 0 0 2px var(--forge-brand)',
+    '--cf-focus-outline':   '2px solid var(--forge-brand)',
 
     // Toggle
     '--cf-toggle-bg':       '#0e1320',
@@ -55,7 +55,7 @@ export const MODES = {
     '--cf-toggle-icon':     '#8AAAC8',
     '--cf-toggle-hover':    '#1a2430',
     '--cf-toggle-active-bg':'#1a3050',
-    '--cf-toggle-active-icon':'#EF9F27',
+    '--cf-toggle-active-icon':'var(--forge-brand)',
 
     '--cf-level-project-tab':  '#5A7A9A',
     '--cf-level-project-bg':   '#131822',
@@ -91,11 +91,11 @@ export const MODES = {
     '--cf-level-frame-text':   '#7A90A0',
     '--cf-level-frame-fw':     '300',
 
-    '--cf-level-frame-active-tab':     '#EF9F27',
-    '--cf-level-frame-active-bg':      'rgba(239,159,39,0.08)',
+    '--cf-level-frame-active-tab':     'var(--forge-brand)',
+    '--cf-level-frame-active-bg':      'color-mix(in srgb, var(--forge-brand) 8%, transparent)',
     '--cf-level-frame-active-text':    '#EFD090',
     '--cf-level-frame-active-fw':      '400',
-    '--cf-level-frame-active-outline': 'rgba(239,159,39,0.30)',
+    '--cf-level-frame-active-outline': 'color-mix(in srgb, var(--forge-brand) 30%, transparent)',
 
     '--cf-indent-line':     'rgba(255,255,255,0.04)',
     '--cf-tree-divider':    'rgba(255,255,255,0.04)',
@@ -130,7 +130,7 @@ export const MODES = {
 
     '--cf-app-bg':          '#F0F4F8',
     '--cf-header-bg':       '#1B3A5C',
-    '--cf-header-border':   '#EF9F27',
+    '--cf-header-border':   'var(--forge-brand)',
     '--cf-panel-bg':        '#FFFFFF',
     '--cf-sidebar-bg':      '#EEF4FA',
     '--cf-editor-bg':       '#FFFFFF',
@@ -143,23 +143,23 @@ export const MODES = {
     '--cf-text-secondary':  '#3A5A78',
     '--cf-text-tertiary':   '#6A8AA8',
 
-    '--cf-accent':          '#EF9F27',
-    '--cf-accent-dim':      '#FFF3E0',
-    '--cf-accent-outline':  '#EF9F27',
+    '--cf-accent':          'var(--forge-brand)',
+    '--cf-accent-dim':      'color-mix(in srgb, var(--forge-brand) 12%, transparent)',
+    '--cf-accent-outline':  'var(--forge-brand)',
 
     '--cf-logo-course':     '#90C0E8',
-    '--cf-logo-slash':      '#EF9F27',
+    '--cf-logo-slash':      'var(--forge-brand)',
     '--cf-logo-forge':      '#FFFFFF',
 
-    '--cf-focus-ring':      '0 0 0 2px #EF9F27',
-    '--cf-focus-outline':   '2px solid #EF9F27',
+    '--cf-focus-ring':      '0 0 0 2px var(--forge-brand)',
+    '--cf-focus-outline':   '2px solid var(--forge-brand)',
 
     '--cf-toggle-bg':       '#E8EEF4',
     '--cf-toggle-border':   '#B8C8D4',
     '--cf-toggle-icon':     '#5A7A9A',
     '--cf-toggle-hover':    '#D8E4EC',
     '--cf-toggle-active-bg':'#1B3A5C',
-    '--cf-toggle-active-icon':'#EF9F27',
+    '--cf-toggle-active-icon':'var(--forge-brand)',
 
     '--cf-level-project-tab':  '#1B3A5C',
     '--cf-level-project-bg':   '#EEF4FA',
@@ -195,11 +195,11 @@ export const MODES = {
     '--cf-level-frame-text':   '#2A4A64',
     '--cf-level-frame-fw':     '300',
 
-    '--cf-level-frame-active-tab':     '#EF9F27',
-    '--cf-level-frame-active-bg':      '#FFF3E0',
+    '--cf-level-frame-active-tab':     'var(--forge-brand)',
+    '--cf-level-frame-active-bg':      'color-mix(in srgb, var(--forge-brand) 12%, transparent)',
     '--cf-level-frame-active-text':    '#8A4A00',
     '--cf-level-frame-active-fw':      '500',
-    '--cf-level-frame-active-outline': '#EF9F27',
+    '--cf-level-frame-active-outline': 'var(--forge-brand)',
 
     '--cf-indent-line':     'rgba(0,0,0,0.06)',
     '--cf-tree-divider':    'rgba(0,0,0,0.08)',
@@ -231,7 +231,7 @@ export const MODES = {
 
     '--cf-app-bg':          '#000000',
     '--cf-header-bg':       '#000000',
-    '--cf-header-border':   '#EF9F27',
+    '--cf-header-border':   'var(--forge-brand)',
     '--cf-panel-bg':        '#000000',
     '--cf-sidebar-bg':      '#000000',
     '--cf-editor-bg':       '#000000',
@@ -244,23 +244,23 @@ export const MODES = {
     '--cf-text-secondary':  '#DDDDDD',
     '--cf-text-tertiary':   '#AAAAAA',
 
-    '--cf-accent':          '#EF9F27',
+    '--cf-accent':          'var(--forge-brand)',
     '--cf-accent-dim':      '#1A0F00',
-    '--cf-accent-outline':  '#EF9F27',
+    '--cf-accent-outline':  'var(--forge-brand)',
 
     '--cf-logo-course':     '#FFFFFF',
-    '--cf-logo-slash':      '#EF9F27',
+    '--cf-logo-slash':      'var(--forge-brand)',
     '--cf-logo-forge':      '#FFFFFF',
 
     // HC focus — extra thick, max visibility
-    '--cf-focus-ring':      '0 0 0 3px #EF9F27',
-    '--cf-focus-outline':   '3px solid #EF9F27',
+    '--cf-focus-ring':      '0 0 0 3px var(--forge-brand)',
+    '--cf-focus-outline':   '3px solid var(--forge-brand)',
 
     '--cf-toggle-bg':       '#000000',
     '--cf-toggle-border':   '#FFFFFF',
     '--cf-toggle-icon':     '#FFFFFF',
     '--cf-toggle-hover':    '#1A1A1A',
-    '--cf-toggle-active-bg':'#EF9F27',
+    '--cf-toggle-active-bg':'var(--forge-brand)',
     '--cf-toggle-active-icon':'#000000',
 
     '--cf-level-project-tab':  '#FFFFFF',
@@ -297,11 +297,11 @@ export const MODES = {
     '--cf-level-frame-text':   '#CCCCCC',
     '--cf-level-frame-fw':     '400',
 
-    '--cf-level-frame-active-tab':     '#EF9F27',
+    '--cf-level-frame-active-tab':     'var(--forge-brand)',
     '--cf-level-frame-active-bg':      '#1A0F00',
-    '--cf-level-frame-active-text':    '#EF9F27',
+    '--cf-level-frame-active-text':    'var(--forge-brand)',
     '--cf-level-frame-active-fw':      '600',
-    '--cf-level-frame-active-outline': '#EF9F27',
+    '--cf-level-frame-active-outline': 'var(--forge-brand)',
 
     '--cf-indent-line':     '#333333',
     '--cf-tree-divider':    '#444444',
@@ -311,7 +311,7 @@ export const MODES = {
     '--cf-badge-ctn-bg':    '#000000',
     '--cf-badge-ctn-text':  '#FFFFFF',
     '--cf-badge-kc-bg':     '#000000',
-    '--cf-badge-kc-text':   '#EF9F27',
+    '--cf-badge-kc-text':   'var(--forge-brand)',
     '--cf-badge-br-bg':     '#000000',
     '--cf-badge-br-text':   '#CCCCCC',
     '--cf-badge-border':    '1px solid',

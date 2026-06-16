@@ -23,7 +23,7 @@ export default function FramePreview({ frame }) {
         color: '#042C53',
         marginBottom: 24,
         paddingBottom: 12,
-        borderBottom: '2px solid #EF9F27',
+        borderBottom: '2px solid var(--forge-brand)',
       }}>
         {frame.name}
       </h1>
@@ -224,8 +224,8 @@ function PreviewHotspot({ block }) {
               position: 'absolute',
               left: `${r.x}%`, top: `${r.y}%`,
               width: `${r.w}%`, height: `${r.h}%`,
-              border: `2px solid ${active === r.id ? '#EF9F27' : '#185FA5'}`,
-              background: active === r.id ? 'rgba(239,159,39,0.2)' : 'rgba(24,95,165,0.1)',
+              border: `2px solid ${active === r.id ? 'var(--forge-brand)' : '#185FA5'}`,
+              background: active === r.id ? 'color-mix(in srgb, var(--forge-brand) 20%, transparent)' : 'rgba(24,95,165,0.1)',
               borderRadius: 2,
               cursor: 'pointer',
               boxSizing: 'border-box',

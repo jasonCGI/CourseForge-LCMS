@@ -68,16 +68,26 @@ body { margin: 0; font-family: var(--font-sans); }
 :root {
   --cf-app-bg:          #06080f;
   --cf-header-bg:       #06080f;
-  --cf-header-border:   #EF9F27;
+  --cf-header-border:   var(--forge-brand);
   --cf-text-primary:    #E0E8F0;
   --cf-text-secondary:  #7A90A8;
   --cf-text-tertiary:   #3A5A7A;
-  --cf-accent:          #EF9F27;
+  --cf-accent:          var(--forge-brand);
   --cf-border-primary:  #1c1c2c;
   --cf-border-tertiary: rgba(255,255,255,0.04);
   --cf-font:            Inter, system-ui, sans-serif;
   --cf-mono:            'SF Mono', 'JetBrains Mono', Consolas, monospace;
 }
+
+/* ── Forge brand token ───────────────────────────────────────────────────────
+   Mirrors the canonical /tokens/forge-tokens.css brand values. The shared file
+   switches dark via [data-bs-theme="dark"]; this app themes via data-cf-mode
+   (set by ThemeContext), so the brand is re-mapped here to stay reactive.
+   --cf-accent and all in-app amber now resolve from this. */
+:root                  { --forge-brand: #F59E0B; }   /* dark-first default   */
+[data-cf-mode="light"] { --forge-brand: #D4820A; }   /* light = spec amber   */
+[data-cf-mode="dark"]  { --forge-brand: #F59E0B; }   /* dark  = lifted amber */
+[data-cf-mode="hc"]    { --forge-brand: #F59E0B; }   /* hc    = lifted amber */
 
 /* ── Focus indicators — 508 required on all interactive elements ── */
 .cf-tree-row:focus-visible,
@@ -86,7 +96,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex="0"]:focus-visible {
-  outline: var(--cf-focus-outline, 2px solid #EF9F27) !important;
+  outline: var(--cf-focus-outline, 2px solid var(--forge-brand)) !important;
   outline-offset: -2px;
   z-index: 10;
   position: relative;
@@ -96,7 +106,7 @@ textarea:focus-visible,
 [data-cf-mode="hc"] .cf-tree-row:focus-visible,
 [data-cf-mode="hc"] button:focus-visible,
 [data-cf-mode="hc"] [tabindex="0"]:focus-visible {
-  outline: 3px solid #EF9F27 !important;
+  outline: 3px solid var(--forge-brand) !important;
   outline-offset: -1px;
 }
 
@@ -111,7 +121,7 @@ textarea:focus-visible,
   top: -100px;
   left: 8px;
   padding: 8px 16px;
-  background: #EF9F27;
+  background: var(--forge-brand);
   color: #000;
   font-weight: 700;
   border-radius: 4px;

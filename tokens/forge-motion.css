@@ -1,0 +1,28 @@
+/* ============================================================================
+   CourseForge LCMS — Motion
+   ----------------------------------------------------------------------------
+   Single home for Forge micro-animations. Keep every @keyframes + animation
+   binding here so motion can be reasoned about — and disabled — in one place.
+   The prefers-reduced-motion block at the bottom switches them all off.
+   Load LAST (after forge-components.css).
+   ============================================================================ */
+
+/* Cursor blink — step-start = hard on/off, no fade between states */
+@keyframes forge-cursor-blink {
+  50% { opacity: 0; }
+}
+
+.forge-path__cursor {
+  animation: forge-cursor-blink var(--forge-cursor-blink) step-start infinite;
+}
+
+/* ----------------------------------------------------------------------------
+   Reduced motion — honor the OS/browser preference.
+   Anything animated above must be neutralized here.
+   ---------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .forge-path__cursor {
+    animation: none;
+    opacity: 1;          /* leave the underscore steadily visible */
+  }
+}

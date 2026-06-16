@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forge Tokens · Demo</title>
+
+  <!-- Forge token system (load order matters) -->
+  <link rel="stylesheet" href="./forge-tokens.css">
+  <link rel="stylesheet" href="./forge-bootstrap.css">
+  <link rel="stylesheet" href="./forge-components.css">
+  <link rel="stylesheet" href="./forge-motion.css">
+
+  <!--
+    Demo-page chrome ONLY (layout + theme backgrounds).
+    The path marks/badges below use component classes exclusively — no inline
+    styles anywhere on the marks themselves.
+  -->
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; }
+    .demo-pane {
+      padding: 2.5rem 2rem;
+      background: var(--bs-body-bg, #fff);
+      color: var(--bs-body-color, #111);
+    }
+    [data-bs-theme="dark"] .demo-pane {
+      --bs-body-bg: #161616;
+      --bs-body-color: #e5e7eb;
+      background: var(--bs-body-bg);
+      color: var(--bs-body-color);
+    }
+    .demo-pane h1 { font-size: 1rem; text-transform: uppercase;
+      letter-spacing: .12em; opacity: .55; margin: 0 0 1.5rem; }
+    .demo-grid { display: grid; gap: 1.4rem; }
+    .demo-row { display: flex; align-items: baseline; gap: 1.5rem;
+      flex-wrap: wrap; }
+    .demo-label { width: 3.5rem; font: 600 .7rem/1 ui-monospace, monospace;
+      opacity: .4; text-transform: uppercase; }
+    .demo-card {
+      border: 1px solid var(--forge-path-slash);
+      border-radius: var(--forge-radius-card);
+      padding: 1.5rem; margin-bottom: 1.25rem;
+      background: var(--forge-bg-secondary);
+    }
+    .demo-badges { display: flex; gap: .6rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+  <!-- ===================================================================== -->
+  <!-- LIGHT                                                                  -->
+  <!-- ===================================================================== -->
+  <section class="demo-pane" data-bs-theme="light">
+    <h1>Light · all marks · all sizes</h1>
+
+    <!-- The four marks, each at xl -->
+    <div class="demo-card">
+      <div class="demo-grid">
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Blueprint</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Pack</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Clip</span><span class="forge-path__cursor">_</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Size ladder on the master mark -->
+    <div class="demo-card">
+      <div class="demo-grid">
+        <div class="demo-row"><span class="demo-label">xl</span>
+          <span class="forge-path forge-path--xl"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">lg</span>
+          <span class="forge-path forge-path--lg"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">md</span>
+          <span class="forge-path forge-path--md"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">sm</span>
+          <span class="forge-path forge-path--sm"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">xs</span>
+          <span class="forge-path forge-path--xs"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="demo-card">
+      <div class="demo-badges">
+        <span class="forge-badge forge-badge--brand">CourseForge</span>
+        <span class="forge-badge forge-badge--tool">Blueprint</span>
+        <span class="forge-badge forge-badge--tool">Pack</span>
+        <span class="forge-badge forge-badge--tool">Clip</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- DARK                                                                   -->
+  <!-- ===================================================================== -->
+  <section class="demo-pane" data-bs-theme="dark">
+    <h1>Dark · all marks · all sizes</h1>
+
+    <div class="demo-card">
+      <div class="demo-grid">
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Blueprint</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Pack</span><span class="forge-path__cursor">_</span>
+        </span>
+        <span class="forge-path forge-path--xl">
+          <span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Clip</span><span class="forge-path__cursor">_</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-grid">
+        <div class="demo-row"><span class="demo-label">xl</span>
+          <span class="forge-path forge-path--xl"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">lg</span>
+          <span class="forge-path forge-path--lg"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">md</span>
+          <span class="forge-path forge-path--md"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">sm</span>
+          <span class="forge-path forge-path--sm"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+        <div class="demo-row"><span class="demo-label">xs</span>
+          <span class="forge-path forge-path--xs"><span class="forge-path__root">Course</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Forge</span><span class="forge-path__cursor">_</span></span></div>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-badges">
+        <span class="forge-badge forge-badge--brand">CourseForge</span>
+        <span class="forge-badge forge-badge--tool">Blueprint</span>
+        <span class="forge-badge forge-badge--tool">Pack</span>
+        <span class="forge-badge forge-badge--tool">Clip</span>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

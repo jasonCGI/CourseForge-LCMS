@@ -67,7 +67,7 @@ export default function FrameHeader({ onPreview }) {
       {/* Save status */}
       <span style={{
         fontSize: 12,
-        color: isDirty ? '#EF9F27' : 'var(--color-text-secondary)',
+        color: isDirty ? 'var(--forge-brand)' : 'var(--color-text-secondary)',
         flexShrink: 0,
         minWidth: 120,
         textAlign: 'right',

@@ -1,0 +1,62 @@
+/* ============================================================================
+   CourseForge LCMS — Design Tokens (source of truth)
+   ----------------------------------------------------------------------------
+   CSS custom properties for the Forge brand path/badge system.
+   Light values live on :root; dark values override under
+   [data-bs-theme="dark"] (Bootstrap 5 convention).
+   Consumed by forge-bootstrap.css and forge-components.css.
+   ============================================================================ */
+
+/* IBM Plex Mono 600 — brand wordmark / path face */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&display=swap');
+
+:root {
+  /* --- Type ------------------------------------------------------------- */
+  --forge-font: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', 'Menlo',
+                'Consolas', monospace;
+  --forge-font-weight: 600;
+
+  /* --- Brand ------------------------------------------------------------ */
+  --forge-brand: #D4820A;          /* amber (light)            */
+  --forge-brand-hover: #b86f08;    /* amber, pressed           */
+
+  /* --- Path hierarchy (light) ------------------------------------------ */
+  --forge-path-root: #6B7280;      /* "Course" segment         */
+  --forge-path-forge: #374151;     /* "Forge" mid segment      */
+  --forge-path-tool: #D4820A;      /* active tool — amber      */
+  --forge-path-slash: #D1D5DB;     /* separators               */
+  --forge-cursor: var(--forge-path-tool);
+
+  /* --- Surfaces -------------------------------------------------------- */
+  --forge-bg-secondary: #f8f9fa;   /* === Bootstrap --bs-gray-100 */
+
+  /* --- Geometry -------------------------------------------------------- */
+  --forge-radius-card: 12px;
+  --forge-radius-badge: 6px;
+
+  /* --- Path sizes ------------------------------------------------------ */
+  --forge-size-xl: 38px;
+  --forge-size-lg: 28px;
+  --forge-size-md: 20px;
+  --forge-size-sm: 14px;
+  --forge-size-xs: 11px;
+
+  /* --- Motion (durations live here; keyframes live in forge-motion.css) - */
+  --forge-cursor-blink: 1.1s;
+}
+
+[data-bs-theme="dark"] {
+  /* --- Brand ----------------------------------------------------------- */
+  --forge-brand: #F59E0B;          /* amber, lifted (dark)     */
+  --forge-brand-hover: #fbbf24;
+
+  /* --- Path hierarchy (dark) ------------------------------------------- */
+  --forge-path-root: #2a2a2a;
+  --forge-path-forge: #4B5563;
+  --forge-path-tool: #F59E0B;
+  --forge-path-slash: #1e1e1e;
+  --forge-cursor: var(--forge-path-tool);
+
+  /* --- Surfaces -------------------------------------------------------- */
+  --forge-bg-secondary: #212529;   /* === Bootstrap dark --bs-gray-100 slot */
+}
