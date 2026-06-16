@@ -9,6 +9,7 @@ import HotspotBlock from './blocks/HotspotBlock'
 import BranchBlock from './blocks/BranchBlock'
 import OamBlock from './blocks/OamBlock'
 import WCNBlock from './blocks/WCNBlock'
+import IVideoBlock from './blocks/IVideoBlock'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -19,6 +20,7 @@ const BLOCK_COMPONENTS = {
   branch:  BranchBlock,
   oam:     OamBlock,
   wcn:     WCNBlock,
+  ivideo:  IVideoBlock,
 }
 
 export default function FrameEditor() {

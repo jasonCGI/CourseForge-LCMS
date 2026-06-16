@@ -298,6 +298,46 @@ def _render_blocks(blocks, scorm_bridge=False):
                 f'title="Interactive animation"></iframe>'
             )
 
+        elif btype == 'ivideo':
+            video_id = data.get('video_asset_id', '')
+            clip_id  = data.get('clip_asset_id', '')
+            caption  = data.get('caption', '')
+            block_id = bid[:8]
+
+            if not video_id:
+                parts.append('<div class="cf-media">▶⊕ [Interactive Video — no video linked]</div>')
+            else:
+                vext = 'mp4'
+                v_asset = MediaAsset.query.get(video_id)
+                if v_asset and v_asset.original_name and '.' in v_asset.original_name:
+                    vext = v_asset.original_name.rsplit('.', 1)[-1].lower()
+                video_src = f'media/video/{video_id}.{vext}'
+
+                # Inline the clip interactions — robust across LMS that block fetch()
+                clip_json = '{"interactions":[]}'
+                if clip_id:
+                    c_asset = MediaAsset.query.get(clip_id)
+                    if c_asset and c_asset.stored_path and Path(c_asset.stored_path).exists():
+                        clip_json = Path(c_asset.stored_path).read_text(encoding='utf-8')
+                clip_json = clip_json.replace('</', '<\\/')  # don't break the <script> tag
+
+                cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+                parts.append(f'''
+<div id="ivideo-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
+  <video controls style="width:100%;border-radius:6px;display:block" aria-label="Interactive video">
+    <source src="{video_src}" type="video/{vext}">
+    <p>Your browser does not support HTML5 video.</p>
+  </video>
+  <div class="ivideo-overlay" style="position:absolute;inset:0;pointer-events:none"></div>
+  {cap_html}
+</div>
+<script>
+(function() {{
+  var clip = {clip_json};
+  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clip && clip.interactions) || [], {{}});
+}})();
+</script>''')
+
     return '\n'.join(parts)
 
 
@@ -446,6 +486,11 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 if poster:
                     pext = poster.original_name.rsplit('.', 1)[-1].lower() if '.' in (poster.original_name or '') else 'jpg'
                     _bundle_media(poster.stored_path, f'media/images/{poster.id}.{pext}')
+
+        # ── Bundle ForgeClip .clip.json files (ivideo blocks) ──────
+        for asset in MediaAsset.query.filter_by(project_id=project_id, kind='clip').all():
+            if asset.stored_path and Path(asset.stored_path).exists():
+                _bundle_media(asset.stored_path, f'media/clips/{asset.id}.clip.json')
 
     buf.seek(0)
     safe_name = project.name.replace(' ', '_').lower()[:40]

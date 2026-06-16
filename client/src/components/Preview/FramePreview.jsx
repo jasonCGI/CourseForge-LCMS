@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 
 const FRAME_BG = '#ffffff'
 
@@ -48,6 +49,7 @@ function PreviewBlock({ block }) {
     case 'hotspot': return <PreviewHotspot block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
+    case 'ivideo':  return <PreviewIVideo  block={block} />
     default:        return (
       <div style={previewBlockWrap}>
         <p style={{ color: '#888', fontSize: 13 }}>
@@ -446,6 +448,46 @@ function PreviewWCN({ block }) {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function PreviewIVideo({ block }) {
+  const [clipData, setClipData] = React.useState(null)
+  const videoId = block.data.video_asset_id
+  const clipId  = block.data.clip_asset_id
+
+  React.useEffect(() => {
+    if (!clipId) { setClipData(null); return }
+    fetch(`/api/media/clip/${clipId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setClipData)
+      .catch(() => {})
+  }, [clipId])
+
+  if (!videoId) {
+    return (
+      <div style={{
+        ...previewBlockWrap, padding: 32, textAlign: 'center',
+        border: '2px dashed #7A3A9A', borderRadius: 8, color: '#7A3A9A',
+        background: 'rgba(122,58,154,0.05)',
+      }}>
+        <div style={{ fontSize: 24, marginBottom: 8 }}>▶⊕</div>
+        <div style={{ fontSize: 13 }}>Interactive Video — upload video + .clip.json to preview</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={previewBlockWrap}>
+      <IVideoRuntime
+        videoSrc={block.data.video_serve_url || `/api/media/serve/${videoId}`}
+        clipData={clipData}
+        onComplete={() => {}}
+      />
+      {block.data.caption && (
+        <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{block.data.caption}</p>
       )}
     </div>
   )

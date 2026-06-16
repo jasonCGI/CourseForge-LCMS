@@ -139,6 +139,7 @@ function _makeBlock(type) {
     branch:  { condition: '', true_frame_id: null, false_frame_id: null, true_label: 'Yes', false_label: 'No' },
     oam:   { oam_asset_id: null, width: 800, height: 600, responsive: false, scorm_bridge_enabled: false, caption: '' },
     wcn:   { wcn_type: 'note', title: '', text: '', modal: false, ack_label: 'I understand — proceed' },
+    ivideo: { video_asset_id: null, clip_asset_id: null, video_filename: null, video_serve_url: null, interaction_count: null, video_duration: null, caption: '' },
   }
   return { id, type, data: defaults[type] || {} }
 }

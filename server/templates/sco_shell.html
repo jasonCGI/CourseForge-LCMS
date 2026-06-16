@@ -406,5 +406,136 @@
   });
   </script>
 
+  <script>
+  // ── IVideo runtime — timecode-triggered interactions (vanilla, self-contained) ──
+  function iVideoInit(containerId, interactions, options) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    var video   = container.querySelector('video');
+    var overlay = container.querySelector('.ivideo-overlay');
+    if (!video) return;
+    var answered = {};
+    var state = { blocking: false };
+
+    video.addEventListener('timeupdate', function() {
+      var t = video.currentTime;
+      if (overlay) {
+        overlay.innerHTML = '';
+        interactions.forEach(function(i) {
+          var inRange = t >= i.timecode && (!i.end_timecode || t <= i.end_timecode);
+          if (!inRange || !i.data) return;
+          if (i.type === 'annotation' && i.data.x != null) {
+            var a = document.createElement('div');
+            a.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;pointer-events:none;z-index:10';
+            var inner = document.createElement('div');
+            inner.style.cssText = 'background:rgba(4,44,83,0.85);color:#B5D4F4;font-size:11px;padding:3px 8px;border-radius:3px;border:1px solid #185FA5;white-space:nowrap';
+            inner.textContent = i.data.text || '';
+            a.appendChild(inner); overlay.appendChild(a);
+          } else if (i.type === 'hotspot' && i.data.x != null) {
+            var h = document.createElement('div');
+            h.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;transform:translate(-50%,-50%);z-index:10';
+            var dot = document.createElement('div');
+            dot.style.cssText = 'width:28px;height:28px;border-radius:50%;background:rgba(24,95,165,0.25);border:2px solid #185FA5';
+            dot.setAttribute('role','button'); dot.setAttribute('tabindex','0');
+            dot.setAttribute('aria-label', i.data.label || 'Hotspot'); dot.title = i.data.label || '';
+            h.appendChild(dot); overlay.appendChild(h);
+          }
+        });
+      }
+      if (state.blocking) return;
+      for (var k = 0; k < interactions.length; k++) {
+        var it = interactions[k];
+        if (answered[it.id] || !it.pause_on_reach) continue;
+        if (t >= it.timecode) {
+          state.blocking = true; video.pause();
+          iVideoShowBlocking(container, video, it, answered, state);
+          break;
+        }
+      }
+    });
+  }
+
+  function iVideoResume(ov, video, state) {
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    state.blocking = false;
+    if (video) { try { video.play(); } catch(e) {} }
+  }
+
+  function iVideoShowBlocking(container, video, i, answered, state) {
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:absolute;inset:0;background:rgba(4,44,83,0.8);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:8px;max-width:480px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
+    var d = i.data || {};
+
+    if (i.type === 'quiz') {
+      card.innerHTML = '<div style="padding:14px 18px;border-bottom:1px solid #eee;background:#f8fbff"><div style="font-size:9px;font-weight:700;color:#185FA5;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;font-family:monospace">Knowledge Check</div><div class="qq" style="font-size:15px;font-weight:600;color:#042C53"></div></div>';
+      card.querySelector('.qq').textContent = d.question || '';
+      var body = document.createElement('div'); body.style.cssText = 'padding:14px 18px';
+      var sel = { idx: null, done: false };
+      (d.choices || []).forEach(function(choice, idx) {
+        var b = document.createElement('button'); b.className = 'ch'; b.textContent = choice;
+        b.style.cssText = 'display:block;width:100%;padding:10px 14px;margin-bottom:8px;border:2px solid #ddd;border-radius:6px;background:#fff;font-size:14px;text-align:left;cursor:pointer;font-family:inherit';
+        b.onclick = function() {
+          if (sel.done) return;
+          [].forEach.call(body.querySelectorAll('button.ch'), function(x){ x.style.borderColor='#ddd'; x.style.background='#fff'; });
+          b.style.borderColor = '#185FA5'; b.style.background = '#F0F6FF'; sel.idx = idx;
+        };
+        body.appendChild(b);
+      });
+      var fb = document.createElement('div'); fb.style.cssText = 'display:none;margin-top:8px;padding:10px 14px;border-radius:6px;font-size:13px;font-weight:500';
+      var submit = document.createElement('button'); submit.textContent = 'Submit';
+      submit.style.cssText = 'margin-top:8px;padding:9px 20px;background:#185FA5;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+      submit.onclick = function() {
+        if (sel.idx === null || sel.done) return;
+        sel.done = true;
+        var correct = sel.idx === d.correct_index;
+        fb.style.display = 'block';
+        fb.style.background = correct ? '#EAF6EC' : '#FDECEA';
+        fb.style.color = correct ? '#1E7E34' : '#C0392B';
+        fb.textContent = correct ? (d.feedback_correct || 'Correct!') : (d.feedback_incorrect || 'Not quite — review and try again.');
+        submit.disabled = true; answered[i.id] = true;
+        try { if (window.scorm && scorm.setValue) scorm.setValue('cmi.core.score.raw', correct ? '100' : '0'); } catch(e) {}
+        setTimeout(function() { iVideoResume(ov, video, state); }, 1400);
+      };
+      body.appendChild(fb); body.appendChild(submit); card.appendChild(body);
+    }
+    else if (i.type === 'branch') {
+      card.innerHTML = '<div style="padding:14px 18px;border-bottom:1px solid #eee;background:#f8fbff"><div style="font-size:9px;font-weight:700;color:#7A3A9A;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;font-family:monospace">Decision Point</div><div class="bq" style="font-size:15px;font-weight:600;color:#042C53"></div></div>';
+      card.querySelector('.bq').textContent = d.prompt || d.condition || '';
+      var row = document.createElement('div'); row.style.cssText = 'padding:14px 18px;display:flex;gap:10px';
+      function mkBranch(label, tc, color) {
+        var b = document.createElement('button'); b.textContent = label;
+        b.style.cssText = 'flex:1;padding:12px 16px;border:2px solid ' + color + ';border-radius:6px;color:' + color + ';background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit';
+        b.onclick = function() { answered[i.id] = true; if (tc != null) { try { video.currentTime = tc; } catch(e) {} } iVideoResume(ov, video, state); };
+        return b;
+      }
+      row.appendChild(mkBranch('✓ ' + (d.true_label || 'Yes'), d.true_timecode, '#3B8A4A'));
+      row.appendChild(mkBranch('✕ ' + (d.false_label || 'No'), d.false_timecode, '#C0392B'));
+      card.appendChild(row);
+    }
+    else if (i.type === 'wcn') {
+      var wc = d.wcn_type === 'warning' ? { c:'#C0392B', h:'#1a0800' }
+             : d.wcn_type === 'caution' ? { c:'#B87A1A', h:'#1a1000' }
+             : { c:'#185FA5', h:'#06080f' };
+      card.innerHTML = '<div style="padding:14px 18px;background:' + wc.h + ';border-bottom:3px solid ' + wc.c + '"><div class="wtag" style="font-family:monospace;font-size:9px;font-weight:700;color:' + wc.c + ';letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px"></div><div class="wt" style="font-size:15px;font-weight:700;color:#fff"></div></div><div class="wx" style="padding:14px 18px;font-size:13px;line-height:1.65;color:#1a1a1a"></div>';
+      card.querySelector('.wtag').textContent = d.wcn_type || 'note';
+      card.querySelector('.wt').textContent = d.title || '';
+      card.querySelector('.wx').textContent = d.text || '';
+      var foot = document.createElement('div'); foot.style.cssText = 'padding:12px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;background:#f8f8f8';
+      var ack = document.createElement('button'); ack.textContent = '✓ ' + (d.ack_label || 'I understand — proceed');
+      ack.style.cssText = 'padding:8px 20px;background:' + wc.c + ';color:#fff;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+      ack.onclick = function() { answered[i.id] = true; iVideoResume(ov, video, state); };
+      foot.appendChild(ack); card.appendChild(foot);
+    }
+    else {
+      answered[i.id] = true; setTimeout(function() { iVideoResume(ov, video, state); }, 0); return;
+    }
+
+    ov.appendChild(card); container.appendChild(ov);
+  }
+  </script>
+
 </body>
 </html>

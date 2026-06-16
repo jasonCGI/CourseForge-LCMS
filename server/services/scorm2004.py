@@ -186,6 +186,8 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 ext    = (asset.original_name or '').rsplit('.', 1)[-1].lower() or 'bin'
                 subdir = 'images' if asset.kind == 'image' else 'audio'
                 _w(asset.stored_path, f'media/{subdir}/{asset.id}.{ext}')
+            elif asset.kind == 'clip':
+                _w(asset.stored_path, f'media/clips/{asset.id}.clip.json')
 
             # Companion files
             companions = asset.companion_files or {}

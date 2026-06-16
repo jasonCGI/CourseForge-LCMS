@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, current_app
@@ -231,6 +232,89 @@ def serve_media(asset_id):
     return send_file(asset.stored_path, mimetype=asset.mime_type)
 
 
+# ── ForgeClip .clip.json Upload ───────────────────────────────────────────────
+
+@media_bp.post('/api/media/clip')
+def upload_clip():
+    """
+    Upload a .clip.json file exported from ForgeClip.
+    Stored as kind='clip' and paired to its video (by base name, or by an
+    explicit video_asset_id when uploaded from an ivideo block's Step 2).
+    Multipart form fields: file, project_id, video_asset_id (optional)
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided.'}), 400
+
+    f          = request.files['file']
+    project_id = request.form.get('project_id')
+    video_id   = request.form.get('video_asset_id', '')
+
+    if not project_id:
+        return jsonify({'error': 'project_id is required.'}), 400
+    if not f.filename or not f.filename.lower().endswith('.json'):
+        return jsonify({'error': 'File must be a .clip.json file.'}), 400
+
+    try:
+        content = json.loads(f.read())
+    except Exception:
+        return jsonify({'error': 'Invalid JSON in .clip.json file.'}), 422
+
+    if content.get('tool') != 'ForgeClip':
+        return jsonify({'error': 'File does not appear to be a ForgeClip export.'}), 422
+
+    asset_id  = str(uuid.uuid4())
+    clip_dir  = get_upload_root() / 'clips'
+    clip_dir.mkdir(parents=True, exist_ok=True)
+    stored    = clip_dir / f"{asset_id}.clip.json"
+    payload   = json.dumps(content)
+    Path(stored).write_text(payload, encoding='utf-8')
+
+    media_asset = MediaAsset(
+        id=asset_id,
+        project_id=project_id,
+        kind='clip',
+        original_name=secure_filename(f.filename),
+        stored_path=str(stored),
+        file_size=len(payload.encode('utf-8')),
+        mime_type='application/json',
+        companion_files={'video_asset_id': video_id} if video_id else {},
+    )
+    db.session.add(media_asset)
+
+    # Explicit bidirectional link when an ivideo block supplied the video id
+    if video_id:
+        video_asset = MediaAsset.query.get(video_id)
+        if video_asset:
+            comp = dict(video_asset.companion_files or {})
+            comp['clip_asset_id'] = asset_id
+            video_asset.companion_files = comp
+
+    db.session.commit()
+
+    # Also pair by base name (handles drag-drop of <name>.mp4 + <name>.clip.json)
+    _pair_companions(media_asset, project_id)
+
+    return jsonify({
+        'id':                asset_id,
+        'project_id':        project_id,
+        'kind':              'clip',
+        'original_name':     media_asset.original_name,
+        'serve_url':         f'/api/media/clip/{asset_id}',
+        'interaction_count': len(content.get('interactions', [])),
+        'video_duration':    content.get('video', {}).get('duration', 0),
+        'schema_version':    content.get('schema_version', '1.0'),
+    }), 201
+
+
+@media_bp.get('/api/media/clip/<asset_id>')
+def serve_clip(asset_id):
+    """Serve a stored .clip.json file."""
+    asset = MediaAsset.query.get_or_404(asset_id)
+    if not asset.stored_path or not Path(asset.stored_path).exists():
+        return jsonify({'error': 'File not found.'}), 404
+    return send_file(asset.stored_path, mimetype='application/json')
+
+
 @media_bp.get('/api/media/project/<project_id>')
 def list_project_media(project_id):
     """List all media assets for a project."""
@@ -253,18 +337,21 @@ def _pair_companions(asset: MediaAsset, project_id: str) -> None:
     if not asset.original_name:
         return
 
-    base = asset.original_name.rsplit('.', 1)[0].lower()
-    ext  = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in asset.original_name else ''
+    def _base(name):
+        n = (name or '').lower()
+        if n.endswith('.clip.json'):        # ForgeClip exports <name>.clip.json
+            return n[:-len('.clip.json')]
+        return n.rsplit('.', 1)[0] if '.' in n else n
+
+    base = _base(asset.original_name)
+    ext  = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else ''
 
     siblings = MediaAsset.query.filter(
         MediaAsset.project_id == project_id,
         MediaAsset.id != asset.id,
     ).all()
 
-    def base_name(name):
-        return name.rsplit('.', 1)[0].lower() if name and '.' in name else (name or '').lower()
-
-    matches = [s for s in siblings if base_name(s.original_name) == base]
+    matches = [s for s in siblings if _base(s.original_name) == base]
 
     companions = dict(asset.companion_files or {})
 
@@ -303,6 +390,14 @@ def _pair_companions(asset: MediaAsset, project_id: str) -> None:
             companions['ogg_asset_id']      = sibling.id
             sib_companions['mp3_asset_id']  = asset.id
 
+        # Clip (.clip.json) ↔ video companions
+        elif ext == 'json' and sib_ext in ('mp4', 'mov', 'webm'):
+            companions['video_asset_id']     = sibling.id
+            sib_companions['clip_asset_id']  = asset.id
+        elif ext in ('mp4', 'mov', 'webm') and sib_ext == 'json':
+            companions['clip_asset_id']      = sibling.id
+            sib_companions['video_asset_id'] = asset.id
+
         sibling.companion_files = sib_companions
 
     asset.companion_files = companions
@@ -323,5 +418,8 @@ def _serialize_media(asset):
         'has_captions':   bool(companions.get('vtt_asset_id')),
         'has_webm':       bool(companions.get('webm_asset_id')),
         'has_poster':     bool(companions.get('poster_asset_id')),
+        'has_clip':       bool(companions.get('clip_asset_id')),
+        'clip_asset_id':  companions.get('clip_asset_id'),
+        'video_asset_id': companions.get('video_asset_id'),
         'created_at':     asset.created_at.isoformat(),
     }

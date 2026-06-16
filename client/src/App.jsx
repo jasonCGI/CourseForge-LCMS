@@ -7,6 +7,7 @@ import PublishModal from './components/Publish/PublishModal'
 import ThemeEditorModal from './components/ThemeEditor/ThemeEditorModal'
 import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
+import EcosystemTray from './components/UI/EcosystemTray'
 import useProjectStore from './store/projectStore'
 import { VERSION } from './version'
 
@@ -109,6 +110,9 @@ export default function App() {
               marginRight: 12,
             }}>loading…</span>
           )}
+
+          {/* Ecosystem tools */}
+          <EcosystemTray />
 
           {/* Mode toggle */}
           <ModeToggle />

@@ -9,6 +9,7 @@ const BLOCK_TYPES = [
   { type: 'branch',  label: 'Branch',  icon: '⋔',  color: '#3C3489', available: true  },
   { type: 'wcn',     label: 'WCN',     icon: '⚠',  color: '#C0392B', available: true  },
   { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: true  },
+  { type: 'ivideo',  label: 'iVideo',  icon: '▶⊕', color: '#7A3A9A', available: true  },
 ]
 
 export default function BlockToolbar() {

@@ -71,6 +71,19 @@ export const uploadMedia = (file, projectId, kind) => {
 export const listProjectMedia = (projectId) =>
   api.get(`/media/project/${projectId}`)
 
+// ForgeClip .clip.json upload + fetch
+export const uploadClip = (file, projectId, videoAssetId) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  if (videoAssetId) form.append('video_asset_id', videoAssetId)
+  return api.post('/media/clip', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const getClipAsset = (id) => api.get(`/media/clip/${id}`)
+
 // ── Themes ───────────────────────────────────────────────────────────────────
 export const getThemes   = ()                => api.get('/themes')
 export const createTheme  = (data)           => api.post('/themes', data)
