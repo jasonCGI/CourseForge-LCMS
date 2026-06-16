@@ -30,6 +30,7 @@ from flask import Blueprint, request, jsonify, current_app
 figma_bp = Blueprint('figma', __name__)
 
 FIGMA_API = 'https://api.figma.com/v1'
+EXPORT_SCALE = 2   # images exported @2x for crisp retina; recorded so the GUI can undo it
 
 ACTION_MAP = {
     'next': 'NEXT', 'prev': 'PREVIOUS', 'previous': 'PREVIOUS', 'back': 'PREVIOUS',
@@ -230,7 +231,7 @@ def import_from_figma():
     if export_ids:
         ids_param = ','.join(export_ids)
         try:
-            img_resp = _figma_get(f'/images/{key}?ids={ids_param}&format=png&scale=2', token)
+            img_resp = _figma_get(f'/images/{key}?ids={ids_param}&format=png&scale={EXPORT_SCALE}', token)
             images = img_resp.get('images', {}) or {}
         except Exception as e:
             layout['warnings'].append(f'Image export failed: {e}')
@@ -248,6 +249,7 @@ def import_from_figma():
                 'background_asset_id': aid,
                 'background_url': f'/api/assets/background/{aid}.png',
                 'background_file': 'background.png',
+                'export_scale': EXPORT_SCALE,
             })
         except Exception as e:
             layout['warnings'].append(f'Background download failed: {e}')
@@ -270,6 +272,7 @@ def import_from_figma():
                     'filename': f'{b["action"].lower()}_normal.png',
                     'serve_url': f'/api/assets/sprite/{aid}.png',
                 }}
+                b['export_scale'] = EXPORT_SCALE   # PNG is 2x the button bounds
             except Exception as e:
                 layout['warnings'].append(f'Button "{b["action"]}" sprite download failed: {e}')
 

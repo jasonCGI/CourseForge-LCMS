@@ -1042,11 +1042,16 @@ function renderButtonPlaceholders() {
     el.style.width  = btn.width  + 'px'
     el.style.height = btn.height + 'px'
 
-    // If sprite uploaded, show it
-    if (btn.sprite_url) {
-      el.style.backgroundImage    = 'url(' + btn.sprite_url + ')'
+    // Show the button art: spritesheet sprite OR individual normal-state PNG
+    // (Figma import uses individual mode — files.normal). backgroundSize is
+    // pinned to the button w/h so 2x exports render crisp at 1x.
+    var artUrl = btn.sprite_url || (btn.files && btn.files.normal && btn.files.normal.serve_url)
+    if (artUrl) {
+      el.style.backgroundImage    = 'url(' + artUrl + ')'
       el.style.backgroundRepeat   = 'no-repeat'
       el.style.backgroundSize     = btn.width + 'px ' + btn.height + 'px'
+      el.style.backgroundPosition = 'center'
+      el.textContent = ''
     } else {
       el.textContent = btn.action
     }
