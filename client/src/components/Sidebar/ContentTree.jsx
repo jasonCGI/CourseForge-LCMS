@@ -77,7 +77,7 @@ const LEVELS = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, onClick, onContextMenu, children, rowIndex = 0
+  frameType, note, onClick, onContextMenu, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
@@ -170,6 +170,12 @@ function TreeRow({
           }}>
             {label}
           </span>
+
+          {/* Author-notes indicator */}
+          {note && (
+            <span title="Has author notes" aria-label="Has author notes"
+              style={{ fontSize: 9, color: 'var(--forge-amber)', opacity: 0.7, flexShrink: 0 }}>✎</span>
+          )}
 
           {/* Count meta */}
           {count && !isFrame && (
@@ -411,6 +417,7 @@ export default function ContentTree() {
                               frameType={frame.frame_type || 'content'}
                               isFrame={true}
                               isCurrent={frame.id === activeFrameId}
+                              note={!!(frame.notes && frame.notes.trim())}
                               onClick={() => loadFrame(frame.id)}
                               onContextMenu={(e) => {
                                 e.preventDefault()

@@ -42,6 +42,12 @@ export const getTemplates   = (tag = null) => api.get('/templates' + (tag ? `?ta
 export const saveTemplate   = (data)       => api.post('/templates', data)
 export const deleteTemplate = (id)         => api.delete(`/templates/${id}`)
 
+// ── Publish history + search (Sprint C) ────────────────────────────────────────
+export const getPublishHistory   = (projectId) => api.get(`/projects/${projectId}/publishes`)
+export const deletePublish       = (jobId)     => api.delete(`/publishes/${jobId}`)
+export const getPublishDownloadUrl = (jobId)   => `/api/publish/${jobId}/download`
+export const searchFrames        = (projectId, params) => api.get(`/projects/${projectId}/search`, { params })
+
 // ── GUI shell library (per-project course skins) ───────────────────────────────
 export const getGuiShells   = ()   => api.get('/gui-shells')
 export const deleteGuiShell = (id) => api.delete(`/gui-shells/${id}`)

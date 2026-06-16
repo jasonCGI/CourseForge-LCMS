@@ -13,6 +13,10 @@ class PublishJob(db.Model):
     status       = db.Column(db.String(20), default='pending')  # pending | running | complete | failed
     output_path  = db.Column(db.String(512))
     error        = db.Column(db.Text)
+    cf_version   = db.Column(db.String(20))
+    frame_count  = db.Column(db.Integer)
+    file_size    = db.Column(db.BigInteger)
+    publish_name = db.Column(db.String(200))
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
 

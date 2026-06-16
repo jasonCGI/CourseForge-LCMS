@@ -16,7 +16,7 @@ import useClipboardStore from '../store/clipboardStore'
  * Block ops read straight from the editor store (active block + actions);
  * the host passes callbacks for the modal/help/preview/save side.
  */
-export function useKeyboardShortcuts({ onSave, onPreview, onCloseModal, onShowHelp }) {
+export function useKeyboardShortcuts({ onSave, onPreview, onCloseModal, onShowHelp, onOpenSearch }) {
   useEffect(() => {
     const handler = (e) => {
       const mod = e.ctrlKey || e.metaKey
@@ -59,6 +59,11 @@ export function useKeyboardShortcuts({ onSave, onPreview, onCloseModal, onShowHe
           if (!isTyping && cb) { e.preventDefault(); st.pasteBlock(cb) }
           break
         }
+        case 'f':
+        case 'k':
+          e.preventDefault()
+          onOpenSearch?.()
+          break
         case 'arrowup':
           if (!isTyping && activeId) { e.preventDefault(); st.moveBlock(activeId, 'up') }
           break

@@ -209,6 +209,10 @@ def update_frame(frame_id):
         frame.order_index = data['order_index']
     if 'content' in data:
         frame.content = data['content']
+    if 'notes' in data:
+        frame.notes = data['notes']
+    if 'optional' in data:
+        frame.optional = bool(data['optional'])
     db.session.commit()
     return jsonify(frame_schema.dump(frame))
 

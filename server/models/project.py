@@ -61,6 +61,8 @@ class Frame(db.Model):
     frame_type  = db.Column(db.String(50), default='content')  # content | assessment | branch
     order_index = db.Column(db.Integer, default=0)
     content     = db.Column(db.JSON, default=lambda: {'blocks': []})
+    notes       = db.Column(db.Text, default='')        # author notes — not published
+    optional    = db.Column(db.Boolean, default=False)  # excluded from completion count (Sprint D)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     lesson      = db.relationship('Lesson', back_populates='frames')

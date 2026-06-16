@@ -13,6 +13,8 @@ import useEditorStore from './store/editorStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import ShortcutHelp from './components/UI/ShortcutHelp'
 import CourseShellModal from './components/UI/CourseShellModal'
+import PublishHistory from './components/Publish/PublishHistory'
+import FrameSearch from './components/UI/FrameSearch'
 import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -27,6 +29,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
   const [showShell, setShowShell] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
 
   useKeyboardShortcuts({
     onSave:    () => useEditorStore.getState().flushSave(),
@@ -36,9 +40,12 @@ export default function App() {
       setShowThemeEditor(false)
       setShowShortcutHelp(false)
       setShowShell(false)
+      setShowHistory(false)
+      setShowSearch(false)
       useEditorStore.getState().setPreviewOpen(false)
     },
     onShowHelp: () => setShowShortcutHelp(true),
+    onOpenSearch: () => { if (activeProject) setShowSearch(true) },
   })
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
@@ -178,6 +185,30 @@ export default function App() {
 
           {/* Theme editor — header trigger hidden for now (feature kept; see ThemeEditorModal) */}
 
+          {/* Search frames (Ctrl/Cmd+F) */}
+          <button
+            onClick={() => activeProject && setShowSearch(true)}
+            disabled={!activeProject}
+            aria-label="Search frames"
+            title="Search frames (Ctrl+F)"
+            className="cf-hide-mobile"
+            style={{ marginLeft: 10, padding: '5px 10px', background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
+              color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
+              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>🔍 Search</button>
+
+          {/* Publish history */}
+          <button
+            onClick={() => activeProject && setShowHistory(true)}
+            disabled={!activeProject}
+            aria-label="Publish history"
+            title="Publish history"
+            className="cf-hide-mobile"
+            style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
+              color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
+              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>⟳ History</button>
+
           {/* Course shell (per-project GUI skin) */}
           <button
             onClick={() => setShowShell(true)}
@@ -248,6 +279,13 @@ export default function App() {
           projectId={activeProject?.id}
           currentShellId={activeProject?.gui_shell_id}
           onChanged={() => { if (activeProject) fetchProject(activeProject.id) }}
+        />
+        <PublishHistory open={showHistory} onClose={() => setShowHistory(false)} projectId={activeProject?.id} />
+        <FrameSearch
+          open={showSearch}
+          onClose={() => setShowSearch(false)}
+          projectId={activeProject?.id}
+          onNavigate={(frameId) => useEditorStore.getState().loadFrame(frameId)}
         />
       </div>
     </ThemeProvider>

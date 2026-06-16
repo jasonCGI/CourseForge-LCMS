@@ -7,6 +7,8 @@ class FrameSchema(Schema):
     frame_type  = fields.Str()
     order_index = fields.Int()
     content     = fields.Dict()
+    notes       = fields.Str(allow_none=True)
+    optional    = fields.Bool()
     created_at  = fields.DateTime(dump_only=True)
     updated_at  = fields.DateTime(dump_only=True)
 
