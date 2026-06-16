@@ -1,0 +1,10 @@
+# Do NOT override [phases.install] — overriding it breaks Railway's
+# auto-generated venv/pip wiring ("pip: command not found"). Only add system
+# packages to [phases.setup]; let nixpacks generate the install phase.
+[phases.setup]
+nixPkgs = ["python311"]
+
+# Single worker: GUI sessions live in an in-memory dict (GUIS), so multiple
+# workers would split create/update/export across processes -> 404s.
+[start]
+cmd = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4"

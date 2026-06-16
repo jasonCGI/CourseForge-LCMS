@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeGUI · GUI Shell Authoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #042C53;
+      --blue:   #185FA5;
+      /* Brand amber inherits the ecosystem token (forge-tokens.css, data-mode=dark -> #F59E0B) */
+      --amber:  var(--forge-amber, #F59E0B);
+      --bg:     #06080f;
+      --bg2:    #0d1017;
+      --bg3:    #131822;
+      --border: #1c2a3a;
+      --text:   #C8D8E8;
+      --text2:  #7A90A8;
+      --text3:  #3A5A7A;
+      --radius: 6px;
+      --font:   'Inter', system-ui, sans-serif;
+      --mono:   var(--forge-font, 'IBM Plex Mono', Consolas, monospace);
+    }
+
+    body {
+      font-family: var(--font);
+      background:  var(--bg);
+      color:       var(--text);
+      height:      100vh;
+      display:     flex;
+      flex-direction: column;
+      overflow:    hidden;
+    }
+
+    /* -- Header -- */
+    .header {
+      background:    var(--navy);
+      border-bottom: 2px solid var(--amber);
+      height:        48px;
+      display:       flex;
+      align-items:   center;
+      padding:       0 18px;
+      gap:           12px;
+      flex-shrink:   0;
+    }
+
+    .mark { flex-shrink: 0; }
+
+    .header-tag {
+      font-family:    var(--mono);
+      font-size:      10px;
+      color:          var(--text2);
+      padding:        2px 8px;
+      border:         1px solid rgba(255,255,255,0.1);
+      border-radius:  20px;
+      letter-spacing: 0.06em;
+    }
+
+    /* -- Main layout: sidebar + canvas area -- */
+    .workspace {
+      flex:     1;
+      display:  flex;
+      overflow: hidden;
+    }
+
+    /* -- Left sidebar — config panels -- */
+    .sidebar {
+      width:        320px;
+      flex-shrink:  0;
+      background:   var(--bg2);
+      border-right: 1px solid var(--border);
+      display:      flex;
+      flex-direction: column;
+      overflow:     hidden;
+    }
+
+    .sidebar-tabs {
+      display:       flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink:   0;
+    }
+
+    .stab {
+      flex:           1;
+      padding:        10px 6px;
+      text-align:     center;
+      font-family:    var(--mono);
+      font-size:      9px;
+      font-weight:    600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color:          var(--text3);
+      background:     transparent;
+      border:         none;
+      border-bottom:  2px solid transparent;
+      cursor:         pointer;
+      transition:     color 0.15s, border-color 0.15s;
+    }
+    .stab:hover  { color: var(--text2); }
+    .stab.active { color: var(--amber); border-bottom-color: var(--amber); }
+    .stab:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+    .sidebar-body {
+      flex:       1;
+      overflow-y: auto;
+      padding:    14px;
+    }
+
+    /* -- Canvas area -- */
+    .canvas-area {
+      flex:       1;
+      display:    flex;
+      flex-direction: column;
+      overflow:   hidden;
+      background: #000;
+    }
+
+    .canvas-toolbar {
+      background:    var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding:       8px 14px;
+      display:       flex;
+      align-items:   center;
+      gap:           10px;
+      flex-shrink:   0;
+    }
+
+    .canvas-wrap {
+      flex:     1;
+      overflow: auto;
+      display:  flex;
+      align-items: center;
+      justify-content: center;
+      padding:  24px;
+    }
+
+    /* Stage preview */
+    #stage-preview {
+      position: relative;
+      background: #111;
+      border:   1px solid var(--border);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    /* Draggable elements on stage */
+    .stage-element {
+      position:   absolute;
+      cursor:     move;
+      user-select: none;
+    }
+
+    .stage-element.selected {
+      outline:        2px solid var(--amber);
+      outline-offset: 1px;
+    }
+
+    /* Content area rect */
+    #content-area-rect {
+      position:   absolute;
+      border:     2px dashed var(--amber);
+      background: color-mix(in srgb, var(--amber) 5%, transparent);
+      cursor:     move;
+    }
+
+    /* Button placeholder on stage */
+    .btn-placeholder {
+      background: rgba(24,95,165,0.3);
+      border:     1px solid var(--blue);
+      border-radius: 3px;
+      display:    flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size:  9px;
+      color:      var(--blue);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    /* Zone placeholder on stage */
+    .zone-placeholder {
+      background: rgba(58,90,122,0.2);
+      border:     1px dashed var(--text3);
+      display:    flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size:  8px;
+      color:      var(--text3);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      overflow:   hidden;
+    }
+
+    /* -- Form controls -- */
+    .field { margin-bottom: 12px; }
+
+    .field-label {
+      display:        block;
+      font-family:    var(--mono);
+      font-size:      9px;
+      font-weight:    600;
+      color:          var(--text3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom:  5px;
+    }
+
+    .field-input {
+      width:        100%;
+      background:   var(--bg3);
+      border:       1px solid var(--border);
+      border-radius: 4px;
+      padding:      6px 8px;
+      font-family:  var(--font);
+      font-size:    12px;
+      color:        var(--text);
+    }
+
+    .field-input:focus {
+      outline:      2px solid var(--amber);
+      outline-offset: -1px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .section-header {
+      font-family:    var(--mono);
+      font-size:      9px;
+      font-weight:    600;
+      color:          var(--text3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom:  10px;
+      margin-top:     16px;
+      padding-bottom: 6px;
+      border-bottom:  1px solid var(--border);
+      display:        flex;
+      align-items:    center;
+      gap:            8px;
+    }
+
+    .btn {
+      padding:      7px 14px;
+      border-radius: var(--radius);
+      border:       none;
+      font-family:  var(--font);
+      font-size:    12px;
+      font-weight:  600;
+      cursor:       pointer;
+      transition:   opacity 0.15s;
+    }
+    .btn:hover        { opacity: 0.85; }
+    .btn:disabled     { opacity: 0.4; cursor: not-allowed; }
+    .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .btn-amber        { background: var(--amber);  color: var(--navy); }
+    .btn-blue         { background: var(--blue);   color: #fff; }
+    .btn-outline      { background: transparent; color: var(--text2);
+                        border: 1px solid var(--border); }
+    .btn-sm           { padding: 4px 10px; font-size: 11px; }
+
+    /* List items (buttons/zones list) */
+    .list-item {
+      display:      flex;
+      align-items:  center;
+      gap:          8px;
+      padding:      8px 10px;
+      background:   var(--bg3);
+      border:       1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+      cursor:       pointer;
+      transition:   border-color 0.12s;
+    }
+    .list-item:hover   { border-color: var(--blue); }
+    .list-item.active  { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 5%, transparent); }
+    .list-item-label   { flex: 1; font-size: 12px; color: var(--text); }
+    .list-item-type    {
+      font-family:    var(--mono);
+      font-size:      8px;
+      font-weight:    600;
+      padding:        2px 6px;
+      border-radius:  3px;
+      background:     var(--navy);
+      color:          var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .list-item-del {
+      background: none; border: none;
+      color: #E87070; cursor: pointer;
+      font-size: 12px; padding: 2px 4px;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border:       2px dashed var(--border);
+      border-radius: var(--radius);
+      padding:      20px;
+      text-align:   center;
+      cursor:       pointer;
+      transition:   border-color 0.15s;
+      margin-bottom: 10px;
+    }
+    .upload-zone:hover { border-color: var(--blue); }
+    .upload-zone .icon { font-size: 24px; margin-bottom: 6px; opacity: 0.4; }
+    .upload-zone p {
+      font-size:  11px;
+      color:      var(--text3);
+      font-family: var(--mono);
+    }
+
+    /* Action bar */
+    .action-bar {
+      background:  var(--bg2);
+      border-top:  1px solid var(--border);
+      padding:     10px 14px;
+      display:     flex;
+      gap:         8px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
+    /* Autosave label */
+    #autosave-label {
+      font-family: var(--mono);
+      font-size:   10px;
+      color:       var(--text3);
+      align-self:  center;
+      margin-right: auto;
+    }
+
+    /* Mobile (demo readiness) */
+    html, body { overflow-x: hidden; max-width: 100vw; }
+    @media (max-width: 767px) {
+      .workspace { flex-direction: column; }
+      .sidebar { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+      .header { padding: 0 12px; gap: 8px; }
+      .header-tag { display: none; }
+    }
+  </style>
+  <link rel="stylesheet" href="/static/forge-tokens.css">
+  <link rel="stylesheet" href="/static/forge-motion.css">
+  <link rel="stylesheet" href="/static/forge-components.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <!-- ForgeGUI mark — stage frame with corner brackets + crosshair origin -->
+  <svg class="mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+    <rect x="4" y="6" width="20" height="16" rx="1.5" fill="none" stroke="#185FA5" stroke-width="1.5"/>
+    <path d="M4,9.5 V6 H7.5 M20.5,6 H24 V9.5 M24,18.5 V22 H20.5 M7.5,22 H4 V18.5"
+      fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="14" y1="9.5" x2="14" y2="18.5" stroke="#185FA5" stroke-width="1" opacity="0.7"/>
+    <line x1="9.5" y1="14" x2="18.5" y2="14" stroke="#185FA5" stroke-width="1" opacity="0.7"/>
+    <circle cx="14" cy="14" r="2" fill="var(--amber)"/>
+  </svg>
+
+  <span class="forge-path forge-path--md forge-path--bar"><span class="forge-path__mid">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">GUI</span><span class="forge-path__cursor">_</span></span>
+  <span class="header-tag">GUI Shell · v1.0</span>
+  <div style="flex:1"></div>
+  <span id="autosave-label"></span>
+  <button class="btn btn-outline btn-sm"
+    onclick="importGUI()" aria-label="Import existing GUI shell">
+    ↑ Import
+  </button>
+  <button class="btn btn-amber btn-sm"
+    onclick="exportGUI()" id="btn-export" disabled
+    aria-label="Export GUI shell as ZIP">
+    ⬇ Export ZIP
+  </button>
+</header>
+
+<div class="workspace">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" role="complementary" aria-label="Configuration panels">
+
+    <div class="sidebar-tabs" role="tablist" aria-label="Configuration sections">
+      <button class="stab active" role="tab" aria-selected="true"
+        onclick="switchTab('stage')" id="tab-stage">Stage</button>
+      <button class="stab" role="tab" aria-selected="false"
+        onclick="switchTab('buttons')" id="tab-buttons">Buttons</button>
+      <button class="stab" role="tab" aria-selected="false"
+        onclick="switchTab('zones')" id="tab-zones">Zones</button>
+      <button class="stab" role="tab" aria-selected="false"
+        onclick="switchTab('export')" id="tab-export">Export</button>
+    </div>
+
+    <!-- Stage tab -->
+    <div class="sidebar-body" id="panel-stage">
+      <div class="field">
+        <label class="field-label" for="gui-name">Shell name</label>
+        <input class="field-input" id="gui-name" type="text"
+          placeholder="Maintenance Terminal Shell"
+          oninput="scheduleAutoSave()" aria-label="Shell name">
+      </div>
+
+      <div class="section-header">Background image</div>
+      <div class="upload-zone" id="bg-drop"
+        onclick="document.getElementById('bg-input').click()"
+        ondragover="event.preventDefault()"
+        ondrop="bgDrop(event)"
+        role="button" tabindex="0"
+        aria-label="Upload background image"
+        onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('bg-input').click()">
+        <div class="icon" id="bg-icon">🖼</div>
+        <p id="bg-label">Drop background image · PNG recommended</p>
+        <p id="bg-dims" style="color:var(--amber);margin-top:4px;font-size:10px"></p>
+      </div>
+      <input type="file" id="bg-input" accept=".png,.jpg,.jpeg,.webp"
+        style="display:none" onchange="bgUpload(event)">
+
+      <div class="section-header">Stage dimensions</div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label" for="stage-w">Width (px)</label>
+          <input class="field-input" id="stage-w" type="number"
+            value="1024" min="320" max="4096"
+            oninput="updateStageSize()" aria-label="Stage width">
+        </div>
+        <div class="field">
+          <label class="field-label" for="stage-h">Height (px)</label>
+          <input class="field-input" id="stage-h" type="number"
+            value="768" min="240" max="3072"
+            oninput="updateStageSize()" aria-label="Stage height">
+        </div>
+      </div>
+
+      <div class="section-header">Content area</div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label" for="ca-x">X</label>
+          <input class="field-input" id="ca-x" type="number"
+            value="200" oninput="updateContentArea()" aria-label="Content area X">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ca-y">Y</label>
+          <input class="field-input" id="ca-y" type="number"
+            value="80" oninput="updateContentArea()" aria-label="Content area Y">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label" for="ca-w">Width</label>
+          <input class="field-input" id="ca-w" type="number"
+            value="600" oninput="updateContentArea()" aria-label="Content area width">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ca-h">Height</label>
+          <input class="field-input" id="ca-h" type="number"
+            value="500" oninput="updateContentArea()" aria-label="Content area height">
+        </div>
+      </div>
+    </div>
+
+    <!-- Buttons tab -->
+    <div class="sidebar-body" id="panel-buttons" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn-blue btn-sm"
+          onclick="addButton()" aria-label="Add button">
+          + Add button
+        </button>
+      </div>
+      <div id="button-list"></div>
+
+      <!-- Selected button editor -->
+      <div id="button-editor" style="display:none">
+        <div class="section-header">Selected button</div>
+
+        <div class="field">
+          <label class="field-label" for="btn-action">Action</label>
+          <select class="field-input" id="btn-action"
+            onchange="updateSelectedButton('action',this.value)"
+            aria-label="Button action">
+            <option value="NEXT">NEXT</option>
+            <option value="PREVIOUS">PREVIOUS</option>
+            <option value="SUBMIT">SUBMIT</option>
+            <option value="CONTINUE">CONTINUE</option>
+            <option value="REPLAY">REPLAY</option>
+            <option value="MENU">MENU</option>
+            <option value="HELP">HELP</option>
+            <option value="CHECK">CHECK</option>
+            <option value="TRY_AGAIN">TRY AGAIN</option>
+            <option value="YES">YES</option>
+            <option value="NO">NO</option>
+            <option value="CONFIRM">CONFIRM</option>
+            <option value="CANCEL">CANCEL</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="btn-label">Accessible label</label>
+          <input class="field-input" id="btn-label" type="text"
+            oninput="updateSelectedButton('label',this.value)"
+            aria-label="Button accessible label">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="btn-x">X</label>
+            <input class="field-input" id="btn-x" type="number"
+              oninput="updateSelectedButton('x',parseInt(this.value))"
+              aria-label="Button X position">
+          </div>
+          <div class="field">
+            <label class="field-label" for="btn-y">Y</label>
+            <input class="field-input" id="btn-y" type="number"
+              oninput="updateSelectedButton('y',parseInt(this.value))"
+              aria-label="Button Y position">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="btn-w">Width</label>
+            <input class="field-input" id="btn-w" type="number"
+              oninput="updateSelectedButton('width',parseInt(this.value))"
+              aria-label="Button width">
+          </div>
+          <div class="field">
+            <label class="field-label" for="btn-h">Height</label>
+            <input class="field-input" id="btn-h" type="number"
+              oninput="updateSelectedButton('height',parseInt(this.value))"
+              aria-label="Button height">
+          </div>
+        </div>
+
+        <div class="section-header">Asset mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn btn-outline btn-sm" id="mode-sprite"
+            onclick="setButtonMode('spritesheet')"
+            aria-pressed="false">Spritesheet</button>
+          <button class="btn btn-outline btn-sm" id="mode-individual"
+            onclick="setButtonMode('individual')"
+            aria-pressed="false">Individual PNGs</button>
+        </div>
+
+        <!-- Spritesheet upload -->
+        <div id="sprite-upload" style="display:none">
+          <div class="upload-zone"
+            onclick="document.getElementById('sprite-input').click()"
+            role="button" tabindex="0"
+            aria-label="Upload spritesheet">
+            <div class="icon">🗃</div>
+            <p id="sprite-label">Drop spritesheet PNG</p>
+            <p style="margin-top:4px;font-size:9px;color:var(--text3)">
+              rows = buttons · cols = states (normal/hover/active/disabled)
+            </p>
+          </div>
+          <input type="file" id="sprite-input" accept=".png,.webp"
+            style="display:none" onchange="spriteUpload(event)">
+          <div class="field-row" style="margin-top:8px">
+            <div class="field">
+              <label class="field-label" for="sprite-w">Cell W (px)</label>
+              <input class="field-input" id="sprite-w" type="number"
+                value="120" aria-label="Sprite cell width">
+            </div>
+            <div class="field">
+              <label class="field-label" for="sprite-h">Cell H (px)</label>
+              <input class="field-input" id="sprite-h" type="number"
+                value="44" aria-label="Sprite cell height">
+            </div>
+          </div>
+          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);
+            margin-top:4px">
+            State columns: 0=normal 1=hover 2=active 3=disabled
+          </div>
+        </div>
+
+        <!-- Individual PNGs upload -->
+        <div id="individual-upload" style="display:none">
+          <div id="png-state-list" style="display:flex;flex-direction:column;gap:6px">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+      </div><!-- end button-editor -->
+    </div>
+
+    <!-- Zones tab -->
+    <div class="sidebar-body" id="panel-zones" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn-blue btn-sm"
+          onclick="addZone()" aria-label="Add text zone">
+          + Add zone
+        </button>
+      </div>
+      <div id="zone-list"></div>
+
+      <!-- Selected zone editor -->
+      <div id="zone-editor" style="display:none">
+        <div class="section-header">Selected zone</div>
+        <div class="field">
+          <label class="field-label" for="zone-type">Type</label>
+          <select class="field-input" id="zone-type"
+            onchange="updateSelectedZone('type',this.value)"
+            aria-label="Zone type">
+            <option value="prompt">Prompt</option>
+            <option value="feedback">Feedback</option>
+            <option value="frame_counter">Frame counter</option>
+            <option value="lesson_title">Lesson title</option>
+            <option value="section_title">Section title</option>
+            <option value="frame_title">Frame title</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="zone-x">X</label>
+            <input class="field-input" id="zone-x" type="number"
+              oninput="updateSelectedZone('x',parseInt(this.value))"
+              aria-label="Zone X position">
+          </div>
+          <div class="field">
+            <label class="field-label" for="zone-y">Y</label>
+            <input class="field-input" id="zone-y" type="number"
+              oninput="updateSelectedZone('y',parseInt(this.value))"
+              aria-label="Zone Y position">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="zone-w">Width</label>
+            <input class="field-input" id="zone-w" type="number"
+              oninput="updateSelectedZone('width',parseInt(this.value))"
+              aria-label="Zone width">
+          </div>
+          <div class="field">
+            <label class="field-label" for="zone-h">Height</label>
+            <input class="field-input" id="zone-h" type="number"
+              oninput="updateSelectedZone('height',parseInt(this.value))"
+              aria-label="Zone height">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="zone-fontsize">Font size</label>
+            <input class="field-input" id="zone-fontsize" type="number"
+              value="13" oninput="updateSelectedZone('font_size',parseInt(this.value))"
+              aria-label="Zone font size">
+          </div>
+          <div class="field">
+            <label class="field-label" for="zone-align">Align</label>
+            <select class="field-input" id="zone-align"
+              onchange="updateSelectedZone('align',this.value)"
+              aria-label="Zone text alignment">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="zone-color">Text color</label>
+          <div style="display:flex;gap:6px">
+            <input type="color" id="zone-color-picker"
+              onchange="updateSelectedZone('color',this.value)"
+              style="width:36px;height:32px;border:none;border-radius:4px;
+              cursor:pointer;padding:2px;background:var(--bg3)"
+              aria-label="Zone text color picker">
+            <input class="field-input" id="zone-color" type="text"
+              value="#C8D8E8"
+              oninput="updateSelectedZone('color',this.value)"
+              aria-label="Zone text color hex" style="flex:1">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="zone-format">Format string</label>
+          <input class="field-input" id="zone-format" type="text"
+            placeholder="{current} / {total}"
+            oninput="updateSelectedZone('format',this.value)"
+            aria-label="Zone format string (for frame counter)">
+          <p style="font-size:9px;color:var(--text3);font-family:var(--mono);
+            margin-top:4px">
+            Use {current} and {total} for frame counter
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export tab -->
+    <div class="sidebar-body" id="panel-export" style="display:none">
+      <div class="section-header">Shell summary</div>
+      <div id="export-summary" style="font-family:var(--mono);font-size:11px;
+        color:var(--text2);line-height:1.8"></div>
+
+      <div class="section-header" style="margin-top:20px">Export</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px;
+        line-height:1.6">
+        Downloads a ZIP containing gui_shell.html + gui_shell.json
+        + all background and sprite assets. Import into CourseForge
+        as a GUI block.
+      </p>
+      <button class="btn btn-amber" style="width:100%"
+        onclick="exportGUI()" id="btn-export-2" disabled>
+        ⬇ Export ForgeGUI ZIP
+      </button>
+
+      <div style="margin-top:16px;padding-top:14px;
+        border-top:1px solid var(--border);
+        font-family:var(--mono);font-size:10px;color:var(--text3);
+        line-height:1.6">
+        // gui_shell.html is the SCORM SCO page<br>
+        // CourseForge injects content into the content area div<br>
+        // NEXT/PREV buttons drive frame navigation<br>
+        // Zones display dynamic metadata from CourseForge<br>
+        // SCORM bridge auto-reports completion + score
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- Canvas area -->
+  <main class="canvas-area">
+    <div class="canvas-toolbar">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">
+        Stage preview — click elements to select and configure
+      </span>
+      <div style="flex:1"></div>
+      <span id="zoom-label"
+        style="font-family:var(--mono);font-size:10px;color:var(--text3)">
+        100%
+      </span>
+      <button class="btn btn-outline btn-sm"
+        onclick="zoomOut()" aria-label="Zoom out">−</button>
+      <button class="btn btn-outline btn-sm"
+        onclick="zoomIn()" aria-label="Zoom in">+</button>
+      <button class="btn btn-outline btn-sm"
+        onclick="zoomFit()" aria-label="Fit to window">Fit</button>
+    </div>
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <!-- No GUI loaded state -->
+      <div id="empty-state" style="text-align:center;color:var(--text2)">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.3">⬡</div>
+        <div style="font-size:14px;margin-bottom:8px">No shell loaded</div>
+        <div style="font-size:11px;color:var(--text3);
+          font-family:var(--mono);margin-bottom:16px">
+          Upload a background image to begin
+        </div>
+        <button class="btn btn-blue"
+          onclick="document.getElementById('bg-input').click()">
+          Upload background image
+        </button>
+      </div>
+
+      <!-- Stage preview (hidden until background loaded) -->
+      <div id="stage-preview" style="display:none">
+        <!-- Background -->
+        <img id="stage-bg" src="" alt="" aria-hidden="true"
+          style="position:absolute;inset:0;width:100%;height:100%;
+          object-fit:cover;pointer-events:none">
+
+        <!-- Content area indicator -->
+        <div id="content-area-rect" title="Content area">
+          <span style="font-family:var(--mono);font-size:9px;
+            color:color-mix(in srgb, var(--amber) 50%, transparent);letter-spacing:0.06em;
+            position:absolute;top:4px;left:6px">
+            CONTENT AREA
+          </span>
+        </div>
+
+        <!-- Dynamic button + zone elements rendered here by JS -->
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <span id="autosave-stage"
+        style="font-family:var(--mono);font-size:10px;
+        color:var(--text3);margin-right:auto"></span>
+      <button class="btn btn-outline btn-sm"
+        onclick="newShell()" aria-label="New shell">
+        + New
+      </button>
+      <button class="btn btn-amber btn-sm"
+        onclick="exportGUI()" id="btn-export-bar" disabled>
+        ⬇ Export ZIP
+      </button>
+    </div>
+  </main>
+
+</div><!-- end workspace -->
+
+<script>
+// -- State -----------------------------------------------------
+var guiId       = null
+var gui         = null
+var selectedEl  = null  // 'content-area' | 'btn-{id}' | 'zone-{id}'
+var zoom        = 1.0
+var autoSaveTimer = null
+
+var ACTIONS = [
+  'NEXT','PREVIOUS','SUBMIT','CONTINUE','REPLAY',
+  'MENU','HELP','CHECK','TRY_AGAIN','YES','NO','CONFIRM','CANCEL'
+]
+
+var ZONE_TYPES = [
+  'prompt','feedback','frame_counter',
+  'lesson_title','section_title','frame_title'
+]
+
+// -- Session init -----------------------------------------------
+function newShell() {
+  fetch('/api/gui', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'New Shell', width: 1024, height: 768 }),
+  })
+  .then(r => r.json())
+  .then(function(data) {
+    guiId = data.id
+    gui   = data
+    renderStage()
+    document.getElementById('btn-export').disabled     = false
+    document.getElementById('btn-export-2').disabled   = false
+    document.getElementById('btn-export-bar').disabled = false
+    document.getElementById('empty-state').style.display    = 'none'
+    document.getElementById('stage-preview').style.display  = 'block'
+    updateExportSummary()
+  })
+}
+
+// Init on load
+window.addEventListener('load', newShell)
+
+// -- Tabs -------------------------------------------------------
+function switchTab(name) {
+  ['stage','buttons','zones','export'].forEach(function(t) {
+    document.getElementById('panel-' + t).style.display = t === name ? 'block' : 'none'
+    var btn = document.getElementById('tab-' + t)
+    btn.classList.toggle('active', t === name)
+    btn.setAttribute('aria-selected', t === name ? 'true' : 'false')
+  })
+  if (name === 'export') updateExportSummary()
+}
+
+// -- Stage size -------------------------------------------------
+function updateStageSize() {
+  if (!gui) return
+  var w = parseInt(document.getElementById('stage-w').value) || 1024
+  var h = parseInt(document.getElementById('stage-h').value) || 768
+  gui.stage.width  = w
+  gui.stage.height = h
+  renderStage()
+  scheduleAutoSave()
+}
+
+// -- Background upload ------------------------------------------
+function bgDrop(e) {
+  e.preventDefault()
+  var file = e.dataTransfer.files[0]
+  if (file) uploadBG(file)
+}
+
+function bgUpload(e) {
+  var file = e.target.files[0]
+  if (file) uploadBG(file)
+}
+
+function uploadBG(file) {
+  var form = new FormData()
+  form.append('file', file)
+  fetch('/api/assets/background', { method: 'POST', body: form })
+    .then(r => r.json())
+    .then(function(data) {
+      gui.stage.background_asset_id = data.asset_id
+      gui.stage.background_url      = data.serve_url
+      gui.stage.background_file     = data.filename
+      gui.stage.width  = data.width
+      gui.stage.height = data.height
+      document.getElementById('stage-w').value     = data.width
+      document.getElementById('stage-h').value     = data.height
+      document.getElementById('bg-icon').textContent = '✓'
+      document.getElementById('bg-label').textContent = data.filename
+      document.getElementById('bg-dims').textContent =
+        data.width + ' × ' + data.height + 'px'
+      document.getElementById('stage-bg').src = data.serve_url
+      document.getElementById('empty-state').style.display   = 'none'
+      document.getElementById('stage-preview').style.display = 'block'
+      renderStage()
+      scheduleAutoSave()
+    })
+}
+
+// -- Content area -----------------------------------------------
+function updateContentArea() {
+  if (!gui) return
+  gui.content_area.x      = parseInt(document.getElementById('ca-x').value) || 0
+  gui.content_area.y      = parseInt(document.getElementById('ca-y').value) || 0
+  gui.content_area.width  = parseInt(document.getElementById('ca-w').value) || 400
+  gui.content_area.height = parseInt(document.getElementById('ca-h').value) || 300
+  renderContentAreaRect()
+  scheduleAutoSave()
+}
+
+function renderContentAreaRect() {
+  if (!gui) return
+  var ca  = gui.content_area
+  var rect = document.getElementById('content-area-rect')
+  rect.style.left   = ca.x + 'px'
+  rect.style.top    = ca.y + 'px'
+  rect.style.width  = ca.width  + 'px'
+  rect.style.height = ca.height + 'px'
+}
+
+// -- Stage render -----------------------------------------------
+function renderStage() {
+  if (!gui) return
+  var stage = document.getElementById('stage-preview')
+  stage.style.width  = gui.stage.width  + 'px'
+  stage.style.height = gui.stage.height + 'px'
+  renderContentAreaRect()
+  renderButtonPlaceholders()
+  renderZonePlaceholders()
+  applyZoom()
+}
+
+function renderButtonPlaceholders() {
+  // Remove existing
+  document.querySelectorAll('.btn-placeholder').forEach(function(el) { el.remove() })
+  var stage = document.getElementById('stage-preview')
+  ;(gui.buttons || []).forEach(function(btn) {
+    var el = document.createElement('div')
+    el.className = 'stage-element btn-placeholder'
+    el.id        = 'stage-btn-' + btn.id
+    el.style.left   = btn.x + 'px'
+    el.style.top    = btn.y + 'px'
+    el.style.width  = btn.width  + 'px'
+    el.style.height = btn.height + 'px'
+
+    // If sprite uploaded, show it
+    if (btn.sprite_url) {
+      el.style.backgroundImage    = 'url(' + btn.sprite_url + ')'
+      el.style.backgroundRepeat   = 'no-repeat'
+      el.style.backgroundSize     = btn.width + 'px ' + btn.height + 'px'
+    } else {
+      el.textContent = btn.action
+    }
+
+    el.onclick = function() { selectButton(btn.id) }
+    el.setAttribute('tabindex', '0')
+    el.setAttribute('aria-label', 'Button: ' + btn.action)
+    el.onkeydown = function(e) {
+      if (e.key === 'Enter') selectButton(btn.id)
+    }
+    stage.appendChild(el)
+  })
+}
+
+function renderZonePlaceholders() {
+  document.querySelectorAll('.zone-placeholder').forEach(function(el) { el.remove() })
+  var stage = document.getElementById('stage-preview')
+  ;(gui.zones || []).forEach(function(zone) {
+    var el = document.createElement('div')
+    el.className = 'stage-element zone-placeholder'
+    el.id        = 'stage-zone-' + zone.id
+    el.style.left   = zone.x + 'px'
+    el.style.top    = zone.y + 'px'
+    el.style.width  = zone.width  + 'px'
+    el.style.height = zone.height + 'px'
+    el.textContent  = zone.type.replace('_',' ')
+    el.onclick      = function() { selectZone(zone.id) }
+    el.setAttribute('tabindex', '0')
+    el.setAttribute('aria-label', 'Zone: ' + zone.type)
+    stage.appendChild(el)
+  })
+}
+
+// -- Buttons ----------------------------------------------------
+function addButton() {
+  if (!gui) return
+  var btn = {
+    id:         'btn-' + Date.now(),
+    action:     'NEXT',
+    label:      'Next',
+    x:          gui.stage.width  - 160,
+    y:          gui.stage.height - 60,
+    width:      120,
+    height:     44,
+    asset_mode: 'individual',
+    sprite_asset_id: null,
+    sprite_url:      null,
+    sprite_file:     null,
+    sprite_w:        120,
+    sprite_h:        44,
+    states:          {},
+    files:           {},
+    visible:         true,
+    enabled:         true,
+    tab_index:       (gui.buttons || []).length + 1,
+  }
+  gui.buttons = gui.buttons || []
+  gui.buttons.push(btn)
+  renderButtonList()
+  renderButtonPlaceholders()
+  selectButton(btn.id)
+  switchTab('buttons')
+  scheduleAutoSave()
+}
+
+function renderButtonList() {
+  var list = document.getElementById('button-list')
+  list.innerHTML = ''
+  ;(gui.buttons || []).forEach(function(btn) {
+    var item = document.createElement('div')
+    item.className = 'list-item' + (selectedEl === 'btn-' + btn.id ? ' active' : '')
+    item.innerHTML = `
+      <span class="list-item-type">${btn.action}</span>
+      <span class="list-item-label">${btn.label || btn.action}</span>
+      <button class="list-item-del"
+        onclick="deleteButton('${btn.id}');event.stopPropagation()"
+        aria-label="Delete button ${btn.action}">✕</button>`
+    item.onclick = function() { selectButton(btn.id) }
+    list.appendChild(item)
+  })
+}
+
+function selectButton(id) {
+  selectedEl = 'btn-' + id
+  var btn = (gui.buttons || []).find(function(b) { return b.id === id })
+  if (!btn) return
+
+  renderButtonList()
+  document.querySelectorAll('.stage-element').forEach(function(el) {
+    el.classList.remove('selected')
+  })
+  var stageEl = document.getElementById('stage-btn-' + id)
+  if (stageEl) stageEl.classList.add('selected')
+
+  document.getElementById('button-editor').style.display = 'block'
+  document.getElementById('btn-action').value = btn.action
+  document.getElementById('btn-label').value  = btn.label  || ''
+  document.getElementById('btn-x').value      = btn.x
+  document.getElementById('btn-y').value      = btn.y
+  document.getElementById('btn-w').value      = btn.width
+  document.getElementById('btn-h').value      = btn.height
+  setButtonMode(btn.asset_mode || 'individual', false)
+}
+
+function setButtonMode(mode, save) {
+  document.getElementById('sprite-upload').style.display     =
+    mode === 'spritesheet' ? 'block' : 'none'
+  document.getElementById('individual-upload').style.display =
+    mode === 'individual'  ? 'block' : 'none'
+  document.getElementById('mode-sprite').setAttribute(
+    'aria-pressed', mode === 'spritesheet' ? 'true' : 'false')
+  document.getElementById('mode-individual').setAttribute(
+    'aria-pressed', mode === 'individual' ? 'true' : 'false')
+  document.getElementById('mode-sprite').style.borderColor =
+    mode === 'spritesheet' ? 'var(--amber)' : 'var(--border)'
+  document.getElementById('mode-individual').style.borderColor =
+    mode === 'individual' ? 'var(--amber)' : 'var(--border)'
+
+  if (save !== false) updateSelectedButton('asset_mode', mode)
+
+  // Render individual PNG state slots
+  if (mode === 'individual') renderPNGStateSlots()
+}
+
+function renderPNGStateSlots() {
+  var btn = getSelectedButton()
+  if (!btn) return
+  var states = ['normal','hover','active','disabled']
+  var list   = document.getElementById('png-state-list')
+  list.innerHTML = states.map(function(state) {
+    var info  = (btn.files || {})[state] || {}
+    var fname = info.filename || ''
+    return `<div style="display:flex;align-items:center;gap:8px;
+      padding:6px 8px;background:var(--bg3);border:1px solid var(--border);
+      border-radius:4px;margin-bottom:4px">
+      <span style="font-family:var(--mono);font-size:9px;font-weight:600;
+        color:var(--text3);text-transform:uppercase;width:56px;
+        flex-shrink:0;letter-spacing:0.06em">${state}</span>
+      <span style="flex:1;font-size:11px;color:${fname ? 'var(--text)' : 'var(--text3)'};
+        font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;
+        white-space:nowrap">${fname || 'not uploaded'}</span>
+      <button onclick="uploadPNGState('${state}')"
+        style="background:var(--navy);border:1px solid var(--border);
+        border-radius:3px;color:var(--text2);font-family:var(--mono);
+        font-size:9px;padding:3px 8px;cursor:pointer"
+        aria-label="Upload ${state} state PNG">↑</button>
+    </div>`
+  }).join('')
+}
+
+function uploadPNGState(state) {
+  var input = document.createElement('input')
+  input.type   = 'file'
+  input.accept = '.png,.webp'
+  input.onchange = function(e) {
+    var file = e.target.files[0]
+    if (!file) return
+    var btn = getSelectedButton()
+    if (!btn) return
+    var form = new FormData()
+    form.append('file',      file)
+    form.append('mode',      'individual')
+    form.append('button_id', btn.id)
+    form.append('state',     state)
+    fetch('/api/assets/sprite', { method: 'POST', body: form })
+      .then(r => r.json())
+      .then(function(data) {
+        btn.files = btn.files || {}
+        btn.files[state] = {
+          asset_id:  data.asset_id,
+          filename:  data.filename,
+          serve_url: data.serve_url,
+        }
+        // Show normal state on stage
+        if (state === 'normal') {
+          var stageEl = document.getElementById('stage-btn-' + btn.id)
+          if (stageEl) {
+            stageEl.style.backgroundImage  = 'url(' + data.serve_url + ')'
+            stageEl.style.backgroundRepeat = 'no-repeat'
+            stageEl.style.backgroundSize   = btn.width + 'px ' + btn.height + 'px'
+            stageEl.textContent = ''
+          }
+        }
+        renderPNGStateSlots()
+        scheduleAutoSave()
+      })
+  }
+  input.click()
+}
+
+function spriteUpload(e) {
+  var file = e.target.files[0]
+  if (!file) return
+  var btn = getSelectedButton()
+  if (!btn) return
+  var sw   = parseInt(document.getElementById('sprite-w').value) || 120
+  var sh   = parseInt(document.getElementById('sprite-h').value) || 44
+  var form = new FormData()
+  form.append('file',     file)
+  form.append('mode',     'spritesheet')
+  form.append('sprite_w', sw)
+  form.append('sprite_h', sh)
+  fetch('/api/assets/sprite', { method: 'POST', body: form })
+    .then(r => r.json())
+    .then(function(data) {
+      btn.asset_mode       = 'spritesheet'
+      btn.sprite_asset_id  = data.asset_id
+      btn.sprite_url       = data.serve_url
+      btn.sprite_file      = data.filename
+      btn.sprite_w         = sw
+      btn.sprite_h         = sh
+      // Default states: col 0/1/2/3, row matches button index
+      var row = (gui.buttons || []).indexOf(btn)
+      btn.states = {
+        normal:   { row: row, col: 0 },
+        hover:    { row: row, col: 1 },
+        active:   { row: row, col: 2 },
+        disabled: { row: row, col: 3 },
+      }
+      document.getElementById('sprite-label').textContent = data.filename
+      renderButtonPlaceholders()
+      scheduleAutoSave()
+    })
+}
+
+function updateSelectedButton(field, val) {
+  var btn = getSelectedButton()
+  if (!btn) return
+  btn[field] = val
+  renderButtonList()
+  renderButtonPlaceholders()
+  scheduleAutoSave()
+}
+
+function deleteButton(id) {
+  gui.buttons = (gui.buttons || []).filter(function(b) { return b.id !== id })
+  if (selectedEl === 'btn-' + id) {
+    selectedEl = null
+    document.getElementById('button-editor').style.display = 'none'
+  }
+  renderButtonList()
+  renderButtonPlaceholders()
+  scheduleAutoSave()
+}
+
+function getSelectedButton() {
+  if (!selectedEl || !selectedEl.startsWith('btn-')) return null
+  var id = selectedEl.slice(4)
+  return (gui.buttons || []).find(function(b) { return b.id === id })
+}
+
+// -- Zones ------------------------------------------------------
+function addZone() {
+  if (!gui) return
+  var zone = {
+    id:           'zone-' + Date.now(),
+    type:         'prompt',
+    x:            gui.content_area.x,
+    y:            gui.content_area.y - 40,
+    width:        gui.content_area.width,
+    height:       32,
+    font_family:  'IBM Plex Mono, monospace',
+    font_size:    13,
+    font_weight:  400,
+    color:        '#C8D8E8',
+    bg_color:     'transparent',
+    align:        'left',
+    padding:      '4px 8px',
+    overflow:     'hidden',
+  }
+  gui.zones = gui.zones || []
+  gui.zones.push(zone)
+  renderZoneList()
+  renderZonePlaceholders()
+  selectZone(zone.id)
+  switchTab('zones')
+  scheduleAutoSave()
+}
+
+function renderZoneList() {
+  var list = document.getElementById('zone-list')
+  list.innerHTML = ''
+  ;(gui.zones || []).forEach(function(zone) {
+    var item = document.createElement('div')
+    item.className = 'list-item' + (selectedEl === 'zone-' + zone.id ? ' active' : '')
+    item.innerHTML = `
+      <span class="list-item-type">${zone.type.replace('_',' ')}</span>
+      <span class="list-item-label">${zone.type}</span>
+      <button class="list-item-del"
+        onclick="deleteZone('${zone.id}');event.stopPropagation()"
+        aria-label="Delete zone ${zone.type}">✕</button>`
+    item.onclick = function() { selectZone(zone.id) }
+    list.appendChild(item)
+  })
+}
+
+function selectZone(id) {
+  selectedEl = 'zone-' + id
+  var zone   = (gui.zones || []).find(function(z) { return z.id === id })
+  if (!zone) return
+  renderZoneList()
+  document.getElementById('zone-editor').style.display = 'block'
+  document.getElementById('zone-type').value     = zone.type
+  document.getElementById('zone-x').value        = zone.x
+  document.getElementById('zone-y').value        = zone.y
+  document.getElementById('zone-w').value        = zone.width
+  document.getElementById('zone-h').value        = zone.height
+  document.getElementById('zone-fontsize').value = zone.font_size || 13
+  document.getElementById('zone-align').value    = zone.align   || 'left'
+  document.getElementById('zone-color').value    = zone.color   || '#C8D8E8'
+  document.getElementById('zone-color-picker').value = zone.color || '#C8D8E8'
+  document.getElementById('zone-format').value   = zone.format  || ''
+}
+
+function updateSelectedZone(field, val) {
+  if (!selectedEl || !selectedEl.startsWith('zone-')) return
+  var id   = selectedEl.slice(5)
+  var zone = (gui.zones || []).find(function(z) { return z.id === id })
+  if (!zone) return
+  zone[field] = field === 'font_size' ? parseInt(val) : val
+  renderZoneList()
+  renderZonePlaceholders()
+  scheduleAutoSave()
+}
+
+function deleteZone(id) {
+  gui.zones = (gui.zones || []).filter(function(z) { return z.id !== id })
+  if (selectedEl === 'zone-' + id) {
+    selectedEl = null
+    document.getElementById('zone-editor').style.display = 'none'
+  }
+  renderZoneList()
+  renderZonePlaceholders()
+  scheduleAutoSave()
+}
+
+// -- Export -----------------------------------------------------
+function exportGUI() {
+  if (!guiId) return
+  saveGUI(function() {
+    window.location.href = '/api/gui/' + guiId + '/export'
+  })
+}
+
+function updateExportSummary() {
+  if (!gui) return
+  var el = document.getElementById('export-summary')
+  el.innerHTML = [
+    'Name:     ' + (gui.name || 'Untitled'),
+    'Stage:    ' + gui.stage.width + ' × ' + gui.stage.height + 'px',
+    'Content:  ' + gui.content_area.x + ',' + gui.content_area.y + ' — '
+                 + gui.content_area.width + '×' + gui.content_area.height + 'px',
+    'Buttons:  ' + (gui.buttons || []).length,
+    'Zones:    ' + (gui.zones || []).length,
+  ].join('\n').replace(/\n/g, '<br>')
+}
+
+// -- Autosave ---------------------------------------------------
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(function() {
+    gui.name = document.getElementById('gui-name').value || 'Untitled Shell'
+    saveGUI()
+  }, 1000)
+}
+
+function saveGUI(cb) {
+  if (!guiId || !gui) { if (cb) cb(); return }
+  document.getElementById('autosave-label').textContent     = 'saving…'
+  document.getElementById('autosave-stage').textContent = 'saving…'
+  fetch('/api/gui/' + guiId, {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(gui),
+  })
+  .then(r => r.json())
+  .then(function(data) {
+    gui = data
+    document.getElementById('autosave-label').textContent     = 'saved ✓'
+    document.getElementById('autosave-stage').textContent = 'saved ✓'
+    setTimeout(function() {
+      document.getElementById('autosave-label').textContent     = ''
+      document.getElementById('autosave-stage').textContent = ''
+    }, 1500)
+    if (cb) cb()
+  })
+  .catch(function() {
+    document.getElementById('autosave-label').textContent = '⚠ save failed'
+  })
+}
+
+// -- Import -----------------------------------------------------
+function importGUI() {
+  var input = document.createElement('input')
+  input.type = 'file'; input.accept = '.json'
+  input.onchange = function(e) {
+    var file = e.target.files[0]
+    if (!file) return
+    var reader = new FileReader()
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result)
+        fetch('/api/gui', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ name: data.name || 'Imported Shell' }),
+        })
+        .then(r => r.json())
+        .then(function(newGui) {
+          guiId = newGui.id
+          gui   = Object.assign(newGui, {
+            stage:        data.stage        || newGui.stage,
+            content_area: data.content_area || newGui.content_area,
+            buttons:      data.buttons      || [],
+            zones:        data.zones        || [],
+          })
+          document.getElementById('gui-name').value =
+            gui.name || 'Imported Shell'
+          document.getElementById('stage-w').value =
+            gui.stage.width
+          document.getElementById('stage-h').value =
+            gui.stage.height
+          document.getElementById('ca-x').value = gui.content_area.x
+          document.getElementById('ca-y').value = gui.content_area.y
+          document.getElementById('ca-w').value = gui.content_area.width
+          document.getElementById('ca-h').value = gui.content_area.height
+          document.getElementById('empty-state').style.display   = 'none'
+          document.getElementById('stage-preview').style.display = 'block'
+          if (gui.stage.background_url) {
+            document.getElementById('stage-bg').src = gui.stage.background_url
+          }
+          renderStage()
+          renderButtonList()
+          renderZoneList()
+          document.getElementById('btn-export').disabled     = false
+          document.getElementById('btn-export-2').disabled   = false
+          document.getElementById('btn-export-bar').disabled = false
+          saveGUI()
+        })
+      } catch(err) {
+        alert('Invalid gui_shell.json: ' + err.message)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+// -- Zoom -------------------------------------------------------
+function applyZoom() {
+  var stage = document.getElementById('stage-preview')
+  stage.style.transform       = 'scale(' + zoom + ')'
+  stage.style.transformOrigin = 'top left'
+  document.getElementById('zoom-label').textContent =
+    Math.round(zoom * 100) + '%'
+}
+
+function zoomIn()  { zoom = Math.min(2.0, zoom + 0.1); applyZoom() }
+function zoomOut() { zoom = Math.max(0.2, zoom - 0.1); applyZoom() }
+function zoomFit() {
+  if (!gui) return
+  var wrap = document.getElementById('canvas-wrap')
+  var sw   = gui.stage.width
+  var sh   = gui.stage.height
+  var fw   = wrap.clientWidth  - 48
+  var fh   = wrap.clientHeight - 48
+  zoom = Math.min(fw / sw, fh / sh, 1.0)
+  applyZoom()
+}
+
+// Fit on load
+window.addEventListener('resize', function() {
+  if (gui) zoomFit()
+})
+</script>
+
+</body>
+</html>

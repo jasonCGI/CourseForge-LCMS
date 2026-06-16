@@ -1,0 +1,6 @@
+# uploads/ is already ignored by the repo-root .gitignore; create_app()
+# recreates uploads/{backgrounds,sprites,outputs} on boot.
+__pycache__/
+*.pyc
+.env
+venv/
