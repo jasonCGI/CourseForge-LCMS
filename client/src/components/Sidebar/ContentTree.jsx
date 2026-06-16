@@ -227,8 +227,22 @@ function TreeRow({
 
 export default function ContentTree() {
   const activeProject = useProjectStore(s => s.activeProject)
+  const fetchProjects = useProjectStore(s => s.fetchProjects)
+  const fetchProject  = useProjectStore(s => s.fetchProject)
   const loadFrame     = useEditorStore(s => s.loadFrame)
   const activeFrameId = useEditorStore(s => s.activeFrame?.id)
+
+  const loadDemo = async () => {
+    try {
+      await fetchProjects()
+      const list = useProjectStore.getState().projects || []
+      const demo = list.find(p => p.name === 'CourseForge Demo')
+      if (demo) await fetchProject(demo.id)
+      else alert('Demo project not found — the server seeds it on first launch.')
+    } catch (e) {
+      alert('Could not load demo: ' + (e.message || 'Unknown error'))
+    }
+  }
 
   const [openCourses,  setOpenCourses]  = useState({})
   const [openModules,  setOpenModules]  = useState({})
@@ -245,9 +259,33 @@ export default function ContentTree() {
         fontSize: 12,
         fontFamily: 'var(--cf-mono, SF Mono, Consolas, monospace)',
         lineHeight: 1.6,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
       }}>
-        No project loaded.<br/>
-        Import a JSON file or select a project.
+        <div>
+          No project loaded.<br/>
+          Import a JSON file or select a project.
+        </div>
+        <button
+          onClick={loadDemo}
+          aria-label="Load built-in demo course"
+          style={{
+            padding: '7px 12px',
+            background: 'var(--cf-accent-dim)',
+            border: '1px solid var(--cf-accent)',
+            borderRadius: 4,
+            color: 'var(--cf-accent)',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--cf-font)',
+            letterSpacing: '0.04em',
+            textAlign: 'center',
+          }}
+        >
+          ▶ Load Demo Course
+        </button>
       </div>
     )
   }

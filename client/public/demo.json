@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "_meta": {
+    "tool": "ForgeBlueprint",
+    "tool_version": "1.1.0",
+    "source_file": "CourseForge_Demo_Structure.xlsx",
+    "generated_at": "2026-06-15T00:00:00Z",
+    "total_courses": 1,
+    "total_modules": 1,
+    "total_lessons": 4,
+    "total_frames": 13
+  },
+  "project_name": "CourseForge Demo",
+  "courses": [
+    {
+      "course_name": "Introduction to CourseForge",
+      "modules": [
+        {
+          "module_name": "Block Types Overview",
+          "lessons": [
+            {
+              "lesson_name": "Content Blocks",
+              "frames": [
+                {"frame_name": "Introduction to CourseForge", "frame_type": "content", "narration": "Welcome to CourseForge. This demo course introduces each block type."},
+                {"frame_name": "Working with Text Blocks", "frame_type": "content", "narration": "Text blocks support rich HTML and narrator scripts."},
+                {"frame_name": "Working with Image Blocks", "frame_type": "content", "narration": "Upload images processed via ForgePack."},
+                {"frame_name": "Working with Video Blocks", "frame_type": "content", "narration": "Video blocks use Video.js for accessible playback."},
+                {"frame_name": "Working with Audio Blocks", "frame_type": "content", "narration": "Audio blocks play narration normalized via ForgePack."}
+              ]
+            },
+            {
+              "lesson_name": "Assessment Blocks",
+              "frames": [
+                {"frame_name": "Knowledge Check — Quiz", "frame_type": "assessment", "narration": "Test your understanding with this knowledge check."},
+                {"frame_name": "Hotspot Interaction", "frame_type": "assessment", "narration": "Explore the image by clicking highlighted regions."},
+                {"frame_name": "Branch Decision Point", "frame_type": "branch", "narration": "Select the appropriate path based on the scenario."}
+              ]
+            },
+            {
+              "lesson_name": "Safety & Notices",
+              "frames": [
+                {"frame_name": "Warning Block (Inline)", "frame_type": "content", "narration": "Warning blocks communicate critical safety information."},
+                {"frame_name": "Caution Block (Modal)", "frame_type": "content", "narration": "Modal cautions interrupt the flow and require acknowledgment."},
+                {"frame_name": "Note Block (Inline)", "frame_type": "content", "narration": "Notes provide supplementary information without interrupting flow."}
+              ]
+            },
+            {
+              "lesson_name": "Advanced Blocks",
+              "frames": [
+                {"frame_name": "OAM — Adobe Animate Canvas", "frame_type": "content", "narration": "OAM blocks embed Adobe Animate HTML5 animations."},
+                {"frame_name": "Interactive Video", "frame_type": "content", "narration": "Interactive video combines playback with timecode interactions."}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -685,9 +685,18 @@
         <div>F</div><div>Frame Type</div><div>Optional — content (default) | assessment | branch</div>
       </div>
 
-      <button class="btn btn-amber" onclick="downloadTemplate()">
-        ⬇ Download Excel Template
-      </button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-amber" onclick="downloadTemplate()">
+          ⬇ Download Excel Template
+        </button>
+        <a class="btn btn-outline"
+           href="https://courseforge-lcms.up.railway.app/demo.json"
+           download="CourseForge_Demo.json"
+           style="text-decoration:none;display:inline-flex;align-items:center;gap:6px"
+           aria-label="Download a sample CourseForge demo JSON">
+          ⬇ Sample JSON
+        </a>
+      </div>
     </div>
   </div>
 

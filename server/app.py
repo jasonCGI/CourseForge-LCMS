@@ -48,6 +48,20 @@ def create_app(config_name=None):
         info['environment'] = os.environ.get('FLASK_ENV', 'production')
         return jsonify(info)
 
+    # ── Auto-seed demo on first launch (only if the DB is empty) ──
+    @app.before_request
+    def _auto_seed_once():
+        if getattr(app, '_demo_seeded', False):
+            return
+        app._demo_seeded = True  # set immediately to narrow the race window
+        try:
+            from .models.project import Project
+            from .demo_seed import seed_demo
+            if Project.query.count() == 0:
+                seed_demo()
+        except Exception as e:
+            print(f'[demo_seed] Warning: seed failed: {e}')
+
     # Serve React SPA for all non-API routes (production)
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
