@@ -129,7 +129,7 @@ export const MODES = {
     icon: 'sun',
 
     '--cf-app-bg':          '#F0F4F8',
-    '--cf-header-bg':       '#1B3A5C',
+    '--cf-header-bg':       '#042C53',  /* global day-mode header bar (matches ForgeBlueprint) */
     '--cf-header-border':   'var(--forge-amber)',
     '--cf-panel-bg':        '#FFFFFF',
     '--cf-sidebar-bg':      '#EEF4FA',
