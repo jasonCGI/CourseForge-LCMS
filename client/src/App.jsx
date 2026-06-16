@@ -115,9 +115,11 @@ export default function App() {
 
           {/* Wordmark — Forge path mark (legible, not recessive). Flagship keeps
               "Course/Forge"; Course via __mid so it stays readable on the bar. */}
+          {/* Full "Course/Forge_" identity is kept on mobile too — collapsing it
+              to just "Forge" reads as a sub-tool, not the flagship. */}
           <span className="forge-path forge-path--md forge-path--bar">
-            <span className="forge-path__mid cf-hide-mobile">Course</span>
-            <span className="forge-path__slash cf-hide-mobile">/</span>
+            <span className="forge-path__mid">Course</span>
+            <span className="forge-path__slash">/</span>
             <span className="forge-path__tool">Forge</span>
             <span className="forge-path__cursor">_</span>
           </span>

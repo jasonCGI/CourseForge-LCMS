@@ -44,6 +44,21 @@ const TOOLS = [
       </svg>
     ),
   },
+  {
+    id: 'forgegui', label: 'GUI', tagline: 'GUI shell authoring',
+    url: import.meta.env.VITE_FORGEGUI_URL || '#',
+    mark: ({ size = 16 }) => (
+      // Stage frame with corner brackets + crosshair origin (matches ForgeGUI's mark)
+      <svg width={size} height={size} viewBox="0 0 28 28" aria-hidden="true">
+        <rect x="4" y="6" width="20" height="16" rx="1.5" fill="none" stroke="#185FA5" strokeWidth="1.5"/>
+        <path d="M4,9.5 V6 H7.5 M20.5,6 H24 V9.5 M24,18.5 V22 H20.5 M7.5,22 H4 V18.5"
+          fill="none" stroke="var(--forge-amber)" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="14" y1="9.5" x2="14" y2="18.5" stroke="#185FA5" strokeWidth="1" opacity="0.7"/>
+        <line x1="9.5" y1="14" x2="18.5" y2="14" stroke="#185FA5" strokeWidth="1" opacity="0.7"/>
+        <circle cx="14" cy="14" r="2" fill="var(--forge-amber)"/>
+      </svg>
+    ),
+  },
 ]
 
 export default function EcosystemTray() {
