@@ -73,58 +73,24 @@ export default function App() {
             <circle cx="0" cy="0" r="1.1" fill="white" opacity="0.88"/>
           </svg>
 
-          {/* Wordmark */}
+          {/* Wordmark — shared Forge path mark (IBM Plex Mono 600) */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
             {/* Prompt */}
             <span style={{
-              fontFamily: "'SF Mono', Consolas, monospace",
+              fontFamily: "'IBM Plex Mono', Consolas, monospace",
               fontSize: 14,
-              fontWeight: 700,
-              color: 'var(--cf-accent)',
+              fontWeight: 600,
+              color: 'var(--forge-brand)',
               marginRight: 8,
+              alignSelf: 'center',
             }}>❯</span>
 
-            {/* Course */}
-            <span style={{
-              fontFamily: "'Inter', system-ui, sans-serif",
-              fontSize: 22,
-              fontWeight: 100,
-              color: 'var(--cf-logo-course)',
-              letterSpacing: '-0.02em',
-              lineHeight: 1,
-            }}>Course</span>
-
-            {/* Slash */}
-            <span style={{
-              fontFamily: "'Inter', system-ui, sans-serif",
-              fontSize: 22,
-              fontWeight: 100,
-              color: 'var(--cf-logo-slash)',
-              lineHeight: 1,
-            }}>/</span>
-
-            {/* Forge */}
-            <span style={{
-              fontFamily: "'Inter', system-ui, sans-serif",
-              fontSize: 22,
-              fontWeight: 200,
-              color: 'var(--cf-logo-forge)',
-              letterSpacing: '-0.02em',
-              lineHeight: 1,
-            }}>Forge</span>
-
-            {/* Underscore cursor */}
-            <span style={{
-              display: 'inline-block',
-              width: 13,
-              height: 2,
-              background: 'var(--cf-accent)',
-              marginLeft: 4,
-              marginBottom: 2,
-              borderRadius: 1,
-              alignSelf: 'flex-end',
-              animation: 'cf-blink 1.05s step-end infinite',
-            }}/>
+            <span className="forge-path">
+              <span className="forge-path__root">Course</span>
+              <span className="forge-path__slash">/</span>
+              <span className="forge-path__tool">Forge</span>
+              <span className="forge-path__cursor">_</span>
+            </span>
           </div>
 
           {/* Version */}

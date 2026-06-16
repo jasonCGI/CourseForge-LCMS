@@ -17,7 +17,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* ── Reset + Base ───────────────────────────────────────────────── */
@@ -28,7 +28,7 @@
       --blue:     #185FA5;
       --blue-mid: #378ADD;
       --blue-lt:  #B5D4F4;
-      --amber:    #EF9F27;
+      --amber:    #F59E0B;
       --amber-dk: #BA7517;
       --red:      #C0392B;
       --red-lt:   #FDECEA;
@@ -50,6 +50,7 @@
 
     /* ── Viewing modes — dark is the :root default above ── */
     html[data-mode="light"] {
+      --amber: #D4820A;
       --bg:     #F0F4F8;
       --bg2:    #FFFFFF;
       --bg3:    #EEF4FA;
@@ -124,8 +125,8 @@
     }
     html[data-mode="light"] .mode-btn { color: #90C0E8; }
     html[data-mode="hc"]    .mode-btn { color: #CCCCCC; }
-    .mode-btn[aria-pressed="true"] { background: #1B3A5C; border-color: #2A5A8A; color: #EF9F27; }
-    html[data-mode="hc"] .mode-btn[aria-pressed="true"] { background: #EF9F27; border-color: #EF9F27; color: #000; }
+    .mode-btn[aria-pressed="true"] { background: #1B3A5C; border-color: #2A5A8A; color: var(--amber); }
+    html[data-mode="hc"] .mode-btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #000; }
 
     body {
       font-family: var(--font);
@@ -155,51 +156,28 @@
     }
 
     .wm-prompt {
-      font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+      font-family: 'IBM Plex Mono', Consolas, monospace;
       font-size: 14px;
-      font-weight: 700;
-      color: #EF9F27;
+      font-weight: 600;
+      color: var(--amber);
       margin-right: 8px;
+      align-self: center;
     }
 
-    .wm-course {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 22px;
-      font-weight: 100;
-      color: #B5D4F4;
-      letter-spacing: -0.02em;
-      line-height: 1;
+    /* ── Forge path mark — shared component (mirrors /tokens/forge-components.css) ── */
+    .forge-path {
+      display: inline-flex; align-items: baseline;
+      font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+      font-weight: 600; font-size: 22px; line-height: 1;
+      letter-spacing: -0.01em; white-space: nowrap; user-select: none;
     }
-
-    .wm-slash {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 22px;
-      font-weight: 100;
-      color: #EF9F27;
-      line-height: 1;
-    }
-
-    .wm-forge {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-size: 22px;
-      font-weight: 200;
-      color: #ffffff;
-      letter-spacing: -0.02em;
-      line-height: 1;
-    }
-
-    /* Underscore cursor */
-    .wm-cursor {
-      display: inline-block;
-      width: 13px;
-      height: 2px;
-      background: #EF9F27;
-      margin-left: 4px;
-      margin-bottom: 2px;
-      border-radius: 1px;
-      align-self: flex-end;
-      animation: cf-blink 1.05s step-end infinite;
-    }
+    .forge-path__root   { color: var(--blue-lt); }
+    .forge-path__tool   { color: #fff; }
+    .forge-path__slash  { color: var(--amber); margin: 0 .04em; }
+    .forge-path__cursor { color: var(--amber); margin-left: .06em;
+      animation: forge-cursor-blink 1.1s step-start infinite; }
+    @keyframes forge-cursor-blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .forge-path__cursor { animation: none; opacity: 1; } }
 
     @keyframes cf-blink {
       0%, 100% { opacity: 1; }
@@ -586,7 +564,7 @@
     <path d="M0,16 L-3.5,3.5 L0,0 Z"    fill="#0C3A6E" opacity="0.6"/>
     <path d="M-16,0 L-3.5,-3.5 L0,0 Z"  fill="#0C3A6E" opacity="0.6"/>
     <g transform="rotate(22.5)">
-      <path d="M0,-8 L1.8,-1.8 L8,0 L1.8,1.8 L0,8 L-1.8,1.8 L-8,0 L-1.8,-1.8 Z" fill="#EF9F27"/>
+      <path d="M0,-8 L1.8,-1.8 L8,0 L1.8,1.8 L0,8 L-1.8,1.8 L-8,0 L-1.8,-1.8 Z" fill="var(--amber)"/>
     </g>
     <circle cx="0" cy="0" r="2.9" fill="#FAC775"/>
     <circle cx="0" cy="0" r="1.3" fill="white" opacity="0.88"/>
@@ -594,7 +572,7 @@
 
   <!-- Wordmark -->
   <div class="wordmark">
-    <span class="wm-prompt">❯</span><span class="wm-course">Forge</span><span class="wm-slash">/</span><span class="wm-forge">Blueprint</span><span class="wm-cursor"></span>
+    <span class="wm-prompt">❯</span><span class="forge-path"><span class="forge-path__root">Forge</span><span class="forge-path__slash">/</span><span class="forge-path__tool">Blueprint</span><span class="forge-path__cursor">_</span></span>
   </div>
 
   <span style="
@@ -1610,7 +1588,7 @@ function removeMedia(idx) {
 
 var WCN_COLORS = {
   warning: { bg:'#C0392B', text:'#FF7070', border:'rgba(192,57,43,0.3)' },
-  caution: { bg:'#B87A1A', text:'#EF9F27', border:'rgba(184,122,26,0.3)' },
+  caution: { bg:'#B87A1A', text:'var(--amber)', border:'rgba(184,122,26,0.3)' },
   note:    { bg:'#185FA5', text:'#7EB8F0', border:'rgba(24,95,165,0.3)'  },
 }
 function renderWCNList(wcn) {

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&display=swap');
+
 /* ── Design tokens ──────────────────────────────────────────────────────────
    The Sprint 3 editor components (right pane) reference these --color-* tokens.
    They are aliased to the mode-reactive --cf-* tokens (set per-mode on
@@ -88,6 +90,26 @@ body { margin: 0; font-family: var(--font-sans); }
 [data-cf-mode="light"] { --forge-brand: #D4820A; }   /* light = spec amber   */
 [data-cf-mode="dark"]  { --forge-brand: #F59E0B; }   /* dark  = lifted amber */
 [data-cf-mode="hc"]    { --forge-brand: #F59E0B; }   /* hc    = lifted amber */
+
+/* ── Forge path mark — shared component (mirrors /tokens/forge-components.css).
+   Header colours keep the locked legible identity (blue prefix / amber slash /
+   light tool / amber underscore); the forge path-hierarchy grays are tuned for
+   light surfaces and would vanish on the dark header bar. ── */
+.forge-path {
+  display: inline-flex; align-items: baseline;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  font-weight: 600; font-size: 22px; line-height: 1;
+  letter-spacing: -0.01em; white-space: nowrap; user-select: none;
+}
+.forge-path__root   { color: var(--cf-logo-course); }
+.forge-path__tool   { color: var(--cf-logo-forge); }
+.forge-path__slash  { color: var(--forge-brand); margin: 0 0.04em; }
+.forge-path__cursor { color: var(--forge-brand); margin-left: 0.06em;
+  animation: forge-cursor-blink 1.1s step-start infinite; }
+@keyframes forge-cursor-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .forge-path__cursor { animation: none; opacity: 1; }
+}
 
 /* ── Focus indicators — 508 required on all interactive elements ── */
 .cf-tree-row:focus-visible,
