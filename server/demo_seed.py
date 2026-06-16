@@ -439,19 +439,15 @@ def reset_demo():
     from .models.project import Project
     existing = Project.query.filter_by(name='CourseForge Demo').first()
     if existing:
-        # Best-effort cleanup of rows that reference the project but aren't in the
-        # courses→frames cascade (media uploads, publish jobs).
-        try:
-            from .models.media import MediaAsset
-            MediaAsset.query.filter_by(project_id=existing.id).delete()
-        except Exception:
-            pass
-        try:
-            from .models.publish import PublishJob
-            PublishJob.query.filter_by(project_id=existing.id).delete()
-        except Exception:
-            pass
-        # courses → modules → lessons → frames cascade via 'all, delete-orphan'.
+        # Cleanup of rows that reference the project but aren't in the
+        # courses->frames ORM cascade (media uploads, publish jobs).
+        # MediaAssets go through the ORM so their OamAsset children cascade.
+        from .models.media import MediaAsset
+        from .models.publish_job import PublishJob
+        for asset in MediaAsset.query.filter_by(project_id=existing.id).all():
+            db.session.delete(asset)
+        PublishJob.query.filter_by(project_id=existing.id).delete()
+        # courses -> modules -> lessons -> frames cascade via 'all, delete-orphan'.
         db.session.delete(existing)
         db.session.commit()
         print('[demo_seed] Deleted existing demo project')

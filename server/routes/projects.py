@@ -57,6 +57,15 @@ def update_project(project_id):
 @projects_bp.delete('/api/projects/<project_id>')
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
+    # MediaAsset and PublishJob reference projects.id but are NOT in the
+    # Project->Course->...->Frame ORM cascade, so the DB-level FK blocks the
+    # delete (500) unless we remove them first. Delete MediaAssets via the ORM
+    # so their OamAsset children cascade; PublishJobs have no children.
+    from ..models.media import MediaAsset
+    from ..models.publish_job import PublishJob
+    for asset in MediaAsset.query.filter_by(project_id=project_id).all():
+        db.session.delete(asset)
+    PublishJob.query.filter_by(project_id=project_id).delete()
     db.session.delete(project)
     db.session.commit()
     return jsonify({'deleted': project_id})
