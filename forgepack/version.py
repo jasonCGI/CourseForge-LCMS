@@ -13,10 +13,14 @@ BUILD_DATE = "2026-06-15"
 # Processing modules available in this version
 MODULES = ["video", "audio", "image"]
 
+# Cross-tool capabilities (beyond the processing modules)
+CAPABILITIES = ["bake"]
+
 def version_info() -> dict:
     return {
-        "app":       "ForgePack",
-        "version":   VERSION,
-        "build":     BUILD_DATE,
-        "modules":   MODULES,
+        "app":          "ForgePack",
+        "version":      VERSION,
+        "build":        BUILD_DATE,
+        "modules":      MODULES,
+        "capabilities": CAPABILITIES,
     }

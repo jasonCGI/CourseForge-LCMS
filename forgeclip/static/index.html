@@ -17,6 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video-js.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -540,6 +541,8 @@
       onclick="importClip()" aria-label="Import existing .clip.json">↑ Import</button>
     <button class="btn btn-amber" style="width:auto;padding:5px 14px;font-size:11px"
       onclick="exportClip()" id="btn-export" disabled aria-label="Export .clip.json">⬇ Export .clip.json</button>
+    <button class="btn btn-amber" style="width:auto;padding:5px 16px;font-size:11px"
+      onclick="bakeAndExport()" id="btn-bake" disabled aria-label="Bake interactions and export mediaPackage">🔥 Bake &amp; Export</button>
   </div>
 </header>
 
@@ -665,7 +668,22 @@ var autoSaveTimer = null
 function handleVideoUpload(e) {
   var file = e.target.files[0]
   if (!file) return
-  var isZip = /\.zip$/i.test(file.name)
+  // A .zip can be a ForgeClip mediaPackage (contains a source .clip.json) OR a
+  // ForgePack processing output (mp4 + webm + poster + vtt). Peek to decide.
+  if (/\.zip$/i.test(file.name) && typeof JSZip !== 'undefined') {
+    JSZip.loadAsync(file).then(function(zip) {
+      var hasClip = Object.keys(zip.files).some(function(n) {
+        return /\.clip\.json$/i.test(n) && !/_baked/i.test(n)
+      })
+      if (hasClip) handleZipImport(zip)
+      else uploadVideoFile(file, true)
+    }).catch(function() { uploadVideoFile(file, true) })
+    return
+  }
+  uploadVideoFile(file, /\.zip$/i.test(file.name))
+}
+
+function uploadVideoFile(file, isZip) {
   var form = new FormData()
   form.append('file', file)
   fetch(isZip ? '/api/media/zip' : '/api/media/video', { method:'POST', body:form })
@@ -673,6 +691,7 @@ function handleVideoUpload(e) {
     .then(function(data) {
       state.videoAssetId  = data.asset_id
       state.videoFilename = data.filename
+      state.videoServeUrl = data.serve_url
       state.companions    = data.companions || {}
       initPlayer(data.serve_url, data.filename)
     })
@@ -705,12 +724,129 @@ function createClipSession(filename, duration) {
     .then(function(clip) {
       state.clipId = clip.id
       state.clip   = clip
+      if (state._pendingImportInteractions) {
+        state.clip.interactions = state._pendingImportInteractions
+        state._pendingImportInteractions = null
+        fetch('/api/clip/' + state.clipId, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(state.clip),
+        }).then(function(){ renderInteractionList(); renderTimelineMarkers() })
+      }
       document.getElementById('btn-export').disabled   = false
       document.getElementById('export-btn-2').disabled = false
       document.getElementById('export-pkg-2').disabled = false
+      document.getElementById('btn-bake').disabled     = false
       renderInteractionList()
       renderTimelineMarkers()
     })
+}
+
+// ── Bake & Export (ForgePack /api/bake) ────────────────────────
+var FORGEPACK_URL = 'https://forgepack-production.up.railway.app'
+var bakeJobId = null, bakePoll = null
+
+function bakeAndExport() {
+  if (!state.clipId || !state.clip) { alert('No clip loaded. Upload a video first.'); return }
+  if (!state.videoServeUrl) { alert('No video file loaded. Upload the source video first.'); return }
+  if (!state.clip.interactions || state.clip.interactions.length === 0) {
+    alert('No interactions defined. Add at least one interaction before baking.'); return
+  }
+  var sec = document.getElementById('bake-section')
+  sec.style.display = 'flex'
+  document.getElementById('bake-progress-fill').style.width = '0%'
+  document.getElementById('bake-progress-msg').textContent  = 'Uploading to ForgePack…'
+  document.getElementById('bake-progress-pct').textContent  = '0%'
+  document.getElementById('bake-timecode-map').style.display = 'none'
+  document.getElementById('bake-error').style.display        = 'none'
+  var dl = document.getElementById('btn-bake-download')
+  dl.disabled = true; dl.style.opacity = '0.4'; dl.style.cursor = 'not-allowed'
+
+  fetch('/api/clip/' + state.clipId, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.clip),
+  })
+  .then(function() { return fetch(state.videoServeUrl) })
+  .then(function(r) { return r.blob() })
+  .then(function(videoBlob) {
+    var form = new FormData()
+    form.append('video', videoBlob, state.videoFilename || 'video.mp4')
+    var clipName = (state.videoFilename || 'clip').replace(/\.(mp4|webm|mov)$/i, '.clip.json')
+    form.append('clip', new Blob([JSON.stringify(state.clip)], { type: 'application/json' }), clipName)
+    return fetch(FORGEPACK_URL + '/api/bake', { method: 'POST', body: form })
+  })
+  .then(function(r) { if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'Bake failed') }); return r.json() })
+  .then(function(data) { bakeJobId = data.job_id; bakePoll = setInterval(pollBakeStatus, 2000) })
+  .catch(function(err) { showBakeError(err.message) })
+}
+
+function pollBakeStatus() {
+  if (!bakeJobId) return
+  fetch(FORGEPACK_URL + '/api/bake/status/' + bakeJobId)
+    .then(r => r.json())
+    .then(function(job) {
+      document.getElementById('bake-progress-fill').style.width = job.progress + '%'
+      document.getElementById('bake-progress-msg').textContent  = job.message || ''
+      document.getElementById('bake-progress-pct').textContent  = job.progress + '%'
+      if (job.status === 'complete') { clearInterval(bakePoll); showBakeComplete(job) }
+      else if (job.status === 'failed') { clearInterval(bakePoll); showBakeError(job.error || 'Bake failed.') }
+    })
+    .catch(function() {})
+}
+
+function showBakeComplete(job) {
+  var dl = document.getElementById('btn-bake-download')
+  dl.disabled = false; dl.style.opacity = '1'; dl.style.cursor = 'pointer'
+  if (job.timecode_map && job.timecode_map.length) {
+    document.getElementById('bake-timecode-map').style.display = 'block'
+    document.getElementById('bake-timecode-list').innerHTML = job.timecode_map.map(function(e) {
+      return '<div style="display:flex;gap:12px;margin-bottom:4px;color:var(--text2)">' +
+        '<span style="color:var(--text3);width:60px">' + e.original.toFixed(2) + 's</span>' +
+        '<span style="color:var(--text3)">→</span>' +
+        '<span style="color:var(--amber);width:60px">' + e.baked.toFixed(2) + 's</span>' +
+        '<span style="color:var(--text3)">' + e.type + '</span></div>'
+    }).join('')
+  }
+  document.getElementById('bake-progress-msg').textContent =
+    '✓ ' + job.hold_count + ' hold point(s) baked · ' + (job.baked_duration || 0).toFixed(1) + 's total'
+}
+
+function downloadBaked() {
+  if (bakeJobId) window.open(FORGEPACK_URL + '/api/bake/download/' + bakeJobId, '_blank')
+}
+
+function showBakeError(msg) {
+  clearInterval(bakePoll)
+  var el = document.getElementById('bake-error')
+  el.style.display = 'block'; el.textContent = '⚠ ' + msg
+  document.getElementById('bake-progress-msg').textContent = 'Failed'
+}
+
+function cancelBake() {
+  clearInterval(bakePoll); bakeJobId = null
+  document.getElementById('bake-section').style.display = 'none'
+}
+
+// ── mediaPackage ZIP import — restore session ──────────────────
+function handleZipImport(zip) {
+  var clipEntry = null, videoName = null
+  zip.forEach(function(path, entry) {
+    if (/\.clip\.json$/i.test(path) && !/_baked/i.test(path)) clipEntry = entry
+    if (/\.(mp4|webm|mov)$/i.test(path) && !/_baked/i.test(path)) videoName = path
+  })
+  if (!clipEntry) { alert('No source .clip.json found in this ZIP. Is this a mediaPackage?'); return }
+
+  clipEntry.async('text').then(function(text) {
+    var clip
+    try { clip = JSON.parse(text) } catch (e) { alert('Invalid clip.json in package.'); return }
+    state._pendingImportInteractions = clip.interactions || []
+    if (videoName && zip.file(videoName)) {
+      zip.file(videoName).async('blob').then(function(blob) {
+        uploadVideoFile(new File([blob], videoName, { type: 'video/mp4' }), false)
+      })
+    } else {
+      alert('Imported ' + (clip.interactions || []).length + ' interactions. Upload the source video (' +
+            (videoName || 'mp4') + ') to continue — markers will reattach.')
+    }
+  })
 }
 
 // ── Playback ───────────────────────────────────────────────────
@@ -1088,6 +1224,42 @@ function formatTC(secs) {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${ds}`
 }
 </script>
+
+<!-- ── Bake progress modal ─────────────────────────────────────── -->
+<div id="bake-section" role="dialog" aria-modal="true" aria-label="Baking interactions"
+  style="display:none;position:fixed;inset:0;background:rgba(4,44,83,0.85);z-index:500;
+         align-items:center;justify-content:center;padding:24px">
+  <div style="background:#0d1017;border:1px solid #1c2a3a;border-radius:10px;width:100%;
+              max-width:480px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="background:#06080f;padding:12px 18px;border-bottom:1px solid #1c2a3a;
+                display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--amber)">🔥</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--text)">Baking interactions…</span>
+    </div>
+    <div style="padding:20px">
+      <div style="height:6px;background:#131822;border-radius:3px;overflow:hidden;margin-bottom:10px">
+        <div id="bake-progress-fill" style="height:100%;background:var(--amber);border-radius:3px;width:0%;transition:width 0.3s ease"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:16px">
+        <span id="bake-progress-msg">Starting…</span>
+        <span id="bake-progress-pct">0%</span>
+      </div>
+      <div id="bake-timecode-map" style="display:none;background:#131822;border:1px solid #1c2a3a;border-radius:6px;padding:12px;margin-bottom:16px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">
+          Timecode map — original → baked
+        </div>
+        <div id="bake-timecode-list" style="font-family:var(--mono);font-size:11px"></div>
+      </div>
+      <div id="bake-error" style="display:none;padding:10px 14px;background:rgba(194,57,52,0.1);border:1px solid rgba(194,57,52,0.3);border-radius:6px;font-size:12px;color:#E87070;margin-bottom:16px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="cancelBake()" id="btn-bake-cancel"
+          style="padding:7px 14px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text2);font-family:var(--font);font-size:12px;cursor:pointer">Close</button>
+        <button onclick="downloadBaked()" id="btn-bake-download" disabled
+          style="padding:7px 16px;background:var(--amber);color:var(--navy);border:none;border-radius:4px;font-family:var(--font);font-size:12px;font-weight:600;cursor:not-allowed;opacity:0.4">⬇ Download mediaPackage</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
