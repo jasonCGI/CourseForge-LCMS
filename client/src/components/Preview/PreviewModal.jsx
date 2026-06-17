@@ -103,6 +103,40 @@ export default function PreviewModal({ onClose }) {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <FramePreview frame={activeFrame} />
         </div>
+
+        {/* Footer — live HTML preview escape hatch */}
+        <div style={{
+          padding: '10px 20px',
+          background: '#F6F8FB',
+          borderTop: '1px solid #E2E8F0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 11, color: '#6A7686', flex: 1 }}>
+            This is an in-editor approximation. Open the live SCO render in a new tab:
+          </span>
+          {activeFrame?.id && (
+            <a
+              href={`/api/frames/${activeFrame.id}/preview-html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                background: '#D4820A',
+                borderRadius: 6,
+                padding: '6px 12px',
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Open as real frame ↗
+            </a>
+          )}
+        </div>
       </div>
     </div>
   )

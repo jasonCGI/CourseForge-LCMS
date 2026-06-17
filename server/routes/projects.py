@@ -260,6 +260,22 @@ def duplicate_frame(frame_id):
     return jsonify(frame_schema.dump(new_frame)), 201
 
 
+@projects_bp.get('/api/frames/<frame_id>/preview-html')
+def preview_frame_html(frame_id):
+    """
+    Single-frame live HTML preview: returns a self-contained HTML page that
+    renders this frame's blocks exactly as the SCO will, with stubbed SCORM
+    APIs and live asset URLs. Meant to be opened in a browser tab.
+    """
+    from ..services.frame_preview import build_frame_preview_html
+    frame = Frame.query.get_or_404(frame_id)
+    html = build_frame_preview_html(frame)
+    return html, 200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Frame-Options': 'SAMEORIGIN',
+    }
+
+
 # ── Reorder (drag-and-drop support) ─────────────────────────────────────────
 
 @projects_bp.post('/api/reorder')
