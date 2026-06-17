@@ -15,7 +15,7 @@ def create_app(config_name=None):
     for folder in [
         app.config['UPLOAD_FOLDER'],
         os.path.join(app.config['UPLOAD_FOLDER'], 'videos'),
-        os.path.join(app.config['UPLOAD_FOLDER'], 'clips'),
+        # 'clips' no longer used — export streams the .clip.json from memory.
     ]:
         os.makedirs(folder, exist_ok=True)
 

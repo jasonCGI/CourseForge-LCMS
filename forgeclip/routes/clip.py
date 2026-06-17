@@ -9,8 +9,15 @@ from flask import Blueprint, request, jsonify, send_file, current_app
 clip_bp = Blueprint('clip', __name__)
 
 # In-memory clip store — sufficient for standalone authoring sessions.
-# Single gunicorn worker (see railway.toml) keeps this consistent.
+# Single gunicorn worker (see railway.toml) keeps this consistent. Bounded so
+# it can't grow unbounded; oldest-inserted evicted past the cap. Lost on restart.
 CLIPS = {}
+CLIPS_MAX = 500
+
+def _clip_put(clip_id, clip):
+    CLIPS[clip_id] = clip
+    while len(CLIPS) > CLIPS_MAX:
+        CLIPS.pop(next(iter(CLIPS)))
 
 
 @clip_bp.post('/api/clip')
@@ -34,7 +41,7 @@ def create_clip():
         },
         'interactions': [],
     }
-    CLIPS[clip_id] = clip
+    _clip_put(clip_id, clip)
     return jsonify(clip), 201
 
 
@@ -50,10 +57,12 @@ def update_clip(clip_id):
     """Full replace of clip data — called on every autosave."""
     if clip_id not in CLIPS:
         return jsonify({'error': 'Clip not found.'}), 404
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body required.'}), 400
     data['id']         = clip_id
     data['updated_at'] = datetime.utcnow().isoformat() + 'Z'
-    CLIPS[clip_id]     = data
+    _clip_put(clip_id, data)
     return jsonify(data)
 
 
@@ -107,13 +116,11 @@ def export_clip(clip_id):
     filename  = (clip['video'].get('filename') or 'clip').rsplit('.', 1)[0]
     safe_name = ''.join(c for c in filename if c.isalnum() or c in '-_')[:40] or 'clip'
 
-    output_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'clips'
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = str(output_dir / f"{safe_name}_{clip_id[:8]}.clip.json")
-    Path(output_path).write_text(json.dumps(clip, indent=2), encoding='utf-8')
-
+    # Serve from memory (was writing a .clip.json to uploads/clips/ on every
+    # export, never cleaned up).
+    buf = io.BytesIO(json.dumps(clip, indent=2).encode('utf-8'))
     return send_file(
-        output_path,
+        buf,
         mimetype='application/json',
         as_attachment=True,
         download_name=f"{safe_name}.clip.json",

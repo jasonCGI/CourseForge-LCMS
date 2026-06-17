@@ -1,5 +1,7 @@
 import uuid
 import zipfile
+import shutil
+import tempfile
 from io import BytesIO
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, current_app
@@ -61,24 +63,37 @@ def upload_zip():
     if not f.filename or Path(f.filename).suffix.lower() != '.zip':
         return jsonify({'error': 'Upload a .zip (ForgePack output).'}), 400
 
-    try:
-        zf = zipfile.ZipFile(BytesIO(f.read()))
-    except zipfile.BadZipFile:
-        return jsonify({'error': 'Not a valid .zip file.'}), 400
-
+    # Stream the upload to a temp file and copy members member-by-member instead
+    # of f.read() + zf.read() holding the whole archive + each member in RAM
+    # (OOM risk with large mp4/webm on the single worker).
     asset_id = str(uuid.uuid4())
     out_dir  = _asset_dir(asset_id)
     extracted = {}
-    for name in zf.namelist():
-        base = Path(name).name              # flatten; ignore folders / paths (zip-slip safe)
-        if not base:
-            continue
-        ext = Path(base).suffix.lower()
-        if ext not in COMPANION_EXTS:
-            continue
-        safe = secure_filename(base)
-        (out_dir / safe).write_bytes(zf.read(name))
-        extracted.setdefault(ext, safe)
+    tmp = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
+    tmp.close()
+    try:
+        f.save(tmp.name)
+        try:
+            zf = zipfile.ZipFile(tmp.name)
+        except zipfile.BadZipFile:
+            return jsonify({'error': 'Not a valid .zip file.'}), 400
+        with zf:
+            for name in zf.namelist():
+                base = Path(name).name      # flatten; ignore folders / paths (zip-slip safe)
+                if not base:
+                    continue
+                ext = Path(base).suffix.lower()
+                if ext not in COMPANION_EXTS:
+                    continue
+                safe = secure_filename(base)
+                with zf.open(name) as src, open(out_dir / safe, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+                extracted.setdefault(ext, safe)
+    finally:
+        try:
+            Path(tmp.name).unlink()
+        except OSError:
+            pass
 
     mp4 = extracted.get('.mp4')
     if not mp4:
