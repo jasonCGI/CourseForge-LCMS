@@ -222,8 +222,10 @@ export default function ContentTree() {
   const activeProject = useProjectStore(s => s.activeProject)
   const fetchProjects = useProjectStore(s => s.fetchProjects)
   const fetchProject  = useProjectStore(s => s.fetchProject)
-  const loadFrame     = useEditorStore(s => s.loadFrame)
-  const activeFrameId = useEditorStore(s => s.activeFrame?.id)
+  const loadFrame        = useEditorStore(s => s.loadFrame)
+  const selectConfigNode = useEditorStore(s => s.selectConfigNode)
+  const activeFrameId    = useEditorStore(s => s.activeFrame?.id)
+  const selectedNode     = useEditorStore(s => s.selectedNode)
 
   const loadDemo = async () => {
     try {
@@ -469,9 +471,10 @@ export default function ContentTree() {
         label={activeProject.name}
         isOpen={true}
         itemId={activeProject.id}
+        isCurrent={selectedNode?.type === 'project'}
         tabIndex={rovingTab(activeProject.id)}
         onKeyDown={e => handleTreeKeyDown(e, { id: activeProject.id, type: 'project', parentId: null })}
-        onClick={() => {}}
+        onClick={() => selectConfigNode('project', activeProject.id)}
       >
 
         {courses.map(course => {

@@ -30,10 +30,35 @@ def _safe_extract(zf, dest):
     zf.extractall(str(dest))
 
 
+def _thumb_url(shell):
+    """Best-effort thumbnail = the shell's background image, served live."""
+    base = Path(shell.stored_path or '')
+    assets = base / 'assets'
+    cfg = shell.shell_config if isinstance(shell.shell_config, dict) else {}
+    stage = cfg.get('stage', {}) if isinstance(cfg, dict) else {}
+    bg = stage.get('background') or stage.get('background_image') or ''
+    if isinstance(bg, str) and bg:
+        name = Path(bg.split('/')[-1]).name
+        if name and (assets / name).exists():
+            return f'/api/gui-shells/{shell.id}/assets/{name}'
+    if assets.is_dir():
+        imgs = sorted(p for p in assets.iterdir()
+                      if p.suffix.lower() in ('.png', '.jpg', '.jpeg', '.webp'))
+        if imgs:
+            pref = [p for p in imgs if p.stem.lower().startswith('background')] or imgs
+            return f'/api/gui-shells/{shell.id}/assets/{pref[0].name}'
+    return None
+
+
 @gui_shells_bp.get('/api/gui-shells')
 def list_gui_shells():
     items = GuiShell.query.order_by(GuiShell.created_at.desc()).all()
-    return jsonify([s.to_dict() for s in items])
+    out = []
+    for s in items:
+        d = s.to_dict()
+        d['thumbnail_url'] = _thumb_url(s)
+        out.append(d)
+    return jsonify(out)
 
 
 @gui_shells_bp.post('/api/gui-shells')

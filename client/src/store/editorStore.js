@@ -17,11 +17,12 @@ const useEditorStore = create((set, get) => ({
   previewOpen: false,         // preview modal flag (so global shortcuts can open it)
   _undoStack: [],             // snapshots of blocks arrays (most recent first)
   saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
+  selectedNode: null,         // {type:'project'|'frame', id} — drives the context-sensitive right panel
 
   // Load a frame by ID
   loadFrame: async (frameId) => {
     if (autosaveTimer) clearTimeout(autosaveTimer)
-    set({ activeFrame: null, isDirty: false, saveError: null })
+    set({ activeFrame: null, isDirty: false, saveError: null, selectedNode: { type: 'frame', id: frameId } })
     try {
       const { data } = await getFrame(frameId)
       set({ activeFrame: data, originalFrame: data, isDirty: false })
@@ -29,6 +30,25 @@ const useEditorStore = create((set, get) => ({
       set({ saveError: e.message })
     }
   },
+
+  // Select a non-frame config node (e.g. the project root → CourseConfigPanel).
+  selectConfigNode: (type, id) => set({ selectedNode: { type, id } }),
+
+  // Advance to the next/prev frame across the whole active project (used by the
+  // persistent preview pane's shell NEXT/PREVIOUS actions).
+  navigateFrame: (dir) => {
+    const order = get()._projectFrameOrder?.() || []
+    const curId = get().activeFrame?.id
+    const i = order.indexOf(curId)
+    if (i === -1) return
+    const j = dir === 'PREVIOUS' ? i - 1 : i + 1
+    if (j < 0 || j >= order.length) return
+    get().loadFrame(order[j])
+  },
+  // Injected by App so the store can resolve frame order without importing the
+  // project store (avoids a circular import).
+  _projectFrameOrder: null,
+  setProjectFrameOrder: (fn) => set({ _projectFrameOrder: fn }),
 
   // Update a single block inside the active frame content
   updateBlock: (blockId, newData) => {

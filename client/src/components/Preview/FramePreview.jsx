@@ -110,7 +110,7 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName }) {
 }
 
 // Minimal block-to-HTML renderer for injecting into the GUI shell preview.
-function renderBlockToHTML(block) {
+export function renderBlockToHTML(block) {
   switch (block.type) {
     case 'text':
       return `<div class="cf-injected-text">${block.data.body || ''}</div>`

@@ -154,3 +154,108 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   .cf-app-header { padding: 0 8px !important; gap: 4px !important; }
   .forge-path--md { font-size: 16px; }       /* shrink header wordmark to fit */
 }
+
+/* ── Sprint 9: three-panel WYSIWYG authoring ──────────────────────── */
+.cf-right-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.cf-preview-pane {
+  flex: 0 0 52%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-bottom: 2px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
+}
+.cf-block-config-pane {
+  overflow-y: auto;
+}
+
+/* Project (course) config panel */
+.cf-course-config {
+  padding: 22px 18px;
+  overflow-y: auto;
+  height: 100%;
+  background: var(--cf-editor-bg);
+}
+.cf-config-section { margin-bottom: 28px; }
+.cf-config-label {
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--forge-amber);
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.cf-config-hint {
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  color: var(--cf-text-secondary);
+  opacity: 0.85;
+  margin: 0 0 12px;
+  line-height: 1.55;
+}
+
+/* Shell thumbnail gallery */
+.cf-shell-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.cf-shell-thumb {
+  width: 132px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--cf-input-bg);
+  transition: border-color 0.15s;
+}
+.cf-shell-thumb:hover  { border-color: color-mix(in srgb, var(--forge-amber) 50%, transparent); }
+.cf-shell-thumb.active { border-color: var(--forge-amber); }
+.cf-shell-thumb img,
+.cf-shell-thumb-empty {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.cf-shell-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cf-sidebar-bg);
+  color: var(--cf-text-tertiary);
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+}
+.cf-shell-thumb span {
+  display: block;
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+  padding: 4px 6px;
+  color: var(--cf-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Upload shell button */
+.cf-upload-shell-btn {
+  display: inline-block;
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--forge-amber);
+  border: 1px solid color-mix(in srgb, var(--forge-amber) 40%, transparent);
+  border-radius: 4px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.cf-upload-shell-btn:hover { border-color: var(--forge-amber); }

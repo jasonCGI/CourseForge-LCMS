@@ -3,6 +3,8 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
 import FrameEditor from './components/Editor/FrameEditor'
+import CourseConfigPanel from './components/Editor/CourseConfigPanel'
+import PersistentPreviewPane, { flatFrameOrder } from './components/Preview/PersistentPreviewPane'
 import PublishModal from './components/Publish/PublishModal'
 import ThemeEditorModal from './components/ThemeEditor/ThemeEditorModal'
 import { ThemeProvider } from './theme/ThemeContext'
@@ -51,6 +53,15 @@ export default function App() {
 
   useEffect(() => { DEMO_AUTOLOAD ? autoloadDemo() : fetchProjects() }, [])
 
+  // Give the editor store a way to resolve frame order (for preview NEXT/PREV)
+  // without a circular import on the project store.
+  const selectedNode = useEditorStore(s => s.selectedNode)
+  useEffect(() => {
+    useEditorStore.getState().setProjectFrameOrder(
+      () => flatFrameOrder(useProjectStore.getState().activeProject)
+    )
+  }, [])
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', onResize)
@@ -85,9 +96,21 @@ export default function App() {
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}><ContentTree /></div>
     </div>
   )
+  // Right panel is context-sensitive: project root node → CourseConfigPanel;
+  // a frame → persistent WYSIWYG preview (desktop) above the block editor.
+  const rightPanelInner = selectedNode?.type === 'project' ? (
+    <CourseConfigPanel />
+  ) : (
+    <div className="cf-right-panel" style={{ height: '100%' }}>
+      {!isMobile && <PersistentPreviewPane />}
+      <div className="cf-block-config-pane" style={{ flex: 1, minHeight: 0 }}>
+        <FrameEditor />
+      </div>
+    </div>
+  )
   const editorInner = (
     <div style={{ height: '100%', background: 'var(--cf-editor-bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <FrameEditor />
+      {rightPanelInner}
     </div>
   )
 
