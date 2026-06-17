@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -372,14 +372,27 @@ export default function ContentTree() {
   }
 
   // Flatten all lessons (with module name) for the copy-to-lesson picker.
-  const allLessons = []
-  for (const c of (activeProject?.courses || [])) {
-    for (const m of (c.modules || [])) {
-      for (const l of (m.lessons || [])) {
-        allLessons.push({ id: l.id, name: l.name, module_name: m.name })
-      }
-    }
-  }
+  // Memoized — only consumed by the (rarely-open) copy-to-lesson modal.
+  const allLessons = useMemo(() => {
+    const out = []
+    for (const c of (activeProject?.courses || []))
+      for (const m of (c.modules || []))
+        for (const l of (m.lessons || []))
+          out.push({ id: l.id, name: l.name, module_name: m.name })
+    return out
+  }, [activeProject])
+
+  // Compute each frame's completion ONCE per project (was getFrameCompletion —
+  // a full block scan — recomputed ~3× per frame on every tree render).
+  const completionByFrame = useMemo(() => {
+    const map = new Map()
+    for (const c of (activeProject?.courses || []))
+      for (const m of (c.modules || []))
+        for (const l of (m.lessons || []))
+          for (const f of (l.frames || []))
+            map.set(f.id, getFrameCompletion(f))
+    return map
+  }, [activeProject])
 
   const doDuplicate = async (frameId, targetLessonId = null) => {
     try {
@@ -448,7 +461,7 @@ export default function ContentTree() {
 
   // ── Sprint D: completion filter + keyboard navigation ──────────────
   const frameVisible = (frame) =>
-    completionFilter === 'all' || getFrameCompletion(frame) === completionFilter
+    completionFilter === 'all' || completionByFrame.get(frame.id) === completionFilter
 
   const courseOpenOf = (id) => openCourses[id] !== false
   const moduleOpenOf = (id) => openModules[id] !== false
@@ -614,7 +627,7 @@ export default function ContentTree() {
                                     isFrame={true}
                                     isCurrent={frame.id === activeFrameId}
                                     note={!!(frame.notes && frame.notes.trim())}
-                                    completion={getFrameCompletion(frame)}
+                                    completion={completionByFrame.get(frame.id)}
                                     itemId={frame.id}
                                     tabIndex={rovingTab(frame.id)}
                                     onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}

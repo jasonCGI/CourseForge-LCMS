@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -89,7 +89,8 @@ export default function TextBlock({ block }) {
 }
 
 function WordCount({ body, script }) {
-  const b = countWords(body), s = countWords(script)
+  const b = useMemo(() => countWords(body), [body])
+  const s = useMemo(() => countWords(script), [script])
   if (!b.words && !s.words) return null
   return (
     <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap',

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors,
@@ -109,9 +109,13 @@ function SortableBlock({ block }) {
 }
 
 function FrameTotals({ blocks }) {
-  const texts = (blocks || []).filter(b => b.type === 'text')
-  const body = texts.reduce((a, b) => a + countWords(b.data?.body || '').words, 0)
-  const script = texts.reduce((a, b) => a + countWords(b.data?.narrator_script || '').words, 0)
+  const { body, script } = useMemo(() => {
+    const texts = (blocks || []).filter(b => b.type === 'text')
+    return {
+      body:   texts.reduce((a, b) => a + countWords(b.data?.body || '').words, 0),
+      script: texts.reduce((a, b) => a + countWords(b.data?.narrator_script || '').words, 0),
+    }
+  }, [blocks])
   if (!body && !script) return null
   return (
     <div style={{ marginTop: 16, padding: '8px 12px', background: 'var(--cf-input-bg, #060810)',
