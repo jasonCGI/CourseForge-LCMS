@@ -71,7 +71,11 @@ export default function Model3DViewer({
   }, [])
 
   useEffect(() => {
-    Promise.all([loadScript(THREE_CDN), loadScript(GLTF_CDN)])
+    // Sequential, NOT Promise.all: the legacy global GLTFLoader references
+    // window.THREE at execution time, so THREE must finish loading first —
+    // parallel loading races and throws "THREE is not defined" (uncaught → blank).
+    loadScript(THREE_CDN)
+      .then(() => loadScript(GLTF_CDN))
       .then(() => setThreeReady(true))
       .catch(() => { setError('Could not load Three.js from CDN.'); setLoading(false) })
   }, [])

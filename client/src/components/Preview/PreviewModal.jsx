@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import FramePreview from './FramePreview'
+import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
 
 export default function PreviewModal({ onClose }) {
@@ -101,7 +102,9 @@ export default function PreviewModal({ onClose }) {
 
         {/* Preview content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <FramePreview frame={activeFrame} />
+          <PreviewErrorBoundary resetKey={activeFrame?.id}>
+            <FramePreview frame={activeFrame} />
+          </PreviewErrorBoundary>
         </div>
 
         {/* Footer — live HTML preview escape hatch */}

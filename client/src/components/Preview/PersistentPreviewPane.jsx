@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import FramePreview, { renderBlockToHTML } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
+import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 
@@ -69,7 +70,9 @@ export default function PersistentPreviewPane() {
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
-          <FramePreview frame={activeFrame} />
+          <PreviewErrorBoundary resetKey={activeFrame.id}>
+            <FramePreview frame={activeFrame} />
+          </PreviewErrorBoundary>
         </div>
       )}
     </div>
