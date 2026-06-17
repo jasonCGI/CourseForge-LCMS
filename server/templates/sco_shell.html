@@ -435,7 +435,7 @@
             var h = document.createElement('div');
             h.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;transform:translate(-50%,-50%);z-index:10';
             var dot = document.createElement('div');
-            dot.style.cssText = 'width:28px;height:28px;border-radius:50%;background:rgba(24,95,165,0.25);border:2px solid #185FA5';
+            dot.style.cssText = 'width:64px;height:64px;border-radius:4px;background:rgba(245,158,11,0.12);border:3px solid #F59E0B';
             dot.setAttribute('role','button'); dot.setAttribute('tabindex','0');
             dot.setAttribute('aria-label', i.data.label || 'Hotspot'); dot.title = i.data.label || '';
             h.appendChild(dot); overlay.appendChild(h);
@@ -468,6 +468,28 @@
     var card = document.createElement('div');
     card.style.cssText = 'background:#fff;border-radius:8px;max-width:480px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
     var d = i.data || {};
+
+    // Hotspot HOLD — pause, show a larger yellow square; click it to resume.
+    if (i.type === 'hotspot') {
+      var hx = (d.x != null ? d.x : 50), hy = (d.y != null ? d.y : 50);
+      ov.style.cssText = 'position:absolute;inset:0;background:rgba(4,44,83,0.45);z-index:50';
+      var hs = document.createElement('button');
+      hs.setAttribute('aria-label', (d.label || 'Hotspot') + ' — click to continue'); hs.title = d.label || '';
+      hs.style.cssText = 'position:absolute;left:' + hx + '%;top:' + hy + '%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:4px;background:rgba(245,158,11,0.18);border:3px solid #F59E0B;cursor:pointer;box-shadow:0 0 0 4px rgba(245,158,11,0.25)';
+      hs.onclick = function() { answered[i.id] = true; iVideoResume(ov, video, state); };
+      ov.appendChild(hs);
+      if (d.description) {
+        var desc = document.createElement('div');
+        desc.style.cssText = 'position:absolute;left:' + hx + '%;top:calc(' + hy + '% + 52px);transform:translateX(-50%);background:#0d1017;color:#B5D4F4;border:1px solid #185FA5;border-radius:6px;padding:6px 10px;font-size:12px;max-width:240px;text-align:center';
+        desc.textContent = d.description; ov.appendChild(desc);
+      }
+      var hint = document.createElement('div');
+      hint.style.cssText = 'position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,0.9);color:#F59E0B;border:1px solid #F59E0B;border-radius:20px;padding:6px 16px;font-size:11px;font-weight:600;white-space:nowrap;font-family:monospace';
+      hint.textContent = '⏸ ' + (d.label ? d.label + ' — ' : '') + 'click the highlighted area to continue';
+      ov.appendChild(hint);
+      container.appendChild(ov);
+      return;
+    }
 
     if (i.type === 'quiz') {
       card.innerHTML = '<div style="padding:14px 18px;border-bottom:1px solid #eee;background:#f8fbff"><div style="font-size:9px;font-weight:700;color:#185FA5;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;font-family:monospace">Knowledge Check</div><div class="qq" style="font-size:15px;font-weight:600;color:#042C53"></div></div>';

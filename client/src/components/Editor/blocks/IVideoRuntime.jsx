@@ -115,8 +115,8 @@ function Overlay({ i }) {
     return (
       <div style={{ position: 'absolute', left: d.x + '%', top: d.y + '%', transform: 'translate(-50%,-50%)', zIndex: 10 }}>
         <div role="button" tabIndex={0} aria-label={d.label} title={d.label}
-          style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(24,95,165,0.25)',
-                   border: '2px solid #185FA5', cursor: 'pointer' }} />
+          style={{ width: 64, height: 64, borderRadius: 4, background: 'rgba(245,158,11,0.12)',
+                   border: '3px solid #F59E0B', cursor: 'pointer' }} />
       </div>
     )
   }
@@ -144,6 +144,35 @@ function Overlay({ i }) {
 
 function Blocking({ i, answered, quizSelected, onQuizSelect, onQuizSubmit, onBranch, onAck }) {
   const d = i.data || {}
+
+  // Hotspot HOLD — video is paused; the hotspot shows as a larger yellow square
+  // over a dimmed video, and clicking it resumes playback.
+  if (i.type === 'hotspot') {
+    return (
+      <div role="dialog" aria-modal="true" aria-label={(d.label || 'Hotspot') + ' — explore to continue'}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(4,44,83,0.45)', zIndex: 50 }}>
+        <button onClick={() => onAck(i)} title={d.label}
+          aria-label={(d.label || 'Hotspot') + ' — click to continue'}
+          style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: (d.y ?? 50) + '%',
+                   transform: 'translate(-50%,-50%)', width: 72, height: 72, borderRadius: 4,
+                   background: 'rgba(245,158,11,0.18)', border: '3px solid #F59E0B', cursor: 'pointer',
+                   boxShadow: '0 0 0 4px rgba(245,158,11,0.25)' }} />
+        {d.description && (
+          <div style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: `calc(${d.y ?? 50}% + 52px)`,
+            transform: 'translateX(-50%)', background: '#0d1017', color: '#B5D4F4', border: '1px solid #185FA5',
+            borderRadius: 6, padding: '6px 10px', fontSize: 12, maxWidth: 240, textAlign: 'center' }}>
+            {d.description}
+          </div>
+        )}
+        <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(13,17,23,0.9)', color: '#F59E0B', border: '1px solid #F59E0B', borderRadius: 20,
+          padding: '6px 16px', fontFamily: 'var(--forge-font, monospace)', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          ⏸ {d.label ? d.label + ' — ' : ''}click the highlighted area to continue
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div role="dialog" aria-modal="true" aria-label={`${i.type} interaction`}
       style={{ position: 'absolute', inset: 0, background: 'rgba(4,44,83,0.80)', zIndex: 50,

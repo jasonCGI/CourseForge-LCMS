@@ -6,7 +6,7 @@
   "interactions": [
     { "id": "ix-annot", "type": "annotation", "timecode": 1.0, "end_timecode": 4.0, "pause_on_reach": false,
       "data": { "x": 24, "y": 28, "text": "Sample annotation — authored in ForgeClip" } },
-    { "id": "ix-hot", "type": "hotspot", "timecode": 2.0, "end_timecode": 4.5, "pause_on_reach": false,
-      "data": { "x": 70, "y": 60, "label": "Sample hotspot" } }
+    { "id": "ix-hot", "type": "hotspot", "timecode": 2.0, "end_timecode": 4.5, "pause_on_reach": true,
+      "data": { "x": 70, "y": 60, "label": "Sample hotspot", "description": "The video holds here until you click the highlighted area." } }
   ]
 }
