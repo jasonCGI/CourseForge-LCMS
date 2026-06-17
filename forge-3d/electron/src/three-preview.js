@@ -4,9 +4,12 @@ window.initForge3DPreview = function(container, glbPath) {
   canvas.style.cssText = 'width:100%;height:100%;display:block;'
   container.appendChild(canvas)
 
-  import('https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js').then(THREE => {
-    import('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
-      import('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js').then(({ OrbitControls }) => {
+  // esm.sh (not jsdelivr): the jsm GLTFLoader/OrbitControls do `import … from
+  // 'three'` — a bare specifier that won't resolve without an import map.
+  // esm.sh rewrites that bare import to a full URL, so these load standalone.
+  import('https://esm.sh/three@0.165.0').then(THREE => {
+    import('https://esm.sh/three@0.165.0/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
+      import('https://esm.sh/three@0.165.0/examples/jsm/controls/OrbitControls.js').then(({ OrbitControls }) => {
 
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
         renderer.setSize(canvas.offsetWidth, canvas.offsetHeight)

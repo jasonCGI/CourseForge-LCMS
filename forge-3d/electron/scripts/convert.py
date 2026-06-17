@@ -14,20 +14,50 @@ def log(msg): print(f"[Forge3D] {msg}", flush=True)
 def op_retry(op, **kw):
     """Call a bpy operator, dropping any kwargs this Blender version rejects.
 
-    Blender's FBX-import / glTF-export signatures changed across 3.6 LTS and
-    4.x (e.g. export_colors was removed in 4.0). Rather than pin to one version,
-    retry the call, stripping each unsupported keyword the error names.
+    Blender's FBX-import / glTF-export signatures changed across 3.6 LTS, 4.x
+    and 5.x (e.g. export_colors was removed in 4.0). Rather than pin to one
+    version, retry the call, stripping each unsupported keyword the error names.
+    bpy.ops reports unknown kwargs as either a Python TypeError ("unexpected
+    keyword argument 'x'") or a Blender RuntimeError/TypeError
+    ('keyword "x" unrecognized') — handle both.
     """
     while True:
         try:
             return op(**kw)
-        except TypeError as e:
-            m = re.search(r"unexpected keyword argument '(\w+)'", str(e))
+        except (TypeError, RuntimeError) as e:
+            msg = str(e)
+            m = (re.search(r"unexpected keyword argument '(\w+)'", msg) or
+                 re.search(r'keyword "(\w+)" unrecognized', msg))
             if m and m.group(1) in kw:
                 log(f"WARN: '{m.group(1)}' unsupported by this Blender version — dropping it.")
                 kw.pop(m.group(1))
                 continue
             raise
+
+
+def patch_fbx_light_bug():
+    """Blender 5.1's bundled FBX importer crashes on any FBX containing a light
+    (blen_read_light does `lamp.cycles.cast_shadow = ...`, an attribute removed
+    from CyclesLightSettings in 5.x). Wrap that reader so a light it can't build
+    is skipped instead of aborting the whole import. No-op on versions that work.
+    """
+    try:
+        import io_scene_fbx.import_fbx as _imp
+    except Exception:
+        return
+    orig = getattr(_imp, 'blen_read_light', None)
+    if orig is None or getattr(orig, '_forge3d_wrapped', False):
+        return
+
+    def safe_blen_read_light(*a, **k):
+        try:
+            return orig(*a, **k)
+        except AttributeError as e:
+            log(f"WARN: skipped a light the importer couldn't build ({e}).")
+            return None
+
+    safe_blen_read_light._forge3d_wrapped = True
+    _imp.blen_read_light = safe_blen_read_light
 
 def main():
     try:
@@ -54,6 +84,7 @@ def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
     log("Importing FBX...")
+    patch_fbx_light_bug()
     try:
         op_retry(
             bpy.ops.import_scene.fbx,
