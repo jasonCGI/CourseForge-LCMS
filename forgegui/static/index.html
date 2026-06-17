@@ -914,7 +914,16 @@ var ZONE_TYPES = [
 ]
 
 // -- Session init -----------------------------------------------
+// Persist the working shell to localStorage so a refresh doesn't lose work.
+// (Layout survives any refresh; uploaded assets persist only while the server
+// container lives — a redeploy clears them. Export, or use a mounted volume,
+// for durable assets.)
+function persistSession() {
+  try { if (gui) localStorage.setItem('fgui_session', JSON.stringify(gui)) } catch (e) {}
+}
+
 function newShell() {
+  try { localStorage.removeItem('fgui_session') } catch (e) {}
   fetch('/api/gui', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -934,8 +943,31 @@ function newShell() {
   })
 }
 
+// On load: restore the last session from localStorage, else start fresh.
+function restoreOrNew() {
+  var saved = null
+  try { saved = JSON.parse(localStorage.getItem('fgui_session') || 'null') } catch (e) {}
+  var hasContent = saved && (saved.stage?.background_url ||
+    (saved.buttons && saved.buttons.length) || (saved.zones && saved.zones.length))
+  if (!hasContent) { newShell(); return }
+  fetch('/api/gui', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: saved.name || 'Restored Shell' }) })
+    .then(r => r.json())
+    .then(function(ng) {
+      loadGuiIntoUI(Object.assign(ng, {
+        name: saved.name || ng.name, stage: saved.stage || ng.stage,
+        content_area: saved.content_area || ng.content_area,
+        buttons: saved.buttons || [], zones: saved.zones || [],
+      }))
+      document.getElementById('autosave-label').textContent = 'restored from this browser'
+      setTimeout(function () { document.getElementById('autosave-label').textContent = '' }, 2500)
+      saveGUI()
+    })
+    .catch(newShell)
+}
+
 // Init on load
-window.addEventListener('load', newShell)
+window.addEventListener('load', restoreOrNew)
 
 // -- Tabs -------------------------------------------------------
 function switchTab(name) {
@@ -1430,6 +1462,7 @@ function saveGUI(cb) {
   .then(r => r.json())
   .then(function(data) {
     gui = data
+    persistSession()
     document.getElementById('autosave-label').textContent     = 'saved ✓'
     document.getElementById('autosave-stage').textContent = 'saved ✓'
     setTimeout(function() {
