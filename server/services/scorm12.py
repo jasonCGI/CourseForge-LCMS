@@ -524,7 +524,7 @@ def _render_blocks(blocks, scorm_bridge=False):
 
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
-                     frame_map, cf_version):
+                     frame_map, cf_version, disp_index=None, disp_total=None):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -560,12 +560,13 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
                                     if b.get('type') != 'gui'])
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
-                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version)
+                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
+                        disp_index, disp_total)
     return html, asset_id
 
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
-                               section_name, frame_map, cf_version):
+                               section_name, frame_map, cf_version, disp_index=None, disp_total=None):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected)."""
     sdir = Path(shell.stored_path)
     html_path = sdir / (shell.html_file or '')
@@ -576,14 +577,19 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         html_path = cands[0]
     injected_html = _render_blocks((frame.content or {}).get('blocks', []))
     html = _patch_shell(html_path.read_text(encoding='utf-8'), shell.id, injected_html,
-                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version)
+                        frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
+                        disp_index, disp_total)
     return html, shell.id
 
 
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
-                 lesson_name, section_name, frame_map, cf_version):
+                 lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None):
     """Namespace a shell's assets to gui_assets/<ns_id>/ and inject the
-    CourseForge runtime (content injection + zones + nav + completion)."""
+    CourseForge runtime (content injection + zones + nav + completion).
+
+    The visible frame counter uses disp_index/disp_total (required frames only,
+    excluding optional); navigation + completion still use the real positions.
+    """
     # Namespace asset references so multiple shells never collide in the ZIP.
     shell_html = shell_html.replace('assets/', f'gui_assets/{ns_id}/')
 
@@ -591,6 +597,8 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     is_last   = frame_idx == total_frames - 1
     prev_href = frame_map.get(frame_idx - 1, '')
     next_href = frame_map.get(frame_idx + 1, '')
+    counter_index = disp_index if disp_index is not None else (frame_idx + 1)
+    counter_total = disp_total if disp_total is not None else total_frames
 
     cf_runtime = f"""
 <script>
@@ -598,8 +606,8 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
 (function() {{
   var FRAME_HTML = {json.dumps(injected_html)};
   var FRAME_DATA = {{
-    frameIndex:   {frame_idx + 1},
-    totalFrames:  {total_frames},
+    frameIndex:   {counter_index},
+    totalFrames:  {counter_total},
     lessonTitle:  {json.dumps(lesson_name or '')},
     sectionTitle: {json.dumps(section_name or '')},
     frameTitle:   {json.dumps(frame.name or '')},
@@ -762,6 +770,16 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             from ..models.gui_shell import GuiShell
             project_shell = GuiShell.query.get(project.gui_shell_id)
 
+        # Frame counter excludes optional frames: required total + per-frame
+        # running required index (optional frames hold the previous value).
+        req_total = sum(1 for (fr, _, _) in all_frames if not getattr(fr, 'optional', False)) or total
+        req_index = {}
+        _run = 0
+        for _i, (fr, _, _) in enumerate(all_frames):
+            if not getattr(fr, 'optional', False):
+                _run += 1
+            req_index[_i] = _run or 1
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
 
@@ -769,6 +787,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if _frame_has_gui(frame):
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
+                    req_index[idx], req_total,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
@@ -781,6 +800,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if project_shell and project_shell.stored_path:
                 ph, sid = _build_project_shell_frame(
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
+                    req_index[idx], req_total,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)
