@@ -757,7 +757,8 @@ function startAudioProcessing() {
 
 function pollAudioStatus() {
   if (!audioJobId) return
-  fetch('/api/audio/status/' + audioJobId).then(r=>r.json()).then(function(job){
+  fetch('/api/audio/status/' + audioJobId).then(r=>{ if(r.status===404){ clearInterval(audioPoll); showAudioError('Job expired — please re-run.'); return null } return r.json() }).then(function(job){
+    if (!job) return
     document.getElementById('audio-progress-fill').style.width = job.progress + '%'
     document.getElementById('audio-progress-msg').textContent  = job.message || ''
     document.getElementById('audio-progress-pct').textContent  = job.progress + '%'
@@ -870,7 +871,8 @@ function startImageProcessing() {
 
 function pollImageStatus() {
   if (!imageJobId) return
-  fetch('/api/image/status/' + imageJobId).then(r=>r.json()).then(function(job){
+  fetch('/api/image/status/' + imageJobId).then(r=>{ if(r.status===404){ clearInterval(imagePoll); showImageError('Job expired — please re-run.'); return null } return r.json() }).then(function(job){
+    if (!job) return
     document.getElementById('image-progress-fill').style.width = job.progress + '%'
     document.getElementById('image-progress-msg').textContent  = job.message || ''
     document.getElementById('image-progress-pct').textContent  = job.progress + '%'
@@ -1057,8 +1059,9 @@ function startProcessing() {
 function pollStatus() {
   if (!currentJobId) return;
   fetch('/api/video/status/' + currentJobId)
-    .then(r => r.json())
+    .then(r => { if (r.status === 404) { clearInterval(pollInterval); showError('Job expired — please re-run.'); return null; } return r.json(); })
     .then(function(job) {
+      if (!job) return;
       document.getElementById('progress-fill').style.width = job.progress + '%';
       document.getElementById('progress-msg').textContent  = job.message || '';
       document.getElementById('progress-pct').textContent  = job.progress + '%';

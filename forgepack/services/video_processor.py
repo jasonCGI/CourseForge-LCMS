@@ -21,6 +21,7 @@ import subprocess
 import threading
 from pathlib import Path
 from datetime import datetime
+from services.job_store import reap
 
 # In-memory job store — sufficient for single-worker Railway deployment
 # Keys: job_id → {status, progress, message, output_path, error}
@@ -205,6 +206,7 @@ def process_video_job(
         '-i', str(input_p),
         '-vf',   webm_cfg.get('vf', 'scale=-2:1080'),
         '-c:v',  webm_cfg.get('vcodec', 'libvpx-vp9'),
+        '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),
         '-b:v',  webm_cfg.get('b:v', '0'),
         '-pass', '1',
@@ -220,6 +222,7 @@ def process_video_job(
         '-i', str(input_p),
         '-vf',   webm_cfg.get('vf', 'scale=-2:1080'),
         '-c:v',  webm_cfg.get('vcodec', 'libvpx-vp9'),
+        '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),
         '-b:v',  webm_cfg.get('b:v', '0'),
         '-pass', '2',
@@ -294,6 +297,7 @@ def start_job(input_path: str, base_name: str, output_dir: str, preset: dict) ->
     """
     Start a background processing job. Returns job_id.
     """
+    reap(JOBS)
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {
         'status':      'queued',

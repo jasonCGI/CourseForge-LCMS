@@ -18,6 +18,7 @@ import subprocess
 import threading
 from pathlib import Path
 from datetime import datetime
+from services.job_store import reap
 
 JOBS = {}
 
@@ -49,22 +50,10 @@ def probe_audio(input_path: str) -> dict:
     except Exception:
         channels, sample_rate, duration = 1, 44100, 0.0
 
+    # Source loudness was measured with a full-file loudnorm decode here purely
+    # for display — the per-format encodes re-run loudnorm themselves and never
+    # use it. Dropped that extra whole-file decode; the encoder normalizes anyway.
     loudness_lufs = None
-    try:
-        loud_cmd = [
-            'ffmpeg', '-i', input_path,
-            '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json',
-            '-f', 'null', '-',
-        ]
-        loud_result = subprocess.run(loud_cmd, capture_output=True, text=True, timeout=120)
-        stderr = loud_result.stderr
-        json_start = stderr.rfind('{')
-        json_end   = stderr.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            loud_data     = json.loads(stderr[json_start:json_end])
-            loudness_lufs = float(loud_data.get('input_i', -99))
-    except Exception:
-        pass
 
     return {
         'channels':      channels,
@@ -205,6 +194,7 @@ Loudness note:
 
 
 def start_audio_job(input_path: str, base_name: str, output_dir: str, preset: dict) -> str:
+    reap(JOBS)
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {
         'status': 'queued', 'progress': 0, 'message': 'Queued',

@@ -26,6 +26,7 @@ import threading
 import copy
 from pathlib import Path
 from datetime import datetime
+from services.job_store import reap
 
 JOBS = {}
 HOLD_DURATION  = 1.0    # seconds per interaction point
@@ -223,6 +224,7 @@ def bake_job(job_id, video_path, clip_data, base_name, output_dir):
 
 
 def start_bake_job(video_path, clip_data, base_name, output_dir):
+    reap(JOBS)
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {'status': 'queued', 'progress': 0, 'message': 'Queued',
                     'output_path': None, 'error': None, 'created_at': datetime.utcnow().isoformat()}

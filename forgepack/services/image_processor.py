@@ -13,6 +13,7 @@ import zipfile
 import threading
 from pathlib import Path
 from datetime import datetime
+from services.job_store import reap
 
 try:
     from PIL import Image
@@ -91,11 +92,11 @@ def process_image_job(job_id, input_path, base_name, output_dir, preset):
         elif img.mode != 'RGB':
             img = img.convert('RGB')
 
-        # Strip EXIF by re-creating pixel data
-        data = list(img.getdata())
-        clean = Image.new(img.mode, img.size)
-        clean.putdata(data)
-        img = clean
+        # Strip EXIF: drop it from the in-memory metadata (Pillow only writes
+        # EXIF on save if you pass it, and we don't). The old getdata()/putdata()
+        # copy materialized every pixel into a Python list — hundreds of MB and a
+        # slow pure-Python pass for a 4096² image, an OOM risk on the 1-worker box.
+        img.info.pop('exif', None)
 
         original_w, original_h = img.size
         JOBS[job_id].update({'progress': 10, 'probe': {'width': original_w, 'height': original_h, 'mode': img.mode}})
@@ -187,6 +188,7 @@ Color space: converted to sRGB for web. EXIF metadata stripped for privacy.
 
 
 def start_image_job(input_path, base_name, output_dir, preset) -> str:
+    reap(JOBS)
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {
         'status': 'queued', 'progress': 0, 'message': 'Queued',
