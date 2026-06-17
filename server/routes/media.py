@@ -211,6 +211,15 @@ def upload_media():
 
     _pair_companions(media_asset, project_id)
 
+    # Detect audio track on video uploads → caption guardrail can skip silent video.
+    if kind == 'video':
+        ha = _mp4_has_audio(str(stored_path))
+        if ha is not None:
+            comp = dict(media_asset.companion_files or {})
+            comp['has_audio'] = ha
+            media_asset.companion_files = comp
+            db.session.commit()
+
     return jsonify(_serialize_media(media_asset)), 201
 
 
@@ -458,6 +467,49 @@ def _pair_companions(asset: MediaAsset, project_id: str) -> None:
     db.session.commit()
 
 
+def _mp4_has_audio(path):
+    """Detect whether an MP4 has an audio track, pure-Python (no ffmpeg).
+    Returns True / False / None (unknown — non-mp4 or unparseable).
+
+    Walks top-level boxes to 'moov', then looks for an audio handler ('soun')
+    in the movie box. Bias is safe for the caption guardrail: audio tracks
+    always carry a 'soun' hdlr, so this never returns a false 'no audio'
+    (which would wrongly drop the caption requirement); at worst it returns
+    True when unsure, keeping the warning.
+    """
+    try:
+        with open(path, 'rb') as fh:
+            data = fh.read(4 * 1024 * 1024)  # moov is typically near the front (faststart)
+    except Exception:
+        return None
+    if b'ftyp' not in data[:64]:
+        return None
+
+    def find_box(buf, name):
+        i = 0
+        while i + 8 <= len(buf):
+            size = int.from_bytes(buf[i:i + 4], 'big')
+            typ  = buf[i + 4:i + 8]
+            hdr  = 8
+            if size == 1:
+                size = int.from_bytes(buf[i + 8:i + 16], 'big'); hdr = 16
+            if size < hdr:
+                break
+            if typ == name:
+                return buf[i + hdr:i + size]
+            i += size
+        return None
+
+    moov = find_box(data, b'moov')
+    if moov is None:
+        return None
+    if b'soun' in moov:   # audio handler present
+        return True
+    if b'vide' in moov:   # has video track(s) but no audio handler
+        return False
+    return None
+
+
 def _serialize_media(asset):
     companions = asset.companion_files or {}
     return {
@@ -472,6 +524,7 @@ def _serialize_media(asset):
         'has_captions':   bool(companions.get('vtt_asset_id')),
         'has_webm':       bool(companions.get('webm_asset_id')),
         'has_poster':     bool(companions.get('poster_asset_id')),
+        'has_audio':      companions.get('has_audio'),   # True/False/None(unknown)
         'has_clip':       bool(companions.get('clip_asset_id')),
         'clip_asset_id':  companions.get('clip_asset_id'),
         'video_asset_id': companions.get('video_asset_id'),
