@@ -1,0 +1,80 @@
+/* ── Forge3D Design Tokens ─────────────────────────────────────────────── */
+/* Modes: [data-theme="night"] [data-theme="day"] [data-theme="hc"]        */
+
+/* ── Night (default) ────────────────────────────────────────────────────── */
+:root,
+[data-theme="night"] {
+  --forge-amber:          #F59E0B;
+  --forge-amber-dark:     #D4820A;
+  --forge-amber-hover:    #FBBF24;
+  --forge-bg:             #0D0D0D;
+  --forge-surface:        #1A1A1A;
+  --forge-surface-2:      #242424;
+  --forge-surface-hover:  #2E2E2E;
+  --forge-border:         #2E2E2E;
+  --forge-border-focus:   #F59E0B;
+  --forge-text:           #E8E8E8;
+  --forge-text-muted:     #888888;
+  --forge-text-inverse:   #0D0D0D;
+  --forge-success:        #22C55E;
+  --forge-warn:           #F59E0B;
+  --forge-error:          #EF4444;
+  --forge-focus-ring:     0 0 0 2px #0D0D0D, 0 0 0 4px #F59E0B;
+  --forge-font:           'IBM Plex Mono', monospace;
+  color-scheme: dark;
+}
+
+/* ── Day ─────────────────────────────────────────────────────────────────── */
+[data-theme="day"] {
+  --forge-amber:          #D4820A;
+  --forge-amber-dark:     #B86A00;
+  --forge-amber-hover:    #E8920B;
+  --forge-bg:             #F5F5F0;
+  --forge-surface:        #FFFFFF;
+  --forge-surface-2:      #EFEFEA;
+  --forge-surface-hover:  #E8E8E2;
+  --forge-border:         #D0D0C8;
+  --forge-border-focus:   #D4820A;
+  --forge-text:           #1A1A1A;
+  --forge-text-muted:     #666660;
+  --forge-text-inverse:   #FFFFFF;
+  --forge-success:        #16A34A;
+  --forge-warn:           #D4820A;
+  --forge-error:          #DC2626;
+  --forge-focus-ring:     0 0 0 2px #F5F5F0, 0 0 0 4px #D4820A;
+  color-scheme: light;
+}
+
+/* ── High Contrast (WCAG AAA / 508 HC) ─────────────────────────────────── */
+[data-theme="hc"] {
+  --forge-amber:          #FFD700;
+  --forge-amber-dark:     #FFD700;
+  --forge-amber-hover:    #FFEC6E;
+  --forge-bg:             #000000;
+  --forge-surface:        #000000;
+  --forge-surface-2:      #1A1A00;
+  --forge-surface-hover:  #2A2A00;
+  --forge-border:         #FFD700;
+  --forge-border-focus:   #FFFFFF;
+  --forge-text:           #FFFFFF;
+  --forge-text-muted:     #FFFFFF;
+  --forge-text-inverse:   #000000;
+  --forge-success:        #00FF00;
+  --forge-warn:           #FFD700;
+  --forge-error:          #FF6060;
+  --forge-focus-ring:     0 0 0 2px #000000, 0 0 0 4px #FFFFFF, 0 0 0 6px #FFD700;
+  color-scheme: dark;
+}
+
+[data-theme="hc"] button,
+[data-theme="hc"] input,
+[data-theme="hc"] .f3d-drop-zone,
+[data-theme="hc"] .f3d-modal,
+[data-theme="hc"] .f3d-panel-left {
+  border-color: var(--forge-border) !important;
+  border-width: 2px !important;
+}
+[data-theme="hc"] .f3d-tab.active {
+  border-bottom-width: 3px !important;
+  border-bottom-color: var(--forge-amber) !important;
+}

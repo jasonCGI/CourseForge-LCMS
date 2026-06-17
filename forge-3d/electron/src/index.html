@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net">
+  <title>Forge3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="forge-tokens.css">
+  <link rel="stylesheet" href="forge3d.css">
+  <script>
+    // Apply theme before paint to prevent flash
+    (function() {
+      const stored = localStorage.getItem('forge3d_theme')
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const theme = stored || (prefersDark ? 'night' : 'day')
+      document.documentElement.setAttribute('data-theme', theme)
+    })()
+  </script>
+</head>
+<body>
+
+  <a href="#main-content" class="f3d-skip-nav">Skip to main content</a>
+
+  <!-- ── Header ── -->
+  <header class="f3d-header">
+    <div class="f3d-logo">
+      <svg class="f3d-logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <polyline points="8,22 8,10 16,6 24,10 24,22 16,26 8,22" stroke="#F59E0B" stroke-width="1.5" fill="none"/>
+        <polyline points="8,10 16,14 24,10" stroke="#F59E0B" stroke-width="1.5" fill="none"/>
+        <line x1="16" y1="14" x2="16" y2="26" stroke="#F59E0B" stroke-width="1.5"/>
+        <circle cx="16" cy="6" r="2" fill="#F59E0B"/>
+      </svg>
+      <span class="f3d-logo-text">Forge<span class="f3d-logo-accent">3D</span></span>
+    </div>
+    <div class="f3d-header-actions">
+      <div class="f3d-theme-switcher" role="group" aria-label="Display mode">
+        <button class="f3d-theme-btn" id="theme-day"   aria-pressed="false" aria-label="Day mode">☀</button>
+        <button class="f3d-theme-btn" id="theme-night" aria-pressed="false" aria-label="Night mode">◑</button>
+        <button class="f3d-theme-btn" id="theme-hc"    aria-pressed="false" aria-label="High contrast mode">◉</button>
+      </div>
+      <button class="f3d-btn f3d-btn-ghost" id="btn-settings" aria-label="Open settings">Settings</button>
+    </div>
+  </header>
+
+  <!-- ── Main ── -->
+  <main class="f3d-main" id="main-content">
+
+    <!-- Left panel -->
+    <section class="f3d-panel f3d-panel-left" aria-label="File input and options">
+
+      <div class="f3d-drop-zone" id="drop-zone"
+           role="button" tabindex="0"
+           aria-label="Drop FBX file here or press Enter to browse"
+           aria-describedby="drop-hint">
+        <div class="f3d-drop-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="12" width="32" height="28" rx="2" stroke="#F59E0B" stroke-width="1.5"/>
+            <path d="M16 12V10a2 2 0 012-2h12a2 2 0 012 2v2" stroke="#F59E0B" stroke-width="1.5"/>
+            <path d="M24 22v12M18 28l6-6 6 6" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="f3d-drop-label">Drop FBX here</p>
+        <p class="f3d-drop-sub" id="drop-hint">or <button class="f3d-link" id="btn-browse">click to browse</button></p>
+      </div>
+
+      <div class="f3d-file-info" id="file-info" style="display:none">
+        <div class="f3d-file-name" id="file-name"></div>
+        <div class="f3d-file-meta" id="file-meta"></div>
+        <button class="f3d-link f3d-clear" id="btn-clear" aria-label="Clear selected file">✕ Clear</button>
+      </div>
+
+      <div class="f3d-preflight" id="preflight-panel" style="display:none"
+           aria-live="polite" aria-label="Preflight scan results">
+        <div class="f3d-section-label">Preflight</div>
+        <div id="preflight-results"></div>
+      </div>
+
+      <div class="f3d-options" id="options-panel" style="display:none">
+        <div class="f3d-section-label">Options</div>
+        <label class="f3d-option"><input type="checkbox" id="opt-animations" checked> Include animations</label>
+        <label class="f3d-option"><input type="checkbox" id="opt-transforms" checked> Apply transforms</label>
+        <label class="f3d-option"><input type="checkbox" id="opt-draco"> Draco mesh compression</label>
+        <label class="f3d-option"><input type="checkbox" id="opt-cameras"> Export cameras</label>
+
+        <div class="f3d-output-row">
+          <div class="f3d-section-label">Output directory</div>
+          <div class="f3d-output-path" id="output-path-display"></div>
+          <button class="f3d-btn f3d-btn-ghost f3d-btn-sm" id="btn-output-dir">Change</button>
+        </div>
+
+        <button class="f3d-btn f3d-btn-primary f3d-btn-full" id="btn-convert"
+                aria-disabled="true" aria-busy="false">
+          Convert to GLB
+        </button>
+      </div>
+
+    </section>
+
+    <!-- Right panel -->
+    <section class="f3d-panel f3d-panel-right" aria-label="Output">
+
+      <div class="f3d-tabs" role="tablist" aria-label="Output panels">
+        <button class="f3d-tab active" data-tab="log"
+                role="tab" aria-selected="true" aria-controls="tab-log" id="tab-btn-log">Log</button>
+        <button class="f3d-tab" data-tab="preview"
+                role="tab" aria-selected="false" aria-controls="tab-preview" id="tab-btn-preview">Preview</button>
+      </div>
+
+      <div class="f3d-tab-content" id="tab-log" role="tabpanel" aria-labelledby="tab-btn-log">
+        <div class="f3d-log" id="conversion-log"
+             role="log" aria-live="polite" aria-label="Conversion log" aria-relevant="additions">
+          <span class="f3d-log-placeholder">Conversion log will appear here...</span>
+        </div>
+      </div>
+
+      <div class="f3d-tab-content" id="tab-preview" role="tabpanel" aria-labelledby="tab-btn-preview" style="display:none">
+        <div class="f3d-preview-area" id="preview-area">
+          <span class="f3d-log-placeholder">GLB preview will appear after conversion.</span>
+        </div>
+      </div>
+
+      <div class="f3d-result-bar" id="result-bar" style="display:none"
+           role="status" aria-live="assertive">
+        <span id="result-message"></span>
+        <button class="f3d-btn f3d-btn-ghost f3d-btn-sm" id="btn-reveal" style="display:none">
+          Show in Explorer
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Settings modal -->
+  <div class="f3d-modal-overlay" id="settings-overlay" style="display:none"
+       role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="f3d-modal">
+      <div class="f3d-modal-header">
+        <span id="settings-title">Settings</span>
+        <button class="f3d-link" id="btn-close-settings" aria-label="Close settings">✕</button>
+      </div>
+      <div class="f3d-modal-body">
+        <label class="f3d-section-label" for="blender-path-input">Blender Executable Path</label>
+        <div class="f3d-path-row">
+          <input type="text" class="f3d-input" id="blender-path-input"
+                 placeholder="C:\Program Files\Blender Foundation\Blender 4.x\blender.exe"
+                 readonly aria-describedby="blender-hint">
+          <button class="f3d-btn f3d-btn-ghost" id="btn-browse-blender">Browse</button>
+        </div>
+        <p class="f3d-hint" id="blender-hint">
+          Blender 3.6 LTS or 4.x required. FBX import and glTF export addons are enabled by default.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
