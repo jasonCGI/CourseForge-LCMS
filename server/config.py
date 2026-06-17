@@ -26,7 +26,14 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = resolve_database_uri()
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
+    # Overridable so a Railway Volume mount path (e.g. /data) provides durable
+    # storage in prod — containers are ephemeral, so the default repo-local
+    # uploads/ dir is wiped on every redeploy. All upload subdirs (media/, oam/,
+    # models/, exports/, cache/, gui*/) are created on demand under this root.
+    UPLOAD_FOLDER = os.environ.get(
+        'UPLOAD_FOLDER',
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads'),
+    )
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 104857600))  # 100MB default
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:5173').split(',')
 
