@@ -16,6 +16,7 @@ preview shows the same markup the published SCO will, then:
 This module is import-only against scorm12 — it never mutates the packager.
 """
 import re
+from functools import lru_cache
 from html import escape
 from pathlib import Path
 
@@ -53,12 +54,13 @@ def _project_for_frame(frame):
     return getattr(course, "project", None) if course else None
 
 
+@lru_cache(maxsize=1)
 def _shell_runtime_js() -> str:
     """
     Lift the WCN-modal + interactive-video runtime scripts verbatim from
     sco_shell.html so preview behaviour matches the SCO exactly (no copy-paste
     drift). Returns the two contiguous <script>...</script> blocks, or '' if the
-    template can't be read.
+    template can't be read. Cached — the template is static at runtime.
     """
     try:
         shell_src = (Path(current_app.root_path) / "templates" / "sco_shell.html").read_text(

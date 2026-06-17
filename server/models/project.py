@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from sqlalchemy.orm import selectinload
 from ..extensions import db
 
 def gen_uuid():
@@ -66,3 +67,15 @@ class Frame(db.Model):
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     lesson      = db.relationship('Lesson', back_populates='frames')
+
+
+def project_full_query():
+    """Project query that eager-loads the whole Course→Module→Lesson→Frame tree
+    in one query per level (selectinload), avoiding the N+1 cascade when the
+    editor loads a project or a packager walks every frame."""
+    return Project.query.options(
+        selectinload(Project.courses)
+        .selectinload(Course.modules)
+        .selectinload(Module.lessons)
+        .selectinload(Lesson.frames)
+    )

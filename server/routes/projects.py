@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from ..extensions import db
-from ..models.project import Project, Course, Module, Lesson, Frame
+from sqlalchemy.orm import selectinload
+from ..models.project import Project, Course, Module, Lesson, Frame, project_full_query
 from ..schemas.project_schemas import (
     ProjectSchema, ProjectListSchema, CourseSchema,
     ModuleSchema, LessonSchema, FrameSchema
@@ -26,7 +27,8 @@ def list_projects():
 
 @projects_bp.get('/api/projects/<project_id>')
 def get_project(project_id):
-    project = Project.query.get_or_404(project_id)
+    # Eager-load the whole tree (one query per level) — the editor's main load.
+    project = project_full_query().get_or_404(project_id)
     return jsonify(project_schema.dump(project))
 
 
@@ -65,7 +67,11 @@ def delete_project(project_id):
     # so their OamAsset children cascade; PublishJobs have no children.
     from ..models.media import MediaAsset
     from ..models.publish_job import PublishJob
-    for asset in MediaAsset.query.filter_by(project_id=project_id).all():
+    # Eager-load oam_asset so the ORM cascade doesn't fire a SELECT per asset.
+    assets = (MediaAsset.query
+              .options(selectinload(MediaAsset.oam_asset))
+              .filter_by(project_id=project_id).all())
+    for asset in assets:
         db.session.delete(asset)
     PublishJob.query.filter_by(project_id=project_id).delete()
     db.session.delete(project)
@@ -301,8 +307,11 @@ def reorder():
     if not model:
         return jsonify({'error': f'Unknown type: {entity_type}'}), 400
 
+    # One query for all rows instead of a SELECT per item.
+    ids = [it['id'] for it in items]
+    by_id = {o.id: o for o in model.query.filter(model.id.in_(ids)).all()}
     for item in items:
-        obj = model.query.get(item['id'])
+        obj = by_id.get(item['id'])
         if obj:
             obj.order_index = item['order_index']
 

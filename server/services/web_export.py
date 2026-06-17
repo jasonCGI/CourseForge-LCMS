@@ -11,7 +11,7 @@ import zipfile
 from datetime import datetime
 from flask import render_template
 
-from ..models.project import Project
+from ..models.project import Project, project_full_query
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks
 from ..version import VERSION, SCHEMA_VERSION
@@ -72,7 +72,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
     Build a standalone web ZIP containing index.html + assets.
     Returns (BytesIO zip buffer, suggested filename).
     """
-    project = Project.query.get_or_404(project_id)
+    project = project_full_query().get_or_404(project_id)
     tokens  = resolve_theme(project)
     css     = tokens_to_css(tokens)
 

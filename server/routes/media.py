@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import selectinload
 from ..extensions import db
 from ..models.media import MediaAsset, OamAsset
 from ..services.oam_importer import ingest_oam, OAMIngestError
@@ -381,7 +382,8 @@ def serve_model(filename):
 @media_bp.get('/api/media/project/<project_id>')
 def list_project_media(project_id):
     """List all media assets for a project."""
-    assets = MediaAsset.query.filter_by(project_id=project_id)\
+    assets = MediaAsset.query.options(selectinload(MediaAsset.oam_asset))\
+        .filter_by(project_id=project_id)\
         .order_by(MediaAsset.created_at.desc()).all()
     result = []
     for a in assets:
@@ -409,9 +411,12 @@ def _pair_companions(asset: MediaAsset, project_id: str) -> None:
     base = _base(asset.original_name)
     ext  = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else ''
 
+    # Prefilter in SQL to same-base-name candidates ("<base>.<ext>") instead of
+    # loading every asset in the project; keep the exact _base() check below.
     siblings = MediaAsset.query.filter(
         MediaAsset.project_id == project_id,
         MediaAsset.id != asset.id,
+        MediaAsset.original_name.ilike(base + '.%'),
     ).all()
 
     matches = [s for s in siblings if _base(s.original_name) == base]
