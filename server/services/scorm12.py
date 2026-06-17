@@ -124,6 +124,35 @@ def _render_blocks(blocks, scorm_bridge=False):
                     f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}'
                 )
 
+        elif btype == 'media' and data.get('kind') == 'image' and data.get('asset_id'):
+            asset_id = data['asset_id']
+            name     = data.get('original_name') or ''
+            ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'jpg'
+            alt      = data.get('placeholder_label') or name or 'Image'
+            caption  = data.get('caption', '')
+            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
+                        if caption else '')
+            parts.append(
+                f'<div style="margin-bottom:20px">'
+                f'<img src="media/images/{asset_id}.{ext}" alt="{alt}" '
+                f'style="max-width:100%;height:auto;border-radius:6px">'
+                f'{cap_html}</div>'
+            )
+
+        elif btype == 'media' and data.get('kind') == 'audio' and data.get('asset_id'):
+            asset_id = data['asset_id']
+            name     = data.get('original_name') or ''
+            ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'mp3'
+            caption  = data.get('caption', '')
+            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
+                        if caption else '')
+            parts.append(
+                f'<div style="margin-bottom:20px">'
+                f'<audio controls src="media/audio/{asset_id}.{ext}" style="width:100%">'
+                f'Your browser does not support audio playback.</audio>'
+                f'{cap_html}</div>'
+            )
+
         elif btype == 'media':
             kind  = data.get('kind', 'image')
             label = data.get('placeholder_label', '')
@@ -871,6 +900,12 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if asset.kind == 'video':
                 vext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'mp4'
                 _bundle_media(asset.stored_path, f'media/video/{asset.id}.{vext}')
+            if asset.kind == 'image':
+                iext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'jpg'
+                _bundle_media(asset.stored_path, f'media/images/{asset.id}.{iext}')
+            if asset.kind == 'audio':
+                aext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'mp3'
+                _bundle_media(asset.stored_path, f'media/audio/{asset.id}.{aext}')
             if companions.get('webm_asset_id'):
                 webm = MediaAsset.query.get(companions['webm_asset_id'])
                 if webm:

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from flask import current_app
 
-from .scorm12 import _render_blocks
+from .scorm12 import _render_blocks, _build_project_shell_frame
 from .theme_resolver import resolve_theme, tokens_to_css
 
 # media/<kind>/<uuid>.<ext>  ->  /api/media/serve/<uuid>   (serve route is kind-agnostic)
@@ -160,12 +160,73 @@ scorm.init();
 """
 
 
+# Head assets shared by both preview layouts (fonts + Video.js from CDN).
+_HEAD_ASSETS = (
+    "<link href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap\" rel=\"stylesheet\">"
+    "<link href=\"https://vjs.zencdn.net/8.10.0/video-js.css\" rel=\"stylesheet\">"
+    "<script src=\"https://vjs.zencdn.net/8.10.0/video.min.js\"></script>"
+)
+
+
+def _project_shell_for(project):
+    """Return the GuiShell selected at the project level, or None."""
+    if not project or not getattr(project, "gui_shell_id", None):
+        return None
+    from ..models.gui_shell import GuiShell
+    shell = GuiShell.query.get(project.gui_shell_id)
+    return shell if (shell and shell.stored_path) else None
+
+
+def _build_shell_preview(shell, frame, project) -> str | None:
+    """
+    Render the frame wrapped in the project's GUI shell exactly as the published
+    SCO will (shell becomes the page, blocks injected via window.fgui), then
+    rewire its paths to live serve URLs and graft in the preview chrome.
+    """
+    from ..version import VERSION
+    lesson = getattr(frame, "lesson", None)
+    module = getattr(lesson, "module", None) if lesson else None
+    course = getattr(module, "course", None) if module else None
+    html, _ = _build_project_shell_frame(
+        shell, frame, 0, 1,
+        getattr(lesson, "name", "") or "",
+        getattr(course, "name", "") or "",
+        {0: ""}, VERSION, 1, 1,
+    )
+    if not html:
+        return None
+
+    # gui_assets/<id>/  -> live shell-asset serve URL;  media/.. / oam/.. -> live serve.
+    html = html.replace(f"gui_assets/{shell.id}/", f"/api/gui-shells/{shell.id}/assets/")
+    html = _rewrite_asset_paths(html)
+
+    # Graft preview chrome into the shell's own document.
+    chrome_scripts = "<script>" + _STUB_JS + "</script>" + _shell_runtime_js()
+    if "</head>" in html:
+        html = html.replace("</head>", _HEAD_ASSETS + "</head>", 1)
+    else:
+        html = _HEAD_ASSETS + html
+    if "</body>" in html:
+        html = html.replace("</body>", _BANNER + chrome_scripts + "</body>", 1)
+    else:
+        html = html + _BANNER + chrome_scripts
+    return html
+
+
 def build_frame_preview_html(frame) -> str:
     """Build a self-contained preview HTML page for a single frame."""
+    project = _project_for_frame(frame)
+
+    # Project-level GUI shell: render the frame inside the shell (the real SCO look).
+    shell = _project_shell_for(project)
+    if shell:
+        shell_html = _build_shell_preview(shell, frame, project)
+        if shell_html:
+            return shell_html
+
     blocks = (frame.content or {}).get("blocks", []) if isinstance(frame.content, dict) else []
     blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False))
 
-    project = _project_for_frame(frame)
     try:
         theme_css = tokens_to_css(resolve_theme(project)) if project else ""
     except Exception:
@@ -178,9 +239,7 @@ def build_frame_preview_html(frame) -> str:
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">",
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
         f"<title>Preview · {title}</title>",
-        "<link href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap\" rel=\"stylesheet\">",
-        "<link href=\"https://vjs.zencdn.net/8.10.0/video-js.css\" rel=\"stylesheet\">",
-        "<script src=\"https://vjs.zencdn.net/8.10.0/video.min.js\"></script>",
+        _HEAD_ASSETS,
         "<style>", _BASE_CSS, theme_css, "</style></head><body>",
         _BANNER,
         "<main class=\"cf-preview-main\">", blocks_html, "</main>",

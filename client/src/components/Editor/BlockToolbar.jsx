@@ -11,7 +11,7 @@ const BLOCK_TYPES = [
   { type: 'oam',     label: 'OAM',     icon: '⚙',  color: '#533AB7', available: true  },
   { type: 'ivideo',  label: 'iVideo',  icon: '▶⊕', color: '#7A3A9A', available: true  },
   { type: 'model3d', label: '3D Model', icon: '⬡', color: '#2A5A8A', available: true  },
-  { type: 'gui',     label: 'GUI Shell', icon: '▣', color: '#3A5A8A', available: true  },
+  // GUI shells are applied at the PROJECT level (header ▣ Shell button), not per frame.
 ]
 
 export default function BlockToolbar() {
@@ -19,9 +19,6 @@ export default function BlockToolbar() {
   const activeFrame  = useEditorStore(s => s.activeFrame)
 
   if (!activeFrame) return null
-
-  // Only one GUI shell per frame — it becomes the SCO page on publish.
-  const hasGui = (activeFrame.content?.blocks || []).some(b => b.type === 'gui')
 
   return (
     <div style={{
@@ -43,12 +40,8 @@ export default function BlockToolbar() {
         Add block
       </span>
       {BLOCK_TYPES.map(({ type, label, icon, color, available }) => {
-        // GUI shell is limited to one per frame.
-        const guiBlocked = type === 'gui' && hasGui
-        const enabled    = available && !guiBlocked
-        const title = guiBlocked
-          ? 'Frame already has a GUI shell'
-          : available ? `Add ${label} block` : `${label} — available in Sprint 4`
+        const enabled = available
+        const title = available ? `Add ${label} block` : `${label} — available in Sprint 4`
         return (
           <button
             key={type}
