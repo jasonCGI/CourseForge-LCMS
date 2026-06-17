@@ -18,7 +18,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- defer: ~900KB lib only needed on upload/download, not at first paint -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* ── Reset + Base ───────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1130,6 +1131,13 @@ function handleParsed(rows, filename) {
 }
 
 // ─── Render validation ────────────────────────────────────────────────────
+// Escape user-supplied spreadsheet content before it goes into innerHTML.
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 function renderValidation(errors, warnings, frameCount) {
   const summary = document.getElementById('report-summary')
   const list    = document.getElementById('report-list')
@@ -1147,12 +1155,16 @@ function renderValidation(errors, warnings, frameCount) {
   if (warnings.length > 0) summary.innerHTML += `<span class="report-badge badge-warn">⚠ ${warnings.length} warning${warnings.length > 1 ? 's' : ''}</span>`
   if (errors.length === 0) summary.innerHTML += `<span class="report-badge badge-ok">✓ Ready to export</span>`
 
+  // Build the list once (was innerHTML += in a loop → O(n²) reserialize) and
+  // escape the messages (they embed user-supplied frame names etc.).
+  const rows = []
   errors.forEach(e => {
-    list.innerHTML += `<li class="report-item error"><span class="report-item-icon">✕</span><span class="report-item-text">${e.msg}</span></li>`
+    rows.push(`<li class="report-item error"><span class="report-item-icon">✕</span><span class="report-item-text">${esc(e.msg)}</span></li>`)
   })
   warnings.forEach(w => {
-    list.innerHTML += `<li class="report-item warn"><span class="report-item-icon">⚠</span><span class="report-item-text">${w.msg}</span></li>`
+    rows.push(`<li class="report-item warn"><span class="report-item-icon">⚠</span><span class="report-item-text">${esc(w.msg)}</span></li>`)
   })
+  list.innerHTML = rows.join('')
 }
 
 // ─── Render stats ─────────────────────────────────────────────────────────
@@ -1560,10 +1572,10 @@ function renderMediaList(media) {
         <option value="audio" ${m.kind==='audio'?'selected':''}>🎙 Audio</option>
         <option value="oam"   ${m.kind==='oam'  ?'selected':''}>⚙ OAM</option>
       </select>
-      <input type="text" value="${m.placeholder_label||''}" placeholder="Label e.g. nose_section_photo"
+      <input type="text" value="${esc(m.placeholder_label||'')}" placeholder="Label e.g. nose_section_photo"
         onchange="updateMedia(${i},'placeholder_label',this.value)" aria-label="Media placeholder label"
         style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:var(--font)">
-      <input type="text" value="${m.caption||''}" placeholder="Caption (optional)"
+      <input type="text" value="${esc(m.caption||'')}" placeholder="Caption (optional)"
         onchange="updateMedia(${i},'caption',this.value)" aria-label="Media caption"
         style="flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:var(--font)">
       <button onclick="removeMedia(${i})" aria-label="Remove media placeholder"
@@ -1604,8 +1616,8 @@ function renderWCNList(wcn) {
     div.style.cssText = `border:1px solid ${c.border};border-left:3px solid ${c.bg};border-radius:6px;padding:10px 12px;margin-bottom:8px;background:${c.border.replace('0.3','0.05')}`
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="background:${c.bg};color:#fff;font-family:var(--forge-font);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:0.1em">${w.type.toUpperCase()}</span>
-        <input type="text" value="${w.title||''}" placeholder="Title" onchange="updateWCN(${i},'title',this.value)" aria-label="WCN title"
+        <span style="background:${c.bg};color:#fff;font-family:var(--forge-font);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:0.1em">${esc(String(w.type||'note').toUpperCase())}</span>
+        <input type="text" value="${esc(w.title||'')}" placeholder="Title" onchange="updateWCN(${i},'title',this.value)" aria-label="WCN title"
           style="flex:1;background:var(--bg);color:${c.text};border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;font-weight:600;font-family:var(--font)">
         <select onchange="updateWCN(${i},'modal',this.value==='true')" aria-label="WCN display mode"
           style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:var(--font)">
@@ -1616,7 +1628,7 @@ function renderWCNList(wcn) {
           style="background:none;border:none;color:#E87070;cursor:pointer;font-size:14px;padding:4px">✕</button>
       </div>
       <textarea onchange="updateWCN(${i},'text',this.value)" aria-label="WCN content text" rows="2" placeholder="Enter warning/caution/note text…"
-        style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:7px 8px;font-size:12px;font-family:var(--font);resize:vertical">${w.text||''}</textarea>`
+        style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:7px 8px;font-size:12px;font-family:var(--font);resize:vertical">${esc(w.text||'')}</textarea>`
     list.appendChild(div)
   })
 }
@@ -1651,7 +1663,7 @@ function renderKCChoices(choices, correctIndex) {
         style="width:22px;height:22px;border-radius:50%;border:2px solid ${i===kcCorrectIndex?'#3B8A4A':'var(--border)'};background:${i===kcCorrectIndex?'#3B8A4A':'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">
         ${i===kcCorrectIndex?'<span style="color:#fff;font-size:11px;font-weight:700">✓</span>':''}
       </button>
-      <input type="text" value="${choice}" placeholder="Choice ${i+1}" onchange="updateKCChoice(${i},this.value)" aria-label="Choice ${i+1}"
+      <input type="text" value="${esc(choice)}" placeholder="Choice ${i+1}" onchange="updateKCChoice(${i},this.value)" aria-label="Choice ${i+1}"
         style="flex:1;background:var(--bg3);color:var(--text);border:1px solid ${i===kcCorrectIndex?'#3B8A4A':'var(--border)'};border-radius:4px;padding:6px 8px;font-size:13px;font-family:var(--font)">
       <button onclick="removeKCChoice(${i})" aria-label="Remove choice ${i+1}"
         style="background:none;border:none;color:#E87070;cursor:pointer;font-size:14px;padding:4px">✕</button>`
