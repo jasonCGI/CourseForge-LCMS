@@ -10,6 +10,9 @@ Manual reset:  GET /api/demo/reset
 
 import uuid
 import base64
+import shutil
+from pathlib import Path
+from flask import current_app
 from .extensions import db
 
 
@@ -391,6 +394,80 @@ LESSON_ORDER = ['Welcome', 'Content Blocks', 'Assessment Blocks', 'Safety Blocks
 
 # ── Seeder ───────────────────────────────────────────────────────────────────────
 
+def _wire_demo_assets(project):
+    """Register the bundled sample media (server/demo_assets/) as real MediaAssets
+    and wire them into the demo's image/video/audio/3D/hotspot blocks, so the demo
+    previews + publishes with LIVE media instead of placeholders. Idempotent: the
+    demo media dir is cleared first so repeated resets don't orphan files."""
+    from sqlalchemy.orm.attributes import flag_modified
+    from .models.project import Frame, Lesson, Module, Course
+    from .models.media import MediaAsset
+    from .routes.media import _serialize_media
+
+    base = Path(__file__).parent / 'demo_assets'
+    if not base.is_dir():
+        print('[demo_seed] demo_assets/ missing — skipping live-asset wiring')
+        return
+    media_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'media' / 'demo'
+    shutil.rmtree(media_dir, ignore_errors=True)
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    def reg(src_name, kind, mime, companions=None):
+        aid = str(uuid.uuid4())
+        src = base / src_name
+        dest = media_dir / f'{aid}{src.suffix}'
+        shutil.copyfile(src, dest)
+        a = MediaAsset(id=aid, project_id=project.id, kind=kind, original_name=src_name,
+                       stored_path=str(dest), mime_type=mime, file_size=dest.stat().st_size,
+                       companion_files=companions or {})
+        db.session.add(a)
+        return a
+
+    webm   = reg('sample_video.webm', 'video', 'video/webm')
+    poster = reg('sample_poster.jpg', 'image', 'image/jpeg')
+    vtt    = reg('sample_captions.vtt', 'caption', 'text/vtt')
+    db.session.flush()
+    mp4 = reg('sample_video.mp4', 'video', 'video/mp4', companions={
+        'webm_asset_id': webm.id, 'poster_asset_id': poster.id,
+        'vtt_asset_id': vtt.id, 'has_audio': True})
+    img = reg('sample_image.jpg', 'image', 'image/jpeg')
+    aud = reg('sample_audio.mp3', 'audio', 'audio/mpeg')
+    glb = reg('sample_model.glb', 'model3d', 'model/gltf-binary')
+    hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
+    db.session.flush()
+
+    mp4_meta = _serialize_media(mp4)
+
+    frames = (Frame.query.join(Lesson, Frame.lesson_id == Lesson.id)
+              .join(Module, Lesson.module_id == Module.id)
+              .join(Course, Module.course_id == Course.id)
+              .filter(Course.project_id == project.id).all())
+    for fr in frames:
+        blocks = (fr.content or {}).get('blocks', [])
+        changed = False
+        for b in blocks:
+            d = b.get('data', {}); t = b.get('type')
+            if fr.name == 'Image Block' and t == 'media' and d.get('kind') == 'image':
+                d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
+                         original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
+            elif fr.name == 'Video Block' and t == 'media' and d.get('kind') == 'video':
+                d.update(asset_id=mp4.id, serve_url=f'/api/media/serve/{mp4.id}',
+                         original_name='sample_video.mp4', use_videojs=True, asset_meta=mp4_meta); changed = True
+            elif fr.name == 'Audio Block' and t == 'media' and d.get('kind') == 'audio':
+                d.update(asset_id=aud.id, serve_url=f'/api/media/serve/{aud.id}',
+                         original_name='sample_audio.mp3', asset_meta=_serialize_media(aud)); changed = True
+            elif fr.name == '3D Model Block' and t == 'model3d':
+                d.update(model_asset_id=glb.id, model_serve_url=f'/api/media/serve/{glb.id}',
+                         model_filename='sample_model.glb'); changed = True
+            elif fr.name == 'Hotspot Block' and t == 'hotspot':
+                d.update(background_asset_id=hb.id, background_url=f'/api/media/serve/{hb.id}'); changed = True
+        if changed:
+            # in-place JSON mutation isn't auto-detected — force the column dirty.
+            flag_modified(fr, 'content')
+    db.session.commit()
+    print('[demo_seed] Wired live demo assets (image/video/audio/3D/hotspot)')
+
+
 def seed_demo(app=None):
     """Seed the expanded demo project. Idempotent — returns existing id if present."""
     from .models.project import Project, Course, Module, Lesson, Frame
@@ -431,6 +508,11 @@ def seed_demo(app=None):
     db.session.commit()
     total = sum(counters.values())
     print(f'[demo_seed] Created {total} frames across {len(LESSON_ORDER)} lessons')
+    try:
+        _wire_demo_assets(project)
+    except Exception as e:
+        db.session.rollback()
+        print(f'[demo_seed] live-asset wiring skipped: {e}')
     return project.id
 
 

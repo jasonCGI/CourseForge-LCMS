@@ -178,6 +178,35 @@ function PreviewText({ block }) {
 function PreviewMedia({ block }) {
   const icons = { image: '🖼', video: '🎬', audio: '🎙', oam: '⚙' }
   const kind = block.data.kind
+  const d = block.data
+
+  // Live video: a real uploaded asset can't render in an <img> — use <video>.
+  if (kind === 'video' && d.asset_id) {
+    const cf = d.asset_meta?.companion_files
+    const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
+      ? `/api/media/serve/${cf.poster_asset_id}` : undefined
+    return (
+      <div style={{ ...previewBlockWrap, textAlign: 'center' }}>
+        <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
+          style={{ maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
+          {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
+            <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
+        </video>
+        {d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
+      </div>
+    )
+  }
+
+  // Live audio: render an <audio> player (was falling through to a placeholder).
+  if (kind === 'audio' && d.asset_id) {
+    return (
+      <div style={previewBlockWrap}>
+        <audio controls src={`/api/media/serve/${d.asset_id}`} style={{ width: '100%' }}
+          aria-label={d.original_name || 'Audio'} />
+        {d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
+      </div>
+    )
+  }
 
   // If a placeholder/asset image is available (demo blocks seed an SVG data-URI
   // in serve_url), render it so the preview shows the intended media slot.
