@@ -7,9 +7,27 @@ Blender API refs:
   bpy.ops.export_scene.gltf -> https://docs.blender.org/api/current/bpy.ops.export_scene.html
 """
 
-import bpy, sys, json, os
+import bpy, sys, json, os, re
 
 def log(msg): print(f"[Forge3D] {msg}", flush=True)
+
+def op_retry(op, **kw):
+    """Call a bpy operator, dropping any kwargs this Blender version rejects.
+
+    Blender's FBX-import / glTF-export signatures changed across 3.6 LTS and
+    4.x (e.g. export_colors was removed in 4.0). Rather than pin to one version,
+    retry the call, stripping each unsupported keyword the error names.
+    """
+    while True:
+        try:
+            return op(**kw)
+        except TypeError as e:
+            m = re.search(r"unexpected keyword argument '(\w+)'", str(e))
+            if m and m.group(1) in kw:
+                log(f"WARN: '{m.group(1)}' unsupported by this Blender version — dropping it.")
+                kw.pop(m.group(1))
+                continue
+            raise
 
 def main():
     try:
@@ -37,7 +55,8 @@ def main():
 
     log("Importing FBX...")
     try:
-        bpy.ops.import_scene.fbx(
+        op_retry(
+            bpy.ops.import_scene.fbx,
             filepath=fbx_path,
             use_custom_normals=True,
             use_image_search=True,
@@ -67,7 +86,8 @@ def main():
     os.makedirs(os.path.dirname(glb_path) or '.', exist_ok=True)
 
     try:
-        bpy.ops.export_scene.gltf(
+        op_retry(
+            bpy.ops.export_scene.gltf,
             filepath=glb_path,
             export_format='GLB',
             export_texcoords=True,
