@@ -173,10 +173,21 @@ def map_layout(frame: dict) -> dict:
     return out
 
 
-def _download(url: str, dest: str):
+def _download(url: str, dest: str, max_bytes: int = 50 * 1024 * 1024):
+    """Stream a Figma asset to disk (was buffering the whole image in RAM via
+    resp.read()), with a size cap so a hostile/huge export can't OOM the worker."""
+    import shutil
     req = urllib.request.Request(url, headers={'User-Agent': 'ForgeGUI'})
     with urllib.request.urlopen(req, timeout=60) as resp, open(dest, 'wb') as fh:
-        fh.write(resp.read())
+        total = 0
+        while True:
+            chunk = resp.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError('Figma asset exceeds size limit')
+            fh.write(chunk)
 
 
 @figma_bp.post('/api/figma/import')
@@ -277,7 +288,7 @@ def import_from_figma():
                 layout['warnings'].append(f'Button "{b["action"]}" sprite download failed: {e}')
 
     # 5. Build + store the gui session (same shape as create_gui)
-    from routes.gui import GUIS
+    from routes.gui import _gui_put
     gid = str(uuid.uuid4())
     gui = {
         'id': gid,
@@ -289,7 +300,7 @@ def import_from_figma():
         'buttons': layout['buttons'],
         'zones': layout['zones'],
     }
-    GUIS[gid] = gui
+    _gui_put(gid, gui)
 
     return jsonify({
         **gui,

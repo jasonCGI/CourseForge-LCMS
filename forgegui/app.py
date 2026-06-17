@@ -17,7 +17,7 @@ def create_app(config_name=None):
         app.config['UPLOAD_FOLDER'],
         os.path.join(app.config['UPLOAD_FOLDER'], 'backgrounds'),
         os.path.join(app.config['UPLOAD_FOLDER'], 'sprites'),
-        os.path.join(app.config['UPLOAD_FOLDER'], 'outputs'),
+        # 'outputs' no longer used — export builds the ZIP in memory.
     ]:
         os.makedirs(folder, exist_ok=True)
 

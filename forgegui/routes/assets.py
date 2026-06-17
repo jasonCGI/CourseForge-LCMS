@@ -52,8 +52,13 @@ def upload_background():
 def serve_background(filename):
     bg_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'backgrounds'
     target = (bg_dir / filename).resolve()
-    # Traversal guard — keep resolved path inside the backgrounds dir.
-    if not str(target).startswith(str(bg_dir.resolve())) or not target.exists():
+    # Traversal guard — relative_to is separator-safe (startswith matched a
+    # sibling like backgrounds_evil/).
+    try:
+        target.relative_to(bg_dir.resolve())
+    except ValueError:
+        return jsonify({'error': 'Not found.'}), 404
+    if not target.exists():
         return jsonify({'error': 'Not found.'}), 404
     return send_file(str(target))
 
@@ -122,7 +127,11 @@ def upload_sprite():
 def serve_sprite(filename):
     sprite_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'sprites'
     target     = (sprite_dir / filename).resolve()
-    # Traversal guard.
-    if not str(target).startswith(str(sprite_dir.resolve())) or not target.exists():
+    # Traversal guard — relative_to is separator-safe.
+    try:
+        target.relative_to(sprite_dir.resolve())
+    except ValueError:
+        return jsonify({'error': 'Not found.'}), 404
+    if not target.exists():
         return jsonify({'error': 'Not found.'}), 404
     return send_file(str(target))

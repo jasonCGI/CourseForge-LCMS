@@ -1,6 +1,7 @@
 import json
 import uuid
 import zipfile
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file, current_app
@@ -9,8 +10,15 @@ from services.json_builder  import build_shell_json
 
 gui_bp = Blueprint('gui', __name__)
 
-# In-memory GUI sessions
+# In-memory GUI sessions. Bounded so it can't grow unbounded (one entry is
+# created per page load); evict oldest-inserted past the cap. Lost on restart.
 GUIS = {}
+GUIS_MAX = 500
+
+def _gui_put(gui_id, data):
+    GUIS[gui_id] = data
+    while len(GUIS) > GUIS_MAX:
+        GUIS.pop(next(iter(GUIS)))
 
 
 @gui_bp.post('/api/gui')
@@ -40,7 +48,7 @@ def create_gui():
         'buttons': [],
         'zones':   [],
     }
-    GUIS[gui_id] = gui
+    _gui_put(gui_id, gui)
     return jsonify(gui), 201
 
 
@@ -134,7 +142,7 @@ def import_gui_zip():
         'buttons': cfg.get('buttons', []),
         'zones': cfg.get('zones', []),
     }
-    GUIS[gid] = gui
+    _gui_put(gid, gui)
     return jsonify(gui), 201
 
 
@@ -149,10 +157,12 @@ def get_gui(gui_id):
 def update_gui(gui_id):
     if gui_id not in GUIS:
         return jsonify({'error': 'Not found.'}), 404
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body required.'}), 400
     data['id']         = gui_id
     data['updated_at'] = datetime.utcnow().isoformat() + 'Z'
-    GUIS[gui_id]       = data
+    _gui_put(gui_id, data)
     return jsonify(data)
 
 
@@ -169,71 +179,51 @@ def export_gui(gui_id):
         c for c in gui['name'] if c.isalnum() or c in '-_ '
     ).strip().replace(' ', '_')[:40] or 'gui_shell'
 
-    output_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'outputs'
-    output_dir.mkdir(exist_ok=True)
-
-    shell_html_path = str(output_dir / f"{safe_name}.html")
-    shell_json_path = str(output_dir / f"{safe_name}.json")
-    zip_path        = str(output_dir / f"ForgeGUI_{safe_name}.zip")
-
-    # Build files
+    # Build the ZIP in memory (was writing 3 files to uploads/outputs/ that
+    # were never cleaned up). Asset writes are deduped by archive name so a
+    # spritesheet shared by N buttons is written once, not N times.
     shell_html = build_shell_html(gui, current_app.config['UPLOAD_FOLDER'])
     shell_json = build_shell_json(gui)
+    UP = Path(current_app.config['UPLOAD_FOLDER'])
 
-    Path(shell_html_path).write_text(shell_html, encoding='utf-8')
-    Path(shell_json_path).write_text(
-        json.dumps(shell_json, indent=2), encoding='utf-8'
-    )
+    buf     = BytesIO()
+    written = set()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        def add_disk(src, arc):
+            if arc in written or not Path(src).exists():
+                return
+            zf.write(str(src), arc)
+            written.add(arc)
 
-    # Package ZIP
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(shell_html_path, f"{safe_name}.html")
-        zf.write(shell_json_path, f"{safe_name}.json")
+        zf.writestr(f"{safe_name}.html", shell_html)
+        zf.writestr(f"{safe_name}.json", json.dumps(shell_json, indent=2))
 
         # Include background image
         bg_id  = gui['stage'].get('background_asset_id')
         bg_url = gui['stage'].get('background_url', '')
         if bg_id and bg_url:
             suffix  = Path(bg_url).suffix
-            bg_path = (
-                Path(current_app.config['UPLOAD_FOLDER'])
-                / 'backgrounds' / f"{bg_id}{suffix}"
-            )
-            if bg_path.exists():
-                bg_file = gui['stage'].get('background_file', f"bg{suffix}")
-                zf.write(str(bg_path), f"assets/{bg_file}")
+            bg_path = UP / 'backgrounds' / f"{bg_id}{suffix}"
+            bg_file = gui['stage'].get('background_file', f"bg{suffix}")
+            add_disk(bg_path, f"assets/{bg_file}")
 
-        # Include sprite assets
+        # Include sprite assets (deduped)
         for btn in gui.get('buttons', []):
             if btn.get('asset_mode') == 'spritesheet':
-                sid    = btn.get('sprite_asset_id')
-                s_url  = btn.get('sprite_url', '')
+                sid   = btn.get('sprite_asset_id')
+                s_url = btn.get('sprite_url', '')
                 if sid and s_url:
                     suffix = Path(s_url).suffix
-                    spath  = (
-                        Path(current_app.config['UPLOAD_FOLDER'])
-                        / 'sprites' / f"{sid}{suffix}"
-                    )
-                    if spath.exists():
-                        zf.write(
-                            str(spath),
-                            f"assets/{btn.get('sprite_file', f'btn_{sid}{suffix}')}"
-                        )
+                    add_disk(UP / 'sprites' / f"{sid}{suffix}",
+                             f"assets/{btn.get('sprite_file', f'btn_{sid}{suffix}')}")
             elif btn.get('asset_mode') == 'individual':
                 for state, info in btn.get('files', {}).items():
                     sid   = info.get('asset_id')
                     s_url = info.get('serve_url', '')
                     if sid and s_url:
                         suffix = Path(s_url).suffix
-                        spath  = (
-                            Path(current_app.config['UPLOAD_FOLDER'])
-                            / 'sprites' / f"{sid}{suffix}"
-                        )
-                        if spath.exists():
-                            zf.write(
-                                str(spath),
-                                f"assets/{info.get('filename', f'{state}{suffix}')}"
-                            )
+                        add_disk(UP / 'sprites' / f"{sid}{suffix}",
+                                 f"assets/{info.get('filename', f'{state}{suffix}')}")
 
         # README
         readme = f"""ForgeGUI Shell — {gui['name']}
@@ -264,8 +254,9 @@ SCORM BRIDGE
 """
         zf.writestr('README.txt', readme)
 
+    buf.seek(0)
     return send_file(
-        zip_path,
+        buf,
         mimetype='application/zip',
         as_attachment=True,
         download_name=f"ForgeGUI_{safe_name}.zip",
