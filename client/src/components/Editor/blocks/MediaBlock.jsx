@@ -1,10 +1,13 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useState, lazy, Suspense } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './TextBlock'
 import MediaUploader from './MediaUploader'
-import VideoPlayer from './VideoPlayer'
 import { uploadMedia } from '../../../api/client'
+
+// video.js is the single biggest dependency — only load it when a video block
+// actually renders a player.
+const VideoPlayer = lazy(() => import('./VideoPlayer'))
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'oam']
 
@@ -210,17 +213,19 @@ export default function MediaBlock({ block }) {
 
             {/* Live preview */}
             {block.data.use_videojs !== false ? (
-              <VideoPlayer
-                mp4Url={`/api/media/serve/${block.data.asset_id}`}
-                webmUrl={block.data.asset_meta?.has_webm
-                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.webm_asset_id}` : null}
-                vttUrl={block.data.asset_meta?.has_captions
-                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.vtt_asset_id}` : null}
-                posterUrl={block.data.asset_meta?.has_poster
-                  ? `/api/media/serve/${block.data.asset_meta.companion_files?.poster_asset_id}` : null}
-                title={block.data.original_name || 'Video'}
-                controls={true}
-              />
+              <Suspense fallback={<div style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', padding: 12 }}>Loading player…</div>}>
+                <VideoPlayer
+                  mp4Url={`/api/media/serve/${block.data.asset_id}`}
+                  webmUrl={block.data.asset_meta?.has_webm
+                    ? `/api/media/serve/${block.data.asset_meta.companion_files?.webm_asset_id}` : null}
+                  vttUrl={block.data.asset_meta?.has_captions
+                    ? `/api/media/serve/${block.data.asset_meta.companion_files?.vtt_asset_id}` : null}
+                  posterUrl={block.data.asset_meta?.has_poster
+                    ? `/api/media/serve/${block.data.asset_meta.companion_files?.poster_asset_id}` : null}
+                  title={block.data.original_name || 'Video'}
+                  controls={true}
+                />
+              </Suspense>
             ) : (
               <video
                 src={`/api/media/serve/${block.data.asset_id}`}

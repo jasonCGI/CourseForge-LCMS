@@ -1,23 +1,26 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, lazy, Suspense } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
 import FrameEditor from './components/Editor/FrameEditor'
 import CourseConfigPanel from './components/Editor/CourseConfigPanel'
 import PersistentPreviewPane, { flatFrameOrder } from './components/Preview/PersistentPreviewPane'
-import PublishModal from './components/Publish/PublishModal'
-import ThemeEditorModal from './components/ThemeEditor/ThemeEditorModal'
 import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import EcosystemTray from './components/UI/EcosystemTray'
 import useProjectStore from './store/projectStore'
 import useEditorStore from './store/editorStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import ShortcutHelp from './components/UI/ShortcutHelp'
-import CourseShellModal from './components/UI/CourseShellModal'
-import PublishHistory from './components/Publish/PublishHistory'
-import FrameSearch from './components/UI/FrameSearch'
 import SaveIndicator from './components/UI/SaveIndicator'
+
+// Modals are interaction-gated — lazy-load so their code (+ unique deps) stays
+// out of the initial bundle until the user opens them.
+const PublishModal      = lazy(() => import('./components/Publish/PublishModal'))
+const ThemeEditorModal  = lazy(() => import('./components/ThemeEditor/ThemeEditorModal'))
+const ShortcutHelp      = lazy(() => import('./components/UI/ShortcutHelp'))
+const CourseShellModal  = lazy(() => import('./components/UI/CourseShellModal'))
+const PublishHistory    = lazy(() => import('./components/Publish/PublishHistory'))
+const FrameSearch       = lazy(() => import('./components/UI/FrameSearch'))
 import { VERSION } from './version'
 
 // Testing convenience: auto-load a project (or seed a demo) on startup.
@@ -308,23 +311,29 @@ export default function App() {
           )}
         </div>
 
-        {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
-        {showThemeEditor && <ThemeEditorModal onClose={() => setShowThemeEditor(false)} />}
-        <ShortcutHelp open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
-        <CourseShellModal
-          open={showShell}
-          onClose={() => setShowShell(false)}
-          projectId={activeProject?.id}
-          currentShellId={activeProject?.gui_shell_id}
-          onChanged={() => { if (activeProject) fetchProject(activeProject.id) }}
-        />
-        <PublishHistory open={showHistory} onClose={() => setShowHistory(false)} projectId={activeProject?.id} />
-        <FrameSearch
-          open={showSearch}
-          onClose={() => setShowSearch(false)}
-          projectId={activeProject?.id}
-          onNavigate={(frameId) => useEditorStore.getState().loadFrame(frameId)}
-        />
+        <Suspense fallback={null}>
+          {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
+          {showThemeEditor && <ThemeEditorModal onClose={() => setShowThemeEditor(false)} />}
+          {showShortcutHelp && <ShortcutHelp open onClose={() => setShowShortcutHelp(false)} />}
+          {showShell && (
+            <CourseShellModal
+              open
+              onClose={() => setShowShell(false)}
+              projectId={activeProject?.id}
+              currentShellId={activeProject?.gui_shell_id}
+              onChanged={() => { if (activeProject) fetchProject(activeProject.id) }}
+            />
+          )}
+          {showHistory && <PublishHistory open onClose={() => setShowHistory(false)} projectId={activeProject?.id} />}
+          {showSearch && (
+            <FrameSearch
+              open
+              onClose={() => setShowSearch(false)}
+              projectId={activeProject?.id}
+              onNavigate={(frameId) => useEditorStore.getState().loadFrame(frameId)}
+            />
+          )}
+        </Suspense>
       </div>
     </ThemeProvider>
   )
