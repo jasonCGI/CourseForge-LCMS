@@ -254,6 +254,8 @@ def duplicate_frame(frame_id):
         frame_type=frame.frame_type,
         order_index=next_order,
         content=content,
+        notes=frame.notes,
+        optional=frame.optional,
     )
     db.session.add(new_frame)
     db.session.commit()

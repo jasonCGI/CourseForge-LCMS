@@ -23,10 +23,19 @@ from ..version import VERSION, SCHEMA_VERSION
 
 
 def build_frame_html(frame, lesson, frame_index, total_frames,
-                     frame_map, theme_css, scorm_bridge=False):
-    """Render a single SCO HTML page for one frame."""
+                     frame_map, theme_css, scorm_bridge=False,
+                     disp_index=None, disp_total=None):
+    """Render a single SCO HTML page for one frame.
+
+    The visible counter + progress bar use disp_index/disp_total (required
+    frames only, excluding optional); navigation still uses the real
+    frame_index/total_frames positions.
+    """
 
     blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge)
+
+    counter_index = disp_index if disp_index is not None else (frame_index + 1)
+    counter_total = disp_total if disp_total is not None else total_frames
 
     return render_template(
         'sco_shell.html',
@@ -34,7 +43,9 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
         lesson_name=lesson.name,
         frame_index=frame_index,
         total_frames=total_frames,
-        progress_pct=round((frame_index / max(total_frames - 1, 1)) * 100),
+        counter_index=counter_index,
+        counter_total=counter_total,
+        progress_pct=round(((counter_index - 1) / max(counter_total - 1, 1)) * 100),
         frame_map_json=json.dumps(frame_map),
         blocks_html=blocks_html,
         theme_css=theme_css,
@@ -844,6 +855,8 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 frame_map=frame_map,
                 theme_css=css,
                 scorm_bridge=_has_oam_with_scorm(frame),
+                disp_index=req_index[idx],
+                disp_total=req_total,
             )
             zf.writestr(fname, comment + html)
 

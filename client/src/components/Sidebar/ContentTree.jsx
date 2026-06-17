@@ -315,6 +315,25 @@ export default function ContentTree() {
   const [openModules,  setOpenModules]  = useState({})
   const [openLessons,  setOpenLessons]  = useState({})
 
+  // Reveal the active frame whenever it changes (e.g. opened from search):
+  // expand its course/module/lesson ancestors and scroll its row into view.
+  useEffect(() => {
+    if (!activeFrameId || !activeProject) return
+    for (const c of activeProject.courses || [])
+      for (const m of c.modules || [])
+        for (const l of m.lessons || [])
+          if ((l.frames || []).some(f => f.id === activeFrameId)) {
+            setOpenCourses(s => ({ ...s, [c.id]: true }))
+            setOpenModules(s => ({ ...s, [m.id]: true }))
+            setOpenLessons(s => ({ ...s, [l.id]: true }))
+          }
+    const t = setTimeout(() => {
+      document.getElementById(`tree-item-${activeFrameId}`)
+        ?.scrollIntoView({ block: 'nearest' })
+    }, 60)
+    return () => clearTimeout(t)
+  }, [activeFrameId])
+
   // ── Sprint A: frame context menu + copy-to-lesson ──────────────────
   const [contextMenu,        setContextMenu]        = useState(null) // {frameId, x, y}
   const [copyToLessonFrameId, setCopyToLessonFrameId] = useState(null)
