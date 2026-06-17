@@ -75,6 +75,47 @@ def _get_gui_block(frame):
     return None
 
 
+_OAM_PLAYER_TPL = """
+<div style="margin-bottom:20px">
+  <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
+    title="Interactive animation" sandbox="allow-scripts allow-same-origin"
+    style="border:0;max-width:100%;border-radius:6px 6px 0 0;display:block;background:#0d1117"></iframe>
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none;border-radius:0 0 6px 6px">
+    <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
+    <div id="oamtrack-__BID__" style="flex:1;position:relative;height:8px;background:#1c2a3a;border-radius:4px;cursor:pointer">
+      <div id="oamfill-__BID__" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:#F59E0B;border-radius:4px"></div>
+      <div id="oammarks-__BID__"></div>
+    </div>
+    <button id="oamnext-__BID__" aria-label="Next stop" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#10515; Next stop</button>
+    <span id="oamtime-__BID__" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7A90A8;min-width:60px;text-align:right"></span>
+  </div>
+</div>
+<script>
+(function(){
+  var f=document.getElementById('oam-__BID__');
+  var play=document.getElementById('oamplay-__BID__'), nextb=document.getElementById('oamnext-__BID__');
+  var track=document.getElementById('oamtrack-__BID__'), fill=document.getElementById('oamfill-__BID__'), marks=document.getElementById('oammarks-__BID__'), tm=document.getElementById('oamtime-__BID__');
+  if(!f) return;
+  var dur=0, supported=false;
+  function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
+  window.addEventListener('message', function(e){
+    if(e.source!==f.contentWindow) return; var d=e.data||{}; if(d.type!=='oam:state') return;
+    supported=true; dur=d.duration||0;
+    fill.style.width=(dur?(d.t/dur*100):0)+'%';
+    play.innerHTML=d.playing?'&#9208;':'&#9658;'; play.setAttribute('data-playing', d.playing?'1':'');
+    tm.textContent=(d.t||0).toFixed(1)+'/'+dur.toFixed(0)+'s';
+    if(!marks.getAttribute('data-done') && d.stops){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
+  });
+  f.addEventListener('load', function(){ send({type:'oam:getState'}); });
+  setTimeout(function(){ send({type:'oam:getState'}); }, 500);
+  play.onclick=function(){ if(!supported) return; send({type: play.getAttribute('data-playing')?'oam:pause':'oam:play'}); };
+  nextb.onclick=function(){ if(!supported) return; send({type:'oam:nextStop'}); };
+  track.onclick=function(ev){ if(!supported||!dur) return; var r=track.getBoundingClientRect(); send({type:'oam:seek', t:Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*dur}); };
+})();
+</script>
+"""
+
+
 def _render_blocks(blocks, scorm_bridge=False):
     """Convert block list to HTML string."""
     parts = []
@@ -364,15 +405,16 @@ def _render_blocks(blocks, scorm_bridge=False):
             width    = data.get('width',  800)
             height   = data.get('height', 600)
             entry    = data.get('entry_point', 'index.html')
-            # In SCORM package, OAM files are bundled at oam/{asset_id}/{entry}
-            src = f"oam/{asset_id}/{entry}" if asset_id else ''
-            parts.append(
-                f'<iframe class="cf-oam-frame" '
-                f'src="{src}" '
-                f'width="{width}" height="{height}" '
-                f'scrolling="no" allowfullscreen '
-                f'title="Interactive animation"></iframe>'
-            )
+            if not asset_id:
+                parts.append('<div class="cf-media">&#9881; [OAM — no animation linked]</div>')
+            else:
+                # OAM files are bundled at oam/{asset_id}/{entry}; the media bar
+                # drives the animation via the oam:* postMessage protocol.
+                src = f"oam/{asset_id}/{entry}"
+                parts.append(
+                    _OAM_PLAYER_TPL.replace('__BID__', bid[:8]).replace('__SRC__', src)
+                                   .replace('__W__', str(width)).replace('__H__', str(height))
+                )
 
         elif btype == 'ivideo':
             video_id = data.get('video_asset_id', '')

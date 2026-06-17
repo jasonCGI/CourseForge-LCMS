@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
+import OamMediaBar from './OamMediaBar'
 
 const FRAME_BG = '#ffffff'
 
@@ -682,11 +683,7 @@ function PreviewOAM({ block }) {
   const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
   return (
     <div style={previewBlockWrap}>
-      <iframe src={src} width={d.width || 800} height={d.height || 500}
-        style={{ border: 0, maxWidth: '100%', borderRadius: 6 }}
-        title="Adobe Animate animation" scrolling="no"
-        sandbox="allow-scripts allow-same-origin" />
-      {d.caption && <p style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</p>}
+      <OamMediaBar src={src} width={d.width || 800} height={d.height || 500} caption={d.caption} />
     </div>
   )
 }
