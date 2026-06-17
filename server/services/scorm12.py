@@ -13,10 +13,18 @@ import json
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
+from functools import lru_cache
 from flask import current_app, render_template
 
 import urllib.request
-from ..models.project import Project, Frame
+from ..models.project import Project, Frame, project_full_query
+
+
+@lru_cache(maxsize=32)
+def _read_text_cached(path):
+    """Read a (static, immutable) shell HTML file once per publish process —
+    the per-project shell is otherwise re-read from disk for every frame."""
+    return Path(path).read_text(encoding='utf-8')
 from ..models.media import OamAsset, MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..version import VERSION, SCHEMA_VERSION
@@ -616,7 +624,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
             return None, None
         html_path = cands[0]
     injected_html = _render_blocks((frame.content or {}).get('blocks', []))
-    html = _patch_shell(html_path.read_text(encoding='utf-8'), shell.id, injected_html,
+    html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
     return html, shell.id
@@ -732,7 +740,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
     Returns (BytesIO zip buffer, suggested filename).
     Must be called within Flask app context.
     """
-    project = Project.query.get_or_404(project_id)
+    project = project_full_query().get_or_404(project_id)
     tokens  = resolve_theme(project)
     css     = tokens_to_css(tokens)
 
@@ -908,40 +916,42 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 zf.write(stored_path, arc_path)
                 _bundled_media.add(arc_path)
 
-        for asset in MediaAsset.query.filter_by(project_id=project_id).all():
+        # One query for the project's media; companions resolved via the dict
+        # (was one MediaAsset.query.get() per companion per asset).
+        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
+        asset_by_id = {a.id: a for a in project_assets}
+
+        for asset in project_assets:
             companions = asset.companion_files or {}
             if asset.kind == 'video':
                 vext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'mp4'
                 _bundle_media(asset.stored_path, f'media/video/{asset.id}.{vext}')
-            if asset.kind == 'image':
+            elif asset.kind == 'image':
                 iext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'jpg'
                 _bundle_media(asset.stored_path, f'media/images/{asset.id}.{iext}')
-            if asset.kind == 'audio':
+            elif asset.kind == 'audio':
                 aext = asset.original_name.rsplit('.', 1)[-1].lower() if '.' in (asset.original_name or '') else 'mp3'
                 _bundle_media(asset.stored_path, f'media/audio/{asset.id}.{aext}')
+            elif asset.kind == 'clip':
+                if asset.stored_path and Path(asset.stored_path).exists():
+                    _bundle_media(asset.stored_path, f'media/clips/{asset.id}.clip.json')
+            elif asset.kind == 'model3d':
+                if asset.stored_path and Path(asset.stored_path).exists():
+                    _bundle_media(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
+
             if companions.get('webm_asset_id'):
-                webm = MediaAsset.query.get(companions['webm_asset_id'])
+                webm = asset_by_id.get(companions['webm_asset_id'])
                 if webm:
                     _bundle_media(webm.stored_path, f'media/video/{webm.id}.webm')
             if companions.get('vtt_asset_id'):
-                vtt = MediaAsset.query.get(companions['vtt_asset_id'])
+                vtt = asset_by_id.get(companions['vtt_asset_id'])
                 if vtt:
                     _bundle_media(vtt.stored_path, f'media/captions/{vtt.id}.vtt')
             if companions.get('poster_asset_id'):
-                poster = MediaAsset.query.get(companions['poster_asset_id'])
+                poster = asset_by_id.get(companions['poster_asset_id'])
                 if poster:
                     pext = poster.original_name.rsplit('.', 1)[-1].lower() if '.' in (poster.original_name or '') else 'jpg'
                     _bundle_media(poster.stored_path, f'media/images/{poster.id}.{pext}')
-
-        # ── Bundle ForgeClip .clip.json files (ivideo blocks) ──────
-        for asset in MediaAsset.query.filter_by(project_id=project_id, kind='clip').all():
-            if asset.stored_path and Path(asset.stored_path).exists():
-                _bundle_media(asset.stored_path, f'media/clips/{asset.id}.clip.json')
-
-        # ── Bundle 3D models (.glb / .gltf) ────────────────────────
-        for asset in MediaAsset.query.filter_by(project_id=project_id, kind='model3d').all():
-            if asset.stored_path and Path(asset.stored_path).exists():
-                _bundle_media(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
 
     buf.seek(0)
     safe_name = project.name.replace(' ', '_').lower()[:40]

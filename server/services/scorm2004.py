@@ -18,7 +18,7 @@ from pathlib import Path
 from datetime import datetime
 from flask import current_app, render_template
 
-from ..models.project import Project
+from ..models.project import Project, project_full_query
 from ..models.media import MediaAsset, OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks, _has_oam_with_scorm
@@ -83,7 +83,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
     Returns (BytesIO buffer, suggested filename).
     Must be called within Flask app context.
     """
-    project     = Project.query.get_or_404(project_id)
+    project     = project_full_query().get_or_404(project_id)
     tokens      = resolve_theme(project)
     css         = tokens_to_css(tokens)
     upload_root = Path(current_app.config['UPLOAD_FOLDER'])
@@ -163,6 +163,10 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             req_index[_i] = _run or 1
 
         # SCO HTML files
+        comment_prefix = (
+            f"<!-- CourseForge v{VERSION} | SCORM 2004 3rd Ed | "
+            f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n"
+        )
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
             html  = build_frame_html_2004(
@@ -176,10 +180,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 disp_index=req_index[idx],
                 disp_total=req_total,
             )
-            html = (
-                f"<!-- CourseForge v{VERSION} | SCORM 2004 3rd Ed | "
-                f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n" + html
-            )
+            html = comment_prefix + html
             zf.writestr(fname, html)
 
         # Video.js assets
@@ -199,7 +200,9 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             _seen.add(arc)
 
         bundled_oam_ids = set()
-        for asset in MediaAsset.query.filter_by(project_id=project_id).all():
+        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
+        asset_by_id = {a.id: a for a in project_assets}
+        for asset in project_assets:
 
             if asset.kind == 'video':
                 ext = (asset.original_name or 'video.mp4').rsplit('.', 1)[-1].lower()
@@ -222,7 +225,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                     continue
                 if not companion_id or not isinstance(companion_id, str):
                     continue
-                companion = MediaAsset.query.get(companion_id)
+                companion = asset_by_id.get(companion_id)
                 if not companion:
                     continue
                 if key == 'vtt_asset_id':
