@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import FramePreview, { renderBlockToHTML } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import useEditorStore from '../../store/editorStore'
@@ -19,39 +19,59 @@ export default function PersistentPreviewPane() {
   const navigateFrame = useEditorStore(s => s.navigateFrame)
   const activeProject = useProjectStore(s => s.activeProject)
 
+  const shellId = activeProject?.gui_shell_id || null
+
+  // Fetch the shell's stage dimensions so the preview can show the ENTIRE GUI
+  // at its true aspect ratio (the shell scales its stage to fit the iframe).
+  const [stage, setStage] = useState(null)
+  useEffect(() => {
+    if (!shellId) { setStage(null); return }
+    let live = true
+    fetch(`/api/gui-shells/${shellId}/shell.json`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(cfg => { if (live) { const s = cfg?.stage || {}; setStage({ w: s.width || 1024, h: s.height || 768 }) } })
+      .catch(() => { if (live) setStage({ w: 1024, h: 768 }) })
+    return () => { live = false }
+  }, [shellId])
+
   if (!activeFrame) return null
 
-  const shellId = activeProject?.gui_shell_id || null
-  const order   = flatFrameOrder(activeProject)
-  const idx     = order.indexOf(activeFrame.id)
-  const total   = order.length || 1
-  const human   = idx >= 0 ? idx + 1 : 1
+  const order = flatFrameOrder(activeProject)
+  const idx   = order.indexOf(activeFrame.id)
+  const total = order.length || 1
+  const human = idx >= 0 ? idx + 1 : 1
+  const ar    = stage ? `${stage.w} / ${stage.h}` : '16 / 9'
+  const maxW  = stage ? `${stage.w}px` : '100%'
 
   return (
     <div className="cf-preview-pane">
       <PreviewHeader human={human} total={total} shell={!!shellId} />
-      <div style={{ flex: 1, overflow: 'hidden', background: shellId ? '#000' : '#fff', overflowY: shellId ? 'hidden' : 'auto' }}>
-        {shellId ? (
-          <GUIShellRenderer
-            key={shellId}
-            shellUrl={`/api/gui-shells/${shellId}/shell.html`}
-            frameHtml={(activeFrame.content?.blocks || []).map(renderBlockToHTML).join('')}
-            frameData={{
-              frameIndex: human, totalFrames: total,
-              lessonTitle: '', sectionTitle: '',
-              frameTitle: activeFrame.name || '',
-              prompt: activeFrame.name || '',
-              isFirst: idx <= 0, isLast: idx === total - 1,
-            }}
-            onAction={(a) => {
-              if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a)
-            }}
-            height={520}
-          />
-        ) : (
+      {shellId ? (
+        // Center + fit the whole shell to the pane width at its real aspect
+        // ratio; scrolls if the pane is shorter than the fitted height.
+        <div style={{ flex: 1, overflow: 'auto', background: '#000', padding: 10, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+          <div style={{ width: '100%', maxWidth: `min(100%, ${maxW})`, aspectRatio: ar, flexShrink: 0 }}>
+            <GUIShellRenderer
+              key={shellId}
+              shellUrl={`/api/gui-shells/${shellId}/shell.html`}
+              frameHtml={(activeFrame.content?.blocks || []).map(renderBlockToHTML).join('')}
+              frameData={{
+                frameIndex: human, totalFrames: total,
+                lessonTitle: '', sectionTitle: '',
+                frameTitle: activeFrame.name || '',
+                prompt: activeFrame.name || '',
+                isFirst: idx <= 0, isLast: idx === total - 1,
+              }}
+              onAction={(a) => { if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a) }}
+              height="100%"
+            />
+          </div>
+        </div>
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
           <FramePreview frame={activeFrame} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

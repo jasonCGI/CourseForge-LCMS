@@ -115,14 +115,27 @@ def upload_gui_shell():
     return jsonify(shell.to_dict()), 201
 
 
+_SHELL_MISSING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>html,body{{margin:0;height:100%;font-family:'IBM Plex Mono',ui-monospace,monospace;
+background:#0d1117;color:#9aa4b2;display:flex;align-items:center;justify-content:center}}
+.box{{text-align:center;max-width:340px;padding:24px;border:1px dashed #2a3340;border-radius:8px}}
+.box b{{color:#F59E0B;display:block;margin-bottom:8px;font-size:13px}}
+.box span{{font-size:11px;line-height:1.6}}</style></head>
+<body><div class="box"><b>&#9633; Shell assets unavailable</b>
+<span>This GUI shell's files aren't on the server. Re-upload the ForgeGUI ZIP
+in the project's shell settings, then re-select it.</span></div></body></html>"""
+
+
 @gui_shells_bp.get('/api/gui-shells/<shell_id>/shell.html')
 def serve_shell_html(shell_id):
     s = GuiShell.query.get_or_404(shell_id)
-    p = Path(s.stored_path) / (s.html_file or '')
+    p = Path(s.stored_path or '') / (s.html_file or '')
     if not p.exists():
-        cands = list(Path(s.stored_path).glob('*.html'))
+        cands = list(Path(s.stored_path).glob('*.html')) if s.stored_path and Path(s.stored_path).is_dir() else []
         if not cands:
-            return jsonify({'error': 'Shell HTML not found.'}), 404
+            # Files gone (e.g. wiped before a durable volume existed). Show a
+            # readable placeholder in the iframe instead of raw JSON.
+            return _SHELL_MISSING_HTML, 200, {'Content-Type': 'text/html; charset=utf-8'}
         p = cands[0]
     return send_file(str(p), mimetype='text/html')
 

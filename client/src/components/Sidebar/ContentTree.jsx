@@ -1,9 +1,37 @@
 import React, { useState, useCallback, useEffect } from 'react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import useProjectStore from '../../store/projectStore'
 import useEditorStore  from '../../store/editorStore'
-import { duplicateFrame, createFrame } from '../../api/client'
+import { duplicateFrame, createFrame, reorder } from '../../api/client'
 import TemplateLibrary from '../UI/TemplateLibrary'
 import { getFrameCompletion } from '../../utils/frameCompletion'
+
+const byOrder = (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+
+// Wraps a frame TreeRow so it can be pointer-dragged to reorder within its
+// lesson. Listeners only (not dnd-kit's keyboard attributes) so the tree's
+// existing roving-tabindex keyboard nav stays intact; clicks still select
+// (PointerSensor activation distance lets a click through without a drag).
+function SortableFrameRow({ id, children }) {
+  const { setNodeRef, transform, transition, listeners, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab',
+  }
+  return (
+    <div ref={setNodeRef} style={style} {...listeners}>
+      {children}
+    </div>
+  )
+}
 
 const COMPLETION_DOT = {
   complete:   { color: '#4CAF50', title: 'All blocks complete' },
@@ -226,6 +254,26 @@ export default function ContentTree() {
   const selectConfigNode = useEditorStore(s => s.selectConfigNode)
   const activeFrameId    = useEditorStore(s => s.activeFrame?.id)
   const selectedNode     = useEditorStore(s => s.selectedNode)
+
+  // Pointer-drag to reorder frames within a lesson. Distance constraint so a
+  // plain click still selects the frame instead of starting a drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  const handleFrameDragEnd = async (event, lesson) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const all = [...(lesson.frames || [])].sort(byOrder)
+    const oldIndex = all.findIndex(f => f.id === active.id)
+    const newIndex = all.findIndex(f => f.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const items = arrayMove(all, oldIndex, newIndex).map((f, i) => ({ id: f.id, order_index: i }))
+    try {
+      await reorder('frames', items)
+      if (activeProject) await fetchProject(activeProject.id)
+    } catch (e) {
+      alert('Could not reorder frames: ' + (e.message || 'Unknown error'))
+    }
+  }
 
   const loadDemo = async () => {
     try {
@@ -530,28 +578,37 @@ export default function ContentTree() {
                           onKeyDown={e => handleTreeKeyDown(e, { id: lesson.id, type: 'lesson', parentId: mod.id })}
                           onClick={() => toggle(setOpenLessons, lesson.id)}
                         >
-                          {frames.map((frame, fi) => (
-                            <TreeRow
-                              key={frame.id}
-                              level="frame"
-                              depth={4}
-                              rowIndex={fi}
-                              label={frame.name}
-                              frameType={frame.frame_type || 'content'}
-                              isFrame={true}
-                              isCurrent={frame.id === activeFrameId}
-                              note={!!(frame.notes && frame.notes.trim())}
-                              completion={getFrameCompletion(frame)}
-                              itemId={frame.id}
-                              tabIndex={rovingTab(frame.id)}
-                              onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}
-                              onClick={() => loadFrame(frame.id)}
-                              onContextMenu={(e) => {
-                                e.preventDefault()
-                                setContextMenu({ frameId: frame.id, x: e.clientX, y: e.clientY })
-                              }}
-                            />
-                          ))}
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(e) => handleFrameDragEnd(e, lesson)}
+                          >
+                            <SortableContext items={frames.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                              {frames.map((frame, fi) => (
+                                <SortableFrameRow key={frame.id} id={frame.id}>
+                                  <TreeRow
+                                    level="frame"
+                                    depth={4}
+                                    rowIndex={fi}
+                                    label={frame.name}
+                                    frameType={frame.frame_type || 'content'}
+                                    isFrame={true}
+                                    isCurrent={frame.id === activeFrameId}
+                                    note={!!(frame.notes && frame.notes.trim())}
+                                    completion={getFrameCompletion(frame)}
+                                    itemId={frame.id}
+                                    tabIndex={rovingTab(frame.id)}
+                                    onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}
+                                    onClick={() => loadFrame(frame.id)}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault()
+                                      setContextMenu({ frameId: frame.id, x: e.clientX, y: e.clientY })
+                                    }}
+                                  />
+                                </SortableFrameRow>
+                              ))}
+                            </SortableContext>
+                          </DndContext>
                           <button
                             onClick={() => { setTemplateTargetLesson(lesson.id); setTemplateLibOpen(true) }}
                             aria-label={`Add frame to ${lesson.name}`}

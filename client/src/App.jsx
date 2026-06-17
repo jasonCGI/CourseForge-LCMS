@@ -56,6 +56,7 @@ export default function App() {
   // Give the editor store a way to resolve frame order (for preview NEXT/PREV)
   // without a circular import on the project store.
   const selectedNode = useEditorStore(s => s.selectedNode)
+  const activeFrame = useEditorStore(s => s.activeFrame)
   useEffect(() => {
     useEditorStore.getState().setProjectFrameOrder(
       () => flatFrameOrder(useProjectStore.getState().activeProject)
@@ -100,12 +101,22 @@ export default function App() {
   // a frame → persistent WYSIWYG preview (desktop) above the block editor.
   const rightPanelInner = selectedNode?.type === 'project' ? (
     <CourseConfigPanel />
+  ) : (!isMobile && activeFrame) ? (
+    // Resizable vertical split: live preview on top, block editor below.
+    <PanelGroup direction="vertical" autoSaveId="cf-frame-vsplit" style={{ height: '100%' }}>
+      <Panel defaultSize={60} minSize={20} style={{ overflow: 'hidden' }}>
+        <PersistentPreviewPane />
+      </Panel>
+      <PanelResizeHandle className="cf-vsplit-handle" />
+      <Panel minSize={25} style={{ overflow: 'hidden' }}>
+        <div className="cf-block-config-pane" style={{ height: '100%' }}>
+          <FrameEditor />
+        </div>
+      </Panel>
+    </PanelGroup>
   ) : (
-    <div className="cf-right-panel" style={{ height: '100%' }}>
-      {!isMobile && <PersistentPreviewPane />}
-      <div className="cf-block-config-pane" style={{ flex: 1, minHeight: 0 }}>
-        <FrameEditor />
-      </div>
+    <div className="cf-block-config-pane" style={{ height: '100%' }}>
+      <FrameEditor />
     </div>
   )
   const editorInner = (

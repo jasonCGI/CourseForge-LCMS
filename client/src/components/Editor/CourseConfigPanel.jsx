@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { getGuiShells, uploadGuiShell, updateProject } from '../../api/client'
+import { getGuiShells, uploadGuiShell, deleteGuiShell, updateProject } from '../../api/client'
 import useProjectStore from '../../store/projectStore'
 
 /**
@@ -30,6 +30,16 @@ export default function CourseConfigPanel() {
       await updateProject(activeProject.id, { gui_shell_id: shellId })
       await fetchProject(activeProject.id)   // refresh → preview pane + tree pick it up
     } catch (e) { setError(e.message) }
+  }
+
+  async function removeShell(e, shell) {
+    e.stopPropagation()
+    if (!confirm(`Delete shell "${shell.name}"? Any project using it falls back to no shell.`)) return
+    try {
+      await deleteGuiShell(shell.id)
+      await reload()
+      if (activeProject) await fetchProject(activeProject.id)  // delete may have cleared our ref
+    } catch (e) { setError(e.response?.data?.error || e.message) }
   }
 
   async function handleUpload(e) {
@@ -82,6 +92,7 @@ export default function CourseConfigPanel() {
             <div
               key={shell.id}
               className={`cf-shell-thumb ${activeShellId === shell.id ? 'active' : ''}`}
+              style={{ position: 'relative' }}
               onClick={() => selectShell(shell.id)}
               role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectShell(shell.id) } }}
@@ -92,6 +103,12 @@ export default function CourseConfigPanel() {
                        onError={e => { e.currentTarget.style.display = 'none' }} />
                 : <div className="cf-shell-thumb-empty">{shell.stage_width}×{shell.stage_height}</div>}
               <span>{shell.name}</span>
+              <button
+                className="cf-shell-del"
+                onClick={e => removeShell(e, shell)}
+                aria-label={`Delete shell ${shell.name}`}
+                title="Delete shell"
+              >✕</button>
             </div>
           ))}
         </div>

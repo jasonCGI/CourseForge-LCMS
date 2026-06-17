@@ -163,16 +163,51 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   overflow: hidden;
 }
 .cf-preview-pane {
-  flex: 0 0 52%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: #fff;
-  border-bottom: 2px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
 }
 .cf-block-config-pane {
   overflow-y: auto;
 }
+
+/* Vertical resize handle between preview and editor */
+.cf-vsplit-handle {
+  height: 7px;
+  flex-shrink: 0;
+  background: var(--cf-border-primary, #1c2a3a);
+  border-top: 1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
+  cursor: row-resize;
+  position: relative;
+}
+.cf-vsplit-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px; height: 3px; border-radius: 2px;
+  background: color-mix(in srgb, var(--forge-amber) 55%, transparent);
+}
+.cf-vsplit-handle:hover::after { background: var(--forge-amber); }
+
+/* Delete (✕) on a shell tile */
+.cf-shell-del {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 18px; height: 18px;
+  line-height: 1;
+  border: none; border-radius: 3px;
+  background: rgba(4, 12, 24, 0.6);
+  color: #C8D8E8;
+  font-size: 11px; cursor: pointer;
+  opacity: 0; transition: opacity 0.12s, background 0.12s;
+}
+.cf-shell-thumb:hover .cf-shell-del,
+.cf-shell-thumb:focus-within .cf-shell-del { opacity: 1; }
+.cf-shell-del:hover { background: #C0392B; color: #fff; }
 
 /* Project (course) config panel */
 .cf-course-config {
