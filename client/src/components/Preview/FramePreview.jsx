@@ -139,6 +139,7 @@ function PreviewBlock({ block }) {
     case 'wcn':     return <PreviewWCN     block={block} />
     case 'ivideo':  return <PreviewIVideo  block={block} />
     case 'model3d': return <PreviewModel3D block={block} />
+    case 'oam':     return <PreviewOAM     block={block} />
     default:        return (
       <div style={previewBlockWrap}>
         <p style={{ color: '#888', fontSize: 13 }}>
@@ -660,6 +661,32 @@ function PreviewModel3D({ block }) {
         bgColor={block.data.bg_color || '#0d1017'}
         annotations={block.data.annotations || []}
       />
+    </div>
+  )
+}
+
+function PreviewOAM({ block }) {
+  const d = block.data
+  if (!d.oam_asset_id) {
+    return (
+      <div style={{
+        ...previewBlockWrap, padding: 32, textAlign: 'center',
+        border: '2px dashed #533AB7', borderRadius: 8, color: '#533AB7',
+        background: 'rgba(83,58,183,0.05)',
+      }}>
+        <div style={{ fontSize: 24, marginBottom: 8 }}>⚙</div>
+        <div style={{ fontSize: 13 }}>Adobe Animate (.oam) — upload to preview</div>
+      </div>
+    )
+  }
+  const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
+  return (
+    <div style={previewBlockWrap}>
+      <iframe src={src} width={d.width || 800} height={d.height || 500}
+        style={{ border: 0, maxWidth: '100%', borderRadius: 6 }}
+        title="Adobe Animate animation" scrolling="no"
+        sandbox="allow-scripts allow-same-origin" />
+      {d.caption && <p style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</p>}
     </div>
   )
 }

@@ -399,10 +399,12 @@ def _wire_demo_assets(project):
     and wire them into the demo's image/video/audio/3D/hotspot blocks, so the demo
     previews + publishes with LIVE media instead of placeholders. Idempotent: the
     demo media dir is cleared first so repeated resets don't orphan files."""
+    import json as _json
     from sqlalchemy.orm.attributes import flag_modified
     from .models.project import Frame, Lesson, Module, Course
-    from .models.media import MediaAsset
+    from .models.media import MediaAsset, OamAsset
     from .routes.media import _serialize_media
+    from .services.oam_importer import ingest_oam
 
     base = Path(__file__).parent / 'demo_assets'
     if not base.is_dir():
@@ -438,6 +440,35 @@ def _wire_demo_assets(project):
 
     mp4_meta = _serialize_media(mp4)
 
+    # iVideo: a dedicated video asset + the ForgeClip clip.json (bidirectionally linked).
+    iv_video = reg('sample_video.mp4', 'video', 'video/mp4')
+    db.session.flush()
+    clip_aid  = str(uuid.uuid4())
+    clip_dest = media_dir / f'{clip_aid}.clip.json'
+    shutil.copyfile(base / 'sample_clip.clip.json', clip_dest)
+    db.session.add(MediaAsset(id=clip_aid, project_id=project.id, kind='clip',
+                              original_name='sample_clip.clip.json', stored_path=str(clip_dest),
+                              mime_type='application/json', file_size=clip_dest.stat().st_size,
+                              companion_files={'video_asset_id': iv_video.id}))
+    iv_video.companion_files = {'clip_asset_id': clip_aid}
+    clip_doc = _json.loads((base / 'sample_clip.clip.json').read_text(encoding='utf-8'))
+
+    # OAM: copy + ingest through the real importer (extract + manifest parse).
+    up = Path(current_app.config['UPLOAD_FOLDER'])
+    oam_aid  = str(uuid.uuid4())
+    oam_dir  = up / 'oam' / oam_aid
+    oam_dir.mkdir(parents=True, exist_ok=True)
+    oam_orig = oam_dir / 'original.oam'
+    shutil.copyfile(base / 'sample_animation.oam', oam_orig)
+    oam_meta = ingest_oam(oam_orig, oam_aid, up)
+    db.session.add(MediaAsset(id=oam_aid, project_id=project.id, kind='oam',
+                              original_name='sample_animation.oam', stored_path=str(oam_orig),
+                              file_size=oam_orig.stat().st_size,
+                              mime_type='application/vnd.adobe.oam+zip'))
+    db.session.flush()
+    db.session.add(OamAsset(media_asset_id=oam_aid, **oam_meta))
+    db.session.flush()
+
     frames = (Frame.query.join(Lesson, Frame.lesson_id == Lesson.id)
               .join(Module, Lesson.module_id == Module.id)
               .join(Course, Module.course_id == Course.id)
@@ -461,11 +492,21 @@ def _wire_demo_assets(project):
                          model_filename='sample_model.glb'); changed = True
             elif fr.name == 'Hotspot Block' and t == 'hotspot':
                 d.update(background_asset_id=hb.id, background_url=f'/api/media/serve/{hb.id}'); changed = True
+            elif fr.name == 'Interactive Video Block' and t == 'ivideo':
+                d.update(video_asset_id=iv_video.id, clip_asset_id=clip_aid,
+                         video_serve_url=f'/api/media/serve/{iv_video.id}',
+                         video_filename='sample_video.mp4',
+                         interaction_count=len(clip_doc.get('interactions', [])),
+                         video_duration=clip_doc.get('video', {}).get('duration', 0)); changed = True
+            elif fr.name.startswith('OAM Block') and t == 'oam':
+                d.update(oam_asset_id=oam_aid, entry_point=oam_meta.get('entry_point', 'index.html'),
+                         width=oam_meta.get('width', 800), height=oam_meta.get('height', 500),
+                         scorm_bridge_enabled=bool(oam_meta.get('has_scorm_calls'))); changed = True
         if changed:
             # in-place JSON mutation isn't auto-detected — force the column dirty.
             flag_modified(fr, 'content')
     db.session.commit()
-    print('[demo_seed] Wired live demo assets (image/video/audio/3D/hotspot)')
+    print('[demo_seed] Wired live demo assets (image/video/audio/3D/hotspot/iVideo/OAM)')
 
 
 def seed_demo(app=None):

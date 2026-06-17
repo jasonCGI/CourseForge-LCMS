@@ -1,0 +1,12 @@
+{
+  "tool": "ForgeClip",
+  "schema_version": "1.0",
+  "tool_version": "1.0.0",
+  "video": { "filename": "sample_video.mp4", "duration": 5, "width": 640, "height": 360 },
+  "interactions": [
+    { "id": "ix-annot", "type": "annotation", "timecode": 1.0, "end_timecode": 4.0, "pause_on_reach": false,
+      "data": { "x": 24, "y": 28, "text": "Sample annotation — authored in ForgeClip" } },
+    { "id": "ix-hot", "type": "hotspot", "timecode": 2.0, "end_timecode": 4.5, "pause_on_reach": false,
+      "data": { "x": 70, "y": 60, "label": "Sample hotspot" } }
+  ]
+}
