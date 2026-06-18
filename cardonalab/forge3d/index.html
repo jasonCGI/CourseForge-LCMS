@@ -171,7 +171,7 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
 <section class="section" aria-labelledby="s1">
 <div class="section-head"><span class="section-num">01</span><span id="s1">Overview</span></div>
 <p>The Forge3D block renders interactive GLB assets directly inside a CourseForge training frame. Learners orbit and zoom the model using mouse, touch, or keyboard controls. Authors place annotation pins on the model surface inside the CourseForge editor — no external tooling required.</p>
-<p>At publish time, the SCORM packager bundles the GLB file into the SCO frame HTML and inlines a self-contained vanilla JS viewer. The GLB ships inside the ZIP and is referenced by relative path; the Three.js runtime is currently loaded from a CDN at runtime (local bundling for fully offline / strict-CSP delivery is on the roadmap — see §06).</p>
+<p>At publish time, the SCORM packager bundles the GLB file into the SCO frame HTML and inlines a self-contained vanilla JS viewer. The GLB ships inside the ZIP and is referenced by relative path; the Three.js runtime, loaders, and Draco decoder are bundled in the ZIP as well, so it runs with no CDN dependency at runtime (see §06).</p>
 <div class="feature-grid">
   <div class="feature-card"><div class="feature-card-icon">⬡</div><div class="feature-card-title">GLB native</div><div class="feature-card-body">Accepts any glTF 2.0 binary — exported from 3ds Max, Blender, Maya, or UE5. Textures embedded in GLB.</div></div>
   <div class="feature-card"><div class="feature-card-icon">✦</div><div class="feature-card-title">Annotation pins</div><div class="feature-card-body">Raycaster-placed pins with label and description. Dot always visible, label on hover, popover on click.</div></div>
@@ -230,7 +230,7 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
   }]
 }</pre></div>
 <h3>SCORM runtime (vanilla JS)</h3>
-<p>At publish time, <code>scorm12.py</code> inlines the orbit controller, annotation overlay system, and GLB loader directly into the SCO frame HTML. The GLB is bundled at <code>media/models/{id}.glb</code> inside the SCORM ZIP and referenced by relative path. The Three.js + GLTFLoader scripts are pulled from a CDN at runtime (see §06).</p>
+<p>At publish time, <code>scorm12.py</code> inlines the orbit controller, annotation overlay system, and GLB loader directly into the SCO frame HTML. The GLB is bundled at <code>media/models/{id}.glb</code> inside the SCORM ZIP and referenced by relative path. The Three.js + GLTFLoader + Draco scripts are bundled in the ZIP and loaded local-first (with a CDN fallback) — see §06.</p>
 <div class="code-block"><pre><span class="cmt"># SCORM package structure</span>
 CourseTitle.zip
   imsmanifest.xml
