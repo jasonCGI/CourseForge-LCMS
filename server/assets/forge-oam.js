@@ -96,6 +96,7 @@
 
   function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
   function postState() {
+    resolveRoot();   // resolve up-front so duration is known before the first play
     post({ type: 'oam:state', t: curFrame() / fps(), duration: duration(),
            stops: stopSeconds(), playing: playing() });
   }
@@ -112,6 +113,14 @@
 
   function resolveRoot() {
     if (root) return root;
+    // Adobe Animate ("AdobeAn") exports use global `stage`/`exportRoot` and create
+    // the stage via lib.Stage (not createjs.Stage), so the constructor wrap/hook
+    // misses it — read the globals directly.
+    try { if (!stage && window.stage) stage = window.stage; } catch (e) {}
+    try {
+      var er = window.exportRoot;
+      if (er && ((er.totalFrames) || (er.timeline && er.timeline.duration))) { root = er; return root; }
+    } catch (e) {}
     try {
       if (stage && stage.numChildren) {
         // The main timeline is the child with the most frames (overlays/bg have 0).
