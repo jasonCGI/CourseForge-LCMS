@@ -41,13 +41,14 @@ function buildStudioEnv(THREE, renderer) {
   return tex
 }
 
-// Scale how strongly the env map reflects per material (0 = off).
+// Scale how strongly the env map reflects per material (envMapIntensity is a
+// plain uniform — no needsUpdate/shader recompile needed).
 function applyEnvIntensity(model, intensity) {
   if (!model) return
   model.traverse(o => {
     if (!o.material) return
     const mats = Array.isArray(o.material) ? o.material : [o.material]
-    mats.forEach(mat => { if ('envMapIntensity' in mat) { mat.envMapIntensity = intensity; mat.needsUpdate = true } })
+    mats.forEach(mat => { if ('envMapIntensity' in mat) mat.envMapIntensity = intensity })
   })
 }
 
@@ -200,21 +201,27 @@ export default function Model3DViewer({
     if (scene && window.THREE) scene.background = new window.THREE.Color(bgColor)
   }, [bgColor])
 
-  // Apply the environment map (IBL) in place — reflections for metallic/glossy
-  // surfaces. Rebuilds on environment/intensity change; no scene rebuild/refetch.
+  // Build/clear the environment map (IBL) — the expensive PMREM step runs only
+  // on environment/model change, never on an intensity drag.
   useEffect(() => {
     if (!threeReady) return
     const THREE = window.THREE, renderer = rendererRef.current, scene = sceneRef.current
     if (!THREE || !renderer || !scene) return
     if (envRef.current) { envRef.current.dispose(); envRef.current = null }
-    const on = environment && environment !== 'none'
-    if (on) {
+    if (environment && environment !== 'none') {
       try { envRef.current = buildStudioEnv(THREE, renderer); scene.environment = envRef.current }
-      catch (e) { scene.environment = null }
+      catch (e) { scene.environment = null; try { console.warn('[Forge3D] environment build failed', e) } catch (_) {} }
     } else {
       scene.environment = null
     }
-    applyEnvIntensity(modelRef.current, on ? envIntensity : 0)
+  }, [threeReady, environment, modelUrl])
+
+  // Apply reflection intensity (cheap per-material scalar). When env is off,
+  // restore the default 1 (NOT 0) so a GLB's own baked envMap still shows.
+  useEffect(() => {
+    if (!threeReady) return
+    const on = environment && environment !== 'none'
+    applyEnvIntensity(modelRef.current, on ? envIntensity : 1)
   }, [threeReady, environment, envIntensity, modelUrl])
 
   // Apply height/resize in place (no scene rebuild, no GLB re-fetch).

@@ -603,7 +603,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
             try:
                 env_int = float(data.get('env_intensity', 1))
             except (TypeError, ValueError):
-                env_int = 1
+                env_int = 1.0
+            # NaN/inf would inject the bare JS identifiers nan/inf -> ReferenceError;
+            # clamp to a finite, sane range.
+            if env_int != env_int or env_int in (float('inf'), float('-inf')):
+                env_int = 1.0
+            env_int = max(0.0, min(env_int, 4.0))
 
             if not model_id:
                 parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
@@ -680,7 +685,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
       scene.environment = _pm.fromScene(_es, 0.04).texture;
       _es.traverse(function(o){{ if(o.geometry)o.geometry.dispose(); if(o.material)o.material.dispose(); }});
       _pm.dispose();
-    }} catch(e) {{}} }}
+    }} catch(e) {{ try {{ console.warn('[Forge3D] environment build failed', e); }} catch(_e) {{}} }} }}
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     var key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(5, 8, 5); scene.add(key);
     var fill = new THREE.DirectionalLight(0x8AAAC8, 0.4); fill.position.set(-5, 2, -5); scene.add(fill);
@@ -735,7 +740,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
       var scale = 2.0 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
       scene.add(model);
-      if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; mt.needsUpdate=true; }} }}); }} }});
+      if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; }} }}); }} }});
       if (loading) loading.style.display = 'none';
     }}, undefined, function() {{
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
