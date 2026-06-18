@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback, useId } from 'react'
 
 const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
 const GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'
+const DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js'
+const DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/'   // Draco WASM decoder (for compressed GLBs)
 
 const scriptCache = {}
 function loadScript(src) {
@@ -152,6 +154,7 @@ export default function Model3DViewer({
     // parallel loading races and throws "THREE is not defined" (uncaught → blank).
     loadScript(THREE_CDN)
       .then(() => loadScript(GLTF_CDN))
+      .then(() => loadScript(DRACO_CDN))
       .then(() => setThreeReady(true))
       .catch(() => { setError('Could not load Three.js from CDN.'); setLoading(false) })
   }, [])
@@ -178,7 +181,13 @@ export default function Model3DViewer({
     const rim = new THREE.DirectionalLight(0xF59E0B, 0.2); rim.position.set(0, -3, -8); scene.add(rim)
 
     setLoading(true); setError(null)
-    new THREE.GLTFLoader().load(modelUrl, (gltf) => {
+    const gltfLoader = new THREE.GLTFLoader()
+    if (THREE.DRACOLoader) {           // decode Draco-compressed GLBs
+      const draco = new THREE.DRACOLoader()
+      draco.setDecoderPath(DRACO_DECODER)
+      gltfLoader.setDRACOLoader(draco)
+    }
+    gltfLoader.load(modelUrl, (gltf) => {
       const model = gltf.scene
       const box = new THREE.Box3().setFromObject(model)
       const center = box.getCenter(new THREE.Vector3())

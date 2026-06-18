@@ -670,14 +670,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
 (function() {{
   var THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   var GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  var DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
+  var DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/';
   var ANNOTATIONS = {ann_json};
   function loadScript(src, cb) {{
     if (document.querySelector('script[src="' + src + '"]')) {{ cb(); return; }}
     var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s);
   }}
-  loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{
+  loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{ loadScript(DRACO_CDN, function() {{
     init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS, {env_on}, {env_int});
-  }}); }});
+  }}); }}); }});
 
   function init3DViewer(blockId, modelSrc, bgColor, height, annotations, envOn, envIntensity) {{
     var THREE = window.THREE;
@@ -760,7 +762,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       }});
     }}
 
-    new THREE.GLTFLoader().load(modelSrc, function(gltf) {{
+    var _gltf = new THREE.GLTFLoader();
+    if (THREE.DRACOLoader) {{ var _dl = new THREE.DRACOLoader(); _dl.setDecoderPath(DRACO_DECODER); _gltf.setDRACOLoader(_dl); }}
+    _gltf.load(modelSrc, function(gltf) {{
       var model = gltf.scene;
       var box = new THREE.Box3().setFromObject(model);
       var center = box.getCenter(new THREE.Vector3());
