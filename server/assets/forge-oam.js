@@ -30,6 +30,8 @@
   var lastCmdKey = null;   // dedupe consecutive identical (command, frame)
   var hotspots = [];       // live hotspot overlay elements
   var endedPosted = false; // forge:end emitted once per arrival at the final frame
+  var lastPlaying = false;  // last reported play state (to detect stop transitions)
+  var pausedByUser = false; // distinguish a bar pause/seek from a native content stop
 
   // Hotspot style tokens — defaults, overridden by FORGE_CONFIG.hotspot (baked
   // at publish) or a forge:config message (preview live-update).
@@ -288,20 +290,23 @@
         if (r) {
           var i = stopIndexAtFrame(curFrame());
           lastCmdKey = null;                   // allow the next organic stop to post
+          pausedByUser = false;
           clearHotspots();                     // resuming clears the current stop's hotspots
-          r.play();
+          var tf = totalFrames();
+          if (tf > 0 && curFrame() >= tf - 1) { endedPosted = false; r.gotoAndPlay(0); }  // at the end -> replay
+          else r.play();
           postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame(), i);  // even = start
         }
         try { createjs.Ticker.paused = false; } catch (e2) {}
         postState(); break;
       case 'oam:pause':
-        r = resolveRoot(); if (r) r.stop(); postState(); break;
+        r = resolveRoot(); pausedByUser = true; if (r) r.stop(); postState(); break;
       case 'oam:seek':
-        r = resolveRoot();
+        r = resolveRoot(); pausedByUser = true;
         if (r) { lastCmdKey = null; var sf = Math.max(0, Math.round((d.t || 0) * fps())); if (sf < totalFrames() - 1) endedPosted = false; r.gotoAndStop(sf); }
         postState(); break;
       case 'oam:nextStop':
-        r = resolveRoot();
+        r = resolveRoot(); pausedByUser = true;
         if (r) {
           var cur = curFrame(), nx = null, s = stopFrames();
           for (var k = 0; k < s.length; k++) { if (s[k] > cur + 1) { nx = s[k]; break; } }
@@ -326,9 +331,18 @@
     // author didn't put forgeStop/forgeEnd there (prevents a gate_next soft-lock).
     forge._pump = setInterval(function () {
       if (!root) return;
-      if (playing()) postState();
-      var tf = totalFrames();
-      if (tf > 0 && curFrame() >= tf - 1 && !endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: curFrame() }); }
+      var p = playing(), cf = curFrame(), tf = totalFrames();
+      if (p !== lastPlaying) {
+        // Stopped on its own (not a bar pause/seek) before the end -> a native
+        // this.stop() content stop: record it so a marker appears, even with no
+        // forgeStop authored.
+        if (!p && !pausedByUser && tf > 0 && cf < tf - 1 && discovered.indexOf(cf) === -1) discovered.push(cf);
+        postState();                       // push the play<->stop transition (button reflects state)
+      } else if (p) {
+        postState();                       // track the playhead while playing
+      }
+      lastPlaying = p;
+      if (tf > 0 && cf >= tf - 1 && !endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: cf }); }
     }, 250);
     post({ type: 'forge:hello' });
     postState();

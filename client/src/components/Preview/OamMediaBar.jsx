@@ -121,7 +121,7 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
             width: (dur ? (t / dur * 100) : 0) + '%', background: 'var(--forge-amber, #F59E0B)', borderRadius: 4 }} />
           {stops.map((s, i) => (
             <div key={i} title={`Stop ${i + 1}`} style={{ position: 'absolute', left: (dur ? s / dur * 100 : 0) + '%',
-              top: -3, width: 2, height: 14, background: '#7EB8F0', transform: 'translateX(-50%)' }} />
+              top: -4, width: 2, height: 16, background: '#7EB8F0', borderRadius: 1, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
           ))}
         </div>
 
