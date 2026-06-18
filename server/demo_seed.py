@@ -98,6 +98,7 @@ def _model3d(caption=''):
     return {'id': str(uuid.uuid4()), 'type': 'model3d', 'data': {
         'model_asset_id': None, 'model_filename': None, 'model_serve_url': None, 'file_size_mb': None,
         'viewer_height': 380, 'bg_color': '#060810',
+        'environment': 'studio', 'env_intensity': 1.4,
         'caption': caption or '3D model placeholder — upload .glb exported from 3ds Max or Blender',
         'annotations': [
             {'id': str(uuid.uuid4()), 'label': 'Example annotation A',
