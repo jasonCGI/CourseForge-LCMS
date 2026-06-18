@@ -273,6 +273,21 @@ export default function App() {
             }}
           >▣ Shell</button>
 
+          {/* Full-course preview — walk the whole course like a learner */}
+          <button
+            onClick={() => activeProject && window.open(`/api/projects/${activeProject.id}/preview-course`, '_blank', 'noopener')}
+            disabled={!activeProject}
+            aria-label="Preview course"
+            title="Preview the whole course — walk it with Prev/Next or arrow keys"
+            style={{
+              marginLeft: 10, padding: '5px 12px', background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
+              color: 'var(--cf-text-secondary)', fontSize: 12,
+              cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
+              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
+            }}
+          >▶ Course</button>
+
           {/* Publish */}
           <button
             onClick={() => setShowPublish(true)}

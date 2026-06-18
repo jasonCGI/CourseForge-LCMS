@@ -284,6 +284,22 @@ def preview_frame_html(frame_id):
     }
 
 
+@projects_bp.get('/api/projects/<project_id>/preview-course')
+def preview_course_html(project_id):
+    """
+    Full-course live preview: a navigable wrapper that chains each frame's
+    single-frame preview (Prev/Next/jump/keyboard), so authors can walk the
+    whole course and test flow/navigation without publishing to an LMS.
+    """
+    from ..services.frame_preview import build_course_preview_html
+    project = project_full_query().get_or_404(project_id)
+    html = build_course_preview_html(project)
+    return html, 200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Frame-Options': 'SAMEORIGIN',
+    }
+
+
 # ── Reorder (drag-and-drop support) ─────────────────────────────────────────
 
 @projects_bp.post('/api/reorder')

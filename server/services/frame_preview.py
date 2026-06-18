@@ -15,6 +15,7 @@ preview shows the same markup the published SCO will, then:
 
 This module is import-only against scorm12 — it never mutates the packager.
 """
+import json
 import re
 from functools import lru_cache
 from html import escape
@@ -249,3 +250,110 @@ def build_frame_preview_html(frame) -> str:
         runtime_js,
         "</body></html>",
     ])
+
+
+# ── Full-course preview ─────────────────────────────────────────────────────
+# A navigable wrapper that chains each frame's single-frame preview in an iframe,
+# so authors can walk the whole course (Prev/Next/jump/keyboard) and test flow
+# exactly as it renders — shell, media, OAM and all.
+
+_COURSE_PREVIEW_TPL = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Course preview · __TITLE__</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{display:flex;flex-direction:column;background:#0d1017;font-family:'IBM Plex Mono',ui-monospace,monospace;color:#e6edf3}
+  #cbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:9px 14px;background:#1a1f29;border-bottom:2px solid #F59E0B;box-shadow:0 2px 12px rgba(0,0,0,0.4);position:relative}
+  #cbar .dot{width:8px;height:8px;border-radius:50%;background:#F59E0B;box-shadow:0 0 8px #F59E0B;flex:none}
+  #cbar .brand{font-weight:600;color:#F59E0B;letter-spacing:.04em}
+  #cbar .ctx{color:#9aa4b2;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+  #cbar .spacer{flex:1}
+  #cbar button,#cbar select{font-family:inherit;font-size:12px;background:#2a313d;color:#e6edf3;border:1px solid #39414f;border-radius:5px;padding:6px 12px;cursor:pointer}
+  #cbar button:disabled{opacity:.4;cursor:not-allowed}
+  #cbar button.nav{background:#F59E0B;color:#042C53;border:none;font-weight:600}
+  #cbar select{max-width:240px}
+  #counter{font-size:12px;color:#c8d2de;min-width:96px;text-align:center}
+  #prog{flex:0 0 auto;height:3px;background:#222a35}
+  #prog>i{display:block;height:100%;background:#F59E0B;width:0;transition:width .2s}
+  #frame{flex:1;width:100%;border:0;background:#fff;display:block}
+</style></head>
+<body>
+  <div id="cbar">
+    <span class="dot"></span><span class="brand">COURSE PREVIEW</span>
+    <span class="ctx" id="ctx"></span>
+    <span class="spacer"></span>
+    <button id="prev" aria-label="Previous frame">&#9664; Prev</button>
+    <span id="counter"></span>
+    <button id="next" class="nav" aria-label="Next frame">Next &#9654;</button>
+    <select id="jump" aria-label="Jump to frame"></select>
+  </div>
+  <div id="prog"><i id="progfill"></i></div>
+  <iframe id="frame" title="Course frame preview"></iframe>
+<script>
+(function(){
+  var FRAMES = __FRAMES__;
+  var i = 0;
+  var frame=document.getElementById('frame'), ctx=document.getElementById('ctx'),
+      counter=document.getElementById('counter'), prev=document.getElementById('prev'),
+      next=document.getElementById('next'), jump=document.getElementById('jump'),
+      progfill=document.getElementById('progfill');
+  if(!FRAMES.length){ ctx.textContent='This course has no frames yet.'; counter.textContent=''; prev.disabled=next.disabled=true; return; }
+  FRAMES.forEach(function(f,n){
+    var o=document.createElement('option'); o.value=n;
+    o.textContent=(n+1)+'. '+f.name+(f.optional?'  (optional)':'');
+    jump.appendChild(o);
+  });
+  function go(n){
+    i=Math.max(0,Math.min(FRAMES.length-1,n));
+    var f=FRAMES[i];
+    frame.src='/api/frames/'+f.id+'/preview-html?cp='+i;
+    ctx.textContent=[f.course,f.lesson,f.name].filter(Boolean).join('  ·  ');
+    counter.textContent='Frame '+(i+1)+' of '+FRAMES.length;
+    prev.disabled=(i===0); next.disabled=(i===FRAMES.length-1);
+    jump.value=i;
+    progfill.style.width=(FRAMES.length>1?(i/(FRAMES.length-1)*100):100)+'%';
+    try{ history.replaceState(null,'','#'+(i+1)); }catch(e){}
+  }
+  prev.onclick=function(){ go(i-1); };
+  next.onclick=function(){ go(i+1); };
+  jump.onchange=function(){ go(parseInt(jump.value,10)||0); };
+  document.addEventListener('keydown',function(e){
+    if(e.target&&/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if(e.key==='ArrowRight'||e.key==='PageDown'){ e.preventDefault(); go(i+1); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); go(i-1); }
+  });
+  // Shell NEXT/PREV (postMessage from a GUI-shell frame) also drive the course.
+  window.addEventListener('message',function(e){
+    var d=e.data||{}; if(d.type!=='fgui_action') return;
+    if(d.action==='NEXT'||d.action==='CONTINUE'||d.action==='SUBMIT') go(i+1);
+    else if(d.action==='PREVIOUS') go(i-1);
+    else if(d.action==='MENU') go(0);
+  });
+  var start=parseInt((location.hash||'').replace('#',''),10);
+  go(isNaN(start)?0:start-1);
+})();
+</script>
+</body></html>"""
+
+
+def build_course_preview_html(project) -> str:
+    """Navigable preview of the whole course (chains per-frame previews)."""
+    frames = []
+    for course in sorted(getattr(project, "courses", []) or [], key=lambda c: c.order_index):
+        for mod in sorted(course.modules or [], key=lambda m: m.order_index):
+            for lesson in sorted(mod.lessons or [], key=lambda l: l.order_index):
+                for fr in sorted(lesson.frames or [], key=lambda f: f.order_index):
+                    frames.append({
+                        "id": fr.id,
+                        "name": fr.name or "Untitled frame",
+                        "lesson": lesson.name or "",
+                        "course": course.name or "",
+                        "optional": bool(getattr(fr, "optional", False)),
+                    })
+    data = json.dumps(frames).replace("</", "<\/")
+    return (_COURSE_PREVIEW_TPL
+            .replace("__FRAMES__", data)
+            .replace("__TITLE__", escape(project.name or "Course")))
