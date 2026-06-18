@@ -76,11 +76,13 @@ def _get_gui_block(frame):
 
 
 _OAM_PLAYER_TPL = """
-<div style="margin-bottom:20px">
-  <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
-    title="Interactive animation" sandbox="allow-scripts allow-same-origin"
-    style="border:0;max-width:100%;border-radius:6px 6px 0 0;display:block;background:#0d1117"></iframe>
-  <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none;border-radius:0 0 6px 6px">
+<div id="oamwrap-__BID__" style="margin-bottom:20px;width:100%">
+  <div id="oamstage-__BID__" style="position:relative;width:100%;overflow:hidden;background:#0d1117;border-radius:6px 6px 0 0">
+    <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
+      title="Interactive animation" sandbox="allow-scripts allow-same-origin"
+      style="position:absolute;top:0;left:0;border:0;transform-origin:top left;display:block;background:#0d1117"></iframe>
+  </div>
+  <div id="oambar-__BID__" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none;border-radius:0 0 6px 6px">
     <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
     <div id="oamtrack-__BID__" style="flex:1;position:relative;height:8px;background:#1c2a3a;border-radius:4px;cursor:pointer">
       <div id="oamfill-__BID__" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:#F59E0B;border-radius:4px"></div>
@@ -92,10 +94,37 @@ _OAM_PLAYER_TPL = """
 </div>
 <script>
 (function(){
+  var SW=__W__, SH=__H__;
+  var wrap=document.getElementById('oamwrap-__BID__'), stage=document.getElementById('oamstage-__BID__'), bar=document.getElementById('oambar-__BID__');
   var f=document.getElementById('oam-__BID__');
   var play=document.getElementById('oamplay-__BID__'), nextb=document.getElementById('oamnext-__BID__');
   var track=document.getElementById('oamtrack-__BID__'), fill=document.getElementById('oamfill-__BID__'), marks=document.getElementById('oammarks-__BID__'), tm=document.getElementById('oamtime-__BID__');
   if(!f) return;
+  // -- Scale-to-fit: letterbox into the GUI shell content area (#fgui-content)
+  //    when present, else fit the container width (preserve aspect, never clip). --
+  var lastW=-1;
+  function fit(){
+    if(!stage||!SW||!SH) return;
+    var cw=stage.clientWidth||SW;
+    if(cw===lastW) return;   // guard the ResizeObserver against its own height write
+    lastW=cw;
+    var s=cw/SW;
+    var sc=document.getElementById('fgui-content');
+    if(sc && sc.contains(wrap)){
+      var availH=sc.clientHeight-(bar?bar.offsetHeight:36)-16;
+      if(availH>0) s=Math.min(s, availH/SH);   // letterbox inside the content box
+    } else {
+      s=Math.min(s,1);                          // flowing layout: don't upscale past native
+    }
+    if(!(s>0)) s=1;
+    f.style.transform='scale('+s+')';
+    f.style.left=Math.max(0,(cw-SW*s)/2)+'px';
+    stage.style.height=(SH*s)+'px';
+  }
+  fit();
+  if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(stage); }catch(e){} }
+  window.addEventListener('resize', function(){ lastW=-1; fit(); });
+  // -- media bar protocol --
   var dur=0, supported=false;
   function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
   window.addEventListener('message', function(e){

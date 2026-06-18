@@ -15,8 +15,35 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 export default function OamMediaBar({ src, width = 800, height = 500, caption }) {
   const iframeRef = useRef(null)
+  const stageRef  = useRef(null)
+  const SW = Number(width)  || 800             // native stage dims (a legacy '100%' → fallback)
+  const SH = Number(height) || 600
+  const [stageH, setStageH] = useState(SH)
   const [st, setSt]   = useState(null)        // {t, duration, stops, playing}
   const [mode, setMode] = useState('pending') // 'pending' | 'protocol' | 'ticker' | 'none'
+
+  // Scale-to-fit the fixed-size animation to the container width (preserve
+  // aspect, never upscale past native), reserving the scaled height below it.
+  useEffect(() => {
+    const stage = stageRef.current, ifr = iframeRef.current
+    if (!stage || !ifr || !SW || !SH) return
+    let lastW = -1
+    const fit = () => {
+      const cw = stage.clientWidth || SW
+      if (cw === lastW) return            // guard ResizeObserver against the height write
+      lastW = cw
+      const s = Math.min(cw / SW, 1)
+      ifr.style.transform = `scale(${s})`
+      ifr.style.left = `${Math.max(0, (cw - SW * s) / 2)}px`
+      setStageH(SH * s)
+    }
+    fit()
+    const onResize = () => { lastW = -1; fit() }
+    let ro
+    if (window.ResizeObserver) { ro = new ResizeObserver(fit); ro.observe(stage) }
+    window.addEventListener('resize', onResize)
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', onResize) }
+  }, [SW, SH, src])
 
   useEffect(() => {
     const onMsg = (e) => {
@@ -73,9 +100,13 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <iframe ref={iframeRef} src={src} width={width} height={height} onLoad={onLoad}
-        title="Adobe Animate animation" scrolling="no" sandbox="allow-scripts allow-same-origin"
-        style={{ border: 0, maxWidth: '100%', borderRadius: '6px 6px 0 0', display: 'block', background: '#0d1017' }} />
+      <div ref={stageRef} style={{ position: 'relative', width: '100%', height: stageH,
+        overflow: 'hidden', background: '#0d1017', borderRadius: '6px 6px 0 0' }}>
+        <iframe ref={iframeRef} src={src} width={SW} height={SH} onLoad={onLoad}
+          title="Adobe Animate animation" scrolling="no" sandbox="allow-scripts allow-same-origin"
+          style={{ position: 'absolute', top: 0, left: 0, border: 0, transformOrigin: 'top left',
+            display: 'block', background: '#0d1017' }} />
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
         background: '#0d1017', border: '1px solid #1c2a3a', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
