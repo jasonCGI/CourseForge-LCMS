@@ -76,11 +76,15 @@
     post({ type: 'oam:state', t: curFrame() / fps(), duration: duration(),
            stops: stopSeconds(), playing: playing() });
   }
-  function postCommand(n, frame) {
+  function postCommand(n, frame, index) {
     var key = n + '@' + frame;
     if (key === lastCmdKey) return;  // dedupe a re-fired frame action at the same frame
     lastCmdKey = key;
-    post({ type: 'forge:command', n: n, parity: (n % 2 === 1 ? 'stop' : 'start'), frame: frame });
+    // index = resolved stop index (-1 if the stop isn't a known stop) so the
+    // consumer maps prompts by index directly instead of decoding it from n
+    // (an unresolved stop must NOT fall back to prompt 0).
+    post({ type: 'forge:command', n: n, parity: (n % 2 === 1 ? 'stop' : 'start'),
+           frame: frame, index: (index == null ? -1 : index) });
   }
 
   function resolveRoot() {
@@ -133,7 +137,7 @@
       if (discovered.indexOf(fr) === -1) discovered.push(fr);
       var idx = stopIndexAtFrame(fr);
       postState();
-      postCommand(idx >= 0 ? 2 * idx + 1 : 1, fr);  // odd = stop
+      postCommand(idx >= 0 ? 2 * idx + 1 : 1, fr, idx);  // odd = stop
       if (fr >= totalFrames() - 1) post({ type: 'forge:end', frame: fr });
     };
     MC.prototype.forgeEnd = function () {
@@ -161,7 +165,7 @@
           var i = stopIndexAtFrame(curFrame());
           lastCmdKey = null;                   // allow the next organic stop to post
           r.play();
-          postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame());  // even = start
+          postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame(), i);  // even = start
         }
         try { createjs.Ticker.paused = false; } catch (e2) {}
         postState(); break;

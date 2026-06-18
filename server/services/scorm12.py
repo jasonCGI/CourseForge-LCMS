@@ -162,8 +162,9 @@ _OAM_PLAYER_TPL = """
       tm.textContent=(d.t||0).toFixed(1)+'/'+dur.toFixed(0)+'s';
       if(!marks.getAttribute('data-done') && d.stops && d.stops.length){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
     } else if(d.type==='forge:command' && d.parity==='stop'){
-      // prompt keyed by stop index (seek-safe); undefined -> persist previous.
-      var idx=(d.n-1)/2, p=(idx>=0 && idx<PROMPTS.length)?PROMPTS[idx]:null;
+      // prompt keyed by the resolved stop index (seek-safe); undefined/unresolved
+      // (-1) -> persist previous.
+      var idx=(d.index!=null)?d.index:(d.n-1)/2, p=(idx>=0 && idx<PROMPTS.length)?PROMPTS[idx]:null;
       lastStopFrame=d.frame; lastWasDefined=(p!=null && p!=='');
       if(lastWasDefined) showPrompt(p);
     } else if(d.type==='forge:end'){
