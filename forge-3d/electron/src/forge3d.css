@@ -65,6 +65,13 @@ button, [role="button"] { min-height: 32px; min-width: 32px; }
 .f3d-logo-mark { width: 28px; height: 28px; }
 .f3d-logo-text { font-size: 16px; font-weight: 600; letter-spacing: 0.05em; }
 .f3d-logo-accent { color: var(--forge-amber); }
+/* Blinking amber prompt cursor, matching the CourseForge brand wordmark. */
+.f3d-logo-cursor { color: var(--forge-amber); font-weight: 400; margin-left: 1px; animation: f3d-blink 1.1s steps(1) infinite; }
+@keyframes f3d-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .f3d-logo-cursor { animation: none; } }
+
+/* Rejected (non-FBX) drop feedback. */
+.f3d-drop-zone.drop-reject { border-color: #C0392B; background: rgba(192,57,43,0.08); }
 .f3d-header-actions { display: flex; align-items: center; gap: 10px; -webkit-app-region: no-drag; }
 
 /* ── Theme switcher ──────────────────────────────────────────────────────── */

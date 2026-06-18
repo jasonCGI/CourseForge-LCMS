@@ -73,7 +73,13 @@ function setupDropZone() {
   zone.addEventListener('drop', async (e) => {
     e.preventDefault()
     zone.classList.remove('drag-over')
-    await browseForFBX() // Electron 36+: file.path unavailable on drop
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    const p = window.forge3d.getPathForFile(file)   // resolve the dropped path (no dialog)
+    if (p && /\.fbx$/i.test(p)) { await loadFBX(p); return }
+    announceToSR('Please drop a .fbx file.')
+    zone.classList.add('drop-reject')
+    setTimeout(() => zone.classList.remove('drop-reject'), 1200)
   })
   zone.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); browseForFBX() }

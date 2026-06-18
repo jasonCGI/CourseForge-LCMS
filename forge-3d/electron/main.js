@@ -15,6 +15,28 @@ function saveConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
 }
 
+// Auto-locate a Blender executable in the usual install locations so first
+// launch doesn't prompt when Blender is already installed. Returns '' if none.
+function detectBlender() {
+  const candidates = []
+  if (process.platform === 'win32') {
+    for (const base of ['C:\\Program Files\\Blender Foundation', 'C:\\Program Files (x86)\\Blender Foundation']) {
+      try {
+        for (const dir of fs.readdirSync(base)) {
+          candidates.push(path.join(base, dir, 'blender.exe'))
+        }
+      } catch { /* base not present */ }
+    }
+  } else if (process.platform === 'darwin') {
+    candidates.push('/Applications/Blender.app/Contents/MacOS/Blender')
+  } else {
+    candidates.push('/usr/bin/blender', '/usr/local/bin/blender', '/snap/bin/blender', '/var/lib/flatpak/exports/bin/org.blender.Blender')
+  }
+  const found = candidates.filter(c => { try { return fs.existsSync(c) } catch { return false } })
+  found.sort().reverse()   // highest version dir first (e.g. "Blender 5.1" before "Blender 4.0")
+  return found[0] || ''
+}
+
 // ── Window ────────────────────────────────────────────────────────────────
 let mainWindow
 
@@ -79,7 +101,16 @@ ipcMain.handle('dialog:openBlender', async () => {
 })
 
 // ── IPC: Get/set config ───────────────────────────────────────────────────
-ipcMain.handle('config:get', () => loadConfig())
+ipcMain.handle('config:get', () => {
+  const config = loadConfig()
+  // Auto-detect + persist Blender if unset or the saved path no longer exists,
+  // so a machine with Blender installed is never prompted.
+  if (!config.blenderPath || !fs.existsSync(config.blenderPath)) {
+    const detected = detectBlender()
+    if (detected) { config.blenderPath = detected; saveConfig(config) }
+  }
+  return config
+})
 ipcMain.handle('config:set', (_, config) => { saveConfig(config); return true })
 
 // ── IPC: FBX Preflight scan ───────────────────────────────────────────────

@@ -1,6 +1,9 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('forge3d', {
+  // Electron 30 removed File.path; webUtils.getPathForFile is the supported way
+  // to resolve a dropped file's absolute path (must run in the preload).
+  getPathForFile:    (file)   => { try { return webUtils.getPathForFile(file) } catch { return '' } },
   openFBX:           ()       => ipcRenderer.invoke('dialog:openFBX'),
   openOutputDir:     ()       => ipcRenderer.invoke('dialog:openOutputDir'),
   openBlender:       ()       => ipcRenderer.invoke('dialog:openBlender'),
