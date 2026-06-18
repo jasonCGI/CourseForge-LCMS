@@ -12,6 +12,7 @@ from datetime import datetime
 from flask import render_template
 
 from ..models.project import Project, project_full_query
+from ..models.media import MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import _render_blocks
 from ..version import VERSION, SCHEMA_VERSION
@@ -85,6 +86,10 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
 
     total = len(all_frames)
 
+    # One media query, threaded into rendering so ivideo/model3d blocks resolve
+    # their asset extension via dict lookup instead of a SELECT per block.
+    asset_by_id = {a.id: a for a in MediaAsset.query.filter_by(project_id=project_id).all()}
+
     # Build frames data for JS
     frames_data = []
     for idx, (frame, lesson, course) in enumerate(all_frames):
@@ -93,7 +98,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
             'name':     frame.name,
             'lesson':   lesson.name,
             'course':   course.name,
-            'html':     _render_blocks(frame.content.get('blocks', [])),
+            'html':     _render_blocks(frame.content.get('blocks', []), asset_map=asset_by_id),
             'progress': round((idx / max(total - 1, 1)) * 100),
         })
 

@@ -50,13 +50,13 @@ def _ensure_videojs_cached(cache_dir: Path) -> None:
 def build_frame_html_2004(frame, lesson, frame_index,
                            total_frames, frame_map,
                            theme_css, scorm_bridge=False,
-                           disp_index=None, disp_total=None):
+                           disp_index=None, disp_total=None, asset_map=None):
     """Render a single SCO HTML page using SCORM 2004 API.
 
     Visible counter + progress use disp_index/disp_total (required frames only,
     excluding optional); navigation uses the real frame_index/total_frames.
     """
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -167,6 +167,11 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             f"<!-- CourseForge v{VERSION} | SCORM 2004 3rd Ed | "
             f"published {datetime.utcnow().strftime('%Y-%m-%d')} -->\n"
         )
+        # One media query, threaded into rendering (no per-block SELECT) and
+        # reused for the bundling pass below.
+        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
+        asset_by_id = {a.id: a for a in project_assets}
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
             html  = build_frame_html_2004(
@@ -179,6 +184,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 scorm_bridge=_has_oam_with_scorm(frame),
                 disp_index=req_index[idx],
                 disp_total=req_total,
+                asset_map=asset_by_id,
             )
             html = comment_prefix + html
             zf.writestr(fname, html)
@@ -200,8 +206,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             _seen.add(arc)
 
         bundled_oam_ids = set()
-        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
-        asset_by_id = {a.id: a for a in project_assets}
+        # project_assets / asset_by_id built once above (reused here).
         for asset in project_assets:
 
             if asset.kind == 'video':

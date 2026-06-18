@@ -53,27 +53,30 @@ def resolve_theme(project) -> dict:
     return tokens
 
 
+# token key → CSS custom property (constant; built once at import).
+_CSS_VAR_MAP = {
+    'primary_color':      '--cf-primary',
+    'secondary_color':    '--cf-secondary',
+    'accent_color':       '--cf-accent',
+    'text_color':         '--cf-text',
+    'text_light':         '--cf-text-light',
+    'bg_color':           '--cf-bg',
+    'bg_secondary':       '--cf-bg-secondary',
+    'font_family':        '--cf-font',
+    'font_size_base':     '--cf-font-size',
+    'border_radius':      '--cf-radius',
+    'nav_bg':             '--cf-nav-bg',
+    'nav_text':           '--cf-nav-text',
+}
+
+
 def tokens_to_css(tokens: dict) -> str:
     """
     Convert resolved token dict to CSS custom properties string.
     Injected into SCO pages and web bundle at publish time.
     """
     lines = [':root {']
-    mapping = {
-        'primary_color':      '--cf-primary',
-        'secondary_color':    '--cf-secondary',
-        'accent_color':       '--cf-accent',
-        'text_color':         '--cf-text',
-        'text_light':         '--cf-text-light',
-        'bg_color':           '--cf-bg',
-        'bg_secondary':       '--cf-bg-secondary',
-        'font_family':        '--cf-font',
-        'font_size_base':     '--cf-font-size',
-        'border_radius':      '--cf-radius',
-        'nav_bg':             '--cf-nav-bg',
-        'nav_text':           '--cf-nav-text',
-    }
-    for token_key, css_var in mapping.items():
+    for token_key, css_var in _CSS_VAR_MAP.items():
         if token_key in tokens and tokens[token_key]:
             lines.append(f'  {css_var}: {tokens[token_key]};')
     lines.append('}')

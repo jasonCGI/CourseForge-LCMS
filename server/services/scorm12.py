@@ -25,14 +25,14 @@ def _read_text_cached(path):
     """Read a (static, immutable) shell HTML file once per publish process —
     the per-project shell is otherwise re-read from disk for every frame."""
     return Path(path).read_text(encoding='utf-8')
-from ..models.media import OamAsset, MediaAsset
+from ..models.media import MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..version import VERSION, SCHEMA_VERSION
 
 
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
-                     disp_index=None, disp_total=None):
+                     disp_index=None, disp_total=None, asset_map=None):
     """Render a single SCO HTML page for one frame.
 
     The visible counter + progress bar use disp_index/disp_total (required
@@ -40,7 +40,7 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
     frame_index/total_frames positions.
     """
 
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -116,8 +116,30 @@ _OAM_PLAYER_TPL = """
 """
 
 
-def _render_blocks(blocks, scorm_bridge=False):
-    """Convert block list to HTML string."""
+def _get_asset(asset_id, asset_map):
+    """Resolve a MediaAsset by id. Uses the prebuilt project asset map when one
+    is threaded in (publish path) to avoid a per-block SELECT; falls back to a
+    direct query for single-frame callers (preview) that pass no map."""
+    if not asset_id:
+        return None
+    if asset_map is not None and asset_id in asset_map:
+        return asset_map[asset_id]
+    return MediaAsset.query.get(asset_id)
+
+
+@lru_cache(maxsize=64)
+def _read_clip_cached(path, mtime):
+    """Read a clip JSON file, cached by (path, mtime) — the same clip would
+    otherwise be re-read from disk for every publish/preview of its frame."""
+    return Path(path).read_text(encoding='utf-8')
+
+
+def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
+    """Convert block list to HTML string.
+
+    asset_map: optional {asset_id: MediaAsset} for the whole project so media
+    blocks resolve via dict lookup instead of one DB query per block.
+    """
     parts = []
     for block in blocks:
         btype = block.get('type')
@@ -426,7 +448,7 @@ def _render_blocks(blocks, scorm_bridge=False):
                 parts.append('<div class="cf-media">▶⊕ [Interactive Video — no video linked]</div>')
             else:
                 vext = 'mp4'
-                v_asset = MediaAsset.query.get(video_id)
+                v_asset = _get_asset(video_id, asset_map)
                 if v_asset and v_asset.original_name and '.' in v_asset.original_name:
                     vext = v_asset.original_name.rsplit('.', 1)[-1].lower()
                 video_src = f'media/video/{video_id}.{vext}'
@@ -434,9 +456,9 @@ def _render_blocks(blocks, scorm_bridge=False):
                 # Inline the clip interactions — robust across LMS that block fetch()
                 clip_json = '{"interactions":[]}'
                 if clip_id:
-                    c_asset = MediaAsset.query.get(clip_id)
+                    c_asset = _get_asset(clip_id, asset_map)
                     if c_asset and c_asset.stored_path and Path(c_asset.stored_path).exists():
-                        clip_json = Path(c_asset.stored_path).read_text(encoding='utf-8')
+                        clip_json = _read_clip_cached(c_asset.stored_path, os.path.getmtime(c_asset.stored_path))
                 clip_json = clip_json.replace('</', '<\\/')  # don't break the <script> tag
 
                 cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
@@ -469,7 +491,7 @@ def _render_blocks(blocks, scorm_bridge=False):
                 parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
             else:
                 m_ext = '.glb'
-                m_asset = MediaAsset.query.get(model_id)
+                m_asset = _get_asset(model_id, asset_map)
                 if m_asset and m_asset.stored_path:
                     m_ext = Path(m_asset.stored_path).suffix.lower()
                 model_src = f'media/models/{model_id}{m_ext}'
@@ -614,7 +636,7 @@ def _render_blocks(blocks, scorm_bridge=False):
 
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
-                     frame_map, cf_version, disp_index=None, disp_total=None):
+                     frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -648,7 +670,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         html_path = candidates[0]
 
     injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
-                                    if b.get('type') != 'gui'])
+                                    if b.get('type') != 'gui'], asset_map=asset_map)
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -656,7 +678,8 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
 
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
-                               section_name, frame_map, cf_version, disp_index=None, disp_total=None):
+                               section_name, frame_map, cf_version, disp_index=None, disp_total=None,
+                               asset_map=None):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected)."""
     sdir = Path(shell.stored_path)
     html_path = sdir / (shell.html_file or '')
@@ -665,7 +688,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         if not cands:
             return None, None
         html_path = cands[0]
-    injected_html = _render_blocks((frame.content or {}).get('blocks', []))
+    injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map)
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -895,6 +918,12 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 _run += 1
             req_index[_i] = _run or 1
 
+        # One query for the project's media; threaded into block rendering so
+        # ivideo/model3d resolve their assets via dict lookup instead of a SELECT
+        # per block, and reused for the media-bundling pass below.
+        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
+        asset_by_id = {a.id: a for a in project_assets}
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
 
@@ -902,11 +931,11 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if _frame_has_gui(frame):
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
-                    req_index[idx], req_total,
+                    req_index[idx], req_total, asset_map=asset_by_id,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
-                    gasset = MediaAsset.query.get(gui_aid)
+                    gasset = asset_by_id.get(gui_aid) or MediaAsset.query.get(gui_aid)
                     _bundle_shell_assets(gasset.stored_path if gasset else None, gui_aid)
                     continue
                 # else fall through
@@ -915,7 +944,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if project_shell and project_shell.stored_path:
                 ph, sid = _build_project_shell_frame(
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
-                    req_index[idx], req_total,
+                    req_index[idx], req_total, asset_map=asset_by_id,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)
@@ -932,29 +961,9 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 scorm_bridge=_has_oam_with_scorm(frame),
                 disp_index=req_index[idx],
                 disp_total=req_total,
+                asset_map=asset_by_id,
             )
             zf.writestr(fname, comment + html)
-
-        # ── Bundle OAM assets ──────────────────────────────────────
-        bundled_oam_ids = set()
-        for idx, (frame, lesson, course) in enumerate(all_frames):
-            for block in frame.content.get('blocks', []):
-                if block.get('type') != 'oam':
-                    continue
-                oam_asset_id = block.get('data', {}).get('oam_asset_id')
-                if not oam_asset_id or oam_asset_id in bundled_oam_ids:
-                    continue
-                oam_asset = OamAsset.query.filter_by(media_asset_id=oam_asset_id).first()
-                if not oam_asset or not oam_asset.extracted_path:
-                    continue
-                extract_dir = Path(oam_asset.extracted_path)
-                if not extract_dir.exists():
-                    continue
-                for oam_file in extract_dir.rglob('*'):
-                    if oam_file.is_file():
-                        arc_path = f"oam/{oam_asset_id}/{oam_file.relative_to(extract_dir)}"
-                        zf.write(str(oam_file), arc_path)
-                bundled_oam_ids.add(oam_asset_id)
 
         # ── Bundle Video.js (cached) ───────────────────────────────
         try:
@@ -983,11 +992,8 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 zf.write(stored_path, arc_path)
                 _bundled_media.add(arc_path)
 
-        # One query for the project's media; companions resolved via the dict
-        # (was one MediaAsset.query.get() per companion per asset).
-        project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
-        asset_by_id = {a.id: a for a in project_assets}
-
+        # project_assets / asset_by_id were built once above (reused here);
+        # companions resolved via the dict (no per-companion SELECT).
         for asset in project_assets:
             companions = asset.companion_files or {}
             if asset.kind == 'video':
@@ -1005,6 +1011,14 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             elif asset.kind == 'model3d':
                 if asset.stored_path and Path(asset.stored_path).exists():
                     _bundle_media(asset.stored_path, f'media/models/{asset.id}{Path(asset.stored_path).suffix.lower()}')
+            elif asset.kind == 'oam' and asset.oam_asset and asset.oam_asset.extracted_path:
+                # Bundle the whole extracted OAM under oam/<media_asset_id>/...
+                # (was a second full frame-walk + a per-OAM OamAsset query).
+                edir = Path(asset.oam_asset.extracted_path)
+                if edir.exists():
+                    for oam_file in edir.rglob('*'):
+                        if oam_file.is_file():
+                            zf.write(str(oam_file), f"oam/{asset.id}/{oam_file.relative_to(edir)}")
 
             if companions.get('webm_asset_id'):
                 webm = asset_by_id.get(companions['webm_asset_id'])
