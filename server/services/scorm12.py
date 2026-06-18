@@ -742,7 +742,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       dotEls.forEach(function(it) {{
         _v3.set(it.ann.position.x, it.ann.position.y, it.ann.position.z);
         var ndc = _v3.clone().project(camera);
-        if (ndc.z >= 1.0) {{ it.dot.style.display = 'none'; return; }}
+        // Hide behind-camera OR off-canvas dots — zooming in pushes dots past the
+        // viewport edge, where they'd otherwise overflow the SCO iframe.
+        if (ndc.z >= 1.0 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {{ it.dot.style.display = 'none'; return; }}
         var sx = (ndc.x * 0.5 + 0.5) * cw, sy = (-ndc.y * 0.5 + 0.5) * ch;
         it.dot.style.display = 'block'; it.dot.style.left = sx + 'px'; it.dot.style.top = sy + 'px';
         it.pop.style.left = sx > cw * 0.6 ? 'auto' : '18px';

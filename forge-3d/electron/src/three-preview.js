@@ -15,14 +15,37 @@ window.initForge3DPreview = function(container, glbPath) {
         renderer.setSize(canvas.offsetWidth, canvas.offsetHeight)
         renderer.setPixelRatio(window.devicePixelRatio)
         renderer.outputColorSpace = THREE.SRGBColorSpace
+        renderer.toneMapping = THREE.ACESFilmicToneMapping
+        renderer.toneMappingExposure = 1.1
 
         const scene    = new THREE.Scene()
         const camera   = new THREE.PerspectiveCamera(45, canvas.offsetWidth / canvas.offsetHeight, 0.01, 1000)
         const controls = new OrbitControls(camera, canvas)
         controls.enableDamping = true
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6))
-        const dir = new THREE.DirectionalLight(0xffffff, 1.2)
+        // Procedural "studio" IBL (no HDR file) so metallic/glossy materials
+        // reflect — matches the CourseForge viewer's studio environment, so what
+        // an author sees here is what they'll get after upload.
+        try {
+          const pmrem = new THREE.PMREMGenerator(renderer)
+          const es = new THREE.Scene()
+          es.add(new THREE.Mesh(new THREE.BoxGeometry(12, 12, 12),
+            new THREE.MeshStandardMaterial({ side: THREE.BackSide, color: 0x767676, roughness: 1, metalness: 0 })))
+          const panel = (hex, x, y, z, sx, sy, sz, it) => {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz),
+              new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(hex), emissiveIntensity: it }))
+            m.position.set(x, y, z); es.add(m)
+          }
+          panel(0xffffff, 0, 5.5, 0, 8, 0.2, 8, 1.4)
+          panel(0xbcd4ff, -5.5, 0, 1, 0.2, 7, 7, 0.7)
+          panel(0xffe2b0, 5.5, 0, -1, 0.2, 7, 7, 0.6)
+          scene.environment = pmrem.fromScene(es, 0.04).texture
+          es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() })
+          pmrem.dispose()
+        } catch (e) { /* IBL is a nice-to-have; lights below still render the model */ }
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+        const dir = new THREE.DirectionalLight(0xffffff, 1.0)
         dir.position.set(5, 10, 5)
         scene.add(dir)
         scene.add(new THREE.GridHelper(10, 20, 0x2E2E2E, 0x1A1A1A))

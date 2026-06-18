@@ -529,7 +529,8 @@ CourseTitle.zip
     annEls.forEach(function(a){
       var wp=a.pos.clone().applyMatrix4(group.matrixWorld);
       var ndc=wp.project(camera);
-      if(ndc.z>=1){a.wrap.style.display='none';return;}
+      // Hide behind-camera OR off-canvas pins (zoom-in pushes them past the edge).
+      if(ndc.z>=1||ndc.x<-1||ndc.x>1||ndc.y<-1||ndc.y>1){a.wrap.style.display='none';return;}
       var sx=(ndc.x*.5+.5)*w,sy=(ndc.y*-.5+.5)*h;
       a.wrap.style.display='block';
       a.wrap.style.left=sx+'px';a.wrap.style.top=sy+'px';

@@ -107,9 +107,12 @@ export default function Model3DViewer({
     const pins = anns.map(ann => {
       const ndc = new THREE.Vector3(ann.position.x, ann.position.y, ann.position.z).project(camera)
       const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
-      // A degenerate camera frame (e.g. before the first updateCamera) can yield
-      // non-finite NDC → an `Infinity` CSS `left`. Treat those as not-visible.
-      return { id: ann.id, x, y, visible: ndc.z < 1.0 && Number.isFinite(x) && Number.isFinite(y) }
+      // Hide a pin that's behind the camera (ndc.z>=1) OR projects OUTSIDE the
+      // canvas (|ndc.x|>1 / |ndc.y|>1) — otherwise zooming in pushes pins past the
+      // viewport edge where they'd overflow the frame. Non-finite NDC (degenerate
+      // camera before first updateCamera) is also not-visible.
+      const onScreen = ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1
+      return { id: ann.id, x, y, visible: ndc.z < 1.0 && onScreen && Number.isFinite(x) && Number.isFinite(y) }
     })
     // This runs every animation frame. Only re-render React when a pin actually
     // moved (>0.5px) or flipped visibility — otherwise a static model would
