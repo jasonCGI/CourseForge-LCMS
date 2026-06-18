@@ -1,10 +1,11 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader }  from './TextBlock'
 import MediaUploader    from './MediaUploader'
-import { uploadOam, getOamAsset, getForgeConfig, setForgeConfig } from '../../../api/client'
+import { uploadOam, getOamAsset } from '../../../api/client'
 import OamMediaBar from '../../Preview/OamMediaBar'
+import useForgeConfigStore, { DEFAULT_HS } from '../../../store/forgeConfigStore'
 
 const OAM_ACCEPT = {
   'application/vnd.adobe.oam+zip': ['.oam'],
@@ -22,42 +23,19 @@ export default function OamBlock({ block }) {
   const [oamMeta,    setOamMeta]    = useState(null)
   const [showPreview, setShowPreview] = useState(false)
 
-  // Project-wide ForgeJS hotspot style (null = use the runtime brand defaults).
-  const [hotspot, setHotspot] = useState(null)
-  const [hsSaved, setHsSaved] = useState(null)   // 'saving' | 'saved' | null
-  const hsTimer = useRef(null)
+  // Project-wide ForgeJS hotspot style lives in a shared store so multiple OAM
+  // blocks on one project stay in sync (no cross-block clobber). null = defaults.
+  const hotspot      = useForgeConfigStore(s => s.hotspot)
+  const hsSaved      = useForgeConfigStore(s => s.saved)
+  const loadForge    = useForgeConfigStore(s => s.load)
+  const patchHotspot = useForgeConfigStore(s => s.patch)
+  const resetHotspot = useForgeConfigStore(s => s.reset)
 
   const assetId = block.data.oam_asset_id
 
-  useEffect(() => {
-    if (!activeProject?.id) { setHotspot(null); return }
-    getForgeConfig(activeProject.id)
-      .then(r => {
-        const hs = r.data?.hotspot
-        // Always set (null when the new project has no config) so switching
-        // projects can't leave the previous project's style in state.
-        setHotspot(hs && Object.keys(hs).length ? { ...DEFAULT_HS, ...hs } : null)
-      })
-      .catch(() => setHotspot(null))
-  }, [activeProject?.id])
-
-  // Flush/clear the debounce timer on unmount so a late save can't fire after
-  // the block is gone (frame nav, block delete).
-  useEffect(() => () => clearTimeout(hsTimer.current), [])
+  useEffect(() => { loadForge(activeProject?.id) }, [activeProject?.id, loadForge])
 
   const effHs = hotspot || DEFAULT_HS
-  const saveHotspot = useCallback((next) => {
-    if (!activeProject?.id) return
-    setHsSaved('saving')
-    clearTimeout(hsTimer.current)
-    hsTimer.current = setTimeout(() => {
-      setForgeConfig(activeProject.id, next ? { hotspot: next } : {})
-        .then(() => setHsSaved('saved'))
-        .catch(() => setHsSaved(null))
-    }, 500)
-  }, [activeProject?.id])
-  const patchHotspot = (p) => { const next = { ...effHs, ...p }; setHotspot(next); saveHotspot(next) }
-  const resetHotspot = () => { setHotspot(null); saveHotspot(null) }
 
   // Load metadata if asset already linked
   useEffect(() => {
@@ -410,14 +388,6 @@ export default function OamBlock({ block }) {
       )}
     </div>
   )
-}
-
-// Runtime hotspot defaults (mirror server/assets/forge-oam.js HS) — also the
-// "brand default" shown until a project customizes the style.
-const DEFAULT_HS = {
-  strokeColor: '#F59E0B', outColor: '#F59E0B', focusOutline: '#F59E0B',
-  overColor: '#FFC04D', fill: 'rgba(245,158,11,0.12)', shadow: '0 0 0 3px rgba(245,158,11,0.25)',
-  strokeWidth: 3, radius: 6, pulse: true,
 }
 
 function hexToRgba(hex, a) {

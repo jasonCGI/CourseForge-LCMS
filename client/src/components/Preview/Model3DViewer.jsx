@@ -308,7 +308,8 @@ export default function Model3DViewer({
   }, [])
 
   return (
-    <div style={{ position: 'relative', width: '100%', marginBottom: 12, userSelect: 'none' }}>
+    <div style={{ position: 'relative', width: '100%', marginBottom: 12, userSelect: 'none',
+                  overflow: 'hidden', borderRadius: 8 }}>
       <canvas ref={canvasRef} width={800} height={height}
         style={{ width: '100%', height, display: 'block', borderRadius: 8,
                  cursor: pinMode ? 'crosshair' : 'grab', outline: 'none', touchAction: 'none' }}
