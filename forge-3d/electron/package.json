@@ -2,6 +2,7 @@
   "name": "forge3d",
   "version": "1.0.0",
   "description": "FBX to GLB conversion pipeline — part of the CourseForge ecosystem",
+  "author": "CardonaLab",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,17 +10,19 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
   },
-  "dependencies": {
-    "three": "^0.165.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "^30.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "three": "^0.165.0"
   },
   "build": {
     "appId": "dev.cardonalab.forge3d",
     "productName": "Forge3D",
     "icon": "assets/icons/forge3d-icon",
+    "compression": "maximum",
+    "electronLanguages": ["en-US"],
+    "removePackageScripts": true,
     "win": {
       "target": "nsis",
       "icon": "assets/icons/forge3d-icon.ico"
