@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import MediaBar from '../../Preview/MediaBar'
 
 export default function IVideoRuntime({
   videoSrc, webmSrc, vttSrc, posterSrc,
@@ -11,6 +12,7 @@ export default function IVideoRuntime({
   const [blocking,     setBlocking]     = useState(null)
   const [currentTime,  setCurrentTime]  = useState(0)
   const [duration,     setDuration]     = useState(0)
+  const [playing,      setPlaying]      = useState(false)
   const [answered,     setAnswered]     = useState({})
   const [quizSelected, setQuizSelected] = useState({})
 
@@ -38,14 +40,20 @@ export default function IVideoRuntime({
     const v = videoRef.current
     if (!v) return
     const meta = () => setDuration(v.duration || 0)
-    const ended = () => onComplete?.()
+    const ended = () => { setPlaying(false); onComplete?.() }
+    const onPlay = () => setPlaying(true)
+    const onPause = () => setPlaying(false)
     v.addEventListener('timeupdate', onTimeUpdate)
     v.addEventListener('loadedmetadata', meta)
     v.addEventListener('ended', ended)
+    v.addEventListener('play', onPlay)
+    v.addEventListener('pause', onPause)
     return () => {
       v.removeEventListener('timeupdate', onTimeUpdate)
       v.removeEventListener('loadedmetadata', meta)
       v.removeEventListener('ended', ended)
+      v.removeEventListener('play', onPlay)
+      v.removeEventListener('pause', onPause)
     }
   }, [onTimeUpdate, onComplete])
 
@@ -71,40 +79,64 @@ export default function IVideoRuntime({
     if (i.pause_on_reach) videoRef.current?.play()
   }
 
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
+  // Interaction timecodes become stop markers on the shared media bar, mirroring
+  // the OAM player's stop markers.
+  const stops = interactions
+    .map(i => i.timecode)
+    .filter(t => typeof t === 'number' && t >= 0)
+
+  const togglePlay = () => {
+    const v = videoRef.current
+    if (!v) return
+    if (v.paused) v.play(); else v.pause()
+  }
+  const seek = (sec) => { const v = videoRef.current; if (v) v.currentTime = sec }
+  const nextStop = () => {
+    const next = stops.filter(s => s > currentTime + 0.05).sort((a, b) => a - b)[0]
+    if (next != null && videoRef.current) videoRef.current.currentTime = next
+  }
 
   return (
-    <div style={{ position: 'relative', width: '100%', background: '#000', borderRadius: 8, overflow: 'hidden' }}>
-      <video ref={videoRef} controls={!blocking} style={{ width: '100%', display: 'block' }}
-        poster={posterSrc} aria-label="Interactive video">
-        {webmSrc && <source src={webmSrc} type="video/webm" />}
-        {videoSrc && <source src={videoSrc} type="video/mp4" />}
-        {vttSrc && <track kind="captions" src={vttSrc} srcLang="en" label="English" default />}
-        <p>Your browser does not support HTML5 video.</p>
-      </video>
+    <div style={{ width: '100%' }}>
+      <div style={{ position: 'relative', width: '100%', background: '#000', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
+        <video ref={videoRef} controls={false} style={{ width: '100%', display: 'block' }}
+          poster={posterSrc} aria-label="Interactive video">
+          {webmSrc && <source src={webmSrc} type="video/webm" />}
+          {videoSrc && <source src={videoSrc} type="video/mp4" />}
+          {vttSrc && <track kind="captions" src={vttSrc} srcLang="en" label="English" default />}
+          <p>Your browser does not support HTML5 video.</p>
+        </video>
 
-      {/* Non-blocking overlays */}
-      {activeInts.filter(i => !i.pause_on_reach || answered[i.id]).map(i => (
-        <Overlay key={i.id} i={i} />
-      ))}
+        {/* Non-blocking overlays */}
+        {activeInts.filter(i => !i.pause_on_reach || answered[i.id]).map(i => (
+          <Overlay key={i.id} i={i} />
+        ))}
 
-      {/* Blocking overlay */}
-      {blocking && (
-        <Blocking
-          i={blocking}
-          answered={answered[blocking.id]}
-          quizSelected={quizSelected}
-          onQuizSelect={(id, idx) => setQuizSelected(prev => ({ ...prev, [id]: idx }))}
-          onQuizSubmit={submitQuiz}
-          onBranch={selectBranch}
-          onAck={acknowledge}
-        />
-      )}
-
-      {/* Progress */}
-      <div style={{ height: 3, background: 'rgba(255,255,255,0.1)' }}>
-        <div style={{ height: '100%', background: 'var(--forge-amber)', width: pct + '%', transition: 'width 0.1s linear' }} />
+        {/* Blocking overlay */}
+        {blocking && (
+          <Blocking
+            i={blocking}
+            answered={answered[blocking.id]}
+            quizSelected={quizSelected}
+            onQuizSelect={(id, idx) => setQuizSelected(prev => ({ ...prev, [id]: idx }))}
+            onQuizSubmit={submitQuiz}
+            onBranch={selectBranch}
+            onAck={acknowledge}
+          />
+        )}
       </div>
+
+      {/* Shared transport bar — gated while a blocking interaction holds the video */}
+      <MediaBar
+        playing={playing}
+        t={currentTime}
+        duration={duration}
+        stops={stops}
+        onPlayPause={togglePlay}
+        onSeek={seek}
+        onNextStop={nextStop}
+        disabled={!!blocking}
+      />
     </div>
   )
 }

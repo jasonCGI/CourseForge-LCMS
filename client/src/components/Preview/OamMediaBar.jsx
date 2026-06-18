@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import MediaBar from './MediaBar'
 
 /**
  * OamMediaBar — an OAM (Adobe Animate Canvas) player with a media bar.
@@ -11,8 +12,6 @@ import React, { useEffect, useRef, useState } from 'react'
  * play/pause via the CreateJS Ticker if reachable (same-origin), else show the
  * iframe with a "no timeline controls" note.
  */
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
-
 export default function OamMediaBar({ src, width = 800, height = 500, caption }) {
   const iframeRef = useRef(null)
   const stageRef  = useRef(null)
@@ -87,11 +86,6 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
   const playing = mode === 'protocol' ? !!st?.playing : tickerPlaying
   const stops = st?.stops || []
 
-  const seekClick = (e) => {
-    if (mode !== 'protocol' || !dur) return
-    const r = e.currentTarget.getBoundingClientRect()
-    send({ type: 'oam:seek', t: clamp((e.clientX - r.left) / r.width, 0, 1) * dur })
-  }
   const togglePlay = () => {
     if (mode === 'protocol') send({ type: playing ? 'oam:pause' : 'oam:play' })
     else if (mode === 'ticker') tickerToggle()
@@ -109,29 +103,17 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
             display: 'block', background: '#0d1017' }} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-        background: '#0d1017', border: '1px solid #1c2a3a', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
-        <button onClick={togglePlay} disabled={!canControl} aria-label={playing ? 'Pause' : 'Play'}
-          style={barBtn(canControl)}>{playing ? '⏸' : '▶'}</button>
-
-        <div onClick={seekClick}
-          style={{ flex: 1, position: 'relative', height: 8, background: '#1c2a3a', borderRadius: 4,
-                   cursor: mode === 'protocol' ? 'pointer' : 'default', opacity: mode === 'protocol' ? 1 : 0.5 }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0,
-            width: (dur ? (t / dur * 100) : 0) + '%', background: 'var(--forge-amber, #F59E0B)', borderRadius: 4 }} />
-          {stops.map((s, i) => (
-            <div key={i} title={`Stop ${i + 1}`} style={{ position: 'absolute', left: (dur ? s / dur * 100 : 0) + '%',
-              top: -4, width: 2, height: 16, background: '#7EB8F0', borderRadius: 1, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
-          ))}
-        </div>
-
-        <button onClick={() => send({ type: 'oam:nextStop' })} disabled={mode !== 'protocol'}
-          aria-label="Skip to next stop" title="Next stop" style={barBtn(mode === 'protocol')}>⤓ Next stop</button>
-
-        <span style={{ fontFamily: 'var(--forge-font, monospace)', fontSize: 10, color: '#7A90A8', minWidth: 60, textAlign: 'right' }}>
-          {mode === 'protocol' ? `${t.toFixed(1)}/${dur.toFixed(0)}s` : ''}
-        </span>
-      </div>
+      <MediaBar
+        playing={playing}
+        t={mode === 'protocol' ? t : 0}
+        duration={mode === 'protocol' ? dur : 0}
+        stops={stops}
+        onPlayPause={togglePlay}
+        onSeek={(sec) => send({ type: 'oam:seek', t: sec })}
+        onNextStop={() => send({ type: 'oam:nextStop' })}
+        disabled={!canControl}
+        seekable={mode === 'protocol'}
+      />
 
       {mode === 'none' && (
         <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary, #7a7a90)', marginTop: 4,
@@ -143,10 +125,3 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
     </div>
   )
 }
-
-const barBtn = (enabled) => ({
-  background: enabled ? 'var(--forge-amber, #F59E0B)' : '#2a2a35',
-  color: enabled ? '#042C53' : '#666', border: 'none', borderRadius: 4,
-  padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: enabled ? 'pointer' : 'not-allowed',
-  fontFamily: 'var(--forge-font, monospace)', whiteSpace: 'nowrap',
-})
