@@ -662,6 +662,7 @@ function PreviewModel3D({ block }) {
         bgColor={block.data.bg_color || '#0d1017'}
         environment={block.data.environment || 'studio'}
         envIntensity={block.data.env_intensity ?? 1}
+        decorative={block.data.decorative}
         annotations={block.data.annotations || []}
       />
     </div>

@@ -57,7 +57,7 @@ function applyEnvIntensity(model, intensity) {
 export default function Model3DViewer({
   modelUrl, caption, bgColor = '#0d1017', height = 400,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
-  environment = 'studio', envIntensity = 1,
+  environment = 'studio', envIntensity = 1, decorative = false,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -339,8 +339,8 @@ export default function Model3DViewer({
       <canvas ref={canvasRef} width={800} height={height}
         style={{ width: '100%', height, display: 'block', borderRadius: 8,
                  cursor: pinMode ? 'crosshair' : 'grab', outline: 'none', touchAction: 'none' }}
-        tabIndex={0} role="img"
-        aria-label={caption || '3D model viewer — arrow keys orbit, +/- zoom, R reset, Tab to navigate annotations'}
+        tabIndex={decorative ? -1 : 0} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined}
+        aria-label={decorative ? undefined : (caption || '3D model viewer — arrow keys orbit, +/- zoom, R reset, Tab to navigate annotations')}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
         onWheel={onWheel} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onKeyDown={onKeyDown} onClick={handleCanvasClick} />
 

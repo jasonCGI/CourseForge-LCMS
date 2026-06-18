@@ -129,6 +129,7 @@ export default function Model3DBlock({ block }) {
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               height={block.data.viewer_height || 400} bgColor={block.data.bg_color || '#0d1017'}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
+              decorative={block.data.decorative}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
         )}
@@ -196,6 +197,17 @@ export default function Model3DBlock({ block }) {
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Caption (optional)</label>
               <input value={block.data.caption || ''} onChange={e => update('caption', e.target.value)} placeholder="Describe the model for learners and screen readers" aria-label="3D model caption" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+
+            <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <input type="checkbox" id={`m3d-decorative-${block.id}`} checked={!!block.data.decorative}
+                onChange={e => update('decorative', e.target.checked)} style={{ marginTop: 2 }} />
+              <label htmlFor={`m3d-decorative-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)', lineHeight: 1.4 }}>
+                Decorative — hide from screen readers (no text alternative needed)
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>
+                  Tick only if the model is purely visual. Otherwise the caption above is the 508/WCAG text alternative.
+                </span>
+              </label>
             </div>
 
             <div style={{ borderTop: '1px solid var(--cf-border-tertiary)', paddingTop: 14, marginBottom: 4 }}>

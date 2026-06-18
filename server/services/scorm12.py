@@ -616,6 +616,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             bg_color = data.get('bg_color', '#0d1017')
             block_id = bid[:8]
             annotations = data.get('annotations', [])
+            decorative = bool(data.get('decorative'))
             ann_json = json.dumps(annotations).replace('</', '<\\/')
             env_on = 'false' if data.get('environment', 'studio') == 'none' else 'true'
             try:
@@ -638,9 +639,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
                 model_src = f'media/models/{model_id}{m_ext}'
                 cap_html = f'<p style="font-size:12px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
                 aria = caption or '3D model viewer — use arrow keys to rotate, plus/minus to zoom, R to reset'
+                # Decorative models are hidden from assistive tech (508/WCAG 1.1.1 —
+                # purely visual content needs no text alternative).
+                canvas_a11y = ('tabindex="-1" aria-hidden="true"' if decorative
+                               else f'tabindex="0" role="img" aria-label="{aria}"')
                 parts.append(f'''
 <div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
-  <canvas id="canvas3d-{block_id}" tabindex="0" role="img" aria-label="{aria}"
+  <canvas id="canvas3d-{block_id}" {canvas_a11y}
     style="width:100%;height:{height}px;display:block;border-radius:8px;cursor:grab;outline:none;touch-action:none"></canvas>
   <div id="annoverlay-{block_id}" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:8px"></div>
   <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color};border-radius:8px">
