@@ -29,6 +29,7 @@
   var discovered = [];     // stop frames discovered via forgeStop()
   var lastCmdKey = null;   // dedupe consecutive identical (command, frame)
   var hotspots = [];       // live hotspot overlay elements
+  var endedPosted = false; // forge:end emitted once per arrival at the final frame
 
   // Hotspot style tokens — defaults, overridden by FORGE_CONFIG.hotspot (baked
   // at publish) or a forge:config message (preview live-update).
@@ -161,13 +162,13 @@
       var idx = stopIndexAtFrame(fr);
       postState();
       postCommand(idx >= 0 ? 2 * idx + 1 : 1, fr, idx);  // odd = stop
-      if (fr >= totalFrames() - 1) post({ type: 'forge:end', frame: fr });
+      if (fr >= totalFrames() - 1 && !endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: fr }); }
     };
     MC.prototype.forgeEnd = function () {
       this.stop();
       if (!root) root = this;
       postState();
-      post({ type: 'forge:end', frame: this.currentFrame || 0 });
+      if (!endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: this.currentFrame || 0 }); }
     };
     // Report completion / score to the LMS (through the parent SCO page, since
     // the OAM iframe is sandboxed and can't reach window.API directly).
@@ -175,6 +176,7 @@
       post({ type: 'forge:complete', score: (score == null ? null : score) });
     };
     MC.prototype.forgeScore = function (score) {
+      if (score == null) return;                  // never report an empty score
       post({ type: 'forge:score', score: score });
     };
     // forgeHotspot is fleshed out in task 4; reserve it so frame scripts don't throw.
@@ -287,7 +289,7 @@
         r = resolveRoot(); if (r) r.stop(); postState(); break;
       case 'oam:seek':
         r = resolveRoot();
-        if (r) { lastCmdKey = null; r.gotoAndStop(Math.max(0, Math.round((d.t || 0) * fps()))); }
+        if (r) { lastCmdKey = null; var sf = Math.max(0, Math.round((d.t || 0) * fps())); if (sf < totalFrames() - 1) endedPosted = false; r.gotoAndStop(sf); }
         postState(); break;
       case 'oam:nextStop':
         r = resolveRoot();
@@ -310,8 +312,15 @@
     installProto();
     // Keep any visible hotspot overlays aligned when the canvas resizes/scales.
     window.addEventListener('resize', function () { for (var i = 0; i < hotspots.length; i++) positionHotspot(hotspots[i]); });
-    // While playing, push state so the bar tracks the playhead.
-    forge._pump = setInterval(function () { if (root && playing()) postState(); }, 250);
+    // While playing, push state so the bar tracks the playhead; and emit
+    // forge:end when the timeline naturally reaches the final frame even if the
+    // author didn't put forgeStop/forgeEnd there (prevents a gate_next soft-lock).
+    forge._pump = setInterval(function () {
+      if (!root) return;
+      if (playing()) postState();
+      var tf = totalFrames();
+      if (tf > 0 && curFrame() >= tf - 1 && !endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: curFrame() }); }
+    }, 250);
     post({ type: 'forge:hello' });
     postState();
   }

@@ -154,14 +154,27 @@ _OAM_PLAYER_TPL = """
     for(var i=0;i<b.length;i++){ try{ b[i].disabled=disabled; b[i].style.opacity=disabled?'0.4':''; b[i].style.pointerEvents=disabled?'none':''; }catch(e){} }
   }
   if(GATE_NEXT) gateButtons(true);
-  // Report completion/score to the LMS (the player is in the SCO page -> has window.API).
+  // Find the SCORM API — the LMS often hosts it on a parent/opener frame, not
+  // the SCO document itself (canonical walk-up-the-frame-tree).
+  function findAPI(name){
+    var w=window;
+    for(var i=0;i<8 && w;i++){ try{ if(w[name]) return w[name]; }catch(e){} if(w===w.parent) break; w=w.parent; }
+    try{ if(window.opener && window.opener[name]) return window.opener[name]; }catch(e){}
+    return null;
+  }
+  var _reported=false;
+  // Report completion/score to the LMS (latched so it fires once).
   function reportComplete(score){
-    try{ if(window.API){ window.API.LMSSetValue('cmi.core.lesson_status','completed'); if(score!=null) window.API.LMSSetValue('cmi.core.score.raw', String(score)); window.API.LMSCommit(''); } }catch(e){}
-    try{ if(window.API_1484_11){ window.API_1484_11.SetValue('cmi.completion_status','completed'); if(score!=null) window.API_1484_11.SetValue('cmi.score.raw', String(score)); window.API_1484_11.Commit(''); } }catch(e){}
+    if(_reported) return; _reported=true;
+    var a12=findAPI('API'), a04=findAPI('API_1484_11');
+    try{ if(a12){ a12.LMSSetValue('cmi.core.lesson_status','completed'); if(score!=null) a12.LMSSetValue('cmi.core.score.raw', String(score)); a12.LMSCommit(''); } }catch(e){}
+    try{ if(a04){ a04.SetValue('cmi.completion_status','completed'); if(score!=null) a04.SetValue('cmi.score.raw', String(score)); a04.Commit(''); } }catch(e){}
   }
   function reportScore(score){
-    try{ if(window.API) window.API.LMSSetValue('cmi.core.score.raw', String(score)); }catch(e){}
-    try{ if(window.API_1484_11) window.API_1484_11.SetValue('cmi.score.raw', String(score)); }catch(e){}
+    if(score==null) return;                       // never write "undefined"/"null"
+    var a12=findAPI('API'), a04=findAPI('API_1484_11');
+    try{ if(a12) a12.LMSSetValue('cmi.core.score.raw', String(score)); }catch(e){}
+    try{ if(a04) a04.SetValue('cmi.score.raw', String(score)); }catch(e){}
   }
   // In a GUI shell -> drive the shell's prompt zone; otherwise console-trace.
   function showPrompt(text){
