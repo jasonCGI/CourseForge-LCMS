@@ -380,6 +380,17 @@ CourseTitle.zip
 
   var camera=new THREE.PerspectiveCamera(45,1,0.01,1000);
 
+  // Studio IBL environment (procedural, no HDR file) so metallic/glossy surfaces
+  // reflect — same approach as the Forge3D block's "studio" environment.
+  (function(){ try{
+    var pm=new THREE.PMREMGenerator(renderer), es=new THREE.Scene();
+    es.add(new THREE.Mesh(new THREE.BoxGeometry(12,12,12), new THREE.MeshStandardMaterial({side:THREE.BackSide,color:0x767676,roughness:1,metalness:0})));
+    var panel=function(hex,x,y,z,sx,sy,sz,it){var m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),new THREE.MeshStandardMaterial({color:0x000000,emissive:new THREE.Color(hex),emissiveIntensity:it}));m.position.set(x,y,z);es.add(m);};
+    panel(0xffffff,0,5.5,0,8,0.2,8,1.4);panel(0xbcd4ff,-5.5,0,1,0.2,7,7,0.7);panel(0xffe2b0,5.5,0,-1,0.2,7,7,0.6);
+    scene.environment=pm.fromScene(es,0.04).texture;
+    es.traverse(function(o){if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});pm.dispose();
+  }catch(e){} })();
+
   scene.add(new THREE.AmbientLight(0xffffff,0.4));
   var key=new THREE.DirectionalLight(0xffffff,1.4);
   key.position.set(5,8,5);key.castShadow=true;scene.add(key);
