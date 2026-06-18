@@ -29,7 +29,8 @@ window.initForge3DPreview = function(container, glbPath) {
     import(V + '/loaders/GLTFLoader.js'),
     import(V + '/loaders/RGBELoader.js'),
     import(V + '/controls/OrbitControls.js'),
-  ]).then(([THREE, { GLTFLoader }, { RGBELoader }, { OrbitControls }]) => {
+    import(V + '/loaders/DRACOLoader.js'),
+  ]).then(([THREE, { GLTFLoader }, { RGBELoader }, { OrbitControls }, { DRACOLoader }]) => {
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     renderer.setPixelRatio(window.devicePixelRatio)
@@ -86,7 +87,12 @@ window.initForge3DPreview = function(container, glbPath) {
       gridBtn.setAttribute('aria-pressed', String(grid.visible))
     })
 
-    new GLTFLoader().load(fileUrl, (gltf) => {
+    // Draco decoder bundled locally so Draco-compressed GLBs load offline.
+    const draco = new DRACOLoader()
+    draco.setDecoderPath(V + '/draco/')
+    const gltfLoader = new GLTFLoader()
+    gltfLoader.setDRACOLoader(draco)
+    gltfLoader.load(fileUrl, (gltf) => {
       const model = gltf.scene
       const box   = new THREE.Box3().setFromObject(model)
       const size  = box.getSize(new THREE.Vector3())
@@ -117,6 +123,7 @@ window.initForge3DPreview = function(container, glbPath) {
       try { if (curEnvRT) curEnvRT.dispose() } catch (e) {}
       try { if (curBg) curBg.dispose() } catch (e) {}
       try { pmrem.dispose() } catch (e) {}
+      try { draco.dispose() } catch (e) {}
       try { renderer.dispose() } catch (e) {}
     }
   })
