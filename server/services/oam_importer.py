@@ -106,6 +106,11 @@ def ingest_oam(file_path: Path, asset_id: str, upload_root: Path) -> dict:
     width            = meta['width']
     height           = meta['height']
 
+    # ── Inject the ForgeJS bridge so the media bar can drive stock CreateJS
+    #    OAMs (which don't speak our protocol on their own) ──────
+    _inject_forge_runtime(extract_dir, entry_point)
+    file_tree = _build_file_tree(extract_dir)   # include forge-oam.js
+
     # ── Detect audio ──────────────────────────────────────────
     has_audio = any(Path(f).suffix.lower() in AUDIO_EXTENSIONS for f in file_tree)
 
@@ -275,6 +280,52 @@ def _parse_dimensions(extract_dir: Path, entry_point: str, file_tree: list):
         if m and int(m.group(1)) > 0 and int(m.group(2)) > 0:
             return int(m.group(1)), int(m.group(2))
     return 800, 600
+
+
+def _forge_runtime_src() -> str:
+    """Read the canonical forge-oam.js bundled with the server."""
+    p = Path(__file__).resolve().parent.parent / 'assets' / 'forge-oam.js'
+    return p.read_text(encoding='utf-8')
+
+
+def _inject_forge_runtime(extract_dir: Path, entry_point: str) -> None:
+    """Drop forge-oam.js into the package root and reference it from the entry
+    HTML (after the CreateJS script so it can wrap the stage before init).
+    Idempotent and best-effort — a failure must not abort the import."""
+    try:
+        # Always (re)write our canonical copy at the package root.
+        (extract_dir / 'forge-oam.js').write_text(_forge_runtime_src(), encoding='utf-8')
+
+        entry_path = extract_dir / entry_point
+        if not entry_path.exists():
+            return
+        html = entry_path.read_text(encoding='utf-8', errors='ignore')
+
+        # Relative path from the entry HTML's dir back to the package root.
+        depth = entry_point.replace('\\', '/').count('/')
+        rel = ('../' * depth) + 'forge-oam.js'
+        tag = f'<script src="{rel}"></script>'
+
+        if re.search(r'<script[^>]*forge-oam\.js', html, re.IGNORECASE):
+            return  # already injected (match the actual tag, not a stray mention)
+
+        # Prefer: right after the CreateJS script (forge must load before init()).
+        m = re.search(r'<script[^>]*createjs[^>]*</script>', html, re.IGNORECASE)
+        if m:
+            html = html[:m.end()] + '\n' + tag + html[m.end():]
+        elif '</head>' in html.lower():
+            idx = html.lower().index('</head>')
+            html = html[:idx] + tag + '\n' + html[idx:]
+        elif '<body' in html.lower():
+            idx = html.lower().index('<body')
+            end = html.index('>', idx) + 1
+            html = html[:end] + '\n' + tag + html[end:]
+        else:
+            html = tag + '\n' + html
+
+        entry_path.write_text(html, encoding='utf-8')
+    except OSError:
+        pass
 
 
 def _detect_responsive(extract_dir: Path, entry_point: str, file_tree: list) -> bool:
