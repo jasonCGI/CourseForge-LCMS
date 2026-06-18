@@ -15,6 +15,9 @@ class Project(db.Model):
     updated_at  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     theme_id        = db.Column(db.String(36), db.ForeignKey('gui_themes.id'), nullable=True)
     theme_overrides = db.Column(db.JSON, default=dict)
+    # Project-level ForgeJS config (e.g. {"hotspot": {strokeColor, fill, ...}}) —
+    # baked into OAM players via forge:config so all hotspots share one style.
+    forge_config    = db.Column(db.JSON, default=dict)
     theme           = db.relationship('GUITheme', back_populates='projects')
     # Per-project GUI shell (from the GuiShell library). Plain id (no FK
     # constraint) — publish + serializer tolerate a missing/deleted shell.

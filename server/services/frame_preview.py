@@ -23,7 +23,7 @@ from pathlib import Path
 
 from flask import current_app
 
-from .scorm12 import _render_blocks, _build_project_shell_frame
+from .scorm12 import _render_blocks, _build_project_shell_frame, _project_hotspot_cfg
 from .theme_resolver import resolve_theme, tokens_to_css
 
 # media/<kind>/<uuid>.<ext>  ->  /api/media/serve/<uuid>   (serve route is kind-agnostic)
@@ -195,6 +195,7 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         getattr(lesson, "name", "") or "",
         getattr(course, "name", "") or "",
         {0: ""}, VERSION, 1, 1,
+        hotspot_cfg=_project_hotspot_cfg(project),
     )
     if not html:
         return None
@@ -228,7 +229,8 @@ def build_frame_preview_html(frame) -> str:
             return shell_html
 
     blocks = (frame.content or {}).get("blocks", []) if isinstance(frame.content, dict) else []
-    blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False))
+    blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False,
+                                                      hotspot_cfg=_project_hotspot_cfg(project)))
 
     try:
         theme_css = tokens_to_css(resolve_theme(project)) if project else ""

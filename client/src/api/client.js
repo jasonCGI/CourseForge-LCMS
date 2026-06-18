@@ -82,6 +82,10 @@ export const uploadOam = (file, projectId) => {
 export const getOamAsset   = (id)  => api.get(`/media/oam/${id}`)
 export const getMediaAsset = (id)  => api.get(`/media/${id}`)
 
+// Project-level ForgeJS config (hotspot style baked into OAM players).
+export const getForgeConfig = (projectId)      => api.get(`/projects/${projectId}/forge-config`)
+export const setForgeConfig = (projectId, cfg) => api.put(`/projects/${projectId}/forge-config`, cfg)
+
 export const uploadMedia = (file, projectId, kind) => {
   const form = new FormData()
   form.append('file', file)

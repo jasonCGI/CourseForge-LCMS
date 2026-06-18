@@ -12,7 +12,7 @@ import MediaBar from './MediaBar'
  * play/pause via the CreateJS Ticker if reachable (same-origin), else show the
  * iframe with a "no timeline controls" note.
  */
-export default function OamMediaBar({ src, width = 800, height = 500, caption }) {
+export default function OamMediaBar({ src, width = 800, height = 500, caption, hotspotConfig }) {
   const iframeRef = useRef(null)
   const stageRef  = useRef(null)
   const wrapRef   = useRef(null)
@@ -59,6 +59,10 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
   const send = (msg) => { try { iframeRef.current?.contentWindow?.postMessage(msg, '*') } catch {} }
 
   const onLoad = () => {
+    // Push the project hotspot style before playback so hotspots adopt it.
+    if (hotspotConfig && Object.keys(hotspotConfig).length) {
+      send({ type: 'forge:config', config: { hotspot: hotspotConfig } })
+    }
     send({ type: 'oam:getState' })
     // If no protocol state arrives, probe for a controllable CreateJS Ticker.
     setTimeout(() => {

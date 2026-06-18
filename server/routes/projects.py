@@ -58,6 +58,27 @@ def update_project(project_id):
     return jsonify(project_schema.dump(project))
 
 
+@projects_bp.get('/api/projects/<project_id>/forge-config')
+def get_forge_config(project_id):
+    """Project-level ForgeJS config (currently the hotspot style). Empty dict
+    means 'use the runtime's built-in brand defaults'."""
+    project = Project.query.get_or_404(project_id)
+    return jsonify(project.forge_config or {})
+
+
+@projects_bp.put('/api/projects/<project_id>/forge-config')
+def set_forge_config(project_id):
+    """Replace the project's ForgeJS config. Accepts {"hotspot": {...}} (or {}
+    to clear back to defaults)."""
+    project = Project.query.get_or_404(project_id)
+    data = request.get_json() or {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'forge-config must be an object'}), 400
+    project.forge_config = data
+    db.session.commit()
+    return jsonify(project.forge_config or {})
+
+
 @projects_bp.delete('/api/projects/<project_id>')
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)

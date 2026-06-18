@@ -1,9 +1,9 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader }  from './TextBlock'
 import MediaUploader    from './MediaUploader'
-import { uploadOam, getOamAsset } from '../../../api/client'
+import { uploadOam, getOamAsset, getForgeConfig, setForgeConfig } from '../../../api/client'
 import OamMediaBar from '../../Preview/OamMediaBar'
 
 const OAM_ACCEPT = {
@@ -22,7 +22,36 @@ export default function OamBlock({ block }) {
   const [oamMeta,    setOamMeta]    = useState(null)
   const [showPreview, setShowPreview] = useState(false)
 
+  // Project-wide ForgeJS hotspot style (null = use the runtime brand defaults).
+  const [hotspot, setHotspot] = useState(null)
+  const [hsSaved, setHsSaved] = useState(null)   // 'saving' | 'saved' | null
+  const hsTimer = useRef(null)
+
   const assetId = block.data.oam_asset_id
+
+  useEffect(() => {
+    if (!activeProject?.id) return
+    getForgeConfig(activeProject.id)
+      .then(r => {
+        const hs = r.data?.hotspot
+        if (hs && Object.keys(hs).length) setHotspot({ ...DEFAULT_HS, ...hs })
+      })
+      .catch(() => {})
+  }, [activeProject?.id])
+
+  const effHs = hotspot || DEFAULT_HS
+  const saveHotspot = useCallback((next) => {
+    if (!activeProject?.id) return
+    setHsSaved('saving')
+    clearTimeout(hsTimer.current)
+    hsTimer.current = setTimeout(() => {
+      setForgeConfig(activeProject.id, next ? { hotspot: next } : {})
+        .then(() => setHsSaved('saved'))
+        .catch(() => setHsSaved(null))
+    }, 500)
+  }, [activeProject?.id])
+  const patchHotspot = (p) => { const next = { ...effHs, ...p }; setHotspot(next); saveHotspot(next) }
+  const resetHotspot = () => { setHotspot(null); saveHotspot(null) }
 
   // Load metadata if asset already linked
   useEffect(() => {
@@ -157,6 +186,7 @@ export default function OamBlock({ block }) {
               src={oamMeta.iframe_src}
               width={block.data.responsive ? '100%' : (block.data.width || 800)}
               height={block.data.height || 600}
+              hotspotConfig={hotspot || undefined}
             />
           </div>
         )}
@@ -269,6 +299,56 @@ export default function OamBlock({ block }) {
                 Disable NEXT until the animation finishes (stream-complete gate)
               </label>
             </div>
+
+            {/* Project-wide hotspot style — drives FORGE_CONFIG.hotspot for every
+                OAM hotspot in this project (baked at publish + live in preview). */}
+            <details style={{ marginTop: 16, border: '1px solid var(--cf-border-secondary)', borderRadius: 6 }}>
+              <summary style={{ cursor: 'pointer', padding: '10px 12px', fontSize: 12, fontWeight: 600,
+                color: 'var(--cf-text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, border: `2px solid ${effHs.strokeColor}`,
+                  background: effHs.fill, display: 'inline-block' }} />
+                Hotspot style (project-wide)
+                {hsSaved === 'saving' && <span style={{ fontWeight: 400, color: 'var(--cf-text-tertiary,#7a7a90)' }}>· saving…</span>}
+                {hsSaved === 'saved'  && <span style={{ fontWeight: 400, color: '#3B8A4A' }}>· saved</span>}
+              </summary>
+              <div style={{ padding: '4px 12px 12px' }}>
+                <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary,#7a7a90)', marginBottom: 10 }}>
+                  Applies to every OAM hotspot in this project. Authors call <code>forgeHotspot(…)</code> in
+                  Animate; CourseForge draws the highlight from this style.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <ColorField label="Hotspot color" value={effHs.strokeColor}
+                    onChange={v => patchHotspot({ strokeColor: v, outColor: v, focusOutline: v })} />
+                  <ColorField label="Hover color" value={effHs.overColor}
+                    onChange={v => patchHotspot({ overColor: v })} />
+                  <NumField label="Border width" value={effHs.strokeWidth} min={0} max={12}
+                    onChange={v => patchHotspot({ strokeWidth: v })} />
+                  <NumField label="Corner radius" value={effHs.radius} min={0} max={40}
+                    onChange={v => patchHotspot({ radius: v })} />
+                  <div>
+                    <label style={fieldLabel}>Fill opacity</label>
+                    <input type="range" min={0} max={0.6} step={0.02} value={alphaOf(effHs.fill)}
+                      aria-label="Hotspot fill opacity"
+                      onChange={e => patchHotspot({ fill: hexToRgba(effHs.strokeColor, parseFloat(e.target.value)) })}
+                      style={{ width: '100%', accentColor: effHs.strokeColor }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, paddingBottom: 4 }}>
+                    <input type="checkbox" id={`oam-pulse-${block.id}`} checked={!!effHs.pulse}
+                      onChange={e => patchHotspot({ pulse: e.target.checked })} />
+                    <label htmlFor={`oam-pulse-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)' }}>
+                      Pulse animation
+                    </label>
+                  </div>
+                </div>
+                <button onClick={resetHotspot} disabled={!hotspot}
+                  style={{ marginTop: 12, padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                    background: 'transparent', color: hotspot ? '#533AB7' : 'var(--cf-text-tertiary,#7a7a90)',
+                    border: '1px solid var(--cf-border-secondary)', borderRadius: 4,
+                    cursor: hotspot ? 'pointer' : 'default' }}>
+                  Reset to brand default
+                </button>
+              </div>
+            </details>
           </>
         )}
       </div>
@@ -321,6 +401,47 @@ export default function OamBlock({ block }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Runtime hotspot defaults (mirror server/assets/forge-oam.js HS) — also the
+// "brand default" shown until a project customizes the style.
+const DEFAULT_HS = {
+  strokeColor: '#F59E0B', outColor: '#F59E0B', focusOutline: '#F59E0B',
+  overColor: '#FFC04D', fill: 'rgba(245,158,11,0.12)', strokeWidth: 3, radius: 6, pulse: true,
+}
+
+function hexToRgba(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+  if (!m) return `rgba(245,158,11,${a})`
+  const n = parseInt(m[1], 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+}
+function alphaOf(rgba) {
+  const m = /rgba?\([^)]*,\s*([\d.]+)\s*\)/.exec(rgba || '')
+  return m ? parseFloat(m[1]) : 0.12
+}
+
+function ColorField({ label, value, onChange }) {
+  return (
+    <div>
+      <label style={fieldLabel}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="color" value={value} onChange={e => onChange(e.target.value)} aria-label={label}
+          style={{ width: 32, height: 28, padding: 0, border: '1px solid var(--cf-input-border)', borderRadius: 4, background: 'none', cursor: 'pointer' }} />
+        <span style={{ fontSize: 11, fontFamily: 'var(--cf-font)', color: 'var(--cf-text-secondary)' }}>{value}</span>
+      </div>
+    </div>
+  )
+}
+function NumField({ label, value, onChange, min, max }) {
+  return (
+    <div>
+      <label style={fieldLabel}>{label}</label>
+      <input type="number" value={value} min={min} max={max} aria-label={label}
+        onChange={e => onChange(Math.max(min, Math.min(max, parseInt(e.target.value) || 0)))}
+        style={inputStyle} />
     </div>
   )
 }

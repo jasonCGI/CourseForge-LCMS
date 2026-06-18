@@ -32,7 +32,7 @@ from ..version import VERSION, SCHEMA_VERSION
 
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
-                     disp_index=None, disp_total=None, asset_map=None):
+                     disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None):
     """Render a single SCO HTML page for one frame.
 
     The visible counter + progress bar use disp_index/disp_total (required
@@ -40,7 +40,7 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
     frame_index/total_frames positions.
     """
 
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -147,7 +147,9 @@ _OAM_PLAYER_TPL = """
   var dur=0, supported=false;
   var PROMPTS=__PROMPTS__, END_PROMPT=__ENDPROMPT__, lastWasDefined=false, lastStopFrame=-1;
   var GATE_NEXT=__GATENEXT__;
+  var HOTSPOT=__HOTSPOT__;   // project-level ForgeJS hotspot style, or null for runtime defaults
   function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
+  function sendConfig(){ if(HOTSPOT) send({type:'forge:config', config:HOTSPOT}); }
   // Gate progression: disable NEXT/CONTINUE until the stream completes.
   function gateButtons(disabled){
     var b=document.querySelectorAll('[data-action="NEXT"],[data-action="CONTINUE"]');
@@ -208,14 +210,23 @@ _OAM_PLAYER_TPL = """
       reportScore(d.score);
     }
   });
-  f.addEventListener('load', function(){ send({type:'oam:getState'}); });
-  setTimeout(function(){ send({type:'oam:getState'}); }, 500);
+  f.addEventListener('load', function(){ sendConfig(); send({type:'oam:getState'}); });
+  setTimeout(function(){ sendConfig(); send({type:'oam:getState'}); }, 500);
   play.onclick=function(){ if(!supported) return; send({type: play.getAttribute('data-playing')?'oam:pause':'oam:play'}); };
   nextb.onclick=function(){ if(!supported) return; send({type:'oam:nextStop'}); };
   track.onclick=function(ev){ if(!supported||!dur) return; var r=track.getBoundingClientRect(); send({type:'oam:seek', t:Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*dur}); };
 })();
 </script>
 """
+
+
+def _project_hotspot_cfg(project):
+    """Project-level ForgeJS hotspot config ({"hotspot": {...}}), or None when the
+    project hasn't customized it (OAM players then keep the runtime brand defaults)."""
+    fc = getattr(project, 'forge_config', None)
+    if isinstance(fc, dict) and isinstance(fc.get('hotspot'), dict) and fc['hotspot']:
+        return {'hotspot': fc['hotspot']}
+    return None
 
 
 def _get_asset(asset_id, asset_map):
@@ -236,12 +247,18 @@ def _read_clip_cached(path, mtime):
     return Path(path).read_text(encoding='utf-8')
 
 
-def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
+def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None):
     """Convert block list to HTML string.
 
     asset_map: optional {asset_id: MediaAsset} for the whole project so media
     blocks resolve via dict lookup instead of one DB query per block.
+    hotspot_cfg: optional project-level ForgeJS config ({"hotspot": {...}})
+    baked into each OAM player so its hotspots adopt the project style.
     """
+    # '</' escaped so a stray sequence in a color/string can't close the player
+    # <script>; null when unset -> OAM players keep the runtime's brand defaults.
+    hotspot_js = (json.dumps(hotspot_cfg).replace('</', '<\\/')
+                  if isinstance(hotspot_cfg, dict) and hotspot_cfg else 'null')
     parts = []
     for block in blocks:
         btype = block.get('type')
@@ -548,7 +565,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
                     _OAM_PLAYER_TPL.replace('__BID__', bid[:8]).replace('__SRC__', src)
                                    .replace('__W__', str(width)).replace('__H__', str(height))
                                    .replace('__PROMPTS__', prompts_js).replace('__ENDPROMPT__', end_js)
-                                   .replace('__GATENEXT__', gate_js)
+                                   .replace('__GATENEXT__', gate_js).replace('__HOTSPOT__', hotspot_js)
                 )
 
         elif btype == 'ivideo':
@@ -773,7 +790,8 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
 
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
-                     frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None):
+                     frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None,
+                     hotspot_cfg=None):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -807,7 +825,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         html_path = candidates[0]
 
     injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
-                                    if b.get('type') != 'gui'], asset_map=asset_map)
+                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg)
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -816,7 +834,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
                                section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                               asset_map=None):
+                               asset_map=None, hotspot_cfg=None):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected)."""
     sdir = Path(shell.stored_path)
     html_path = sdir / (shell.html_file or '')
@@ -825,7 +843,8 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         if not cands:
             return None, None
         html_path = cands[0]
-    injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map)
+    injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
+                                   hotspot_cfg=hotspot_cfg)
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -974,6 +993,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
     project = project_full_query().get_or_404(project_id)
     tokens  = resolve_theme(project)
     css     = tokens_to_css(tokens)
+    hotspot_cfg = _project_hotspot_cfg(project)
 
     # Collect all frames in order
     all_frames = []   # list of (frame, lesson, course)
@@ -1072,7 +1092,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if _frame_has_gui(frame):
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
-                    req_index[idx], req_total, asset_map=asset_by_id,
+                    req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
@@ -1085,7 +1105,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             if project_shell and project_shell.stored_path:
                 ph, sid = _build_project_shell_frame(
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
-                    req_index[idx], req_total, asset_map=asset_by_id,
+                    req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)
@@ -1103,6 +1123,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 disp_index=req_index[idx],
                 disp_total=req_total,
                 asset_map=asset_by_id,
+                hotspot_cfg=hotspot_cfg,
             )
             zf.writestr(fname, comment + html)
 
