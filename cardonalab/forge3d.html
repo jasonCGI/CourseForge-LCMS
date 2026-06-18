@@ -524,6 +524,7 @@ CourseTitle.zip
 
   var pinsOn=true,wireOn=false;
 
+  var _pinRay=new THREE.Raycaster();
   function projectPins(){
     var w=canvas.clientWidth,h=canvas.clientHeight;
     annEls.forEach(function(a){
@@ -531,6 +532,11 @@ CourseTitle.zip
       var ndc=wp.project(camera);
       // Hide behind-camera OR off-canvas pins (zoom-in pushes them past the edge).
       if(ndc.z>=1||ndc.x<-1||ndc.x>1||ndc.y<-1||ndc.y>1){a.wrap.style.display='none';return;}
+      // Occlusion: hide pins behind the model (raycaster skips invisible meshes).
+      var _d=wp.clone().sub(camera.position),_dist=_d.length();
+      _pinRay.set(camera.position,_d.normalize());_pinRay.far=_dist;
+      var _h=_pinRay.intersectObject(group,true);
+      if(_h.length>0&&_h[0].distance<_dist-Math.max(0.01,_dist*0.02)){a.wrap.style.display='none';return;}
       var sx=(ndc.x*.5+.5)*w,sy=(ndc.y*-.5+.5)*h;
       a.wrap.style.display='block';
       a.wrap.style.left=sx+'px';a.wrap.style.top=sy+'px';

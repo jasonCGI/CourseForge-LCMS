@@ -736,6 +736,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     }});
 
     var _v3 = new THREE.Vector3();
+    var loadedModel = null, _ray = new THREE.Raycaster();
     function projectDots() {{
       if (!overlay) return;
       var cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -745,6 +746,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         // Hide behind-camera OR off-canvas dots — zooming in pushes dots past the
         // viewport edge, where they'd otherwise overflow the SCO iframe.
         if (ndc.z >= 1.0 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {{ it.dot.style.display = 'none'; return; }}
+        // Occlusion: hide a dot when the model sits between it and the camera.
+        if (loadedModel) {{
+          var _d = _v3.clone().sub(camera.position); var _dist = _d.length();
+          _ray.set(camera.position, _d.normalize()); _ray.far = _dist;
+          var _h = _ray.intersectObject(loadedModel, true);
+          if (_h.length > 0 && _h[0].distance < _dist - Math.max(0.01, _dist * 0.02)) {{ it.dot.style.display = 'none'; return; }}
+        }}
         var sx = (ndc.x * 0.5 + 0.5) * cw, sy = (-ndc.y * 0.5 + 0.5) * ch;
         it.dot.style.display = 'block'; it.dot.style.left = sx + 'px'; it.dot.style.top = sy + 'px';
         it.pop.style.left = sx > cw * 0.6 ? 'auto' : '18px';
@@ -759,7 +767,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       var size = box.getSize(new THREE.Vector3());
       var scale = 2.0 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
-      scene.add(model);
+      scene.add(model); loadedModel = model;
       if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; }} }}); }} }});
       if (loading) loading.style.display = 'none';
     }}, undefined, function() {{

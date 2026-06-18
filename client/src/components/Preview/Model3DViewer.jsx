@@ -62,6 +62,7 @@ export default function Model3DViewer({
   const cameraRef   = useRef(null)
   const sceneRef    = useRef(null)
   const modelRef    = useRef(null)
+  const raycasterRef = useRef(null)
   const envRef      = useRef(null)
   const frameRef    = useRef(null)
   const annsRef     = useRef(annotations)
@@ -104,15 +105,31 @@ export default function Model3DViewer({
     const THREE = window.THREE
     const canvas = renderer.domElement
     const w = canvas.clientWidth, h = canvas.clientHeight
+    const model = modelRef.current
+    const rc = raycasterRef.current || (raycasterRef.current = new THREE.Raycaster())
     const pins = anns.map(ann => {
-      const ndc = new THREE.Vector3(ann.position.x, ann.position.y, ann.position.z).project(camera)
+      const world = new THREE.Vector3(ann.position.x, ann.position.y, ann.position.z)
+      const ndc = world.clone().project(camera)
       const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
+      // Occlusion: cast camera→pin and hide the pin if the mesh sits in front of
+      // it (so pins on the far side don't show through the model). far=dist limits
+      // the ray to between camera and pin; a small tolerance avoids the pin's own
+      // surface flickering it off.
+      let occluded = false
+      if (model) {
+        const dir = world.clone().sub(camera.position)
+        const dist = dir.length()
+        rc.set(camera.position, dir.normalize())
+        rc.far = dist
+        const hits = rc.intersectObject(model, true)
+        occluded = hits.length > 0 && hits[0].distance < dist - Math.max(0.01, dist * 0.02)
+      }
       // Hide a pin that's behind the camera (ndc.z>=1) OR projects OUTSIDE the
       // canvas (|ndc.x|>1 / |ndc.y|>1) — otherwise zooming in pushes pins past the
       // viewport edge where they'd overflow the frame. Non-finite NDC (degenerate
       // camera before first updateCamera) is also not-visible.
       const onScreen = ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1
-      return { id: ann.id, x, y, visible: ndc.z < 1.0 && onScreen && Number.isFinite(x) && Number.isFinite(y) }
+      return { id: ann.id, x, y, visible: ndc.z < 1.0 && onScreen && !occluded && Number.isFinite(x) && Number.isFinite(y) }
     })
     // This runs every animation frame. Only re-render React when a pin actually
     // moved (>0.5px) or flipped visibility — otherwise a static model would
