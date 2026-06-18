@@ -201,6 +201,10 @@ def process_video_job(
     # ── Step 4: WebM encode ───────────────────────────────────
     JOBS[job_id]['message'] = 'Encoding WebM (VP9)…'
     webm_cfg = preset.get('webm', {})
+    # Per-job passlog prefix — the default fixed 'ffmpeg2pass-0.log' in the CWD
+    # collides when two jobs encode concurrently (pass 2 of one reads the other's
+    # stats → corrupt output / cross-deleted log).
+    passlog = str(output_p / f"ffmpeg2pass_{job_id}")
     webm_cmd = [
         'ffmpeg', '-y',
         '-i', str(input_p),
@@ -209,7 +213,7 @@ def process_video_job(
         '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),
         '-b:v',  webm_cfg.get('b:v', '0'),
-        '-pass', '1',
+        '-pass', '1', '-passlogfile', passlog,
         '-an',
         '-f', 'webm', os.devnull,
     ]
@@ -225,7 +229,7 @@ def process_video_job(
         '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),
         '-b:v',  webm_cfg.get('b:v', '0'),
-        '-pass', '2',
+        '-pass', '2', '-passlogfile', passlog,
     ]
     if has_audio:
         webm_cmd2 += ['-c:a', webm_cfg.get('acodec', 'libopus'), '-b:a', webm_cfg.get('ab', '96k')]
@@ -236,8 +240,8 @@ def process_video_job(
     if not run_ffmpeg(webm_cmd2, job_id, 'WebM pass 2', 70, 85):
         return
 
-    # Clean up VP9 two-pass log files
-    for f in ['ffmpeg2pass-0.log', 'ffmpeg2pass-0.log.mbtree']:
+    # Clean up this job's VP9 two-pass log files
+    for f in [f"{passlog}-0.log", f"{passlog}-0.log.mbtree"]:
         try: os.remove(f)
         except: pass
 

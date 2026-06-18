@@ -118,7 +118,12 @@ def serve_video(filename):
     """Serve an uploaded media file (path may include the per-asset dir)."""
     base = Path(current_app.config['UPLOAD_FOLDER']) / 'videos'
     target = (base / filename).resolve()
-    # zip-slip / traversal guard
-    if not str(target).startswith(str(base.resolve())) or not target.exists():
+    # Traversal guard — relative_to is separator-safe (a startswith check matched
+    # a sibling dir like videos_evil/).
+    try:
+        target.relative_to(base.resolve())
+    except ValueError:
+        return jsonify({'error': 'Not found.'}), 404
+    if not target.exists():
         return jsonify({'error': 'Not found.'}), 404
     return send_file(str(target), mimetype=_mime_for(target.suffix))

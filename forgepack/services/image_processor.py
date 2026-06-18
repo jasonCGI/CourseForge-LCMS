@@ -79,18 +79,23 @@ def process_image_job(job_id, input_path, base_name, output_dir, preset):
 
     try:
         JOBS[job_id]['message'] = 'Opening source image…'
-        img = Image.open(str(input_p))
-
-        # Flatten transparency onto white, else convert to RGB
-        if img.mode in ('RGBA', 'LA', 'PA'):
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'RGBA':
-                bg.paste(img, mask=img.split()[3])
+        # Read into memory and close the source handle immediately. Keeping the
+        # PIL file handle open (it's lazy) leaves a Windows lock that blocks the
+        # os.remove(input_p) cleanup below until GC — a slow source-file leak.
+        with Image.open(str(input_p)) as src:
+            src.load()
+            # Flatten transparency onto white, else convert to RGB
+            if src.mode in ('RGBA', 'LA', 'PA'):
+                bg = Image.new('RGB', src.size, (255, 255, 255))
+                if src.mode == 'RGBA':
+                    bg.paste(src, mask=src.split()[3])
+                else:
+                    bg.paste(src.convert('RGBA'), mask=src.convert('RGBA').split()[3])
+                img = bg
+            elif src.mode != 'RGB':
+                img = src.convert('RGB')
             else:
-                bg.paste(img.convert('RGBA'), mask=img.convert('RGBA').split()[3])
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
+                img = src.copy()
 
         # Strip EXIF: drop it from the in-memory metadata (Pillow only writes
         # EXIF on save if you pass it, and we don't). The old getdata()/putdata()

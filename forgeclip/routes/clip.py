@@ -72,9 +72,11 @@ def add_interaction(clip_id):
     if clip_id not in CLIPS:
         return jsonify({'error': 'Clip not found.'}), 404
     clip        = CLIPS[clip_id]
-    interaction = request.get_json()
+    interaction = request.get_json(silent=True)
+    if not isinstance(interaction, dict):
+        return jsonify({'error': 'JSON body required.'}), 400
     interaction['id'] = str(uuid.uuid4())
-    clip['interactions'].append(interaction)
+    clip.setdefault('interactions', []).append(interaction)
     clip['updated_at'] = datetime.utcnow().isoformat() + 'Z'
     return jsonify(interaction), 201
 
@@ -84,9 +86,11 @@ def update_interaction(clip_id, interaction_id):
     if clip_id not in CLIPS:
         return jsonify({'error': 'Clip not found.'}), 404
     clip = CLIPS[clip_id]
-    for i, item in enumerate(clip['interactions']):
-        if item['id'] == interaction_id:
-            data       = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body required.'}), 400
+    for i, item in enumerate(clip.get('interactions', [])):
+        if item.get('id') == interaction_id:
             data['id'] = interaction_id
             clip['interactions'][i] = data
             clip['updated_at'] = datetime.utcnow().isoformat() + 'Z'
@@ -100,7 +104,7 @@ def delete_interaction(clip_id, interaction_id):
         return jsonify({'error': 'Clip not found.'}), 404
     clip = CLIPS[clip_id]
     clip['interactions'] = [
-        i for i in clip['interactions'] if i['id'] != interaction_id
+        i for i in clip.get('interactions', []) if i.get('id') != interaction_id
     ]
     clip['updated_at'] = datetime.utcnow().isoformat() + 'Z'
     return jsonify({'deleted': interaction_id})

@@ -221,6 +221,11 @@ def bake_job(job_id, video_path, clip_data, base_name, output_dir):
         })
     except Exception as e:
         JOBS[job_id].update({'status': 'failed', 'error': str(e)})
+    finally:
+        # The uploaded source MP4 is bundled into the ZIP above; always remove it
+        # afterwards (success or failure) so uploads/source/bake/ doesn't grow.
+        try: os.remove(video_path)
+        except OSError: pass
 
 
 def start_bake_job(video_path, clip_data, base_name, output_dir):

@@ -20,6 +20,8 @@ def upload_background():
         return jsonify({'error': 'No file provided.'}), 400
 
     f      = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'No file provided.'}), 400
     suffix = Path(f.filename).suffix.lower()
     if suffix not in ALLOWED_IMAGE:
         return jsonify({'error': 'Image must be PNG, JPG, or WebP.'}), 400
@@ -79,6 +81,8 @@ def upload_sprite():
         return jsonify({'error': 'No file provided.'}), 400
 
     f      = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'No file provided.'}), 400
     suffix = Path(f.filename).suffix.lower()
     if suffix not in ALLOWED_IMAGE:
         return jsonify({'error': 'Sprite must be PNG or WebP.'}), 400
