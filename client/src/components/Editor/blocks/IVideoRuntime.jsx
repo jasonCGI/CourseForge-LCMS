@@ -8,11 +8,14 @@ export default function IVideoRuntime({
   scorm,
 }) {
   const videoRef = useRef(null)
+  const wrapRef  = useRef(null)
   const [activeInts,   setActiveInts]   = useState([])
   const [blocking,     setBlocking]     = useState(null)
   const [currentTime,  setCurrentTime]  = useState(0)
   const [duration,     setDuration]     = useState(0)
   const [playing,      setPlaying]      = useState(false)
+  const [volume,       setVolume]       = useState(1)
+  const [muted,        setMuted]        = useState(false)
   const [answered,     setAnswered]     = useState({})
   const [quizSelected, setQuizSelected] = useState({})
 
@@ -43,17 +46,20 @@ export default function IVideoRuntime({
     const ended = () => { setPlaying(false); onComplete?.() }
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)
+    const onVol = () => { setVolume(v.volume); setMuted(v.muted) }
     v.addEventListener('timeupdate', onTimeUpdate)
     v.addEventListener('loadedmetadata', meta)
     v.addEventListener('ended', ended)
     v.addEventListener('play', onPlay)
     v.addEventListener('pause', onPause)
+    v.addEventListener('volumechange', onVol)
     return () => {
       v.removeEventListener('timeupdate', onTimeUpdate)
       v.removeEventListener('loadedmetadata', meta)
       v.removeEventListener('ended', ended)
       v.removeEventListener('play', onPlay)
       v.removeEventListener('pause', onPause)
+      v.removeEventListener('volumechange', onVol)
     }
   }, [onTimeUpdate, onComplete])
 
@@ -95,9 +101,20 @@ export default function IVideoRuntime({
     const next = stops.filter(s => s > currentTime + 0.05).sort((a, b) => a - b)[0]
     if (next != null && videoRef.current) videoRef.current.currentTime = next
   }
+  const changeVolume = (val) => {
+    const v = videoRef.current
+    if (!v) return
+    v.volume = val
+    v.muted = val === 0
+  }
+  const toggleMute = () => { const v = videoRef.current; if (v) v.muted = !v.muted }
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) { document.exitFullscreen?.(); return }
+    wrapRef.current?.requestFullscreen?.()
+  }
 
   return (
-    <div style={{ width: '100%' }}>
+    <div ref={wrapRef} style={{ width: '100%', background: '#000' }}>
       <div style={{ position: 'relative', width: '100%', background: '#000', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
         <video ref={videoRef} controls={false} style={{ width: '100%', display: 'block' }}
           poster={posterSrc} aria-label="Interactive video">
@@ -136,6 +153,11 @@ export default function IVideoRuntime({
         onSeek={seek}
         onNextStop={nextStop}
         disabled={!!blocking}
+        volume={volume}
+        muted={muted}
+        onVolume={changeVolume}
+        onToggleMute={toggleMute}
+        onFullscreen={toggleFullscreen}
       />
     </div>
   )

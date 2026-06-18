@@ -15,6 +15,7 @@ import MediaBar from './MediaBar'
 export default function OamMediaBar({ src, width = 800, height = 500, caption }) {
   const iframeRef = useRef(null)
   const stageRef  = useRef(null)
+  const wrapRef   = useRef(null)
   const SW = Number(width)  || 800             // native stage dims (a legacy '100%' → fallback)
   const SH = Number(height) || 600
   const [stageH, setStageH] = useState(SH)
@@ -92,9 +93,13 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
   }
 
   const canControl = mode === 'protocol' || mode === 'ticker'
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) { document.exitFullscreen?.(); return }
+    wrapRef.current?.requestFullscreen?.()
+  }
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div ref={wrapRef} style={{ marginBottom: 20, background: '#0d1017' }}>
       <div ref={stageRef} style={{ position: 'relative', width: '100%', height: stageH,
         overflow: 'hidden', background: '#0d1017', borderRadius: '6px 6px 0 0' }}>
         <iframe ref={iframeRef} src={src} width={SW} height={SH} onLoad={onLoad}
@@ -113,6 +118,7 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
         onNextStop={() => send({ type: 'oam:nextStop' })}
         disabled={!canControl}
         seekable={mode === 'protocol'}
+        onFullscreen={toggleFullscreen}
       />
 
       {mode === 'none' && (

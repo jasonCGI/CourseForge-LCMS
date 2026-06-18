@@ -17,12 +17,18 @@ import React from 'react'
  *   onNextStop  ()        — omit to hide the Next-stop button
  *   disabled    bool      — whole bar inert
  *   seekable    bool      — scrubber clickable (default: !!onSeek)
+ *   volume      0..1      — current volume (when a volume control is wanted)
+ *   muted       bool
+ *   onVolume    (0..1)    — omit to hide the volume control
+ *   onToggleMute()        — speaker-icon click (defaults to onVolume toggle if omitted)
+ *   onFullscreen()        — omit to hide the fullscreen button
  */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 export default function MediaBar({
   playing = false, t = 0, duration = 0, stops = [],
   onPlayPause, onSeek, onNextStop, disabled = false, seekable,
+  volume = 1, muted = false, onVolume, onToggleMute, onFullscreen,
 }) {
   const canSeek = (seekable ?? !!onSeek) && !disabled && duration > 0
   const seekClick = (e) => {
@@ -30,6 +36,8 @@ export default function MediaBar({
     const r = e.currentTarget.getBoundingClientRect()
     onSeek(clamp((e.clientX - r.left) / r.width, 0, 1) * duration)
   }
+  const vol = muted ? 0 : clamp(volume, 0, 1)
+  const toggleMute = onToggleMute || (() => onVolume?.(vol > 0 ? 0 : 1))
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
       background: '#0d1017', border: '1px solid #1c2a3a', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
@@ -56,9 +64,30 @@ export default function MediaBar({
       <span style={{ fontFamily: 'var(--forge-font, monospace)', fontSize: 10, color: '#7A90A8', minWidth: 60, textAlign: 'right' }}>
         {duration ? `${t.toFixed(1)}/${duration.toFixed(0)}s` : ''}
       </span>
+
+      {onVolume && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={toggleMute} disabled={disabled} aria-label={vol === 0 ? 'Unmute' : 'Mute'}
+            title={vol === 0 ? 'Unmute' : 'Mute'} style={iconBtn(!disabled)}>{vol === 0 ? '🔇' : vol < 0.5 ? '🔈' : '🔊'}</button>
+          <input type="range" min={0} max={1} step={0.05} value={vol} disabled={disabled}
+            onChange={(e) => onVolume(Number(e.target.value))} aria-label="Volume"
+            style={{ width: 56, accentColor: 'var(--forge-amber, #F59E0B)', cursor: disabled ? 'default' : 'pointer' }} />
+        </div>
+      )}
+
+      {onFullscreen && (
+        <button onClick={onFullscreen} aria-label="Fullscreen" title="Fullscreen"
+          style={iconBtn(true)}>⛶</button>
+      )}
     </div>
   )
 }
+
+const iconBtn = (enabled) => ({
+  background: 'transparent', color: enabled ? '#B5D4F4' : '#445',
+  border: 'none', borderRadius: 4, padding: '4px 6px', fontSize: 14,
+  cursor: enabled ? 'pointer' : 'not-allowed', lineHeight: 1,
+})
 
 const barBtn = (enabled) => ({
   background: enabled ? 'var(--forge-amber, #F59E0B)' : '#2a2a35',
