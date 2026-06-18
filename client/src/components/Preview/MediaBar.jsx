@@ -21,6 +21,8 @@ import React from 'react'
  *   muted       bool
  *   onVolume    (0..1)    — omit to hide the volume control
  *   onToggleMute()        — speaker-icon click (defaults to onVolume toggle if omitted)
+ *   captions    bool      — captions currently showing
+ *   onToggleCaptions()    — omit to hide the CC button
  *   onFullscreen()        — omit to hide the fullscreen button
  */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -28,7 +30,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 export default function MediaBar({
   playing = false, t = 0, duration = 0, stops = [],
   onPlayPause, onSeek, onNextStop, disabled = false, seekable,
-  volume = 1, muted = false, onVolume, onToggleMute, onFullscreen,
+  volume = 1, muted = false, onVolume, onToggleMute,
+  captions = false, onToggleCaptions, onFullscreen,
 }) {
   const canSeek = (seekable ?? !!onSeek) && !disabled && duration > 0
   const seekClick = (e) => {
@@ -73,6 +76,14 @@ export default function MediaBar({
             onChange={(e) => onVolume(Number(e.target.value))} aria-label="Volume"
             style={{ width: 56, accentColor: 'var(--forge-amber, #F59E0B)', cursor: disabled ? 'default' : 'pointer' }} />
         </div>
+      )}
+
+      {onToggleCaptions && (
+        <button onClick={onToggleCaptions} aria-label="Captions" aria-pressed={captions}
+          title={captions ? 'Hide captions' : 'Show captions'}
+          style={{ ...iconBtn(true), fontSize: 11, fontWeight: 700, padding: '3px 5px', borderRadius: 3,
+                   background: captions ? 'var(--forge-amber, #F59E0B)' : 'transparent',
+                   color: captions ? '#042C53' : '#B5D4F4' }}>CC</button>
       )}
 
       {onFullscreen && (

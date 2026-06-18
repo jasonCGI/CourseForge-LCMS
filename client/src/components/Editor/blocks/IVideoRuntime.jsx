@@ -16,6 +16,7 @@ export default function IVideoRuntime({
   const [playing,      setPlaying]      = useState(false)
   const [volume,       setVolume]       = useState(1)
   const [muted,        setMuted]        = useState(false)
+  const [captionsOn,   setCaptionsOn]   = useState(!!vttSrc)  // <track default> shows them initially
   const [answered,     setAnswered]     = useState({})
   const [quizSelected, setQuizSelected] = useState({})
 
@@ -108,6 +109,15 @@ export default function IVideoRuntime({
     v.muted = val === 0
   }
   const toggleMute = () => { const v = videoRef.current; if (v) v.muted = !v.muted }
+  const toggleCaptions = () => {
+    const v = videoRef.current
+    if (!v || !v.textTracks?.length) return
+    const next = !captionsOn
+    for (const tt of v.textTracks) {
+      if (tt.kind === 'captions' || tt.kind === 'subtitles') tt.mode = next ? 'showing' : 'hidden'
+    }
+    setCaptionsOn(next)
+  }
   const toggleFullscreen = () => {
     if (document.fullscreenElement) { document.exitFullscreen?.(); return }
     wrapRef.current?.requestFullscreen?.()
@@ -157,6 +167,8 @@ export default function IVideoRuntime({
         muted={muted}
         onVolume={changeVolume}
         onToggleMute={toggleMute}
+        captions={captionsOn}
+        onToggleCaptions={vttSrc ? toggleCaptions : undefined}
         onFullscreen={toggleFullscreen}
       />
     </div>
