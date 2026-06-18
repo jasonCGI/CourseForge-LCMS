@@ -18,14 +18,50 @@ function loadScript(src) {
 const REDUCE_MOTION = typeof window !== 'undefined' &&
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// Procedural studio environment (image-based lighting) — no HDR file, CSP/offline
+// safe. Gives metallic/glossy PBR surfaces real reflections via scene.environment.
+function buildStudioEnv(THREE, renderer) {
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  const env = new THREE.Scene()
+  env.add(new THREE.Mesh(
+    new THREE.BoxGeometry(12, 12, 12),
+    new THREE.MeshStandardMaterial({ side: THREE.BackSide, color: 0x767676, roughness: 1, metalness: 0 })
+  ))
+  const panel = (hex, x, y, z, sx, sy, sz, intensity) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz),
+      new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(hex), emissiveIntensity: intensity }))
+    m.position.set(x, y, z); env.add(m)
+  }
+  panel(0xffffff, 0, 5.5, 0, 8, 0.2, 8, 1.4)    // top key
+  panel(0xbcd4ff, -5.5, 0, 1, 0.2, 7, 7, 0.7)   // cool left
+  panel(0xffe2b0, 5.5, 0, -1, 0.2, 7, 7, 0.6)   // warm right
+  const tex = pmrem.fromScene(env, 0.04).texture
+  env.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() })
+  pmrem.dispose()
+  return tex
+}
+
+// Scale how strongly the env map reflects per material (0 = off).
+function applyEnvIntensity(model, intensity) {
+  if (!model) return
+  model.traverse(o => {
+    if (!o.material) return
+    const mats = Array.isArray(o.material) ? o.material : [o.material]
+    mats.forEach(mat => { if ('envMapIntensity' in mat) { mat.envMapIntensity = intensity; mat.needsUpdate = true } })
+  })
+}
+
 export default function Model3DViewer({
   modelUrl, caption, bgColor = '#0d1017', height = 400,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
+  environment = 'studio', envIntensity = 1,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
   const cameraRef   = useRef(null)
   const sceneRef    = useRef(null)
+  const modelRef    = useRef(null)
+  const envRef      = useRef(null)
   const frameRef    = useRef(null)
   const annsRef     = useRef(annotations)
   const lastPinsRef = useRef([])
@@ -129,6 +165,8 @@ export default function Model3DViewer({
       const scale = 2.0 / Math.max(size.x, size.y, size.z)
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale))
       scene.add(model)
+      modelRef.current = model
+      if (scene.environment) applyEnvIntensity(model, envIntensity)   // env may already be set
       orbitRef.current.radius = 3; updateCamera(camera, orbitRef.current)
       setLoading(false); onLoad?.()
     }, undefined, () => { setError('Failed to load 3D model.'); setLoading(false) })
@@ -146,7 +184,11 @@ export default function Model3DViewer({
     })
     ro.observe(canvas)
 
-    return () => { cancelAnimationFrame(frameRef.current); ro.disconnect(); renderer.dispose() }
+    return () => {
+      cancelAnimationFrame(frameRef.current); ro.disconnect()
+      if (envRef.current) { envRef.current.dispose(); envRef.current = null }
+      modelRef.current = null; renderer.dispose()
+    }
     // bgColor/height are intentionally NOT deps — changing them must not tear
     // down the scene + re-download the GLB. They're applied in place below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -157,6 +199,23 @@ export default function Model3DViewer({
     const scene = sceneRef.current
     if (scene && window.THREE) scene.background = new window.THREE.Color(bgColor)
   }, [bgColor])
+
+  // Apply the environment map (IBL) in place — reflections for metallic/glossy
+  // surfaces. Rebuilds on environment/intensity change; no scene rebuild/refetch.
+  useEffect(() => {
+    if (!threeReady) return
+    const THREE = window.THREE, renderer = rendererRef.current, scene = sceneRef.current
+    if (!THREE || !renderer || !scene) return
+    if (envRef.current) { envRef.current.dispose(); envRef.current = null }
+    const on = environment && environment !== 'none'
+    if (on) {
+      try { envRef.current = buildStudioEnv(THREE, renderer); scene.environment = envRef.current }
+      catch (e) { scene.environment = null }
+    } else {
+      scene.environment = null
+    }
+    applyEnvIntensity(modelRef.current, on ? envIntensity : 0)
+  }, [threeReady, environment, envIntensity, modelUrl])
 
   // Apply height/resize in place (no scene rebuild, no GLB re-fetch).
   useEffect(() => {

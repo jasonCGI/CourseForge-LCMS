@@ -128,6 +128,7 @@ export default function Model3DBlock({ block }) {
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               height={block.data.viewer_height || 400} bgColor={block.data.bg_color || '#0d1017'}
+              environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
         )}
@@ -171,6 +172,24 @@ export default function Model3DBlock({ block }) {
                   <input type="color" value={block.data.bg_color || '#0d1017'} onChange={e => update('bg_color', e.target.value)} aria-label="Viewer background color" style={{ width: 36, height: 32, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 2 }} />
                   <input type="text" value={block.data.bg_color || '#0d1017'} onChange={e => update('bg_color', e.target.value)} aria-label="Background color hex" style={{ ...inputStyle, flex: 1 }} />
                 </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Environment (reflections)</label>
+                <select value={block.data.environment || 'studio'} onChange={e => update('environment', e.target.value)}
+                  aria-label="Viewer environment" style={{ ...inputStyle, width: '100%' }}>
+                  <option value="studio">Studio — reflective</option>
+                  <option value="none">None — flat lighting</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Reflection intensity</label>
+                <input type="range" min="0" max="2" step="0.1" value={block.data.env_intensity ?? 1}
+                  onChange={e => update('env_intensity', parseFloat(e.target.value))}
+                  disabled={(block.data.environment || 'studio') === 'none'}
+                  aria-label="Reflection intensity" style={{ width: '100%' }} />
               </div>
             </div>
 

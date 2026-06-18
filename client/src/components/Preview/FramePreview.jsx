@@ -660,6 +660,8 @@ function PreviewModel3D({ block }) {
         caption={block.data.caption}
         height={block.data.viewer_height || 400}
         bgColor={block.data.bg_color || '#0d1017'}
+        environment={block.data.environment || 'studio'}
+        envIntensity={block.data.env_intensity ?? 1}
         annotations={block.data.annotations || []}
       />
     </div>

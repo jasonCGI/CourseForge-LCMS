@@ -599,6 +599,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
             block_id = bid[:8]
             annotations = data.get('annotations', [])
             ann_json = json.dumps(annotations).replace('</', '<\\/')
+            env_on = 'false' if data.get('environment', 'studio') == 'none' else 'true'
+            try:
+                env_int = float(data.get('env_intensity', 1))
+            except (TypeError, ValueError):
+                env_int = 1
 
             if not model_id:
                 parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
@@ -648,10 +653,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
     var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s);
   }}
   loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{
-    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS);
+    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS, {env_on}, {env_int});
   }}); }});
 
-  function init3DViewer(blockId, modelSrc, bgColor, height, annotations) {{
+  function init3DViewer(blockId, modelSrc, bgColor, height, annotations, envOn, envIntensity) {{
     var THREE = window.THREE;
     var canvas = document.getElementById('canvas3d-' + blockId);
     var loading = document.getElementById('loading3d-' + blockId);
@@ -664,6 +669,18 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
     renderer.outputEncoding = THREE.sRGBEncoding;
     var scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor);
     var camera = new THREE.PerspectiveCamera(45, w / height, 0.01, 1000);
+    // Procedural studio environment (IBL) for reflective/metallic surfaces — no
+    // HDR file. scene.environment makes standard materials reflect it.
+    if (envOn) {{ try {{
+      var _pm = new THREE.PMREMGenerator(renderer);
+      var _es = new THREE.Scene();
+      _es.add(new THREE.Mesh(new THREE.BoxGeometry(12,12,12), new THREE.MeshStandardMaterial({{ side: THREE.BackSide, color: 0x767676, roughness: 1, metalness: 0 }})));
+      var _panel = function(hex,x,y,z,sx,sy,sz,it) {{ var m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz), new THREE.MeshStandardMaterial({{ color:0x000000, emissive:new THREE.Color(hex), emissiveIntensity:it }})); m.position.set(x,y,z); _es.add(m); }};
+      _panel(0xffffff,0,5.5,0,8,0.2,8,1.4); _panel(0xbcd4ff,-5.5,0,1,0.2,7,7,0.7); _panel(0xffe2b0,5.5,0,-1,0.2,7,7,0.6);
+      scene.environment = _pm.fromScene(_es, 0.04).texture;
+      _es.traverse(function(o){{ if(o.geometry)o.geometry.dispose(); if(o.material)o.material.dispose(); }});
+      _pm.dispose();
+    }} catch(e) {{}} }}
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     var key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(5, 8, 5); scene.add(key);
     var fill = new THREE.DirectionalLight(0x8AAAC8, 0.4); fill.position.set(-5, 2, -5); scene.add(fill);
@@ -717,7 +734,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
       var size = box.getSize(new THREE.Vector3());
       var scale = 2.0 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
-      scene.add(model); if (loading) loading.style.display = 'none';
+      scene.add(model);
+      if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; mt.needsUpdate=true; }} }}); }} }});
+      if (loading) loading.style.display = 'none';
     }}, undefined, function() {{
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
     }});
