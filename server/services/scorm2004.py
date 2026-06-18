@@ -21,7 +21,7 @@ from flask import current_app, render_template
 from ..models.project import Project, project_full_query
 from ..models.media import MediaAsset, OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
-from ..services.scorm12 import _render_blocks, _has_oam_with_scorm
+from ..services.scorm12 import _render_blocks, _has_oam_with_scorm, _project_hotspot_cfg
 from ..version import VERSION
 
 # Video.js CDN — same files as SCORM 1.2, cached locally
@@ -50,13 +50,13 @@ def _ensure_videojs_cached(cache_dir: Path) -> None:
 def build_frame_html_2004(frame, lesson, frame_index,
                            total_frames, frame_map,
                            theme_css, scorm_bridge=False,
-                           disp_index=None, disp_total=None, asset_map=None):
+                           disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None):
     """Render a single SCO HTML page using SCORM 2004 API.
 
     Visible counter + progress use disp_index/disp_total (required frames only,
     excluding optional); navigation uses the real frame_index/total_frames.
     """
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -86,6 +86,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
     project     = project_full_query().get_or_404(project_id)
     tokens      = resolve_theme(project)
     css         = tokens_to_css(tokens)
+    hotspot_cfg = _project_hotspot_cfg(project)
     upload_root = Path(current_app.config['UPLOAD_FOLDER'])
 
     # ── Collect frames in order ──────────────────────────────
@@ -185,6 +186,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 disp_index=req_index[idx],
                 disp_total=req_total,
                 asset_map=asset_by_id,
+                hotspot_cfg=hotspot_cfg,
             )
             html = comment_prefix + html
             zf.writestr(fname, html)

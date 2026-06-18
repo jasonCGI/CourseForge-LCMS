@@ -14,7 +14,7 @@ from flask import render_template
 from ..models.project import Project, project_full_query
 from ..models.media import MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
-from ..services.scorm12 import _render_blocks
+from ..services.scorm12 import _render_blocks, _project_hotspot_cfg
 from ..version import VERSION, SCHEMA_VERSION
 
 # 508-compliant WCN modal controller (focus trap, Escape, focus return).
@@ -98,7 +98,8 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
             'name':     frame.name,
             'lesson':   lesson.name,
             'course':   course.name,
-            'html':     _render_blocks(frame.content.get('blocks', []), asset_map=asset_by_id),
+            'html':     _render_blocks(frame.content.get('blocks', []), asset_map=asset_by_id,
+                                       hotspot_cfg=_project_hotspot_cfg(project)),
             'progress': round((idx / max(total - 1, 1)) * 100),
         })
 

@@ -1,3 +1,4 @@
+import re
 from flask import Blueprint, request, jsonify
 from ..extensions import db
 from sqlalchemy.orm import selectinload
@@ -69,14 +70,66 @@ def get_forge_config(project_id):
 @projects_bp.put('/api/projects/<project_id>/forge-config')
 def set_forge_config(project_id):
     """Replace the project's ForgeJS config. Accepts {"hotspot": {...}} (or {}
-    to clear back to defaults)."""
+    to clear back to defaults). Values are sanitized server-side — this config is
+    baked into published SCORM <script> and into CSS in the OAM runtime, so the
+    API (not just the UI) is the trust boundary."""
     project = Project.query.get_or_404(project_id)
     data = request.get_json() or {}
     if not isinstance(data, dict):
         return jsonify({'error': 'forge-config must be an object'}), 400
-    project.forge_config = data
+    project.forge_config = _sanitize_forge_config(data)
     db.session.commit()
     return jsonify(project.forge_config or {})
+
+
+# Hotspot style is baked into an inline <script> and concatenated into CSS in the
+# OAM runtime, so every value is whitelisted + bounded here. Unknown keys and
+# malformed values are dropped rather than rejected (lenient: a bad field just
+# falls back to the runtime brand default).
+_HS_COLOR_KEYS = {'strokeColor', 'outColor', 'overColor', 'focusOutline', 'fill', 'shadow'}
+_HS_NUM_KEYS   = {'strokeWidth': (0, 20), 'radius': (0, 100), 'hitPadding': (0, 400)}
+_HS_BOOL_KEYS  = {'pulse'}
+_HS_CURSORS    = {'pointer', 'default', 'crosshair', 'grab', 'grabbing', 'help', 'zoom-in', 'none'}
+_CSS_SAFE      = re.compile(r'^[#0-9a-zA-Z(),.%\s+-]*$')   # no ; { } < > : url( etc.
+
+
+def _clean_css_value(v):
+    if not isinstance(v, str):
+        return None
+    v = v.strip()
+    if not v or len(v) > 120:
+        return None
+    low = v.lower()
+    if any(bad in low for bad in (';', '{', '}', '<', '>', ':', 'url(', 'expression', '/*', '@')):
+        return None
+    return v if _CSS_SAFE.match(v) else None
+
+
+def _sanitize_forge_config(data):
+    hs_in = data.get('hotspot') if isinstance(data, dict) else None
+    if not isinstance(hs_in, dict):
+        return {}
+    hs = {}
+    for k, v in hs_in.items():
+        if k in _HS_COLOR_KEYS:
+            cv = _clean_css_value(v)
+            if cv is not None:
+                hs[k] = cv
+        elif k in _HS_NUM_KEYS:
+            try:
+                n = float(v)
+            except (TypeError, ValueError):
+                continue
+            if n != n or n in (float('inf'), float('-inf')):   # NaN / inf guard
+                continue
+            lo, hi = _HS_NUM_KEYS[k]
+            hs[k] = max(lo, min(hi, n))
+        elif k in _HS_BOOL_KEYS:
+            hs[k] = bool(v)
+        elif k == 'cursor' and isinstance(v, str) and v in _HS_CURSORS:
+            hs[k] = v
+        # unknown keys dropped
+    return {'hotspot': hs} if hs else {}
 
 
 @projects_bp.delete('/api/projects/<project_id>')

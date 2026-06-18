@@ -30,14 +30,20 @@ export default function OamBlock({ block }) {
   const assetId = block.data.oam_asset_id
 
   useEffect(() => {
-    if (!activeProject?.id) return
+    if (!activeProject?.id) { setHotspot(null); return }
     getForgeConfig(activeProject.id)
       .then(r => {
         const hs = r.data?.hotspot
-        if (hs && Object.keys(hs).length) setHotspot({ ...DEFAULT_HS, ...hs })
+        // Always set (null when the new project has no config) so switching
+        // projects can't leave the previous project's style in state.
+        setHotspot(hs && Object.keys(hs).length ? { ...DEFAULT_HS, ...hs } : null)
       })
-      .catch(() => {})
+      .catch(() => setHotspot(null))
   }, [activeProject?.id])
+
+  // Flush/clear the debounce timer on unmount so a late save can't fire after
+  // the block is gone (frame nav, block delete).
+  useEffect(() => () => clearTimeout(hsTimer.current), [])
 
   const effHs = hotspot || DEFAULT_HS
   const saveHotspot = useCallback((next) => {
@@ -318,7 +324,8 @@ export default function OamBlock({ block }) {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <ColorField label="Hotspot color" value={effHs.strokeColor}
-                    onChange={v => patchHotspot({ strokeColor: v, outColor: v, focusOutline: v })} />
+                    onChange={v => patchHotspot({ strokeColor: v, outColor: v, focusOutline: v,
+                      shadow: '0 0 0 3px ' + hexToRgba(v, 0.25) })} />
                   <ColorField label="Hover color" value={effHs.overColor}
                     onChange={v => patchHotspot({ overColor: v })} />
                   <NumField label="Border width" value={effHs.strokeWidth} min={0} max={12}
@@ -409,7 +416,8 @@ export default function OamBlock({ block }) {
 // "brand default" shown until a project customizes the style.
 const DEFAULT_HS = {
   strokeColor: '#F59E0B', outColor: '#F59E0B', focusOutline: '#F59E0B',
-  overColor: '#FFC04D', fill: 'rgba(245,158,11,0.12)', strokeWidth: 3, radius: 6, pulse: true,
+  overColor: '#FFC04D', fill: 'rgba(245,158,11,0.12)', shadow: '0 0 0 3px rgba(245,158,11,0.25)',
+  strokeWidth: 3, radius: 6, pulse: true,
 }
 
 function hexToRgba(hex, a) {

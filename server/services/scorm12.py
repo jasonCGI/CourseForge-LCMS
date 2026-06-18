@@ -255,10 +255,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     hotspot_cfg: optional project-level ForgeJS config ({"hotspot": {...}})
     baked into each OAM player so its hotspots adopt the project style.
     """
-    # '</' escaped so a stray sequence in a color/string can't close the player
-    # <script>; null when unset -> OAM players keep the runtime's brand defaults.
-    hotspot_js = (json.dumps(hotspot_cfg).replace('</', '<\\/')
-                  if isinstance(hotspot_cfg, dict) and hotspot_cfg else 'null')
+    # Escape every '<' so no stored value can break out of the inline player
+    # <script> -- covers </script, <!--, <script. (json.dumps is ensure_ascii,
+    # so U+2028/2029 are already escaped.) null when unset -> brand defaults.
+    hotspot_js = ('null' if not (isinstance(hotspot_cfg, dict) and hotspot_cfg)
+                  else json.dumps(hotspot_cfg).replace('<', '\\u003c'))
     parts = []
     for block in blocks:
         btype = block.get('type')
