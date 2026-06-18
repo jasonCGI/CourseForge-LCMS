@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld('forge3d', {
   // to resolve a dropped file's absolute path (must run in the preload).
   getPathForFile:    (file)   => { try { return webUtils.getPathForFile(file) } catch { return '' } },
   openFBX:           ()       => ipcRenderer.invoke('dialog:openFBX'),
+  openGLB:           ()       => ipcRenderer.invoke('dialog:openGLB'),
   openOutputDir:     ()       => ipcRenderer.invoke('dialog:openOutputDir'),
+  setLastDir:        (p)      => ipcRenderer.invoke('config:setLastDir', p),
   openBlender:       ()       => ipcRenderer.invoke('dialog:openBlender'),
   getConfig:         ()       => ipcRenderer.invoke('config:get'),
   setConfig:         (c)      => ipcRenderer.invoke('config:set', c),

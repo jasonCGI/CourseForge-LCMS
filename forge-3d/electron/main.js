@@ -7,12 +7,25 @@ const { spawn } = require('child_process')
 const CONFIG_PATH = path.join(app.getPath('userData'), 'forge3d-config.json')
 
 function loadConfig() {
-  try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) }
-  catch { return { blenderPath: '' } }
+  try { return { blenderPath: '', lastDir: '', ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) } }
+  catch { return { blenderPath: '', lastDir: '' } }
 }
 
 function saveConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+}
+
+// Last directory a file was picked/dropped from, so dialogs reopen there.
+function dialogDefaultDir() {
+  const d = loadConfig().lastDir
+  try { return (d && fs.existsSync(d)) ? d : undefined } catch { return undefined }
+}
+function rememberDir(p) {
+  if (!p) return
+  try {
+    const dir = fs.statSync(p).isDirectory() ? p : path.dirname(p)
+    const config = loadConfig(); config.lastDir = dir; saveConfig(config)
+  } catch { /* path gone — leave lastDir as-is */ }
 }
 
 // Auto-locate a Blender executable in the usual install locations so first
@@ -66,19 +79,41 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
 ipcMain.handle('dialog:openFBX', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select FBX File',
+    defaultPath: dialogDefaultDir(),
     filters: [{ name: 'FBX Files', extensions: ['fbx'] }],
     properties: ['openFile']
   })
-  return result.canceled ? null : result.filePaths[0]
+  if (result.canceled) return null
+  rememberDir(result.filePaths[0])
+  return result.filePaths[0]
 })
+
+// ── IPC: Open a GLB/glTF to preview (no conversion) ───────────────────────
+ipcMain.handle('dialog:openGLB', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select GLB / glTF to preview',
+    defaultPath: dialogDefaultDir(),
+    filters: [{ name: '3D Models', extensions: ['glb', 'gltf'] }],
+    properties: ['openFile']
+  })
+  if (result.canceled) return null
+  rememberDir(result.filePaths[0])
+  return result.filePaths[0]
+})
+
+// ── IPC: Persist the last directory (e.g. from a drag-drop, which has no dialog)
+ipcMain.handle('config:setLastDir', (_, p) => { rememberDir(p); return true })
 
 // ── IPC: Open output directory dialog ────────────────────────────────────
 ipcMain.handle('dialog:openOutputDir', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select Output Directory',
+    defaultPath: dialogDefaultDir(),
     properties: ['openDirectory']
   })
-  return result.canceled ? null : result.filePaths[0]
+  if (result.canceled) return null
+  rememberDir(result.filePaths[0])
+  return result.filePaths[0]
 })
 
 // ── IPC: Browse for Blender executable ───────────────────────────────────

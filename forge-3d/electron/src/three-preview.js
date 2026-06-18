@@ -1,4 +1,6 @@
 window.initForge3DPreview = function(container, glbPath) {
+  // Tear down a previous preview so repeated loads don't stack render loops.
+  if (window.__forge3dCleanup) { try { window.__forge3dCleanup() } catch (e) {} window.__forge3dCleanup = null }
   const fileUrl = 'file:///' + glbPath.replace(/\\/g, '/')
 
   // Rebuild the preview area: a small control bar + the canvas.
@@ -101,10 +103,21 @@ window.initForge3DPreview = function(container, glbPath) {
     }
     new ResizeObserver(fit).observe(canvas); fit()
 
+    let rafId
     ;(function animate() {
-      requestAnimationFrame(animate)
+      rafId = requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
     })()
+
+    // Expose teardown for the next initForge3DPreview call.
+    window.__forge3dCleanup = function () {
+      cancelAnimationFrame(rafId)
+      try { controls.dispose() } catch (e) {}
+      try { if (curEnvRT) curEnvRT.dispose() } catch (e) {}
+      try { if (curBg) curBg.dispose() } catch (e) {}
+      try { pmrem.dispose() } catch (e) {}
+      try { renderer.dispose() } catch (e) {}
+    }
   })
 }

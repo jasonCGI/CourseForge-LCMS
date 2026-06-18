@@ -77,7 +77,8 @@ function setupDropZone() {
     if (!file) return
     const p = window.forge3d.getPathForFile(file)   // resolve the dropped path (no dialog)
     if (p && /\.fbx$/i.test(p)) { await loadFBX(p); return }
-    announceToSR('Please drop a .fbx file.')
+    if (p && /\.(glb|gltf)$/i.test(p)) { previewGLB(p); return }   // drop a GLB to preview it
+    announceToSR('Please drop a .fbx, .glb, or .gltf file.')
     zone.classList.add('drop-reject')
     setTimeout(() => zone.classList.remove('drop-reject'), 1200)
   })
@@ -89,6 +90,10 @@ function setupDropZone() {
 // ── Buttons ───────────────────────────────────────────────────────────────
 function setupButtons() {
   document.getElementById('btn-browse').addEventListener('click', browseForFBX)
+  document.getElementById('btn-preview-glb')?.addEventListener('click', async () => {
+    const p = await window.forge3d.openGLB()
+    if (p) previewGLB(p)
+  })
   document.getElementById('btn-clear').addEventListener('click', clearFile)
   document.getElementById('btn-convert').addEventListener('click', runConversion)
   document.getElementById('btn-output-dir').addEventListener('click', browseOutputDir)
@@ -131,11 +136,23 @@ async function browseForFBX() {
   if (fbxPath) await loadFBX(fbxPath)
 }
 
+// Preview a GLB/glTF directly (no conversion).
+function previewGLB(glbPath) {
+  if (!glbPath) return
+  window.forge3d.setLastDir(glbPath)
+  lastGLBPath = glbPath
+  const sep  = glbPath.includes('/') ? '/' : '\\'
+  const name = glbPath.split(sep).pop()
+  showResult(true, `Previewing — ${name}`)
+  loadPreview(glbPath)
+}
+
 async function loadFBX(fbxPath) {
   currentFBXPath = fbxPath
   const sep  = fbxPath.includes('/') ? '/' : '\\'
   const name = fbxPath.split(sep).pop()
   outputDir  = fbxPath.substring(0, fbxPath.lastIndexOf(sep))
+  window.forge3d.setLastDir(fbxPath)
 
   document.getElementById('drop-zone').style.display    = 'none'
   document.getElementById('file-info').style.display    = 'block'
@@ -270,6 +287,8 @@ function loadPreview(glbPath) {
   switchTab('preview')
   const area = document.getElementById('preview-area')
   area.innerHTML = ''
+  // Load the preview module once; reuse it on subsequent previews.
+  if (window.initForge3DPreview) { window.initForge3DPreview(area, glbPath); return }
   const script = document.createElement('script')
   script.src = 'three-preview.js'
   script.onload = () => window.initForge3DPreview(area, glbPath)
