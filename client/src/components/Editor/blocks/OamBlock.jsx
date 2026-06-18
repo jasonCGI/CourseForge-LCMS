@@ -211,6 +211,35 @@ export default function OamBlock({ block }) {
                 style={inputStyle}
               />
             </div>
+
+            {/* Stop prompts — shown in the shell prompt zone at each stop, in
+                order (line 1 → stop 1). A blank line keeps the previous prompt. */}
+            <div style={{ marginTop: 14 }}>
+              <label style={fieldLabel}>Stop prompts (one per line, in stop order)</label>
+              <textarea
+                value={(block.data.prompts || []).join('\n')}
+                onChange={e => update('prompts', e.target.value.split('\n'))}
+                placeholder={'Examine the valve\nNow open it\n…'}
+                aria-label="OAM stop prompts"
+                rows={4}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--cf-font)' }}
+              />
+              <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary, #7a7a90)', marginTop: 4 }}>
+                Outside a GUI shell these log to the console; the final frame shows the end prompt.
+              </div>
+            </div>
+
+            {/* End prompt — final-frame fallback */}
+            <div style={{ marginTop: 14 }}>
+              <label style={fieldLabel}>End prompt (final frame)</label>
+              <input
+                value={block.data.end_prompt || ''}
+                onChange={e => update('end_prompt', e.target.value)}
+                placeholder="Press NEXT to continue."
+                aria-label="OAM end prompt"
+                style={inputStyle}
+              />
+            </div>
           </>
         )}
       </div>

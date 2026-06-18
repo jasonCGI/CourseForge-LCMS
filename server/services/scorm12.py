@@ -143,16 +143,33 @@ _OAM_PLAYER_TPL = """
   fit();
   if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(stage); }catch(e){} }
   window.addEventListener('resize', function(){ lastKey=''; fit(); });
-  // -- media bar protocol --
+  // -- media bar protocol + prompt cue wiring --
   var dur=0, supported=false;
+  var PROMPTS=__PROMPTS__, END_PROMPT=__ENDPROMPT__, lastWasDefined=false, lastStopFrame=-1;
   function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
+  // In a GUI shell -> drive the shell's prompt zone; otherwise console-trace.
+  function showPrompt(text){
+    if(text==null) return;
+    if(window.fgui && window.fgui.setFrameData) window.fgui.setFrameData({prompt:text});
+    else { try{ console.log('[ForgeJS] prompt:', text); }catch(e){} }
+  }
   window.addEventListener('message', function(e){
-    if(e.source!==f.contentWindow) return; var d=e.data||{}; if(d.type!=='oam:state') return;
-    supported=true; dur=d.duration||0;
-    fill.style.width=(dur?(d.t/dur*100):0)+'%';
-    play.innerHTML=d.playing?'&#9208;':'&#9658;'; play.setAttribute('data-playing', d.playing?'1':'');
-    tm.textContent=(d.t||0).toFixed(1)+'/'+dur.toFixed(0)+'s';
-    if(!marks.getAttribute('data-done') && d.stops && d.stops.length){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
+    if(e.source!==f.contentWindow) return; var d=e.data||{};
+    if(d.type==='oam:state'){
+      supported=true; dur=d.duration||0;
+      fill.style.width=(dur?(d.t/dur*100):0)+'%';
+      play.innerHTML=d.playing?'&#9208;':'&#9658;'; play.setAttribute('data-playing', d.playing?'1':'');
+      tm.textContent=(d.t||0).toFixed(1)+'/'+dur.toFixed(0)+'s';
+      if(!marks.getAttribute('data-done') && d.stops && d.stops.length){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
+    } else if(d.type==='forge:command' && d.parity==='stop'){
+      // prompt keyed by stop index (seek-safe); undefined -> persist previous.
+      var idx=(d.n-1)/2, p=(idx>=0 && idx<PROMPTS.length)?PROMPTS[idx]:null;
+      lastStopFrame=d.frame; lastWasDefined=(p!=null && p!=='');
+      if(lastWasDefined) showPrompt(p);
+    } else if(d.type==='forge:end'){
+      // generic end prompt — unless a defined prompt coincided with the final frame.
+      if(END_PROMPT && !(lastWasDefined && lastStopFrame===d.frame)) showPrompt(END_PROMPT);
+    }
   });
   f.addEventListener('load', function(){ send({type:'oam:getState'}); });
   setTimeout(function(){ send({type:'oam:getState'}); }, 500);
@@ -483,9 +500,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
                 # OAM files are bundled at oam/{asset_id}/{entry}; the media bar
                 # drives the animation via the oam:* postMessage protocol.
                 src = f"oam/{asset_id}/{entry}"
+                # Ordered prompt list (by stop index) + final-frame fallback. The
+                # OAM carries no text — CourseForge owns it. '</' escaped so a
+                # prompt can't close the player's <script>.
+                prompts = data.get('prompts') if isinstance(data.get('prompts'), list) else []
+                prompts_js = json.dumps([str(p) for p in prompts]).replace('</', '<\\/')
+                end_js = json.dumps(str(data.get('end_prompt') or 'Press NEXT to continue.')).replace('</', '<\\/')
                 parts.append(
                     _OAM_PLAYER_TPL.replace('__BID__', bid[:8]).replace('__SRC__', src)
                                    .replace('__W__', str(width)).replace('__H__', str(height))
+                                   .replace('__PROMPTS__', prompts_js).replace('__ENDPROMPT__', end_js)
                 )
 
         elif btype == 'ivideo':
