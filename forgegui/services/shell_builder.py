@@ -17,10 +17,29 @@ forge-tokens.css, so brand amber is the concrete dark-mode value
 """
 
 import json
+import re
+from html import escape
 
 
 # Concrete brand amber for standalone output (dark forge amber).
 AMBER = '#F59E0B'
+
+_ID_SAFE = re.compile(r'[^A-Za-z0-9_-]')
+
+
+def _safe_id(raw, fallback):
+    """Sanitize an author-supplied id to a safe CSS/HTML identifier (it is
+    interpolated into both `#id {}` selectors and id="" attributes). Prevents
+    attribute breakout like  id="x" onmouseover="..."  and CSS rule injection."""
+    cleaned = _ID_SAFE.sub('', str(raw or ''))
+    return cleaned or fallback
+
+
+def _css_val(raw, default=''):
+    """Strip characters that could break out of a CSS value inside a <style>
+    block ('</style>' escape, rule/selector injection)."""
+    s = str(raw if raw is not None else default)
+    return s.translate({ord(c): None for c in '<>{};'})
 
 
 def build_shell_html(gui: dict, upload_folder: str) -> str:
@@ -43,8 +62,8 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
 
     # -- CSS for buttons --------------------------------------------
     btn_css = []
-    for btn in buttons:
-        bid    = btn['id']
+    for i, btn in enumerate(buttons):
+        bid    = _safe_id(btn.get('id'), f'fgui-btn-{i}')
         bx     = btn.get('x', 0)
         by     = btn.get('y', 0)
         bw     = btn.get('width', 120)
@@ -120,41 +139,41 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
 
     # -- CSS for zones ----------------------------------------------
     zone_css = []
-    for zone in zones:
-        zid = zone['id']
+    for i, zone in enumerate(zones):
+        zid = _safe_id(zone.get('id'), f'fgui-zone-{i}')
         zone_css.append(f"""
   #{zid} {{
     position: absolute;
-    left:   {zone.get('x',0)}px;
-    top:    {zone.get('y',0)}px;
-    width:  {zone.get('width',200)}px;
-    height: {zone.get('height',30)}px;
-    font-family: {zone.get('font_family','IBM Plex Mono,monospace')};
-    font-size:   {zone.get('font_size',13)}px;
-    font-weight: {zone.get('font_weight',400)};
-    color:       {zone.get('color','#C8D8E8')};
-    background:  {zone.get('bg_color','transparent')};
-    text-align:  {zone.get('align','left')};
-    padding:     {zone.get('padding','4px 8px')};
-    overflow:    {zone.get('overflow','hidden')};
+    left:   {int(zone.get('x',0) or 0)}px;
+    top:    {int(zone.get('y',0) or 0)}px;
+    width:  {int(zone.get('width',200) or 0)}px;
+    height: {int(zone.get('height',30) or 0)}px;
+    font-family: {_css_val(zone.get('font_family','IBM Plex Mono,monospace'))};
+    font-size:   {_css_val(zone.get('font_size',13))}px;
+    font-weight: {_css_val(zone.get('font_weight',400))};
+    color:       {_css_val(zone.get('color','#C8D8E8'))};
+    background:  {_css_val(zone.get('bg_color','transparent'))};
+    text-align:  {_css_val(zone.get('align','left'))};
+    padding:     {_css_val(zone.get('padding','4px 8px'))};
+    overflow:    {_css_val(zone.get('overflow','hidden'))};
     white-space: pre-wrap;
     word-break:  break-word;
     box-sizing:  border-box;
-    {'text-transform:' + zone.get('text_transform','none') + ';'
+    {'text-transform:' + _css_val(zone.get('text_transform','none')) + ';'
      if zone.get('text_transform') else ''}
-    {'letter-spacing:' + zone.get('letter_spacing','normal') + ';'
+    {'letter-spacing:' + _css_val(zone.get('letter_spacing','normal')) + ';'
      if zone.get('letter_spacing') else ''}
-    {'border-radius:' + str(zone.get('border_radius',0)) + 'px;'
+    {'border-radius:' + str(int(zone.get('border_radius',0) or 0)) + 'px;'
      if zone.get('border_radius') else ''}
   }}""")
 
     # -- Button HTML ------------------------------------------------
     btn_html = []
-    for btn in buttons:
-        bid    = btn['id']
-        action = btn.get('action', 'NEXT')
-        label  = btn.get('label', action)
-        ti     = btn.get('tab_index', 0)
+    for i, btn in enumerate(buttons):
+        bid    = _safe_id(btn.get('id'), f'fgui-btn-{i}')
+        action = escape(str(btn.get('action', 'NEXT')), quote=True)
+        label  = escape(str(btn.get('label', btn.get('action', 'NEXT'))), quote=True)
+        ti     = int(btn.get('tab_index', 0) or 0)
         btn_html.append(
             f'  <button id="{bid}" data-action="{action}" '
             f'tabindex="{ti}" aria-label="{label}">'
@@ -163,31 +182,33 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
 
     # -- Zone HTML --------------------------------------------------
     zone_html = []
-    for zone in zones:
-        zid   = zone['id']
-        ztype = zone.get('type', 'prompt')
+    for i, zone in enumerate(zones):
+        zid   = _safe_id(zone.get('id'), f'fgui-zone-{i}')
+        ztype = escape(str(zone.get('type', 'prompt')), quote=True)
         zone_html.append(
             f'  <div id="{zid}" class="fgui-zone" data-zone-type="{ztype}" '
             f'role="status" aria-live="polite" aria-atomic="true"></div>'
         )
 
-    # -- Button action JS -------------------------------------------
+    # -- Button action JS (keys must match the sanitized HTML ids) --
+    # .replace('</','<\\/') so an author value containing </script> can't close
+    # the embedding <script> tag (json.dumps leaves '/' unescaped).
     btn_actions_js = json.dumps({
-        btn['id']: btn.get('action', 'NEXT')
-        for btn in buttons
-    })
+        _safe_id(btn.get('id'), f'fgui-btn-{i}'): btn.get('action', 'NEXT')
+        for i, btn in enumerate(buttons)
+    }).replace('</', '<\\/')
 
     # -- Zone config JS ---------------------------------------------
     zone_config_js = json.dumps({
-        zone['id']: {
+        _safe_id(zone.get('id'), f'fgui-zone-{i}'): {
             'type':            zone.get('type'),
             'format':          zone.get('format', ''),
             'color_correct':   zone.get('color_correct', '#4CAF50'),
             'color_incorrect': zone.get('color_incorrect', '#E87070'),
             'color_normal':    zone.get('color_normal', zone.get('color', '#C8D8E8')),
         }
-        for zone in zones
-    })
+        for i, zone in enumerate(zones)
+    }).replace('</', '<\\/')
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -195,7 +216,7 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="ForgeGUI v1.0.0">
-  <title>{gui.get('name', 'ForgeGUI Shell')}</title>
+  <title>{escape(str(gui.get('name', 'ForgeGUI Shell')), quote=True)}</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -295,7 +316,7 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
 </head>
 <body>
 
-<div id="fgui-stage" role="main" aria-label="{gui.get('name', 'Course shell')}">
+<div id="fgui-stage" role="main" aria-label="{escape(str(gui.get('name', 'Course shell')), quote=True)}">
 
   <!-- Background -->
   <div id="fgui-bg" aria-hidden="true"></div>

@@ -71,7 +71,12 @@ def main():
 
     fbx_path = args[0]
     glb_path = args[1]
-    options  = json.loads(args[2]) if len(args) > 2 else {}
+    try:
+        options = json.loads(args[2]) if len(args) > 2 else {}
+        if not isinstance(options, dict):
+            raise ValueError("options must be a JSON object")
+    except (ValueError, TypeError) as e:
+        log(f"ERROR: Invalid options JSON: {e}"); sys.exit(1)
 
     log(f"Input:   {fbx_path}")
     log(f"Output:  {glb_path}")
@@ -100,7 +105,14 @@ def main():
     except Exception as e:
         log(f"ERROR: FBX import failed: {e}"); sys.exit(1)
 
-    log(f"Imported {len(bpy.data.objects)} object(s).")
+    obj_count = len(bpy.data.objects)
+    mesh_count = len([o for o in bpy.data.objects if o.type == 'MESH'])
+    log(f"Imported {obj_count} object(s), {mesh_count} mesh(es).")
+    if mesh_count == 0:
+        # A silently-empty import would otherwise export a near-empty GLB and
+        # report SUCCESS — fail loudly instead.
+        log("ERROR: No meshes were imported — the FBX is empty or unreadable.")
+        sys.exit(1)
 
     if options.get('apply_transforms', True):
         log("Applying transforms...")

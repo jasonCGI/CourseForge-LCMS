@@ -89,9 +89,20 @@ ipcMain.handle('fbx:preflight', async (_, fbxPath) => {
 })
 
 // ── IPC: Run Blender conversion ───────────────────────────────────────────
+const CONVERT_TIMEOUT_MS = 5 * 60 * 1000   // kill a hung Blender after 5 min
+let activeBlender = null                    // single-flight guard
+
+// The window may be closed mid-convert; guard every send.
+function sendConvertLog(line) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('convert:log', line)
+  }
+}
+
 ipcMain.handle('fbx:convert', async (_, { fbxPath, glbPath, options }) => {
   const config = loadConfig()
   if (!config.blenderPath) return { success: false, error: 'Blender path not configured.' }
+  if (activeBlender) return { success: false, error: 'A conversion is already in progress.' }
 
   const scriptPath = path.join(__dirname, 'scripts', 'convert.py')
 
@@ -103,25 +114,50 @@ ipcMain.handle('fbx:convert', async (_, { fbxPath, glbPath, options }) => {
     ]
 
     const blender = spawn(config.blenderPath, args)
+    activeBlender = blender
     const logs = []
+    let settled = false
+
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      activeBlender = null
+      resolve(result)
+    }
+
+    const timer = setTimeout(() => {
+      sendConvertLog('[error] Conversion timed out — terminating Blender.')
+      try { blender.kill() } catch (_) { /* already gone */ }
+      finish({ success: false, error: `Conversion timed out after ${CONVERT_TIMEOUT_MS / 60000} minutes.`, logs })
+    }, CONVERT_TIMEOUT_MS)
 
     blender.stdout.on('data', (data) => {
       const line = data.toString()
       logs.push(line)
-      mainWindow.webContents.send('convert:log', line)
+      sendConvertLog(line)
     })
     blender.stderr.on('data', (data) => {
       const line = '[stderr] ' + data.toString()
       logs.push(line)
-      mainWindow.webContents.send('convert:log', line)
+      sendConvertLog(line)
     })
     blender.on('close', (code) => {
-      resolve(code === 0
+      finish(code === 0
         ? { success: true, glbPath, logs }
         : { success: false, error: `Blender exited with code ${code}`, logs })
     })
-    blender.on('error', (err) => resolve({ success: false, error: err.message, logs }))
+    blender.on('error', (err) => finish({ success: false, error: err.message, logs }))
   })
+})
+
+// ── IPC: Cancel an in-progress conversion ─────────────────────────────────
+ipcMain.handle('fbx:cancel', () => {
+  if (activeBlender) {
+    try { activeBlender.kill() } catch (_) { /* already gone */ }
+    return { cancelled: true }
+  }
+  return { cancelled: false }
 })
 
 // ── IPC: Reveal file in Explorer/Finder ──────────────────────────────────
