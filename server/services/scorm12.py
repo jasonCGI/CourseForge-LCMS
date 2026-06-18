@@ -152,7 +152,7 @@ _OAM_PLAYER_TPL = """
     fill.style.width=(dur?(d.t/dur*100):0)+'%';
     play.innerHTML=d.playing?'&#9208;':'&#9658;'; play.setAttribute('data-playing', d.playing?'1':'');
     tm.textContent=(d.t||0).toFixed(1)+'/'+dur.toFixed(0)+'s';
-    if(!marks.getAttribute('data-done') && d.stops){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
+    if(!marks.getAttribute('data-done') && d.stops && d.stops.length){ marks.setAttribute('data-done','1'); d.stops.forEach(function(s){ var k=document.createElement('div'); k.style.cssText='position:absolute;left:'+(dur?s/dur*100:0)+'%;top:-3px;width:2px;height:14px;background:#7EB8F0;transform:translateX(-50%)'; marks.appendChild(k); }); }
   });
   f.addEventListener('load', function(){ send({type:'oam:getState'}); });
   setTimeout(function(){ send({type:'oam:getState'}); }, 500);

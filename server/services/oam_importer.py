@@ -310,9 +310,14 @@ def _inject_forge_runtime(extract_dir: Path, entry_point: str) -> None:
             return  # already injected (match the actual tag, not a stray mention)
 
         # Prefer: right after the CreateJS script (forge must load before init()).
-        m = re.search(r'<script[^>]*createjs[^>]*</script>', html, re.IGNORECASE)
+        # Match the OPENING <script ...createjs...> tag (a `>` closes it before
+        # </script>, so a full-tag regex can't span it), then insert after its
+        # matching </script>.
+        m = re.search(r'<script\b[^>]*\bcreatejs\b[^>]*>', html, re.IGNORECASE)
         if m:
-            html = html[:m.end()] + '\n' + tag + html[m.end():]
+            close = html.find('</script>', m.end())
+            pos = (close + len('</script>')) if close != -1 else m.end()
+            html = html[:pos] + '\n' + tag + html[pos:]
         elif '</head>' in html.lower():
             idx = html.lower().index('</head>')
             html = html[:idx] + tag + '\n' + html[idx:]

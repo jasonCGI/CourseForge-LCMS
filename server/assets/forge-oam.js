@@ -27,7 +27,7 @@
   var root = null;         // root MovieClip (the main timeline)
   var stage = null;        // CreateJS stage
   var discovered = [];     // stop frames discovered via forgeStop()
-  var lastCmd = null;      // dedupe consecutive identical commands
+  var lastCmdKey = null;   // dedupe consecutive identical (command, frame)
 
   function declared() {
     return Array.isArray(window.forgeStops) ? window.forgeStops.slice() : null;
@@ -61,9 +61,14 @@
   function stopSeconds() { var f = fps(); return stopFrames().map(function (fr) { return fr / f; }); }
 
   function stopIndexAtFrame(fr) {
-    var s = stopFrames();
-    for (var i = 0; i < s.length; i++) { if (Math.abs(s[i] - fr) <= 1) return i; }
-    return -1;
+    // Closest stop within a 1-frame tolerance (gotoAndStop rounding) — return
+    // the NEAREST, so two adjacent stops resolve to distinct indices.
+    var s = stopFrames(), best = -1, bestD = 2;
+    for (var i = 0; i < s.length; i++) {
+      var d = Math.abs(s[i] - fr);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
   }
 
   function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
@@ -72,25 +77,48 @@
            stops: stopSeconds(), playing: playing() });
   }
   function postCommand(n, frame) {
-    if (n === lastCmd) return;       // dedupe (gotoAndStop can re-fire a frame action)
-    lastCmd = n;
+    var key = n + '@' + frame;
+    if (key === lastCmdKey) return;  // dedupe a re-fired frame action at the same frame
+    lastCmdKey = key;
     post({ type: 'forge:command', n: n, parity: (n % 2 === 1 ? 'stop' : 'start'), frame: frame });
   }
 
   function resolveRoot() {
     if (root) return root;
-    try { if (stage && stage.getChildAt) { var c = stage.getChildAt(0); if (c) root = c; } } catch (e) {}
+    try {
+      if (stage && stage.numChildren) {
+        // The main timeline is the child with the most frames (overlays/bg have 0).
+        var best = null, bestF = -1;
+        for (var i = 0; i < stage.numChildren; i++) {
+          var c = stage.getChildAt(i), tf = (c && c.totalFrames) || 0;
+          if (tf > bestF) { bestF = tf; best = c; }
+        }
+        root = best || (stage.getChildAt ? stage.getChildAt(0) : null);
+      }
+    } catch (e) {}
     return root;
   }
 
-  // ---- capture the CreateJS stage (root = its first child) -----------------
+  // ---- capture the CreateJS stage -----------------------------------------
+  // Two ways, for robustness across Animate output variants:
+  //  (a) wrap the Stage constructor (earliest capture), and
+  //  (b) hook Stage.prototype.update so the REAL instance records itself on its
+  //      first tick — survives the lib aliasing `var S = createjs.Stage` before
+  //      forge loaded.
   function wrapStage(name) {
     if (!window.createjs || !createjs[name] || createjs[name].__forgeWrapped) return;
     var Orig = createjs[name];
-    function Wrapped() { Orig.apply(this, arguments); try { stage = this; } catch (e) {} return this; }
+    function Wrapped() { Orig.apply(this, arguments); try { if (!stage) stage = this; } catch (e) {} return this; }
     Wrapped.prototype = Orig.prototype;
     Wrapped.__forgeWrapped = true;
     createjs[name] = Wrapped;
+  }
+  function hookStageUpdate(name) {
+    var S = window.createjs && createjs[name];
+    if (!S || !S.prototype || S.prototype.__forgeUpd) return;
+    var up = S.prototype.update;
+    S.prototype.update = function () { if (!stage) { try { stage = this; } catch (e) {} } return up.apply(this, arguments); };
+    S.prototype.__forgeUpd = true;
   }
 
   // ---- MovieClip authoring API --------------------------------------------
@@ -122,6 +150,7 @@
 
   // ---- parent -> iframe protocol -------------------------------------------
   window.addEventListener('message', function (e) {
+    if (e.source !== window.parent) return;   // only accept commands from our host
     var d = e.data || {}, r;
     switch (d.type) {
       case 'oam:getState':
@@ -130,6 +159,7 @@
         r = resolveRoot();
         if (r) {
           var i = stopIndexAtFrame(curFrame());
+          lastCmdKey = null;                   // allow the next organic stop to post
           r.play();
           postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame());  // even = start
         }
@@ -139,14 +169,14 @@
         r = resolveRoot(); if (r) r.stop(); postState(); break;
       case 'oam:seek':
         r = resolveRoot();
-        if (r) { lastCmd = null; r.gotoAndStop(Math.max(0, Math.round((d.t || 0) * fps()))); }
+        if (r) { lastCmdKey = null; r.gotoAndStop(Math.max(0, Math.round((d.t || 0) * fps()))); }
         postState(); break;
       case 'oam:nextStop':
         r = resolveRoot();
         if (r) {
           var cur = curFrame(), nx = null, s = stopFrames();
           for (var k = 0; k < s.length; k++) { if (s[k] > cur + 1) { nx = s[k]; break; } }
-          lastCmd = null;
+          lastCmdKey = null;
           r.gotoAndStop(nx != null ? nx : Math.max(0, totalFrames() - 1));
         }
         postState(); break;
@@ -155,10 +185,13 @@
 
   // ---- init ----------------------------------------------------------------
   function init() {
+    if (forge._inited) return;            // run once
+    forge._inited = true;
     wrapStage('Stage'); wrapStage('StageGL');
+    hookStageUpdate('Stage'); hookStageUpdate('StageGL');
     installProto();
     // While playing, push state so the bar tracks the playhead.
-    setInterval(function () { if (root && playing()) postState(); }, 250);
+    forge._pump = setInterval(function () { if (root && playing()) postState(); }, 250);
     post({ type: 'forge:hello' });
     postState();
   }
