@@ -1,77 +1,108 @@
 window.initForge3DPreview = function(container, glbPath) {
   const fileUrl = 'file:///' + glbPath.replace(/\\/g, '/')
-  const canvas  = document.createElement('canvas')
-  canvas.style.cssText = 'width:100%;height:100%;display:block;'
+
+  // Rebuild the preview area: a small control bar + the canvas.
+  container.innerHTML = ''
+  const bar = document.createElement('div')
+  bar.className = 'f3d-viewer-bar'
+  bar.innerHTML =
+    '<div class="f3d-env-group" role="group" aria-label="Environment lighting">' +
+      '<span class="f3d-viewer-bar-label">Environment</span>' +
+      '<button type="button" data-env="studio" class="active" aria-pressed="true">Studio</button>' +
+      '<button type="button" data-env="day" aria-pressed="false">Day</button>' +
+      '<button type="button" data-env="night" aria-pressed="false">Night</button>' +
+    '</div>' +
+    '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>'
+  const canvas = document.createElement('canvas')
+  canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
+  container.appendChild(bar)
   container.appendChild(canvas)
 
-  // esm.sh (not jsdelivr): the jsm GLTFLoader/OrbitControls do `import … from
-  // 'three'` — a bare specifier that won't resolve without an import map.
-  // esm.sh rewrites that bare import to a full URL, so these load standalone.
-  import('https://esm.sh/three@0.165.0').then(THREE => {
-    import('https://esm.sh/three@0.165.0/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
-      import('https://esm.sh/three@0.165.0/examples/jsm/controls/OrbitControls.js').then(({ OrbitControls }) => {
+  // esm.sh rewrites the jsm modules' bare `three` imports so they load standalone.
+  const B = 'https://esm.sh/three@0.165.0'
+  Promise.all([
+    import(B),
+    import(B + '/examples/jsm/loaders/GLTFLoader.js'),
+    import(B + '/examples/jsm/loaders/RGBELoader.js'),
+    import(B + '/examples/jsm/controls/OrbitControls.js'),
+  ]).then(([THREE, { GLTFLoader }, { RGBELoader }, { OrbitControls }]) => {
 
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
-        renderer.setSize(canvas.offsetWidth, canvas.offsetHeight)
-        renderer.setPixelRatio(window.devicePixelRatio)
-        renderer.outputColorSpace = THREE.SRGBColorSpace
-        renderer.toneMapping = THREE.ACESFilmicToneMapping
-        renderer.toneMappingExposure = 1.1
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.0
 
-        const scene    = new THREE.Scene()
-        const camera   = new THREE.PerspectiveCamera(45, canvas.offsetWidth / canvas.offsetHeight, 0.01, 1000)
-        const controls = new OrbitControls(camera, canvas)
-        controls.enableDamping = true
+    const scene  = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000)
+    const controls = new OrbitControls(camera, canvas)
+    controls.enableDamping = true
 
-        // Procedural "studio" IBL (no HDR file) so metallic/glossy materials
-        // reflect — matches the CourseForge viewer's studio environment, so what
-        // an author sees here is what they'll get after upload.
-        try {
-          const pmrem = new THREE.PMREMGenerator(renderer)
-          const es = new THREE.Scene()
-          es.add(new THREE.Mesh(new THREE.BoxGeometry(12, 12, 12),
-            new THREE.MeshStandardMaterial({ side: THREE.BackSide, color: 0x767676, roughness: 1, metalness: 0 })))
-          const panel = (hex, x, y, z, sx, sy, sz, it) => {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz),
-              new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(hex), emissiveIntensity: it }))
-            m.position.set(x, y, z); es.add(m)
-          }
-          panel(0xffffff, 0, 5.5, 0, 8, 0.2, 8, 1.4)
-          panel(0xbcd4ff, -5.5, 0, 1, 0.2, 7, 7, 0.7)
-          panel(0xffe2b0, 5.5, 0, -1, 0.2, 7, 7, 0.6)
-          scene.environment = pmrem.fromScene(es, 0.04).texture
-          es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() })
-          pmrem.dispose()
-        } catch (e) { /* IBL is a nice-to-have; lights below still render the model */ }
+    // A couple of soft lights so the model is lit even before the HDRI resolves.
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8)
+    dir.position.set(5, 10, 5); scene.add(dir)
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5))
-        const dir = new THREE.DirectionalLight(0xffffff, 1.0)
-        dir.position.set(5, 10, 5)
-        scene.add(dir)
-        scene.add(new THREE.GridHelper(10, 20, 0x2E2E2E, 0x1A1A1A))
+    const grid = new THREE.GridHelper(10, 20, 0x2E2E2E, 0x1A1A1A)
+    scene.add(grid)
 
-        new GLTFLoader().load(fileUrl, (gltf) => {
-          const model = gltf.scene
-          const box   = new THREE.Box3().setFromObject(model)
-          const size  = box.getSize(new THREE.Vector3())
-          model.position.sub(box.getCenter(new THREE.Vector3()))
-          camera.position.set(size.x * 1.5, size.y * 1.5, size.z * 2)
-          controls.update()
-          scene.add(model)
+    // ── HDRI environments (Poly Haven, CC0; bundled under ../assets/hdri) ──────
+    const ENVS = { studio: '../assets/hdri/studio.hdr', day: '../assets/hdri/day.hdr', night: '../assets/hdri/night.hdr' }
+    const rgbe = new RGBELoader()
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    pmrem.compileEquirectangularShader()
+    let curEnvRT = null, curBg = null
+    function setEnv(name) {
+      const url = ENVS[name]; if (!url) return
+      rgbe.load(url, (tex) => {
+        tex.mapping = THREE.EquirectangularReflectionMapping
+        const rt = pmrem.fromEquirectangular(tex)         // PMREM for correct PBR reflections
+        if (curEnvRT) curEnvRT.dispose()
+        if (curBg) curBg.dispose()
+        curEnvRT = rt; curBg = tex
+        scene.environment = rt.texture
+        scene.background = tex                              // show the HDRI so day/night reads clearly
+      }, undefined, () => { /* keep current env on load error */ })
+    }
+    setEnv('studio')
+
+    bar.querySelectorAll('[data-env]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        bar.querySelectorAll('[data-env]').forEach((b) => {
+          const on = b === btn
+          b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on))
         })
-
-        ;(function animate() {
-          requestAnimationFrame(animate)
-          controls.update()
-          renderer.render(scene, camera)
-        })()
-
-        window.addEventListener('resize', () => {
-          camera.aspect = canvas.offsetWidth / canvas.offsetHeight
-          camera.updateProjectionMatrix()
-          renderer.setSize(canvas.offsetWidth, canvas.offsetHeight)
-        })
+        setEnv(btn.dataset.env)
       })
     })
+    const gridBtn = bar.querySelector('[data-grid]')
+    gridBtn.addEventListener('click', () => {
+      grid.visible = !grid.visible
+      gridBtn.classList.toggle('active', grid.visible)
+      gridBtn.setAttribute('aria-pressed', String(grid.visible))
+    })
+
+    new GLTFLoader().load(fileUrl, (gltf) => {
+      const model = gltf.scene
+      const box   = new THREE.Box3().setFromObject(model)
+      const size  = box.getSize(new THREE.Vector3())
+      model.position.sub(box.getCenter(new THREE.Vector3()))
+      camera.position.set(size.x * 1.5, size.y * 1.5, size.z * 2 || 3)
+      controls.update()
+      scene.add(model)
+    })
+
+    function fit() {
+      const w = canvas.clientWidth, h = canvas.clientHeight
+      if (!w || !h) return
+      renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix()
+    }
+    new ResizeObserver(fit).observe(canvas); fit()
+
+    ;(function animate() {
+      requestAnimationFrame(animate)
+      controls.update()
+      renderer.render(scene, camera)
+    })()
   })
 }

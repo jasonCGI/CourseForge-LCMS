@@ -1,0 +1,11 @@
+HDRI environment maps bundled with Forge3D
+===========================================
+
+Source: Poly Haven (https://polyhaven.com) — all assets licensed CC0 (public
+domain). No attribution required; credited here as good practice.
+
+  studio.hdr  = "Studio Small 09"   (https://polyhaven.com/a/studio_small_09)
+  day.hdr     = "Qwantani Noon"     (https://polyhaven.com/a/qwantani_noon)
+  night.hdr   = "Dikhololo Night"   (https://polyhaven.com/a/dikhololo_night)
+
+Resolution: 1k (.hdr). Downloaded via the Poly Haven API.
