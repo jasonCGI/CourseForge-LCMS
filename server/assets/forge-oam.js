@@ -28,6 +28,20 @@
   var stage = null;        // CreateJS stage
   var discovered = [];     // stop frames discovered via forgeStop()
   var lastCmdKey = null;   // dedupe consecutive identical (command, frame)
+  var hotspots = [];       // live hotspot overlay elements
+
+  // Hotspot style tokens — defaults, overridden by FORGE_CONFIG.hotspot (baked
+  // at publish) or a forge:config message (preview live-update).
+  var HS = {
+    strokeColor: '#F59E0B', strokeWidth: 3, fill: 'rgba(245,158,11,0.12)',
+    radius: 6, shadow: '0 0 0 3px rgba(245,158,11,0.25)',
+    overColor: '#FFC04D', outColor: '#F59E0B', cursor: 'pointer',
+    hitPadding: 0, pulse: true, focusOutline: '#F59E0B'
+  };
+  function applyConfig(cfg) {
+    if (cfg && cfg.hotspot) { for (var k in cfg.hotspot) if (cfg.hotspot[k] != null) HS[k] = cfg.hotspot[k]; }
+  }
+  if (window.FORGE_CONFIG) applyConfig(window.FORGE_CONFIG);
 
   function declared() {
     return Array.isArray(window.forgeStops) ? window.forgeStops.slice() : null;
@@ -133,6 +147,7 @@
     MC.prototype.forgeStop = function () {
       this.stop();
       if (!root) root = this;                       // first forgeStop = root timeline
+      clearHotspots();                              // a new stop clears the prior stop's hotspots
       var fr = this.currentFrame || 0;
       if (discovered.indexOf(fr) === -1) discovered.push(fr);
       var idx = stopIndexAtFrame(fr);
@@ -148,7 +163,69 @@
     };
     // forgeHotspot is fleshed out in task 4; reserve it so frame scripts don't throw.
     if (!MC.prototype.forgeHotspot) {
-      MC.prototype.forgeHotspot = function (opts) { post({ type: 'forge:hotspot', hotspot: opts || {} }); };
+      MC.prototype.forgeHotspot = function (opts) { drawHotspot(this, opts || {}); };
+    }
+  }
+
+  // ---- hotspots: project a MovieClip's bounds to a DOM overlay --------------
+  function clearHotspots() {
+    for (var i = 0; i < hotspots.length; i++) {
+      if (hotspots[i] && hotspots[i].parentNode) hotspots[i].parentNode.removeChild(hotspots[i]);
+    }
+    hotspots = [];
+  }
+
+  function drawHotspot(clip, opts) {
+    resolveRoot();
+    var canvas = stage && stage.canvas;
+    if (!canvas || !clip) return;
+    // Bounds in the clip's local space -> stage(canvas-internal) coords.
+    var b = clip.nominalBounds || (clip.getBounds && clip.getBounds()) || { x: 0, y: 0, width: 40, height: 40 };
+    var p1 = clip.localToGlobal(b.x, b.y), p2 = clip.localToGlobal(b.x + b.width, b.y + b.height);
+    var x = Math.min(p1.x, p2.x), y = Math.min(p1.y, p2.y), w = Math.abs(p2.x - p1.x), h = Math.abs(p2.y - p1.y);
+    // canvas-internal px -> CSS px (canvas may be CSS-scaled inside the iframe)
+    var rect = canvas.getBoundingClientRect();
+    var sx = rect.width / (canvas.width || rect.width), sy = rect.height / (canvas.height || rect.height);
+    var pad = HS.hitPadding || 0;
+    var el = document.createElement('div');
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', (opts.label || 'Hotspot') + ' — activate to continue');
+    if (opts.label) el.title = opts.label;
+    el.style.cssText = [
+      'position:absolute',
+      'left:' + (rect.left + window.scrollX + x * sx - pad) + 'px',
+      'top:' + (rect.top + window.scrollY + y * sy - pad) + 'px',
+      'width:' + (w * sx + pad * 2) + 'px',
+      'height:' + (h * sy + pad * 2) + 'px',
+      'border:' + HS.strokeWidth + 'px solid ' + HS.outColor,
+      'border-radius:' + HS.radius + 'px',
+      'background:' + HS.fill,
+      'box-shadow:' + HS.shadow,
+      'cursor:' + HS.cursor,
+      'box-sizing:border-box',
+      'z-index:2147483000',
+      HS.pulse ? 'animation:forgeHsPulse 1.2s ease-in-out infinite' : ''
+    ].join(';');
+    el.addEventListener('mouseenter', function () { el.style.borderColor = HS.overColor; });
+    el.addEventListener('mouseleave', function () { el.style.borderColor = HS.outColor; });
+    function activate(ev) {
+      if (ev) ev.preventDefault();
+      post({ type: 'forge:hotspot', hotspot: { id: opts.id, label: opts.label, description: opts.description } });
+      clearHotspots();
+      var r = resolveRoot();
+      if (r) { lastCmdKey = null; r.play(); try { createjs.Ticker.paused = false; } catch (e) {} }
+      postState();
+    }
+    el.addEventListener('click', activate);
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') activate(e); });
+    document.body.appendChild(el);
+    hotspots.push(el);
+    if (!document.getElementById('forge-hs-style')) {
+      var st = document.createElement('style'); st.id = 'forge-hs-style';
+      st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:' + HS.shadow + '}50%{box-shadow:0 0 0 6px rgba(245,158,11,0.10)}}' +
+        '[role=button]:focus-visible{outline:2px solid ' + HS.focusOutline + ';outline-offset:2px}';
+      document.head.appendChild(st);
     }
   }
 
@@ -159,11 +236,14 @@
     switch (d.type) {
       case 'oam:getState':
         postState(); break;
+      case 'forge:config':
+        applyConfig(d.config || d); break;
       case 'oam:play':
         r = resolveRoot();
         if (r) {
           var i = stopIndexAtFrame(curFrame());
           lastCmdKey = null;                   // allow the next organic stop to post
+          clearHotspots();                     // resuming clears the current stop's hotspots
           r.play();
           postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame(), i);  // even = start
         }
