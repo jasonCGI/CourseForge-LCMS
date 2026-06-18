@@ -75,6 +75,22 @@ export default function OamBlock({ block }) {
 
       <div style={{ padding: 16 }}>
 
+        {/* Authoring kit — runtime + snippets + local test harness for Animate authors */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+          padding: '8px 10px', background: 'var(--cf-input-bg)', borderRadius: 6,
+          border: '1px solid var(--cf-border-secondary)' }}>
+          <span style={{ fontSize: 16 }}>🧰</span>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--cf-text-secondary)' }}>
+            Authoring this in Adobe Animate? Grab the ForgeJS kit (runtime, frame-script
+            snippets, and a local test harness).
+          </span>
+          <a href="/api/forgejs/authoring-kit.zip" download
+            style={{ fontSize: 12, fontWeight: 600, color: '#533AB7', textDecoration: 'none',
+              border: '1px solid #533AB7', borderRadius: 4, padding: '5px 10px', whiteSpace: 'nowrap' }}>
+            ⬇ Authoring kit
+          </a>
+        </div>
+
         {/* Upload zone — shown until asset is linked */}
         {!assetId && (
           <div style={{ marginBottom: 16 }}>

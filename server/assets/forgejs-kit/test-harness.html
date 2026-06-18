@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeJS local test harness</title>
+<style>
+  :root { --amber:#F59E0B; --navy:#042C53; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:#0d1017; color:#cfe0f2; }
+  header { padding:12px 16px; background:var(--navy); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:14px; margin:0; color:#fff; font-weight:600; }
+  header .grow { flex:1; }
+  input[type=text] { background:#0d1017; border:1px solid #1c2a3a; color:#cfe0f2; border-radius:4px; padding:6px 8px; width:280px; font-size:12px; }
+  .wrap { max-width:960px; margin:0 auto; padding:16px; }
+  .stage { position:relative; width:100%; min-height:200px; background:#000; border-radius:6px 6px 0 0; overflow:hidden; }
+  iframe { display:block; width:100%; height:540px; border:0; background:#000; }
+  .bar { display:flex; align-items:center; gap:10px; padding:8px 12px; background:#0d1017; border:1px solid #1c2a3a; border-top:none; border-radius:0 0 6px 6px; }
+  button { background:var(--amber); color:var(--navy); border:none; border-radius:4px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:monospace; }
+  button.ghost { background:#16202c; color:#9fb6cd; }
+  .track { flex:1; position:relative; height:8px; background:#1c2a3a; border-radius:4px; cursor:pointer; }
+  .fill { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--amber); border-radius:4px; }
+  .mark { position:absolute; top:-4px; width:2px; height:16px; background:#7EB8F0; border-radius:1px; transform:translateX(-50%); }
+  .time { font-family:monospace; font-size:11px; color:#7A90A8; min-width:74px; text-align:right; }
+  .state { font-family:monospace; font-size:11px; color:#9fb6cd; padding:8px 0; }
+  .log { margin-top:12px; background:#06080d; border:1px solid #1c2a3a; border-radius:6px; height:200px; overflow:auto; padding:8px 10px; font-family:monospace; font-size:11px; line-height:1.5; }
+  .log .cmd { color:#F59E0B; } .log .end { color:#7EB8F0; } .log .hs { color:#8ad0a0; }
+  .log .complete { color:#c9a0ff; } .log .hello { color:#5f7d99; }
+  .hint { color:#5f7d99; font-size:11px; margin:10px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ForgeJS local test harness</h1>
+  <span class="grow"></span>
+  <input id="src" type="text" placeholder="path to your exported index.html" value="index.html">
+  <button id="load" class="ghost">Load</button>
+</header>
+
+<div class="wrap">
+  <div class="stage"><iframe id="frame" title="OAM under test" src="about:blank"></iframe></div>
+  <div class="bar">
+    <button id="play">▶</button>
+    <div class="track" id="track"><div class="fill" id="fill"></div></div>
+    <button id="next" class="ghost">⤓ Next stop</button>
+    <span class="time" id="time">0.0 / 0s</span>
+  </div>
+  <div class="state" id="state">Waiting for <code>forge:hello</code> from the iframe…</div>
+  <div class="log" id="log"></div>
+  <p class="hint">
+    Add <code>&lt;script src="forge-oam.js"&gt;&lt;/script&gt;</code> AFTER the CreateJS script in your
+    exported HTML, then serve this folder over <code>http://</code> (e.g.
+    <code>python -m http.server</code>) — not <code>file://</code> — so the iframe can talk to the harness.
+  </p>
+</div>
+
+<script>
+(function () {
+  var frame = document.getElementById('frame');
+  var logEl = document.getElementById('log');
+  var fill  = document.getElementById('fill');
+  var track = document.getElementById('track');
+  var timeEl = document.getElementById('time');
+  var stateEl = document.getElementById('state');
+  var playBtn = document.getElementById('play');
+  var st = { t:0, duration:0, stops:[], playing:false };
+
+  function log(cls, text) {
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = text;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function send(msg) { try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+
+  function render() {
+    var pct = st.duration ? (st.t / st.duration * 100) : 0;
+    fill.style.width = pct + '%';
+    timeEl.textContent = st.t.toFixed(1) + ' / ' + (st.duration || 0).toFixed(0) + 's';
+    playBtn.textContent = st.playing ? '⏸' : '▶';
+    // markers
+    Array.prototype.slice.call(track.querySelectorAll('.mark')).forEach(function (m) { m.remove(); });
+    (st.stops || []).forEach(function (s, i) {
+      var m = document.createElement('div'); m.className = 'mark';
+      m.title = 'Stop ' + (i + 1);
+      m.style.left = (st.duration ? s / st.duration * 100 : 0) + '%';
+      track.appendChild(m);
+    });
+    stateEl.textContent = 'playing=' + st.playing + '  t=' + st.t.toFixed(2) +
+      '  duration=' + (st.duration || 0).toFixed(2) + '  stops=[' + (st.stops || []).map(function (s) { return s.toFixed(2); }).join(', ') + ']';
+  }
+
+  window.addEventListener('message', function (e) {
+    if (e.source !== frame.contentWindow) return;
+    var d = e.data || {};
+    switch (d.type) {
+      case 'oam:state': st = d; render(); break;
+      case 'forge:hello': log('hello', 'forge:hello — bridge is live'); break;
+      case 'forge:command':
+        log('cmd', 'forge:command  n=' + d.n + '  parity=' + d.parity + '  frame=' + d.frame + '  index=' + d.index); break;
+      case 'forge:end': log('end', 'forge:end  frame=' + d.frame + '  (stream complete)'); break;
+      case 'forge:hotspot': log('hs', 'forge:hotspot  ' + JSON.stringify(d.hotspot)); break;
+      case 'forge:complete': log('complete', 'forge:complete  score=' + d.score); break;
+      case 'forge:score': log('complete', 'forge:score  score=' + d.score); break;
+    }
+  });
+
+  playBtn.onclick = function () { send({ type: st.playing ? 'oam:pause' : 'oam:play' }); };
+  document.getElementById('next').onclick = function () { send({ type: 'oam:nextStop' }); };
+  track.onclick = function (e) {
+    if (!st.duration) return;
+    var r = track.getBoundingClientRect();
+    send({ type: 'oam:seek', t: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * st.duration });
+  };
+
+  function load() {
+    var src = document.getElementById('src').value || 'index.html';
+    logEl.innerHTML = '';
+    frame.src = src;
+    frame.onload = function () { send({ type: 'oam:getState' }); };
+  }
+  document.getElementById('load').onclick = load;
+  // Auto-load the default path on open.
+  load();
+})();
+</script>
+</body>
+</html>

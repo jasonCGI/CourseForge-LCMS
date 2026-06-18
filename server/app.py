@@ -31,6 +31,7 @@ def create_app(config_name=None):
     from .routes.templates import templates_bp
     from .routes.gui_shells import gui_shells_bp
     from .routes.search import search_bp
+    from .routes.forgejs import forgejs_bp
 
     app.register_blueprint(projects_bp)
     app.register_blueprint(import_bp)
@@ -41,6 +42,7 @@ def create_app(config_name=None):
     app.register_blueprint(templates_bp)
     app.register_blueprint(gui_shells_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(forgejs_bp)
 
     # Health check
     @app.route('/api/health')
