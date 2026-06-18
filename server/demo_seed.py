@@ -434,7 +434,7 @@ def _wire_demo_assets(project):
         'vtt_asset_id': vtt.id, 'has_audio': True})
     img = reg('sample_image.jpg', 'image', 'image/jpeg')
     aud = reg('sample_audio.mp3', 'audio', 'audio/mpeg')
-    glb = reg('sample_model.glb', 'model3d', 'model/gltf-binary')
+    glb = reg('teapot.glb', 'model3d', 'model/gltf-binary')
     hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
     db.session.flush()
 
@@ -489,7 +489,9 @@ def _wire_demo_assets(project):
                          original_name='sample_audio.mp3', asset_meta=_serialize_media(aud)); changed = True
             elif fr.name == '3D Model Block' and t == 'model3d':
                 d.update(model_asset_id=glb.id, model_serve_url=f'/api/media/serve/{glb.id}',
-                         model_filename='sample_model.glb'); changed = True
+                         model_filename='teapot.glb',
+                         caption='Utah teapot — FBX converted to GLB via the Forge3D Blender pipeline. '
+                                 'Drag to orbit (drag down tilts the top toward you), scroll to zoom, R resets.'); changed = True
             elif fr.name == 'Hotspot Block' and t == 'hotspot':
                 d.update(background_asset_id=hb.id, background_url=f'/api/media/serve/{hb.id}'); changed = True
             elif fr.name == 'Interactive Video Block' and t == 'ivideo':

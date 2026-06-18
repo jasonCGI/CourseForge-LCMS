@@ -360,6 +360,7 @@ CourseTitle.zip
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
   var THREE=window.THREE,canvas=document.getElementById('viewer-canvas'),
@@ -433,6 +434,27 @@ CourseTitle.zip
   var plane=new THREE.Mesh(new THREE.PlaneGeometry(6,6),new THREE.ShadowMaterial({opacity:0.12}));
   plane.rotation.x=-Math.PI/2;plane.position.y=-1.8;plane.receiveShadow=true;scene.add(plane);
 
+  // Demo model: the Utah teapot, converted FBX -> GLB through the Forge3D
+  // Blender pipeline. Polished-metal material so the studio IBL reflects. Loads
+  // into the same group (so orbit + annotation pins apply); on success the
+  // procedural placeholder geometry is hidden.
+  var matTeapot=new THREE.MeshStandardMaterial({color:0xF59E0B,metalness:0.92,roughness:0.16,emissive:new THREE.Color(0x6E4708),emissiveIntensity:0.06});
+  try {
+    new THREE.GLTFLoader().load('teapot.glb', function(gltf){
+      [ico,icoW,tor,tor2,inner].forEach(function(m){m.visible=false;});
+      octs.forEach(function(m){m.visible=false;});
+      var model=gltf.scene;
+      var box=new THREE.Box3().setFromObject(model);
+      var size=box.getSize(new THREE.Vector3()), center=box.getCenter(new THREE.Vector3());
+      var s=2/Math.max(size.x,size.y,size.z||1);
+      model.scale.setScalar(s);
+      model.position.sub(center.multiplyScalar(s));
+      model.traverse(function(o){ if(o.isMesh){ o.material=matTeapot; o.castShadow=true; } });
+      group.add(model);
+      if(loading)loading.style.display='none';
+    }, undefined, function(){ /* keep the procedural fallback on load error */ });
+  } catch(e){}
+
   var ANNS=[
     {id:'a0',label:'Orbit constraint',pos:new THREE.Vector3(0.9,0.6,0.4),
      desc:'No pan permitted. Horizontal theta and vertical phi orbit axes keep the subject centered at origin — essential for part identification training where spatial reference must be maintained.'},
@@ -441,7 +463,7 @@ CourseTitle.zip
     {id:'a2',label:'Annotation overlay',pos:new THREE.Vector3(0.3,-0.9,0.7),
      desc:'Dots are absolutely-positioned divs over the canvas, projected from 3D world space to 2D screen coordinates each frame. Hidden when ndc.z >= 1.0.'},
     {id:'a3',label:'GLB geometry',pos:new THREE.Vector3(1.2,0.2,0.0),
-     desc:'Procedural demo geometry only. Production: authors upload GLB from 3ds Max (File → Export → glTF 2.0), Blender, Maya, or UE5. Textures must be embedded in the GLB.'},
+     desc:'Live GLB — the Utah teapot, converted from FBX through the Forge3D Blender pipeline (import_scene.fbx → export_scene.gltf). Authors upload GLB from 3ds Max (File → Export → glTF 2.0), Blender, Maya, or UE5; textures embedded in the GLB.'},
   ];
 
   var activeId=null;
