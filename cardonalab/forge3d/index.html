@@ -65,6 +65,7 @@ body{font-family:var(--mono);background:var(--bg);color:var(--t1);min-height:100
 .ctrl-btn{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:4px;color:var(--t2);font-size:9px;font-weight:600;font-family:var(--mono);padding:4px 10px;cursor:pointer;letter-spacing:.04em;transition:background .12s,color .12s,border-color .12s}
 .ctrl-btn:hover{background:rgba(245,158,11,.1);color:var(--amber);border-color:var(--amber2)}
 .ctrl-btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.ctrl-btn.active{background:rgba(245,158,11,.14);color:var(--amber);border-color:var(--amber)}
 #viewer-loading{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50}
 .spinner{width:32px;height:32px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--amber);animation:spin3d .8s linear infinite}
 .loading-label{font-size:10px;color:var(--t3);letter-spacing:.08em}
@@ -140,6 +141,9 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
   <div class="viewer-footer">
     <span class="viewer-hint">drag orbit · scroll zoom · R reset · click pins for info</span>
     <div class="viewer-controls">
+      <button class="ctrl-btn env-btn active" data-env="studio" aria-pressed="true" aria-label="Studio environment">Studio</button>
+      <button class="ctrl-btn env-btn" data-env="day" aria-pressed="false" aria-label="Day HDRI environment">Day</button>
+      <button class="ctrl-btn env-btn" data-env="night" aria-pressed="false" aria-label="Night HDRI environment">Night</button>
       <button class="ctrl-btn" id="btn-reset" aria-label="Reset camera">Reset</button>
       <button class="ctrl-btn" id="btn-wireframe" aria-label="Toggle wireframe">Wire</button>
       <button class="ctrl-btn" id="btn-pins" aria-label="Toggle annotation pins">Pins</button>
@@ -368,6 +372,7 @@ CourseTitle.zip
 
 <script src="vendor/three.min.js"></script>
 <script src="vendor/GLTFLoader.js"></script>
+<script src="vendor/RGBELoader.js"></script>
 <script>
 (function(){
   var THREE=window.THREE,canvas=document.getElementById('viewer-canvas'),
@@ -383,21 +388,36 @@ CourseTitle.zip
   renderer.shadowMap.enabled=true;
 
   var scene=new THREE.Scene();
-  scene.background=new THREE.Color('#0A1220');
-  scene.fog=new THREE.FogExp2('#0A1220',0.07);
+  var DARK_BG=new THREE.Color('#0A1220'), DARK_FOG=new THREE.FogExp2('#0A1220',0.07);
+  scene.background=DARK_BG; scene.fog=DARK_FOG;
 
   var camera=new THREE.PerspectiveCamera(45,1,0.01,1000);
 
-  // Studio IBL environment (procedural, no HDR file) so metallic/glossy surfaces
-  // reflect — same approach as the Forge3D block's "studio" environment.
-  (function(){ try{
-    var pm=new THREE.PMREMGenerator(renderer), es=new THREE.Scene();
+  // ── Environment: procedural "studio" (default, no file) + bundled HDRIs
+  //    (day/night) loaded on demand. Same options as the Forge3D tool. ──
+  var pmrem=new THREE.PMREMGenerator(renderer), curEnvRT=null, curBgTex=null, rgbe=new THREE.RGBELoader();
+  function applyStudioEnv(){
+    var es=new THREE.Scene();
     es.add(new THREE.Mesh(new THREE.BoxGeometry(12,12,12), new THREE.MeshStandardMaterial({side:THREE.BackSide,color:0x767676,roughness:1,metalness:0})));
     var panel=function(hex,x,y,z,sx,sy,sz,it){var m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),new THREE.MeshStandardMaterial({color:0x000000,emissive:new THREE.Color(hex),emissiveIntensity:it}));m.position.set(x,y,z);es.add(m);};
     panel(0xffffff,0,5.5,0,8,0.2,8,1.4);panel(0xbcd4ff,-5.5,0,1,0.2,7,7,0.7);panel(0xffe2b0,5.5,0,-1,0.2,7,7,0.6);
-    scene.environment=pm.fromScene(es,0.04).texture;
-    es.traverse(function(o){if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});pm.dispose();
-  }catch(e){} })();
+    var rt=pmrem.fromScene(es,0.04);
+    if(curEnvRT)curEnvRT.dispose(); curEnvRT=rt; scene.environment=rt.texture;
+    if(curBgTex){curBgTex.dispose(); curBgTex=null;}
+    scene.background=DARK_BG; scene.fog=DARK_FOG;
+    es.traverse(function(o){if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});
+  }
+  function applyHdriEnv(name){
+    rgbe.load('hdri/'+name+'.hdr', function(tex){
+      tex.mapping=THREE.EquirectangularReflectionMapping;
+      var rt=pmrem.fromEquirectangular(tex);
+      if(curEnvRT)curEnvRT.dispose(); curEnvRT=rt; scene.environment=rt.texture;
+      if(curBgTex)curBgTex.dispose(); curBgTex=tex;
+      scene.background=tex; scene.fog=null;   // show the HDRI backdrop (no fog)
+    });
+  }
+  function setEnv(name){ if(name==='studio') applyStudioEnv(); else applyHdriEnv(name); }
+  applyStudioEnv();
 
   scene.add(new THREE.AmbientLight(0xffffff,0.4));
   var key=new THREE.DirectionalLight(0xffffff,1.4);
@@ -606,6 +626,12 @@ CourseTitle.zip
     e.preventDefault();updateCam();
   });
 
+  document.querySelectorAll('.env-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.env-btn').forEach(function(b){var on=b===btn;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});
+      setEnv(btn.dataset.env);
+    });
+  });
   document.getElementById('btn-reset').addEventListener('click',function(){
     orbit.theta=0.4;orbit.phi=1.1;orbit.radius=3.8;updateCam();closeAll();
   });
