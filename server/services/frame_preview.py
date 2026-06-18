@@ -327,6 +327,7 @@ _COURSE_PREVIEW_TPL = """<!DOCTYPE html>
   });
   // Shell NEXT/PREV (postMessage from a GUI-shell frame) also drive the course.
   window.addEventListener('message',function(e){
+    if(e.source!==frame.contentWindow) return;   // only the embedded frame may drive nav
     var d=e.data||{}; if(d.type!=='fgui_action') return;
     if(d.action==='NEXT'||d.action==='CONTINUE'||d.action==='SUBMIT') go(i+1);
     else if(d.action==='PREVIOUS') go(i-1);
@@ -342,10 +343,11 @@ _COURSE_PREVIEW_TPL = """<!DOCTYPE html>
 def build_course_preview_html(project) -> str:
     """Navigable preview of the whole course (chains per-frame previews)."""
     frames = []
-    for course in sorted(getattr(project, "courses", []) or [], key=lambda c: c.order_index):
-        for mod in sorted(course.modules or [], key=lambda m: m.order_index):
-            for lesson in sorted(mod.lessons or [], key=lambda l: l.order_index):
-                for fr in sorted(lesson.frames or [], key=lambda f: f.order_index):
+    # `or 0` — order_index can be NULL (raw inserts / PATCH bodies); None<int crashes sorted().
+    for course in sorted(getattr(project, "courses", []) or [], key=lambda c: c.order_index or 0):
+        for mod in sorted(course.modules or [], key=lambda m: m.order_index or 0):
+            for lesson in sorted(mod.lessons or [], key=lambda l: l.order_index or 0):
+                for fr in sorted(lesson.frames or [], key=lambda f: f.order_index or 0):
                     frames.append({
                         "id": fr.id,
                         "name": fr.name or "Untitled frame",
@@ -353,7 +355,7 @@ def build_course_preview_html(project) -> str:
                         "course": course.name or "",
                         "optional": bool(getattr(fr, "optional", False)),
                     })
-    data = json.dumps(frames).replace("</", "<\/")
-    return (_COURSE_PREVIEW_TPL
-            .replace("__FRAMES__", data)
-            .replace("__TITLE__", escape(project.name or "Course")))
+    data = json.dumps(frames).replace("</", "<\\/")
+    repl = {"__FRAMES__": data, "__TITLE__": escape(project.name or "Course")}
+    # single pass so an injected value can't contain (and re-trigger) the other token
+    return re.sub("__FRAMES__|__TITLE__", lambda m: repl[m.group(0)], _COURSE_PREVIEW_TPL)
