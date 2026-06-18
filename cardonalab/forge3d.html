@@ -435,10 +435,10 @@ CourseTitle.zip
   plane.rotation.x=-Math.PI/2;plane.position.y=-1.8;plane.receiveShadow=true;scene.add(plane);
 
   // Demo model: the Utah teapot, converted FBX -> GLB through the Forge3D
-  // Blender pipeline. Polished-metal material so the studio IBL reflects. Loads
-  // into the same group (so orbit + annotation pins apply); on success the
+  // Blender pipeline with a polished-amber-metal material baked into the GLB —
+  // so this showcase and the in-app Model3D viewer render the identical asset.
+  // Loads into the same group (orbit + annotation pins apply); on success the
   // procedural placeholder geometry is hidden.
-  var matTeapot=new THREE.MeshStandardMaterial({color:0xF59E0B,metalness:0.92,roughness:0.16,emissive:new THREE.Color(0x6E4708),emissiveIntensity:0.06});
   try {
     new THREE.GLTFLoader().load('teapot.glb', function(gltf){
       [ico,icoW,tor,tor2,inner].forEach(function(m){m.visible=false;});
@@ -449,7 +449,7 @@ CourseTitle.zip
       var s=2/Math.max(size.x,size.y,size.z||1);
       model.scale.setScalar(s);
       model.position.sub(center.multiplyScalar(s));
-      model.traverse(function(o){ if(o.isMesh){ o.material=matTeapot; o.castShadow=true; } });
+      model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; } });  // keep the GLB's baked material
       group.add(model);
       if(loading)loading.style.display='none';
     }, undefined, function(){ /* keep the procedural fallback on load error */ });
