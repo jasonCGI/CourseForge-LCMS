@@ -889,6 +889,10 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     runInjectedScripts();
     window.fgui.setFrameData(FRAME_DATA);
     window.fgui.onAction = function(action) {{
+      // Bubble to a host that drives navigation itself (the course-preview
+      // wrapper). Harmless in a published SCO — the LMS ignores it and the
+      // window.location.href navigation below still runs.
+      try {{ if (window.parent && window.parent !== window) window.parent.postMessage({{ type: 'fgui_action', action: action }}, '*'); }} catch(e) {{}}
       switch(action) {{
         case 'NEXT':
         case 'CONTINUE':
