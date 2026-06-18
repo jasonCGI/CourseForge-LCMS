@@ -21,7 +21,8 @@ from flask import current_app, render_template
 from ..models.project import Project, project_full_query
 from ..models.media import MediaAsset, OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
-from ..services.scorm12 import _render_blocks, _has_oam_with_scorm, _project_hotspot_cfg
+from ..services.scorm12 import (_render_blocks, _has_oam_with_scorm, _project_hotspot_cfg,
+                                _bundle_three_assets, _frames_have_model3d)
 from ..version import VERSION
 
 # Video.js CDN — same files as SCORM 1.2, cached locally
@@ -197,6 +198,10 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             cached   = videojs_cache / filename
             if cached.exists():
                 zf.write(str(cached), arc_path)
+
+        # three.js + loaders + Draco (only if a 3D block exists) → fully offline
+        if _frames_have_model3d(f for (f, _l, _c) in all_frames):
+            _bundle_three_assets(zf)
 
         # ── Media files + companions (deduped) ────────────────
         _seen = set()

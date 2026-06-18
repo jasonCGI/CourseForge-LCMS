@@ -220,6 +220,30 @@ _OAM_PLAYER_TPL = """
 """
 
 
+def _bundle_three_assets(zf):
+    """Copy the vendored three.js + GLTF/DRACO loaders + Draco WASM decoder into
+    a package (assets/three/) so 3D blocks run fully offline — no CDN at runtime.
+    Best-effort: a missing file just falls back to the runtime's CDN path."""
+    base = Path(__file__).resolve().parent.parent / 'assets' / 'three'
+    for rel in ('three.min.js', 'GLTFLoader.js', 'DRACOLoader.js',
+                'draco/draco_wasm_wrapper.js', 'draco/draco_decoder.wasm'):
+        try:
+            src = base / rel
+            if src.exists():
+                zf.write(str(src), 'assets/three/' + rel)
+        except Exception:
+            pass
+
+
+def _frames_have_model3d(frames):
+    """True if any frame contains a 3D model block (frames: iterable of Frame)."""
+    for fr in frames:
+        for b in (getattr(fr, 'content', None) or {}).get('blocks', []):
+            if b.get('type') == 'model3d':
+                return True
+    return False
+
+
 def _project_hotspot_cfg(project):
     """Project-level ForgeJS hotspot config ({"hotspot": {...}}), or None when the
     project hasn't customized it (OAM players then keep the runtime brand defaults)."""
@@ -673,16 +697,23 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
 </style>
 <script>
 (function() {{
-  var THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-  var GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  var DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
-  var DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/';
+  // Local-first (bundled under assets/three for fully-offline packages) with a
+  // CDN fallback so formats that don't bundle still work online.
+  var THREE_LOCAL='assets/three/three.min.js',  THREE_CDN='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  var GLTF_LOCAL ='assets/three/GLTFLoader.js', GLTF_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  var DRACO_LOCAL='assets/three/DRACOLoader.js',DRACO_CDN='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
+  var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
-  function loadScript(src, cb) {{
-    if (document.querySelector('script[src="' + src + '"]')) {{ cb(); return; }}
-    var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s);
+  function loadScript(local, cdn, cb) {{
+    if (document.querySelector('script[src="' + local + '"]') || document.querySelector('script[src="' + cdn + '"]')) {{ cb(); return; }}
+    var s = document.createElement('script'); s.src = local; s.onload = cb;
+    s.onerror = function() {{
+      DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/';   // local missing -> use CDN decoder too
+      var c = document.createElement('script'); c.src = cdn; c.onload = cb; c.onerror = cb; document.head.appendChild(c);
+    }};
+    document.head.appendChild(s);
   }}
-  loadScript(THREE_CDN, function() {{ loadScript(GLTF_CDN, function() {{ loadScript(DRACO_CDN, function() {{
+  loadScript(THREE_LOCAL, THREE_CDN, function() {{ loadScript(GLTF_LOCAL, GLTF_CDN, function() {{ loadScript(DRACO_LOCAL, DRACO_CDN, function() {{
     init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS, {env_on}, {env_int});
   }}); }}); }});
 
@@ -1163,6 +1194,10 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
         except Exception:
             # Network egress unavailable — omit player JS; publish still succeeds.
             pass
+
+        # ── Bundle three.js + loaders + Draco (only if a 3D block exists) ──
+        if _frames_have_model3d(f for (f, _l, _c) in all_frames):
+            _bundle_three_assets(zf)
 
         # ── Bundle video + companion media (webm/vtt/poster) ───────
         _bundled_media = set()
