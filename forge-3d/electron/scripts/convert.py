@@ -35,6 +35,50 @@ def op_retry(op, **kw):
             raise
 
 
+METAL_WORDS = ('metal', 'gold', 'chrome', 'steel', 'brass', 'silver', 'iron',
+               'alumin', 'copper', 'bronze', 'nickel', 'titanium', 'platinum',
+               'gunmetal', 'pewter', 'metallic')
+
+
+def apply_pbr(options):
+    """FBX often loses PBR metalness on import (3ds Max Physical/Standard material
+    metalness doesn't map into Blender's Principled BSDF), so a 'Metal' material
+    exports with metallicFactor=0 and renders flat. Recover it:
+      - force_metallic: set every material to metalness 1.0
+      - metalness / roughness: explicit overrides (0..1)
+      - otherwise auto-detect: a material whose NAME looks metallic but imported
+        with metalness 0 is bumped to 1.0 (and shininess if very rough).
+    """
+    force  = bool(options.get('force_metallic', False))
+    auto   = options.get('auto_metal_from_name', True)
+    set_m  = options.get('metalness', None)
+    set_r  = options.get('roughness', None)
+    for mat in bpy.data.materials:
+        try:
+            if not mat.use_nodes:
+                mat.use_nodes = True
+            bsdf = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+            if not bsdf:
+                continue
+            m_in = bsdf.inputs.get('Metallic')
+            r_in = bsdf.inputs.get('Roughness')
+            name = (mat.name or '').lower()
+            if set_m is not None and m_in:
+                m_in.default_value = max(0.0, min(1.0, float(set_m)))
+            elif force and m_in:
+                m_in.default_value = 1.0
+                log(f"Forced metallic on '{mat.name}'.")
+            elif auto and m_in and m_in.default_value == 0.0 and any(w in name for w in METAL_WORDS):
+                m_in.default_value = 1.0
+                if r_in and r_in.default_value > 0.5:
+                    r_in.default_value = 0.3
+                log(f"Auto-metal: '{mat.name}' looks metallic -> metalness=1.0.")
+            if set_r is not None and r_in:
+                r_in.default_value = max(0.0, min(1.0, float(set_r)))
+        except Exception as e:
+            log(f"WARN: PBR fixup skipped for a material ({e}).")
+
+
 def patch_fbx_light_bug():
     """Blender 5.1's bundled FBX importer crashes on any FBX containing a light
     (blen_read_light does `lamp.cycles.cast_shadow = ...`, an attribute removed
@@ -119,6 +163,9 @@ def main():
         bpy.ops.object.select_all(action='SELECT')
         try: bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         except Exception as e: log(f"WARN: Transform apply skipped: {e}")
+
+    # Recover/override PBR metalness lost on FBX import (see apply_pbr).
+    apply_pbr(options)
 
     mesh_count = sum(1 for o in bpy.data.objects if o.type == 'MESH')
     mat_count  = len(bpy.data.materials)

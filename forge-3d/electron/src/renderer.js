@@ -222,7 +222,8 @@ async function runConversion() {
     include_animations: document.getElementById('opt-animations').checked,
     apply_transforms:   document.getElementById('opt-transforms').checked,
     draco:              document.getElementById('opt-draco').checked,
-    export_cameras:     document.getElementById('opt-cameras').checked
+    export_cameras:     document.getElementById('opt-cameras').checked,
+    force_metallic:     document.getElementById('opt-metallic').checked
   }
 
   clearLog()

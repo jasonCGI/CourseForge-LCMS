@@ -170,7 +170,9 @@ ipcMain.handle('fbx:convert', async (_, { fbxPath, glbPath, options }) => {
   if (!config.blenderPath) return { success: false, error: 'Blender path not configured.' }
   if (activeBlender) return { success: false, error: 'A conversion is already in progress.' }
 
-  const scriptPath = path.join(__dirname, 'scripts', 'convert.py')
+  // Blender is an external process and can't read inside app.asar — the script
+  // is unpacked (asarUnpack in build config), so point at the unpacked copy.
+  const scriptPath = path.join(__dirname, 'scripts', 'convert.py').replace('app.asar', 'app.asar.unpacked')
 
   return new Promise((resolve) => {
     const args = [
@@ -227,4 +229,15 @@ ipcMain.handle('fbx:cancel', () => {
 })
 
 // ── IPC: Reveal file in Explorer/Finder ──────────────────────────────────
-ipcMain.handle('shell:showItem', (_, filePath) => shell.showItemInFolder(filePath))
+ipcMain.handle('shell:showItem', (_, filePath) => {
+  // showItemInFolder needs a native (back-slash on Windows), existing path; it
+  // silently no-ops on forward-slash or missing paths. Normalize + fall back to
+  // opening the containing folder.
+  const p = path.normalize(String(filePath || ''))
+  try {
+    if (fs.existsSync(p)) { shell.showItemInFolder(p); return true }
+    const dir = path.dirname(p)
+    if (fs.existsSync(dir)) { shell.openPath(dir); return true }
+  } catch (e) { /* fall through */ }
+  return false
+})

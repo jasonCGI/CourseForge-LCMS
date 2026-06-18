@@ -23,6 +23,7 @@
     "compression": "maximum",
     "electronLanguages": ["en-US"],
     "removePackageScripts": true,
+    "asarUnpack": ["scripts/**/*"],
     "win": {
       "target": "nsis",
       "icon": "assets/icons/forge3d-icon.ico"
