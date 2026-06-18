@@ -38,8 +38,16 @@
     overColor: '#FFC04D', outColor: '#F59E0B', cursor: 'pointer',
     hitPadding: 0, pulse: true, focusOutline: '#F59E0B'
   };
+  var HS_KEYS = ['strokeColor', 'strokeWidth', 'fill', 'radius', 'shadow', 'overColor',
+                'outColor', 'cursor', 'hitPadding', 'pulse', 'focusOutline'];
   function applyConfig(cfg) {
-    if (cfg && cfg.hotspot) { for (var k in cfg.hotspot) if (cfg.hotspot[k] != null) HS[k] = cfg.hotspot[k]; }
+    if (!cfg || !cfg.hotspot) return;
+    for (var i = 0; i < HS_KEYS.length; i++) {           // whitelist only (no for..in pollution)
+      var k = HS_KEYS[i];
+      if (cfg.hotspot[k] != null) HS[k] = cfg.hotspot[k];
+    }
+    var st = document.getElementById('forge-hs-style');  // rebuild keyframes/focus on next draw
+    if (st && st.parentNode) st.parentNode.removeChild(st);
   }
   if (window.FORGE_CONFIG) applyConfig(window.FORGE_CONFIG);
 
@@ -170,34 +178,49 @@
   // ---- hotspots: project a MovieClip's bounds to a DOM overlay --------------
   function clearHotspots() {
     for (var i = 0; i < hotspots.length; i++) {
-      if (hotspots[i] && hotspots[i].parentNode) hotspots[i].parentNode.removeChild(hotspots[i]);
+      var el = hotspots[i].el;
+      if (el && el.parentNode) el.parentNode.removeChild(el);
     }
     hotspots = [];
   }
 
-  function drawHotspot(clip, opts) {
-    resolveRoot();
+  // Compute the clip's on-screen (viewport) rect. position:fixed coords, so it's
+  // immune to body margin/scroll. Re-runnable on resize for responsive canvases.
+  function hotspotRect(clip) {
     var canvas = stage && stage.canvas;
-    if (!canvas || !clip) return;
-    // Bounds in the clip's local space -> stage(canvas-internal) coords.
-    var b = clip.nominalBounds || (clip.getBounds && clip.getBounds()) || { x: 0, y: 0, width: 40, height: 40 };
-    var p1 = clip.localToGlobal(b.x, b.y), p2 = clip.localToGlobal(b.x + b.width, b.y + b.height);
-    var x = Math.min(p1.x, p2.x), y = Math.min(p1.y, p2.y), w = Math.abs(p2.x - p1.x), h = Math.abs(p2.y - p1.y);
-    // canvas-internal px -> CSS px (canvas may be CSS-scaled inside the iframe)
-    var rect = canvas.getBoundingClientRect();
+    if (!canvas || !clip || !clip.localToGlobal) return null;
+    var b = clip.nominalBounds || (clip.getBounds && clip.getBounds());
+    if (!b) { b = { x: 0, y: 0, width: 80, height: 60 }; try { console.warn('[ForgeJS] hotspot clip has no bounds — using a default box; set bounds in Animate.'); } catch (e) {} }
+    // Project all four corners so rotation/scale give a correct axis-aligned box.
+    var pts = [clip.localToGlobal(b.x, b.y), clip.localToGlobal(b.x + b.width, b.y),
+               clip.localToGlobal(b.x, b.y + b.height), clip.localToGlobal(b.x + b.width, b.y + b.height)];
+    var xs = pts.map(function (p) { return p.x; }), ys = pts.map(function (p) { return p.y; });
+    var gx = Math.min.apply(null, xs), gy = Math.min.apply(null, ys);
+    var gw = Math.max.apply(null, xs) - gx, gh = Math.max.apply(null, ys) - gy;
+    var rect = canvas.getBoundingClientRect();              // canvas-internal px -> CSS px
     var sx = rect.width / (canvas.width || rect.width), sy = rect.height / (canvas.height || rect.height);
     var pad = HS.hitPadding || 0;
+    return { left: rect.left + gx * sx - pad, top: rect.top + gy * sy - pad,
+             width: gw * sx + pad * 2, height: gh * sy + pad * 2 };
+  }
+  function positionHotspot(desc) {
+    var r = hotspotRect(desc.clip); if (!r) return;
+    var s = desc.el.style;
+    s.left = r.left + 'px'; s.top = r.top + 'px'; s.width = r.width + 'px'; s.height = r.height + 'px';
+  }
+
+  function drawHotspot(clip, opts) {
+    resolveRoot();
+    var r = hotspotRect(clip); if (!r) return;
     var el = document.createElement('div');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
     el.setAttribute('aria-label', (opts.label || 'Hotspot') + ' — activate to continue');
     if (opts.label) el.title = opts.label;
     el.style.cssText = [
-      'position:absolute',
-      'left:' + (rect.left + window.scrollX + x * sx - pad) + 'px',
-      'top:' + (rect.top + window.scrollY + y * sy - pad) + 'px',
-      'width:' + (w * sx + pad * 2) + 'px',
-      'height:' + (h * sy + pad * 2) + 'px',
+      'position:fixed',                                    // viewport coords (no body-margin/scroll offset)
+      'left:' + r.left + 'px', 'top:' + r.top + 'px',
+      'width:' + r.width + 'px', 'height:' + r.height + 'px',
       'border:' + HS.strokeWidth + 'px solid ' + HS.outColor,
       'border-radius:' + HS.radius + 'px',
       'background:' + HS.fill,
@@ -209,21 +232,24 @@
     ].join(';');
     el.addEventListener('mouseenter', function () { el.style.borderColor = HS.overColor; });
     el.addEventListener('mouseleave', function () { el.style.borderColor = HS.outColor; });
+    var fired = false;
     function activate(ev) {
       if (ev) ev.preventDefault();
+      if (fired) return; fired = true;                     // guard double-activation
       post({ type: 'forge:hotspot', hotspot: { id: opts.id, label: opts.label, description: opts.description } });
       clearHotspots();
-      var r = resolveRoot();
-      if (r) { lastCmdKey = null; r.play(); try { createjs.Ticker.paused = false; } catch (e) {} }
+      var rr = resolveRoot();
+      if (rr) { lastCmdKey = null; rr.play(); try { createjs.Ticker.paused = false; } catch (e) {} }
       postState();
     }
     el.addEventListener('click', activate);
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') activate(e); });
     document.body.appendChild(el);
-    hotspots.push(el);
+    hotspots.push({ el: el, clip: clip, opts: opts });
     if (!document.getElementById('forge-hs-style')) {
       var st = document.createElement('style'); st.id = 'forge-hs-style';
-      st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:' + HS.shadow + '}50%{box-shadow:0 0 0 6px rgba(245,158,11,0.10)}}' +
+      var pulseMid = 'box-shadow:0 0 0 6px ' + (HS.fill || 'rgba(245,158,11,0.10)');
+      st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:' + HS.shadow + '}50%{' + pulseMid + '}}' +
         '[role=button]:focus-visible{outline:2px solid ' + HS.focusOutline + ';outline-offset:2px}';
       document.head.appendChild(st);
     }
@@ -274,6 +300,8 @@
     wrapStage('Stage'); wrapStage('StageGL');
     hookStageUpdate('Stage'); hookStageUpdate('StageGL');
     installProto();
+    // Keep any visible hotspot overlays aligned when the canvas resizes/scales.
+    window.addEventListener('resize', function () { for (var i = 0; i < hotspots.length; i++) positionHotspot(hotspots[i]); });
     // While playing, push state so the bar tracks the playhead.
     forge._pump = setInterval(function () { if (root && playing()) postState(); }, 250);
     post({ type: 'forge:hello' });
