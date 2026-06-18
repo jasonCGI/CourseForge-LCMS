@@ -538,7 +538,8 @@ CourseTitle.zip
   canvas.addEventListener('pointermove',function(e){
     if(!orbit.dragging)return;
     orbit.theta-=(e.clientX-orbit.lastX)*0.008;
-    orbit.phi=Math.max(orbit.minP,Math.min(orbit.maxP,orbit.phi+(e.clientY-orbit.lastY)*0.008));
+    // Drag down tilts the model's top toward you (grab feel), not flight-stick pitch.
+    orbit.phi=Math.max(orbit.minP,Math.min(orbit.maxP,orbit.phi-(e.clientY-orbit.lastY)*0.008));
     orbit.lastX=e.clientX;orbit.lastY=e.clientY;updateCam();
   });
   canvas.addEventListener('pointerup',function(e){orbit.dragging=false;canvas.releasePointerCapture(e.pointerId);});
@@ -559,8 +560,8 @@ CourseTitle.zip
     var s=0.06;
     if(e.key==='ArrowLeft')orbit.theta-=s;
     else if(e.key==='ArrowRight')orbit.theta+=s;
-    else if(e.key==='ArrowUp')orbit.phi=Math.max(orbit.minP,orbit.phi-s);
-    else if(e.key==='ArrowDown')orbit.phi=Math.min(orbit.maxP,orbit.phi+s);
+    else if(e.key==='ArrowUp')orbit.phi=Math.min(orbit.maxP,orbit.phi+s);
+    else if(e.key==='ArrowDown')orbit.phi=Math.max(orbit.minP,orbit.phi-s);
     else if(e.key==='+'||e.key==='=')orbit.radius=Math.max(orbit.minR,orbit.radius-.25);
     else if(e.key==='-')orbit.radius=Math.min(orbit.maxR,orbit.radius+.25);
     else if(e.key==='r'||e.key==='R'){orbit.theta=0.4;orbit.phi=1.1;orbit.radius=3.8;}

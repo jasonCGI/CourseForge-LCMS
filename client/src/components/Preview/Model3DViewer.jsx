@@ -262,7 +262,9 @@ export default function Model3DViewer({
     const orbit = orbitRef.current
     if (!orbit.dragging) return
     orbit.theta -= (e.clientX - orbit.lastX) * 0.01
-    orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi + (e.clientY - orbit.lastY) * 0.01))
+    // Drag DOWN tilts the model's top toward the viewer (grab-the-model feel),
+    // not flight-stick pitch where pulling down looks up at the underside.
+    orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - (e.clientY - orbit.lastY) * 0.01))
     orbit.lastX = e.clientX; orbit.lastY = e.clientY
     updateCamera(cameraRef.current, orbit)
   }, [])
@@ -291,8 +293,8 @@ export default function Model3DViewer({
     switch (e.key) {
       case 'ArrowLeft':  orbit.theta -= step; break
       case 'ArrowRight': orbit.theta += step; break
-      case 'ArrowUp':    orbit.phi = Math.max(orbit.minPhi, orbit.phi - step); break
-      case 'ArrowDown':  orbit.phi = Math.min(orbit.maxPhi, orbit.phi + step); break
+      case 'ArrowUp':    orbit.phi = Math.min(orbit.maxPhi, orbit.phi + step); break
+      case 'ArrowDown':  orbit.phi = Math.max(orbit.minPhi, orbit.phi - step); break
       case '+': case '=': orbit.radius = Math.max(orbit.minRadius, orbit.radius - 0.2); break
       case '-':           orbit.radius = Math.min(orbit.maxRadius, orbit.radius + 0.2); break
       case 'r': case 'R': orbit.theta = 0; orbit.phi = Math.PI / 4; orbit.radius = 3; break
