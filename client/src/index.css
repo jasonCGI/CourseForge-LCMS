@@ -151,7 +151,9 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   body { font-size: 14px; }
   .tray-label { display: none; }            /* ecosystem tray: marks only */
   .cf-hide-mobile { display: none !important; }  /* "Course/", version, Publish label */
-  .cf-app-header { padding: 0 8px !important; gap: 4px !important; }
+  /* Let the toolbar wrap to multiple rows instead of clipping buttons off the
+     right edge (body has overflow-x:hidden, so overflow = hidden controls). */
+  .cf-app-header { padding: 4px 8px !important; gap: 4px !important; flex-wrap: wrap; height: auto !important; min-height: 48px; }
   .forge-path--md { font-size: 16px; }       /* shrink header wordmark to fit */
 }
 

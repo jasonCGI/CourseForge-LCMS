@@ -239,11 +239,10 @@ export default function App() {
             disabled={!activeProject}
             aria-label="Search frames"
             title="Search frames (Ctrl+F)"
-            className="cf-hide-mobile"
             style={{ marginLeft: 10, padding: '5px 10px', background: 'transparent',
               border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
               color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
-              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>🔍 Search</button>
+              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>🔍<span className="cf-hide-mobile"> Search</span></button>
 
           {/* Publish history */}
           <button
@@ -251,11 +250,10 @@ export default function App() {
             disabled={!activeProject}
             aria-label="Publish history"
             title="Publish history"
-            className="cf-hide-mobile"
             style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent',
               border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
               color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
-              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>⟳ History</button>
+              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>⟳<span className="cf-hide-mobile"> History</span></button>
 
           {/* Course shell (per-project GUI skin) */}
           <button
@@ -263,7 +261,6 @@ export default function App() {
             disabled={!activeProject}
             aria-label="Course shell"
             title="Course shell — apply a ForgeGUI skin to the whole project"
-            className="cf-hide-mobile"
             style={{
               marginLeft: 10, padding: '5px 12px', background: 'transparent',
               border: `1px solid ${activeProject?.gui_shell_id ? 'var(--forge-amber)' : 'rgba(255,255,255,0.15)'}`,
@@ -271,7 +268,7 @@ export default function App() {
               fontSize: 12, cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
               fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
             }}
-          >▣ Shell</button>
+          >▣<span className="cf-hide-mobile"> Shell</span></button>
 
           {/* Full-course preview — walk the whole course like a learner */}
           <button
@@ -286,7 +283,7 @@ export default function App() {
               cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
               fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
             }}
-          >▶ Course</button>
+          >▶<span className="cf-hide-mobile"> Course</span></button>
 
           {/* Publish */}
           <button
