@@ -18,13 +18,15 @@ window.initForge3DPreview = function(container, glbPath) {
   container.appendChild(bar)
   container.appendChild(canvas)
 
-  // esm.sh rewrites the jsm modules' bare `three` imports so they load standalone.
-  const B = 'https://esm.sh/three@0.165.0'
+  // three + addons are vendored locally (assets/vendor/three) so the preview
+  // works fully offline. The addon copies have their bare `three` imports
+  // rewritten to the local build. Paths resolve relative to src/index.html.
+  const V = '../assets/vendor/three'
   Promise.all([
-    import(B),
-    import(B + '/examples/jsm/loaders/GLTFLoader.js'),
-    import(B + '/examples/jsm/loaders/RGBELoader.js'),
-    import(B + '/examples/jsm/controls/OrbitControls.js'),
+    import(V + '/three.module.js'),
+    import(V + '/loaders/GLTFLoader.js'),
+    import(V + '/loaders/RGBELoader.js'),
+    import(V + '/controls/OrbitControls.js'),
   ]).then(([THREE, { GLTFLoader }, { RGBELoader }, { OrbitControls }]) => {
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })

@@ -1,6 +1,14 @@
 /* ── Forge3D Design Tokens ─────────────────────────────────────────────── */
 /* Modes: [data-theme="night"] [data-theme="day"] [data-theme="hc"]        */
 
+/* IBM Plex Mono bundled locally (../assets/fonts) for fully-offline use. */
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 300;
+  font-display: swap; src: url('../assets/fonts/ibm-plex-mono-300.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400;
+  font-display: swap; src: url('../assets/fonts/ibm-plex-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600;
+  font-display: swap; src: url('../assets/fonts/ibm-plex-mono-600.woff2') format('woff2'); }
+
 /* ── Night (default) ────────────────────────────────────────────────────── */
 :root,
 [data-theme="night"] {
