@@ -394,6 +394,38 @@ export default function ContentTree() {
     return map
   }, [activeProject])
 
+  // Sorted top-level courses + the flat render-order navigation list. Memoized
+  // so a re-render that didn't change the tree/open-state/filter (e.g. an editor
+  // keystroke or hover) doesn't re-walk and re-sort the whole hierarchy.
+  const courses = useMemo(
+    () => [...(activeProject?.courses || [])].sort((a, b) => a.order_index - b.order_index),
+    [activeProject],
+  )
+  const flatItems = useMemo(() => {
+    if (!activeProject) return []
+    const cOpen = (id) => openCourses[id] !== false
+    const mOpen = (id) => openModules[id] !== false
+    const lOpen = (id) => openLessons[id] !== false
+    const visible = (fr) => completionFilter === 'all' || completionByFrame.get(fr.id) === completionFilter
+    const items = [{ id: activeProject.id, type: 'project', parentId: null }]
+    for (const co of courses) {
+      items.push({ id: co.id, type: 'course', parentId: activeProject.id })
+      if (!cOpen(co.id)) continue
+      for (const mo of [...(co.modules || [])].sort((a, b) => a.order_index - b.order_index)) {
+        items.push({ id: mo.id, type: 'module', parentId: co.id })
+        if (!mOpen(mo.id)) continue
+        for (const le of [...(mo.lessons || [])].sort((a, b) => a.order_index - b.order_index)) {
+          items.push({ id: le.id, type: 'lesson', parentId: mo.id })
+          if (!lOpen(le.id)) continue
+          for (const fr of [...(le.frames || [])].sort((a, b) => a.order_index - b.order_index)) {
+            if (visible(fr)) items.push({ id: fr.id, type: 'frame', parentId: le.id })
+          }
+        }
+      }
+    }
+    return items
+  }, [activeProject, courses, openCourses, openModules, openLessons, completionFilter, completionByFrame])
+
   const doDuplicate = async (frameId, targetLessonId = null) => {
     try {
       await duplicateFrame(frameId, targetLessonId)
@@ -457,33 +489,15 @@ export default function ContentTree() {
     )
   }
 
-  const courses = [...(activeProject.courses || [])].sort((a, b) => a.order_index - b.order_index)
-
   // ── Sprint D: completion filter + keyboard navigation ──────────────
+  // (courses + flatItems are memoized above; these helpers are still used by
+  // the JSX render below.)
   const frameVisible = (frame) =>
     completionFilter === 'all' || completionByFrame.get(frame.id) === completionFilter
 
   const courseOpenOf = (id) => openCourses[id] !== false
   const moduleOpenOf = (id) => openModules[id] !== false
   const lessonOpenOf = (id) => openLessons[id] !== false
-
-  // Flat, render-order list of navigable items respecting open state + filter.
-  const flatItems = [{ id: activeProject.id, type: 'project', parentId: null }]
-  for (const co of courses) {
-    flatItems.push({ id: co.id, type: 'course', parentId: activeProject.id })
-    if (!courseOpenOf(co.id)) continue
-    for (const mo of [...(co.modules || [])].sort((a, b) => a.order_index - b.order_index)) {
-      flatItems.push({ id: mo.id, type: 'module', parentId: co.id })
-      if (!moduleOpenOf(mo.id)) continue
-      for (const le of [...(mo.lessons || [])].sort((a, b) => a.order_index - b.order_index)) {
-        flatItems.push({ id: le.id, type: 'lesson', parentId: mo.id })
-        if (!lessonOpenOf(le.id)) continue
-        for (const fr of [...(le.frames || [])].sort((a, b) => a.order_index - b.order_index)) {
-          if (frameVisible(fr)) flatItems.push({ id: fr.id, type: 'frame', parentId: le.id })
-        }
-      }
-    }
-  }
 
   const focusItem = (id) => { setFocusedId(id); setTimeout(() => document.getElementById(`tree-item-${id}`)?.focus(), 0) }
   const setOpen = (type, id, val) => {

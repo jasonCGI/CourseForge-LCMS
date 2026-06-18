@@ -28,6 +28,7 @@ export default function Model3DViewer({
   const sceneRef    = useRef(null)
   const frameRef    = useRef(null)
   const annsRef     = useRef(annotations)
+  const lastPinsRef = useRef([])
   const orbitRef    = useRef({
     dragging: false, lastX: 0, lastY: 0,
     theta: 0, phi: Math.PI / 4, radius: 3,
@@ -59,15 +60,33 @@ export default function Model3DViewer({
 
   const projectAnnotations = useCallback((camera, renderer) => {
     const anns = annsRef.current
-    if (!camera || !renderer || !anns?.length) { setScreenPins(prev => prev.length ? [] : prev); return }
+    if (!camera || !renderer || !anns?.length) {
+      if (lastPinsRef.current.length) { lastPinsRef.current = []; setScreenPins([]) }
+      return
+    }
     const THREE = window.THREE
     const canvas = renderer.domElement
     const w = canvas.clientWidth, h = canvas.clientHeight
     const pins = anns.map(ann => {
       const ndc = new THREE.Vector3(ann.position.x, ann.position.y, ann.position.z).project(camera)
-      return { id: ann.id, x: (ndc.x * 0.5 + 0.5) * w, y: (-ndc.y * 0.5 + 0.5) * h, visible: ndc.z < 1.0 }
+      const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
+      // A degenerate camera frame (e.g. before the first updateCamera) can yield
+      // non-finite NDC → an `Infinity` CSS `left`. Treat those as not-visible.
+      return { id: ann.id, x, y, visible: ndc.z < 1.0 && Number.isFinite(x) && Number.isFinite(y) }
     })
-    setScreenPins(pins)
+    // This runs every animation frame. Only re-render React when a pin actually
+    // moved (>0.5px) or flipped visibility — otherwise a static model would
+    // setState 60×/sec and re-render the whole viewer continuously.
+    const prev = lastPinsRef.current
+    let changed = pins.length !== prev.length
+    if (!changed) {
+      for (let i = 0; i < pins.length; i++) {
+        const a = pins[i], b = prev[i]
+        if (a.id !== b.id || a.visible !== b.visible ||
+            Math.abs(a.x - b.x) > 0.5 || Math.abs(a.y - b.y) > 0.5) { changed = true; break }
+      }
+    }
+    if (changed) { lastPinsRef.current = pins; setScreenPins(pins) }
   }, [])
 
   useEffect(() => {
@@ -128,7 +147,24 @@ export default function Model3DViewer({
     ro.observe(canvas)
 
     return () => { cancelAnimationFrame(frameRef.current); ro.disconnect(); renderer.dispose() }
-  }, [threeReady, modelUrl, bgColor, height, projectAnnotations])
+    // bgColor/height are intentionally NOT deps — changing them must not tear
+    // down the scene + re-download the GLB. They're applied in place below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threeReady, modelUrl, projectAnnotations])
+
+  // Apply background-color changes in place (no scene rebuild).
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (scene && window.THREE) scene.background = new window.THREE.Color(bgColor)
+  }, [bgColor])
+
+  // Apply height/resize in place (no scene rebuild, no GLB re-fetch).
+  useEffect(() => {
+    const renderer = rendererRef.current, camera = cameraRef.current, canvas = canvasRef.current
+    if (!renderer || !camera || !canvas) return
+    const w = canvas.clientWidth || 800
+    renderer.setSize(w, height); camera.aspect = w / height; camera.updateProjectionMatrix()
+  }, [height])
 
   const handleCanvasClick = useCallback((e) => {
     if (!pinMode || !onPinPlaced) return

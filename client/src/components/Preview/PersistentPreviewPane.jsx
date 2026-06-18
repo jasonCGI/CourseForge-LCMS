@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import FramePreview, { renderBlockToHTML } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
@@ -35,12 +35,28 @@ export default function PersistentPreviewPane() {
     return () => { live = false }
   }, [shellId])
 
-  if (!activeFrame) return null
-
-  const order = flatFrameOrder(activeProject)
-  const idx   = order.indexOf(activeFrame.id)
+  // Memoized so a non-content re-render (e.g. the shell.json fetch resolving)
+  // doesn't recompute the tree walk or hand GUIShellRenderer fresh prop
+  // references — which would re-inject into the iframe needlessly.
+  const order = useMemo(() => flatFrameOrder(activeProject), [activeProject])
+  const idx   = activeFrame ? order.indexOf(activeFrame.id) : -1
   const total = order.length || 1
   const human = idx >= 0 ? idx + 1 : 1
+
+  const frameHtml = useMemo(
+    () => (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join(''),
+    [activeFrame?.content?.blocks],
+  )
+  const frameData = useMemo(() => ({
+    frameIndex: human, totalFrames: total,
+    lessonTitle: '', sectionTitle: '',
+    frameTitle: activeFrame?.name || '',
+    prompt: activeFrame?.name || '',
+    isFirst: idx <= 0, isLast: idx === total - 1,
+  }), [human, total, activeFrame?.name, idx])
+
+  if (!activeFrame) return null
+
   const ar    = stage ? `${stage.w} / ${stage.h}` : '16 / 9'
   const maxW  = stage ? `${stage.w}px` : '100%'
 
@@ -55,14 +71,8 @@ export default function PersistentPreviewPane() {
             <GUIShellRenderer
               key={shellId}
               shellUrl={`/api/gui-shells/${shellId}/shell.html`}
-              frameHtml={(activeFrame.content?.blocks || []).map(renderBlockToHTML).join('')}
-              frameData={{
-                frameIndex: human, totalFrames: total,
-                lessonTitle: '', sectionTitle: '',
-                frameTitle: activeFrame.name || '',
-                prompt: activeFrame.name || '',
-                isFirst: idx <= 0, isLast: idx === total - 1,
-              }}
+              frameHtml={frameHtml}
+              frameData={frameData}
               onAction={(a) => { if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a) }}
               height="100%"
             />

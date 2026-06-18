@@ -28,7 +28,14 @@ import { VERSION } from './version'
 const DEMO_AUTOLOAD = true
 
 export default function App() {
-  const { projects, fetchProjects, fetchProject, autoloadDemo, loading, activeProject } = useProjectStore()
+  // Individual selectors (not a full-store destructure) so App — the root —
+  // only re-renders when these specific fields change, not on every store write.
+  const projects      = useProjectStore(s => s.projects)
+  const fetchProjects = useProjectStore(s => s.fetchProjects)
+  const fetchProject  = useProjectStore(s => s.fetchProject)
+  const autoloadDemo  = useProjectStore(s => s.autoloadDemo)
+  const loading       = useProjectStore(s => s.loading)
+  const activeProject = useProjectStore(s => s.activeProject)
   const [showPublish, setShowPublish] = useState(false)
   const [showThemeEditor, setShowThemeEditor] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
