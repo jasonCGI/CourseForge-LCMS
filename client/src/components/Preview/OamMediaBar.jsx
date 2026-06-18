@@ -32,7 +32,8 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption })
       const cw = stage.clientWidth || SW
       if (cw === lastW) return            // guard ResizeObserver against the height write
       lastW = cw
-      const s = Math.min(cw / SW, 1)
+      let s = Math.min(cw / SW, 1)
+      if (!(s > 0) || !isFinite(s)) s = 1
       ifr.style.transform = `scale(${s})`
       ifr.style.left = `${Math.max(0, (cw - SW * s) / 2)}px`
       setStageH(SH * s)

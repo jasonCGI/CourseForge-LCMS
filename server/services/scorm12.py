@@ -75,6 +75,16 @@ def _get_gui_block(frame):
     return None
 
 
+def _int_dim(v, default):
+    """Coerce a stored block dimension to a positive int (a non-numeric value
+    injected into the player's inline JS would be a syntax error)."""
+    try:
+        n = int(float(v))
+        return n if n > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
 _OAM_PLAYER_TPL = """
 <div id="oamwrap-__BID__" style="margin-bottom:20px;width:100%">
   <div id="oamstage-__BID__" style="position:relative;width:100%;overflow:hidden;background:#0d1117;border-radius:6px 6px 0 0">
@@ -102,28 +112,37 @@ _OAM_PLAYER_TPL = """
   if(!f) return;
   // -- Scale-to-fit: letterbox into the GUI shell content area (#fgui-content)
   //    when present, else fit the container width (preserve aspect, never clip). --
-  var lastW=-1;
+  var lastKey='';
   function fit(){
     if(!stage||!SW||!SH) return;
     var cw=stage.clientWidth||SW;
-    if(cw===lastW) return;   // guard the ResizeObserver against its own height write
-    lastW=cw;
-    var s=cw/SW;
     var sc=document.getElementById('fgui-content');
-    if(sc && sc.contains(wrap)){
-      var availH=sc.clientHeight-(bar?bar.offsetHeight:36)-16;
-      if(availH>0) s=Math.min(s, availH/SH);   // letterbox inside the content box
+    var inShell=sc && sc.contains(wrap);
+    var barH=bar?bar.offsetHeight:36;
+    var ch=inShell?sc.clientHeight:0;
+    // Key on every input to the scale (width, content height, bar height) so a
+    // height-only change (bar settling, vertical resize) still re-fits — while
+    // still skipping our own stage-height write (which changes none of these).
+    var key=cw+'x'+ch+'x'+barH;
+    if(key===lastKey) return;
+    lastKey=key;
+    var s=cw/SW;
+    if(inShell){
+      var cs=getComputedStyle(sc);
+      var padV=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+      var availH=ch-padV-barH;                   // content-box height minus padding + bar
+      if(availH>0) s=Math.min(s, availH/SH);     // letterbox inside the content box
     } else {
-      s=Math.min(s,1);                          // flowing layout: don't upscale past native
+      s=Math.min(s,1);                           // flowing layout: don't upscale past native
     }
-    if(!(s>0)) s=1;
+    if(!(s>0)||!isFinite(s)) s=1;
     f.style.transform='scale('+s+')';
     f.style.left=Math.max(0,(cw-SW*s)/2)+'px';
     stage.style.height=(SH*s)+'px';
   }
   fit();
   if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(stage); }catch(e){} }
-  window.addEventListener('resize', function(){ lastW=-1; fit(); });
+  window.addEventListener('resize', function(){ lastKey=''; fit(); });
   // -- media bar protocol --
   var dur=0, supported=false;
   function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
@@ -453,8 +472,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
 
         elif btype == 'oam':
             asset_id = data.get('oam_asset_id', '')
-            width    = data.get('width',  800)
-            height   = data.get('height', 600)
+            # Coerce to int — a non-numeric width/height (e.g. a legacy '100%' or
+            # null) would inject `var SW=100%` and throw, killing the whole player.
+            width    = _int_dim(data.get('width'),  800)
+            height   = _int_dim(data.get('height'), 600)
             entry    = data.get('entry_point', 'index.html')
             if not asset_id:
                 parts.append('<div class="cf-media">&#9881; [OAM — no animation linked]</div>')
