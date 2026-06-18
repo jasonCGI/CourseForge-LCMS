@@ -690,11 +690,17 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     counter_index = disp_index if disp_index is not None else (frame_idx + 1)
     counter_total = disp_total if disp_total is not None else total_frames
 
+    # Escape '</' so an embedded </script> can't close the runtime's own tag.
+    frame_html_js = json.dumps(injected_html).replace('</', '<\\/')
+
     cf_runtime = f"""
 <script>
 // CourseForge GUI Runtime — injected by CourseForge v{cf_version} at publish time
 (function() {{
-  var FRAME_HTML = {json.dumps(injected_html)};
+  // FRAME_HTML has its close-tag sequences backslash-escaped server-side so an
+  // inline script inside a block (3D viewer, OAM player) can't terminate this
+  // runtime tag early. The escaping is invisible once the JS string is parsed.
+  var FRAME_HTML = {frame_html_js};
   var FRAME_DATA = {{
     frameIndex:   {counter_index},
     totalFrames:  {counter_total},
@@ -723,9 +729,28 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     }} catch(e) {{}}
   }}
 
+  // innerHTML (used by fgui.injectContent) parses script tags but never
+  // executes them, so re-create each one to run interactive blocks
+  // (3D viewer, OAM player, interactive video) after injection.
+  function runInjectedScripts() {{
+    var ca = document.getElementById('fgui-content');
+    if (!ca) return;
+    var scripts = ca.querySelectorAll('script');
+    for (var i = 0; i < scripts.length; i++) {{
+      var old = scripts[i];
+      var s = document.createElement('script');
+      for (var a = 0; a < old.attributes.length; a++) {{
+        s.setAttribute(old.attributes[a].name, old.attributes[a].value);
+      }}
+      s.textContent = old.textContent;
+      old.parentNode.replaceChild(s, old);
+    }}
+  }}
+
   function inject() {{
     if (!window.fgui) {{ setTimeout(inject, 100); return; }}
     window.fgui.injectContent(FRAME_HTML);
+    runInjectedScripts();
     window.fgui.setFrameData(FRAME_DATA);
     window.fgui.onAction = function(action) {{
       switch(action) {{
