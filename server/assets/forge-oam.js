@@ -169,6 +169,14 @@
       postState();
       post({ type: 'forge:end', frame: this.currentFrame || 0 });
     };
+    // Report completion / score to the LMS (through the parent SCO page, since
+    // the OAM iframe is sandboxed and can't reach window.API directly).
+    MC.prototype.forgeComplete = function (score) {
+      post({ type: 'forge:complete', score: (score == null ? null : score) });
+    };
+    MC.prototype.forgeScore = function (score) {
+      post({ type: 'forge:score', score: score });
+    };
     // forgeHotspot is fleshed out in task 4; reserve it so frame scripts don't throw.
     if (!MC.prototype.forgeHotspot) {
       MC.prototype.forgeHotspot = function (opts) { drawHotspot(this, opts || {}); };

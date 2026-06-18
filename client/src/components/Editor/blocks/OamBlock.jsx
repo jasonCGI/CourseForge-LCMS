@@ -240,6 +240,19 @@ export default function OamBlock({ block }) {
                 style={inputStyle}
               />
             </div>
+
+            {/* Gate progression until the animation completes */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+              <input
+                type="checkbox"
+                id={`oam-gate-${block.id}`}
+                checked={block.data.gate_next || false}
+                onChange={e => update('gate_next', e.target.checked)}
+              />
+              <label htmlFor={`oam-gate-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)' }}>
+                Disable NEXT until the animation finishes (stream-complete gate)
+              </label>
+            </div>
           </>
         )}
       </div>

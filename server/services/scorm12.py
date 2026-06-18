@@ -146,7 +146,23 @@ _OAM_PLAYER_TPL = """
   // -- media bar protocol + prompt cue wiring --
   var dur=0, supported=false;
   var PROMPTS=__PROMPTS__, END_PROMPT=__ENDPROMPT__, lastWasDefined=false, lastStopFrame=-1;
+  var GATE_NEXT=__GATENEXT__;
   function send(m){ try{ f.contentWindow.postMessage(m,'*'); }catch(e){} }
+  // Gate progression: disable NEXT/CONTINUE until the stream completes.
+  function gateButtons(disabled){
+    var b=document.querySelectorAll('[data-action="NEXT"],[data-action="CONTINUE"]');
+    for(var i=0;i<b.length;i++){ try{ b[i].disabled=disabled; b[i].style.opacity=disabled?'0.4':''; b[i].style.pointerEvents=disabled?'none':''; }catch(e){} }
+  }
+  if(GATE_NEXT) gateButtons(true);
+  // Report completion/score to the LMS (the player is in the SCO page -> has window.API).
+  function reportComplete(score){
+    try{ if(window.API){ window.API.LMSSetValue('cmi.core.lesson_status','completed'); if(score!=null) window.API.LMSSetValue('cmi.core.score.raw', String(score)); window.API.LMSCommit(''); } }catch(e){}
+    try{ if(window.API_1484_11){ window.API_1484_11.SetValue('cmi.completion_status','completed'); if(score!=null) window.API_1484_11.SetValue('cmi.score.raw', String(score)); window.API_1484_11.Commit(''); } }catch(e){}
+  }
+  function reportScore(score){
+    try{ if(window.API) window.API.LMSSetValue('cmi.core.score.raw', String(score)); }catch(e){}
+    try{ if(window.API_1484_11) window.API_1484_11.SetValue('cmi.score.raw', String(score)); }catch(e){}
+  }
   // In a GUI shell -> drive the shell's prompt zone; otherwise console-trace.
   function showPrompt(text){
     if(text==null) return;
@@ -170,6 +186,12 @@ _OAM_PLAYER_TPL = """
     } else if(d.type==='forge:end'){
       // generic end prompt — unless a defined prompt coincided with the final frame.
       if(END_PROMPT && !(lastWasDefined && lastStopFrame===d.frame)) showPrompt(END_PROMPT);
+      if(GATE_NEXT) gateButtons(false);   // stream complete -> allow NEXT
+    } else if(d.type==='forge:complete'){
+      reportComplete(d.score);
+      if(GATE_NEXT) gateButtons(false);
+    } else if(d.type==='forge:score'){
+      reportScore(d.score);
     }
   });
   f.addEventListener('load', function(){ send({type:'oam:getState'}); });
@@ -507,10 +529,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None):
                 prompts = data.get('prompts') if isinstance(data.get('prompts'), list) else []
                 prompts_js = json.dumps([str(p) for p in prompts]).replace('</', '<\\/')
                 end_js = json.dumps(str(data.get('end_prompt') or 'Press NEXT to continue.')).replace('</', '<\\/')
+                gate_js = 'true' if data.get('gate_next') else 'false'
                 parts.append(
                     _OAM_PLAYER_TPL.replace('__BID__', bid[:8]).replace('__SRC__', src)
                                    .replace('__W__', str(width)).replace('__H__', str(height))
                                    .replace('__PROMPTS__', prompts_js).replace('__ENDPROMPT__', end_js)
+                                   .replace('__GATENEXT__', gate_js)
                 )
 
         elif btype == 'ivideo':
