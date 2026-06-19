@@ -562,8 +562,9 @@ CourseTitle.zip
   new ResizeObserver(resize).observe(canvas);resize();
 
   var pinsOn=true,wireOn=false;
-  // Auto-rotate defaults on, but off for visitors who prefer reduced motion.
-  var autoRotate=!window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  // Auto-rotate is OFF by default (508 — no motion until the visitor opts in via
+  // the Rotate button); reduced-motion also keeps it off.
+  var autoRotate=false;
 
   var _pinRay=new THREE.Raycaster();
   function projectPins(){
