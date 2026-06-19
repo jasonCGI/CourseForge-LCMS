@@ -148,6 +148,10 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
       <button class="ctrl-btn" id="btn-pins" aria-label="Toggle annotation pins">Pins</button>
     </div>
   </div>
+  <p class="viewer-credit" style="margin:8px 14px 2px;font-size:9px;line-height:1.55;color:var(--t3);font-family:var(--mono);letter-spacing:.02em">
+    Model: &ldquo;Coffee Latte In Mug With Saucer&rdquo; by HQ3DMOD &middot; licensed
+    <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:var(--amber)">CC&nbsp;BY&nbsp;4.0</a>
+  </p>
 </aside>
 
 <!-- RIGHT: WHITE PAPER -->
@@ -460,14 +464,14 @@ CourseTitle.zip
   var plane=new THREE.Mesh(new THREE.PlaneGeometry(6,6),new THREE.ShadowMaterial({opacity:0.12}));
   plane.rotation.x=-Math.PI/2;plane.position.y=-1.8;plane.receiveShadow=true;scene.add(plane);
 
-  // Demo model: the Utah teapot, converted FBX -> GLB through the Forge3D
-  // Blender pipeline with a polished-amber-metal material baked into the GLB —
-  // so this showcase and the in-app Model3D viewer render the identical asset.
-  // Loads into the same group (orbit + annotation pins apply); on success the
-  // procedural placeholder geometry is hidden.
+  // Demo model: "Coffee Latte In Mug With Saucer" by HQ3DMOD (CC BY), run through
+  // the Forge3D Blender pipeline — imported as glTF and re-exported as GLB, which
+  // bakes its deprecated spec-gloss materials into modern metallic-roughness so
+  // the texture maps render in current three.js. Loads into the same group (orbit
+  // + annotation pins apply); on success the procedural placeholder is hidden.
   var loadedModel=null;
   try {
-    new THREE.GLTFLoader().load('teapot.glb', function(gltf){
+    new THREE.GLTFLoader().load('coffee_cup.glb', function(gltf){
       [ico,icoW,tor,tor2,inner].forEach(function(m){m.visible=false;});
       octs.forEach(function(m){m.visible=false;});
       var model=gltf.scene;
@@ -490,7 +494,7 @@ CourseTitle.zip
     {id:'a2',label:'Annotation overlay',pos:new THREE.Vector3(0.3,-0.9,0.7),
      desc:'Dots are absolutely-positioned divs over the canvas, projected from 3D world space to 2D screen coordinates each frame. Hidden when ndc.z >= 1.0.'},
     {id:'a3',label:'GLB geometry',pos:new THREE.Vector3(1.2,0.2,0.0),
-     desc:'Live GLB — the Utah teapot, converted from FBX through the Forge3D Blender pipeline (import_scene.fbx → export_scene.gltf). Authors upload GLB from 3ds Max (File → Export → glTF 2.0), Blender, Maya, or UE5; textures embedded in the GLB.'},
+     desc:'Live GLB — "Coffee Latte In Mug With Saucer" by HQ3DMOD (CC BY), normalized through the Forge3D Blender pipeline. It shipped with deprecated KHR_materials_pbrSpecularGlossiness materials; the pipeline imports the glTF and re-exports GLB, baking spec-gloss into metallic-roughness so the maps render in modern three.js. Authors bring FBX (3ds Max) or glTF/GLB; textures embed in the output GLB.'},
   ];
 
   var activeId=null;

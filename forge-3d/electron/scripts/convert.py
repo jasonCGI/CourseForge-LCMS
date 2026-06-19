@@ -1,15 +1,34 @@
 """
 Forge3D — Blender Headless Conversion Script
-Usage: blender --background --python convert.py -- <fbx_path> <glb_path> [options_json]
+Usage: blender --background --python convert.py -- <input_path> <glb_path> [options_json]
+
+Accepts FBX and glTF/GLB inputs and always re-exports a clean, self-contained
+GLB (metallic-roughness materials, embedded textures). Re-exporting glTF through
+Blender bakes the deprecated KHR_materials_pbrSpecularGlossiness material model
+into modern metallic-roughness, which is required for the model to render with
+its texture maps in newer three.js (the Forge3D viewer is on three 0.165, where
+spec-gloss support was removed).
+
+(OBJ is intentionally not accepted: its .mtl carries no PBR/spec-gloss texture
+maps, so the real authoring path is Max → assign materials/textures → FBX →
+this pipeline.)
 
 Blender API refs:
   bpy.ops.import_scene.fbx  -> https://docs.blender.org/api/current/bpy.ops.import_scene.html
+  bpy.ops.import_scene.gltf -> https://docs.blender.org/api/current/bpy.ops.import_scene.html
   bpy.ops.export_scene.gltf -> https://docs.blender.org/api/current/bpy.ops.export_scene.html
 """
 
 import bpy, sys, json, os, re
 
 def log(msg): print(f"[Forge3D] {msg}", flush=True)
+
+# Input formats Forge3D can ingest -> all normalize to GLB on the way out.
+SUPPORTED_EXTS = {'.fbx': 'fbx', '.glb': 'gltf', '.gltf': 'gltf'}
+
+def detect_format(path):
+    """Pick an importer from the file extension; None if unsupported."""
+    return SUPPORTED_EXTS.get(os.path.splitext(path)[1].lower())
 
 def op_retry(op, **kw):
     """Call a bpy operator, dropping any kwargs this Blender version rejects.
@@ -103,6 +122,32 @@ def patch_fbx_light_bug():
     safe_blen_read_light._forge3d_wrapped = True
     _imp.blen_read_light = safe_blen_read_light
 
+
+def import_model(fmt, path, options):
+    """Import the source into the (empty) scene using the right Blender importer.
+    op_retry drops any kwarg this Blender version doesn't accept."""
+    if fmt == 'fbx':
+        patch_fbx_light_bug()
+        op_retry(
+            bpy.ops.import_scene.fbx,
+            filepath=path,
+            use_custom_normals=True,
+            use_image_search=True,
+            use_anim=options.get('include_animations', True),
+            global_scale=options.get('global_scale', 1.0),
+            bake_space_transform=options.get('bake_space_transform', False),
+            axis_forward=options.get('axis_forward', '-Z'),
+            axis_up=options.get('axis_up', 'Y'),
+        )
+    elif fmt == 'gltf':
+        # Blender converts spec-gloss -> Principled BSDF on import; the GLB export
+        # below then writes standard metallic-roughness (the bake). GLB embeds its
+        # own images; a multi-file .gltf resolves textures relative to the file.
+        op_retry(bpy.ops.import_scene.gltf, filepath=path)
+    else:
+        raise ValueError(f"unsupported format: {fmt}")
+
+
 def main():
     try:
         sep  = sys.argv.index("--")
@@ -111,9 +156,9 @@ def main():
         log("ERROR: Missing '--' separator."); sys.exit(1)
 
     if len(args) < 2:
-        log("ERROR: Usage: convert.py -- <fbx_path> <glb_path> [options_json]"); sys.exit(1)
+        log("ERROR: Usage: convert.py -- <input_path> <glb_path> [options_json]"); sys.exit(1)
 
-    fbx_path = args[0]
+    src_path = args[0]
     glb_path = args[1]
     try:
         options = json.loads(args[2]) if len(args) > 2 else {}
@@ -122,32 +167,32 @@ def main():
     except (ValueError, TypeError) as e:
         log(f"ERROR: Invalid options JSON: {e}"); sys.exit(1)
 
-    log(f"Input:   {fbx_path}")
+    fmt = detect_format(src_path)
+    if fmt is None:
+        log(f"ERROR: Unsupported input '{os.path.basename(src_path)}' — "
+            f"accepted: {', '.join(sorted(SUPPORTED_EXTS))}."); sys.exit(1)
+
+    # Re-exporting a glTF/GLB through Blender trusts the source's own PBR, so the
+    # name-based metal heuristic (meant for FBX, which loses metalness) would only
+    # mangle it — default it off for glTF.
+    if fmt == 'gltf':
+        options.setdefault('auto_metal_from_name', False)
+
+    log(f"Input:   {src_path}  (format: {fmt})")
     log(f"Output:  {glb_path}")
     log(f"Options: {options}")
 
-    if not os.path.exists(fbx_path):
-        log(f"ERROR: FBX not found: {fbx_path}"); sys.exit(1)
+    if not os.path.exists(src_path):
+        log(f"ERROR: Input not found: {src_path}"); sys.exit(1)
 
     log("Clearing scene...")
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
-    log("Importing FBX...")
-    patch_fbx_light_bug()
+    log(f"Importing {fmt.upper()}...")
     try:
-        op_retry(
-            bpy.ops.import_scene.fbx,
-            filepath=fbx_path,
-            use_custom_normals=True,
-            use_image_search=True,
-            use_anim=options.get('include_animations', True),
-            global_scale=options.get('global_scale', 1.0),
-            bake_space_transform=options.get('bake_space_transform', False),
-            axis_forward=options.get('axis_forward', '-Z'),
-            axis_up=options.get('axis_up', 'Y')
-        )
+        import_model(fmt, src_path, options)
     except Exception as e:
-        log(f"ERROR: FBX import failed: {e}"); sys.exit(1)
+        log(f"ERROR: {fmt.upper()} import failed: {e}"); sys.exit(1)
 
     obj_count = len(bpy.data.objects)
     mesh_count = len([o for o in bpy.data.objects if o.type == 'MESH'])
@@ -155,7 +200,7 @@ def main():
     if mesh_count == 0:
         # A silently-empty import would otherwise export a near-empty GLB and
         # report SUCCESS — fail loudly instead.
-        log("ERROR: No meshes were imported — the FBX is empty or unreadable.")
+        log("ERROR: No meshes were imported — the input is empty or unreadable.")
         sys.exit(1)
 
     if options.get('apply_transforms', True):
