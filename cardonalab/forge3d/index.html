@@ -90,7 +90,7 @@ li strong{color:var(--ink);font-weight:600}
 .code-block .str{color:#533AFD}
 .code-block .cmt{color:#3A5A7A}
 .code-block .fn{color:#90D0A0}
-.callout{background:rgba(83,58,253,.06);border:1px solid rgba(83,58,253,.2);border-left:3px solid var(--amber);border-radius:6px;padding:12px 16px;margin:14px 0}
+.callout{background:rgba(83,58,253,.06);border:1px solid rgba(83,58,253,.2);border-bottom:3px solid var(--amber);border-radius:6px;padding:12px 16px;margin:14px 0}
 .callout p{margin-bottom:0;font-size:13px}
 .callout-label{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--amber2);margin-bottom:5px}
 .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
@@ -132,7 +132,7 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
       <span class="wm-root">Forge</span><span class="wm-sl">/</span><span class="wm-tool">3D</span>
       <span class="wm-cur" aria-hidden="true"></span>
     </div>
-    <span class="viewer-tag">Interactive 3D Block</span>
+    <span class="viewer-tag">Interactive 3D Model Viewer</span>
     <span class="viewer-version">Three.js r128 · WebGL</span>
   </div>
   <div class="canvas-wrap">
@@ -167,8 +167,8 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
 <article class="paper">
 
 <div class="paper-eyebrow">Cardona Creative Technology Lab · Technical Documentation</div>
-<h1 class="paper-title">Forge3D<br>Interactive 3D Block</h1>
-<p class="paper-subtitle">A self-contained GLB model viewer with annotation authoring, keyboard navigation, and SCORM-safe output — built as a native block type in the CourseForge LCMS.</p>
+<h1 class="paper-title">Forge<span style="color:var(--amber2)">3D</span><br>Interactive 3D Model Viewer</h1>
+<p class="paper-subtitle">A self-contained GLB model viewer with annotation authoring, keyboard navigation, and SCORM-safe output — built as a native <strong>block type</strong> in the CourseForge LCMS: one of the modular, reusable content components (text, media, quiz, hotspot, interactive video, 3D model, …) that authors stack to compose a frame.</p>
 
 <div class="paper-meta">
   <div class="meta-item"><span class="meta-label">Version</span><span class="meta-value">Sprint 9b · v1.0</span></div>
@@ -218,7 +218,7 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
 <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd></td><td>Open focused annotation popover</td></tr>
 <tr><td><kbd>Escape</kbd></td><td>Close open popover</td></tr>
 </tbody></table>
-<div class="callout"><div class="callout-label">Design rationale</div><p>Static on load — learner initiates all interaction. No auto-rotate. This prevents disorientation when a frame opens mid-lesson and gives the learner full agency over the 3D exploration experience.</p></div>
+<div class="callout"><div class="callout-label">Design rationale</div><p>Static on load by default — the learner initiates interaction, so a frame opening mid-lesson doesn't disorient and the learner keeps full agency over the exploration. Auto-rotation is an opt-in, per-model setting (and honors the visitor's reduced-motion preference).</p></div>
 </section>
 
 <!-- 03 -->
