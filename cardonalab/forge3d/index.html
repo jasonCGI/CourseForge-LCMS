@@ -465,6 +465,7 @@ CourseTitle.zip
   // so this showcase and the in-app Model3D viewer render the identical asset.
   // Loads into the same group (orbit + annotation pins apply); on success the
   // procedural placeholder geometry is hidden.
+  var loadedModel=null;
   try {
     new THREE.GLTFLoader().load('teapot.glb', function(gltf){
       [ico,icoW,tor,tor2,inner].forEach(function(m){m.visible=false;});
@@ -475,8 +476,8 @@ CourseTitle.zip
       var s=2/Math.max(size.x,size.y,size.z||1);
       model.scale.setScalar(s);
       model.position.sub(center.multiplyScalar(s));
-      model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; } });  // keep the GLB's baked material
-      group.add(model);
+      model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; if(wireOn)o.material.wireframe=true; } });  // keep the GLB's baked material
+      group.add(model); loadedModel=model;
       if(loading)loading.style.display='none';
     }, undefined, function(){ /* keep the procedural fallback on load error */ });
   } catch(e){}
@@ -635,7 +636,10 @@ CourseTitle.zip
     orbit.theta=0.4;orbit.phi=1.1;orbit.radius=3.8;updateCam();closeAll();
   });
   document.getElementById('btn-wireframe').addEventListener('click',function(){
-    wireOn=!wireOn;icoW.visible=wireOn;inner.visible=wireOn;
+    wireOn=!wireOn;
+    if(loadedModel){                              // toggle the model's own wireframe
+      loadedModel.traverse(function(o){ if(o.isMesh&&o.material){ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(m){ m.wireframe=wireOn; }); } });
+    } else { icoW.visible=wireOn;inner.visible=wireOn; }   // procedural fallback (no GLB loaded)
     this.style.color=wireOn?'var(--amber)':'';
     this.style.borderColor=wireOn?'var(--amber)':'';
   });
