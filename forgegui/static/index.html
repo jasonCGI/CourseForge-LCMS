@@ -871,10 +871,8 @@
         onclick="newShell()" aria-label="New shell">
         + New
       </button>
-      <button class="btn btn-amber btn-sm"
-        onclick="exportGUI()" id="btn-export-bar" disabled>
-        ⬇ Export ZIP
-      </button>
+      <!-- Export lives in the header (quick) and the Export tab (detailed) —
+           no third copy here, to avoid two identical Export ZIP buttons. -->
     </div>
   </main>
 
@@ -936,7 +934,6 @@ function newShell() {
     renderStage()
     document.getElementById('btn-export').disabled     = false
     document.getElementById('btn-export-2').disabled   = false
-    document.getElementById('btn-export-bar').disabled = false
     document.getElementById('empty-state').style.display    = 'none'
     document.getElementById('stage-preview').style.display  = 'block'
     updateExportSummary()
@@ -1531,7 +1528,6 @@ function importGUI() {
           renderZoneList()
           document.getElementById('btn-export').disabled     = false
           document.getElementById('btn-export-2').disabled   = false
-          document.getElementById('btn-export-bar').disabled = false
           saveGUI()
         })
       } catch(err) {
@@ -1565,7 +1561,6 @@ function loadGuiIntoUI(g) {
   renderStage(); renderButtonList(); renderZoneList()
   document.getElementById('btn-export').disabled     = false
   document.getElementById('btn-export-2').disabled   = false
-  document.getElementById('btn-export-bar').disabled = false
 }
 
 function importFigma() {
