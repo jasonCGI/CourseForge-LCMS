@@ -227,7 +227,7 @@ def _bundle_three_assets(zf):
     a package (assets/three/) so 3D blocks run fully offline — no CDN at runtime.
     Best-effort: a missing file just falls back to the runtime's CDN path."""
     base = Path(__file__).resolve().parent.parent / 'assets' / 'three'
-    for rel in ('three.min.js', 'GLTFLoader.js', 'DRACOLoader.js',
+    for rel in ('three.min.js', 'GLTFLoader.js', 'DRACOLoader.js', 'RGBELoader.js',
                 'draco/draco_wasm_wrapper.js', 'draco/draco_decoder.wasm'):
         try:
             src = base / rel
@@ -235,6 +235,32 @@ def _bundle_three_assets(zf):
                 zf.write(str(src), 'assets/three/' + rel)
         except Exception:
             pass
+
+
+def _bundle_hdri_assets(zf, names):
+    """Copy the equirectangular HDRIs (assets/hdri/<name>.hdr) used by 3D blocks
+    into the package so day/night environments work offline. Best-effort."""
+    base = Path(__file__).resolve().parent.parent / 'assets' / 'hdri'
+    for name in names:
+        try:
+            src = base / f'{name}.hdr'
+            if src.exists():
+                zf.write(str(src), f'assets/hdri/{name}.hdr')
+        except Exception:
+            pass
+
+
+def _model3d_hdri_names(frames):
+    """Set of HDRI environment names (day/night) referenced by 3D blocks, so we
+    bundle only the .hdr files actually used."""
+    names = set()
+    for fr in frames:
+        for b in (getattr(fr, 'content', None) or {}).get('blocks', []):
+            if b.get('type') == 'model3d':
+                env = str((b.get('data') or {}).get('environment', '') or '').lower()
+                if env in ('day', 'night'):
+                    names.add(env)
+    return names
 
 
 def _frames_have_model3d(frames):
@@ -644,7 +670,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             annotations = data.get('annotations', [])
             decorative = bool(data.get('decorative'))
             ann_json = json.dumps(annotations).replace('</', '<\\/')
-            env_on = 'false' if data.get('environment', 'studio') == 'none' else 'true'
+            env_name_raw = str(data.get('environment', 'studio') or 'studio').lower()
+            env_name = env_name_raw if env_name_raw in ('studio', 'day', 'night', 'none') else 'studio'
+            hdri_src = f'assets/hdri/{env_name}.hdr' if env_name in ('day', 'night') else ''
             try:
                 env_int = float(data.get('env_intensity', 1))
             except (TypeError, ValueError):
@@ -704,8 +732,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   var THREE_LOCAL='assets/three/three.min.js',  THREE_CDN='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   var GLTF_LOCAL ='assets/three/GLTFLoader.js', GLTF_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
   var DRACO_LOCAL='assets/three/DRACOLoader.js',DRACO_CDN='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
+  var RGBE_LOCAL ='assets/three/RGBELoader.js', RGBE_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js';
   var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
+  var ENV_NAME = '{env_name}', HDRI_SRC = '{hdri_src}';   // 'studio' procedural | 'day'/'night' HDRI | 'none'
   function loadScript(local, cdn, cb) {{
     if (document.querySelector('script[src="' + local + '"]') || document.querySelector('script[src="' + cdn + '"]')) {{ cb(); return; }}
     var s = document.createElement('script'); s.src = local; s.onload = cb;
@@ -716,10 +746,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     document.head.appendChild(s);
   }}
   loadScript(THREE_LOCAL, THREE_CDN, function() {{ loadScript(GLTF_LOCAL, GLTF_CDN, function() {{ loadScript(DRACO_LOCAL, DRACO_CDN, function() {{
-    init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS, {env_on}, {env_int});
+    var go = function() {{ init3DViewer('{block_id}', '{model_src}', '{bg_color}', {height}, ANNOTATIONS, ENV_NAME, {env_int}, HDRI_SRC); }};
+    if (HDRI_SRC) {{ loadScript(RGBE_LOCAL, RGBE_CDN, go); }} else {{ go(); }}
   }}); }}); }});
 
-  function init3DViewer(blockId, modelSrc, bgColor, height, annotations, envOn, envIntensity) {{
+  function init3DViewer(blockId, modelSrc, bgColor, height, annotations, envName, envIntensity, hdriSrc) {{
+    var envOn = envName !== 'none';
     var THREE = window.THREE;
     var canvas = document.getElementById('canvas3d-' + blockId);
     var loading = document.getElementById('loading3d-' + blockId);
@@ -732,9 +764,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     renderer.outputEncoding = THREE.sRGBEncoding;
     var scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor);
     var camera = new THREE.PerspectiveCamera(45, w / height, 0.01, 1000);
-    // Procedural studio environment (IBL) for reflective/metallic surfaces — no
-    // HDR file. scene.environment makes standard materials reflect it.
-    if (envOn) {{ try {{
+    // Image-based lighting for reflective/metallic surfaces. 'day'/'night' load a
+    // bundled equirectangular .hdr; 'studio' builds a procedural light box (no
+    // file). scene.environment makes standard materials reflect it.
+    function buildStudioEnv() {{ try {{
       var _pm = new THREE.PMREMGenerator(renderer);
       var _es = new THREE.Scene();
       _es.add(new THREE.Mesh(new THREE.BoxGeometry(12,12,12), new THREE.MeshStandardMaterial({{ side: THREE.BackSide, color: 0x767676, roughness: 1, metalness: 0 }})));
@@ -744,6 +777,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       _es.traverse(function(o){{ if(o.geometry)o.geometry.dispose(); if(o.material)o.material.dispose(); }});
       _pm.dispose();
     }} catch(e) {{ try {{ console.warn('[Forge3D] environment build failed', e); }} catch(_e) {{}} }} }}
+    if (envOn) {{
+      if (hdriSrc && THREE.RGBELoader) {{
+        try {{
+          new THREE.RGBELoader().load(hdriSrc, function(hdr) {{
+            try {{ var _pm = new THREE.PMREMGenerator(renderer); scene.environment = _pm.fromEquirectangular(hdr).texture; hdr.dispose(); _pm.dispose(); }}
+            catch(e) {{ buildStudioEnv(); }}
+          }}, undefined, function() {{ buildStudioEnv(); }});   // HDRI fetch failed -> procedural fallback
+        }} catch(e) {{ buildStudioEnv(); }}
+      }} else {{ buildStudioEnv(); }}
+    }}
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     var key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(5, 8, 5); scene.add(key);
     var fill = new THREE.DirectionalLight(0x8AAAC8, 0.4); fill.position.set(-5, 2, -5); scene.add(fill);
@@ -1198,8 +1241,10 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             pass
 
         # ── Bundle three.js + loaders + Draco (only if a 3D block exists) ──
-        if _frames_have_model3d(f for (f, _l, _c) in all_frames):
+        _model_frames = [f for (f, _l, _c) in all_frames]
+        if _frames_have_model3d(_model_frames):
             _bundle_three_assets(zf)
+            _bundle_hdri_assets(zf, _model3d_hdri_names(_model_frames))
 
         # ── Bundle video + companion media (webm/vtt/poster) ───────
         _bundled_media = set()

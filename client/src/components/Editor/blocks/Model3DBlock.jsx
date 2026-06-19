@@ -181,7 +181,9 @@ export default function Model3DBlock({ block }) {
                 <label style={labelStyle}>Environment (reflections)</label>
                 <select value={block.data.environment || 'studio'} onChange={e => update('environment', e.target.value)}
                   aria-label="Viewer environment" style={{ ...inputStyle, width: '100%' }}>
-                  <option value="studio">Studio — reflective</option>
+                  <option value="studio">Studio — procedural</option>
+                  <option value="day">Day — outdoor HDRI</option>
+                  <option value="night">Night — HDRI</option>
                   <option value="none">None — flat lighting</option>
                 </select>
               </div>

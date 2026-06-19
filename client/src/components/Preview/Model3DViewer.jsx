@@ -3,7 +3,12 @@ import React, { useEffect, useRef, useState, useCallback, useId } from 'react'
 const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
 const GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'
 const DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js'
+const RGBE_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js'
 const DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/'   // Draco WASM decoder (for compressed GLBs)
+
+// Bundled equirectangular HDRIs (served from client/public/hdri). 'studio' is
+// procedural (no file) — these are the real image-based presets.
+const HDRI_URLS = { day: '/hdri/day.hdr', night: '/hdri/night.hdr' }
 
 const scriptCache = {}
 function loadScript(src) {
@@ -41,6 +46,22 @@ function buildStudioEnv(THREE, renderer) {
   env.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() })
   pmrem.dispose()
   return tex
+}
+
+// Load an equirectangular .hdr and PMREM-process it into a scene.environment
+// texture. Async (returns a Promise) — RGBELoader must already be loaded.
+function buildHdriEnv(THREE, renderer, url) {
+  return new Promise((resolve, reject) => {
+    if (!THREE.RGBELoader) { reject(new Error('RGBELoader unavailable')); return }
+    new THREE.RGBELoader().load(url, (hdr) => {
+      try {
+        const pmrem = new THREE.PMREMGenerator(renderer)
+        const tex = pmrem.fromEquirectangular(hdr).texture
+        hdr.dispose(); pmrem.dispose()
+        resolve(tex)
+      } catch (e) { reject(e) }
+    }, undefined, reject)
+  })
 }
 
 // Scale how strongly the env map reflects per material (envMapIntensity is a
@@ -155,6 +176,7 @@ export default function Model3DViewer({
     loadScript(THREE_CDN)
       .then(() => loadScript(GLTF_CDN))
       .then(() => loadScript(DRACO_CDN))
+      .then(() => loadScript(RGBE_CDN).catch(() => {}))   // HDRI presets optional; studio still works
       .then(() => setThreeReady(true))
       .catch(() => { setError('Could not load Three.js from CDN.'); setLoading(false) })
   }, [])
@@ -236,13 +258,31 @@ export default function Model3DViewer({
     if (!threeReady) return
     const THREE = window.THREE, renderer = rendererRef.current, scene = sceneRef.current
     if (!THREE || !renderer || !scene) return
+    let cancelled = false
     if (envRef.current) { envRef.current.dispose(); envRef.current = null }
-    if (environment && environment !== 'none') {
-      try { envRef.current = buildStudioEnv(THREE, renderer); scene.environment = envRef.current }
-      catch (e) { scene.environment = null; try { console.warn('[Forge3D] environment build failed', e) } catch (_) {} }
-    } else {
-      scene.environment = null
+    const setEnv = (tex) => {
+      // A later environment change may have resolved first — drop a stale async result.
+      if (cancelled) { try { tex && tex.dispose() } catch (_) {} ; return }
+      if (envRef.current) { envRef.current.dispose() }
+      envRef.current = tex; scene.environment = tex
+      applyEnvIntensity(modelRef.current, envIntensity)   // model may already be loaded
     }
+    if (environment === 'none' || !environment) {
+      scene.environment = null
+    } else if (HDRI_URLS[environment]) {
+      buildHdriEnv(THREE, renderer, HDRI_URLS[environment])
+        .then(setEnv)
+        .catch((e) => {   // HDRI missing/failed → fall back to procedural studio
+          if (cancelled) return
+          try { console.warn('[Forge3D] HDRI load failed, using studio', e) } catch (_) {}
+          try { setEnv(buildStudioEnv(THREE, renderer)) } catch (_) { scene.environment = null }
+        })
+    } else {   // 'studio' (procedural) or any unknown name
+      try { setEnv(buildStudioEnv(THREE, renderer)) }
+      catch (e) { scene.environment = null; try { console.warn('[Forge3D] environment build failed', e) } catch (_) {} }
+    }
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threeReady, environment, modelUrl])
 
   // Apply reflection intensity (cheap per-material scalar). When env is off,
