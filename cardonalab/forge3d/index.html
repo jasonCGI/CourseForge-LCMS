@@ -152,6 +152,7 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
       <button class="ctrl-btn env-btn" data-env="night" aria-pressed="false" aria-label="Night HDRI environment">Night</button>
       <button class="ctrl-btn" id="btn-reset" aria-label="Reset camera">Reset</button>
       <button class="ctrl-btn" id="btn-wireframe" aria-label="Toggle wireframe">Wire</button>
+      <button class="ctrl-btn" id="btn-rotate" aria-label="Toggle auto-rotation">Rotate</button>
       <button class="ctrl-btn" id="btn-pins" aria-label="Toggle annotation pins">Pins</button>
     </div>
   </div>
@@ -561,6 +562,8 @@ CourseTitle.zip
   new ResizeObserver(resize).observe(canvas);resize();
 
   var pinsOn=true,wireOn=false;
+  // Auto-rotate defaults on, but off for visitors who prefer reduced motion.
+  var autoRotate=!window.matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   var _pinRay=new THREE.Raycaster();
   function projectPins(){
@@ -588,7 +591,7 @@ CourseTitle.zip
   function animate(){
     requestAnimationFrame(animate);
     var t=clock.getElapsedTime();
-    group.rotation.y+=0.001;
+    if(autoRotate)group.rotation.y+=0.001;
     tor.rotation.z=t*0.12;tor2.rotation.x=t*0.08;
     inner.rotation.y=t*0.15;inner.rotation.z=t*0.07;
     octs.forEach(function(m,i){m.rotation.x+=0.005+i*.002;m.rotation.y+=0.003+i*.001;});
@@ -661,6 +664,14 @@ CourseTitle.zip
     this.style.color=pinsOn?'':'var(--t3)';
     this.style.borderColor=pinsOn?'':'var(--border2)';
   });
+  var btnRotate=document.getElementById('btn-rotate');
+  function paintRotate(){
+    btnRotate.style.color=autoRotate?'var(--amber)':'';
+    btnRotate.style.borderColor=autoRotate?'var(--amber)':'';
+    btnRotate.setAttribute('aria-pressed',String(autoRotate));
+  }
+  btnRotate.addEventListener('click',function(){ autoRotate=!autoRotate; paintRotate(); });
+  paintRotate();
 })();
 </script>
 </body>
