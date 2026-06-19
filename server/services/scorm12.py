@@ -664,6 +664,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         elif btype == 'model3d':
             model_id = data.get('model_asset_id', '')
             caption  = data.get('caption', '')
+            attribution = data.get('attribution', '')
             height   = data.get('viewer_height', 400)
             bg_color = data.get('bg_color', '#0d1017')
             block_id = bid[:8]
@@ -701,6 +702,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
                 # WCAG 2.2.2 Pause/Stop/Hide: auto-rotation needs a visible pause
                 # control (only rendered when auto-rotate is on).
                 rotate_btn_html = (f'''<button id="rotbtn-{block_id}" type="button" aria-label="Pause auto-rotation" style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.55);color:#F59E0B;border:1px solid rgba(245,158,11,0.5);border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;cursor:pointer;letter-spacing:0.04em;z-index:5">Pause spin</button>''' if auto_rotate_js == 'true' else '')
+                # Optional attribution overlay (e.g. CC-BY credit) — empty = hidden.
+                _attr_safe = attribution.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                attr_html = (f'''<div style="position:absolute;bottom:6px;left:8px;max-width:70%;background:rgba(0,0,0,0.45);color:#9FB4CC;font-family:'IBM Plex Mono',monospace;font-size:8.5px;padding:2px 7px;border-radius:4px;letter-spacing:0.03em;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none">{_attr_safe}</div>''' if attribution else '')
                 parts.append(f'''
 <div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
   <canvas id="canvas3d-{block_id}" {canvas_a11y}
@@ -716,6 +720,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     arrows orbit · +/- zoom · R reset
   </div>
   {rotate_btn_html}
+  {attr_html}
   {cap_html}
 </div>
 <style>

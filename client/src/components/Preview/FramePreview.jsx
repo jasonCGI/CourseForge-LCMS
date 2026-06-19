@@ -32,13 +32,20 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
     )
   }
 
+  const textBlocks  = blocks.filter(b => b.type === 'text')
+  const otherBlocks = blocks.filter(b => b.type !== 'text')
+  const renderBlock = (block) => (
+    <SelectableBlock key={block.id} block={block}
+      active={block.id === activeBlockId} onSelect={onBlockSelect} />
+  )
+
   return (
     <div style={{
       background: FRAME_BG,
       color: '#1a1a1a',
       fontFamily: 'Inter, system-ui, sans-serif',
       minHeight: '100%',
-      padding: '32px 40px',
+      padding: '28px 0 40px',
       boxSizing: 'border-box',
     }}>
       {/* Frame title */}
@@ -46,22 +53,30 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         fontSize: 22,
         fontWeight: 600,
         color: '#042C53',
-        marginBottom: 24,
+        margin: '0 25px 24px',
         paddingBottom: 12,
         borderBottom: '2px solid var(--forge-amber)',
       }}>
         {frame.name}
       </h1>
 
-      {/* Blocks */}
       {blocks.length === 0 && (
-        <p style={{ color: '#888', fontStyle: 'italic' }}>No content blocks in this frame.</p>
+        <p style={{ color: '#888', fontStyle: 'italic', padding: '0 25px' }}>No content blocks in this frame.</p>
       )}
 
-      {blocks.map(block => (
-        <SelectableBlock key={block.id} block={block}
-          active={block.id === activeBlockId} onSelect={onBlockSelect} />
-      ))}
+      {/* Basic two-zone layout: text on the left half, media/image/3D on the right
+          half — each 50%, 25px padding. A layout-preset dropdown (text-left/
+          image-right, image-left/text-right, …) will replace this default later. */}
+      {blocks.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 25 }}>
+            {textBlocks.map(renderBlock)}
+          </div>
+          <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 25 }}>
+            {otherBlocks.map(renderBlock)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -681,6 +696,7 @@ function PreviewModel3D({ block }) {
       <Model3DViewer
         modelUrl={block.data.model_serve_url}
         caption={block.data.caption}
+        attribution={block.data.attribution}
         height={block.data.viewer_height || 400}
         bgColor={block.data.bg_color || '#0d1017'}
         environment={block.data.environment || 'studio'}

@@ -133,6 +133,7 @@ export default function Model3DBlock({ block }) {
         {(preview || block.data.part_highlight) && hasModel && (
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
+              attribution={block.data.attribution}
               height={block.data.viewer_height || 400} bgColor={block.data.bg_color || '#0d1017'}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
@@ -207,6 +208,11 @@ export default function Model3DBlock({ block }) {
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Caption (optional)</label>
               <input value={block.data.caption || ''} onChange={e => update('caption', e.target.value)} placeholder="Describe the model for learners and screen readers" aria-label="3D model caption" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Attribution / credit (optional)</label>
+              <input value={block.data.attribution || ''} onChange={e => update('attribution', e.target.value)} placeholder="e.g. “Model” by Author (CC BY) — shown as a small overlay; leave empty to hide" aria-label="3D model attribution" style={{ ...inputStyle, width: '100%' }} />
             </div>
 
             <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>

@@ -491,8 +491,8 @@ def _wire_demo_assets(project):
             elif fr.name == '3D Model Block' and t == 'model3d':
                 d.update(model_asset_id=glb.id, model_serve_url=f'/api/media/serve/{glb.id}',
                          model_filename='coffee_cup.glb',
-                         caption='Coffee Latte In Mug With Saucer by HQ3DMOD (CC BY) — glTF normalized to '
-                                 'metallic-roughness via the Forge3D Blender pipeline. Drag to orbit, scroll to zoom, R resets.'); changed = True
+                         caption='Coffee latte in a mug with saucer.',
+                         attribution='“Coffee Latte In Mug With Saucer” by HQ3DMOD (CC BY)'); changed = True
             elif fr.name == 'Hotspot Block' and t == 'hotspot':
                 d.update(background_asset_id=hb.id, background_url=f'/api/media/serve/{hb.id}'); changed = True
             elif fr.name == 'Interactive Video Block' and t == 'ivideo':

@@ -100,7 +100,7 @@ function setEntryLevel(THREE, entry, level) {
 }
 
 export default function Model3DViewer({
-  modelUrl, caption, bgColor = '#0d1017', height = 400,
+  modelUrl, caption, attribution = '', bgColor = '#0d1017', height = 400,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
@@ -598,6 +598,15 @@ export default function Model3DViewer({
       {!loading && !error && (
         <div aria-hidden="true" style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', color: '#3A5A7A', fontSize: 9, fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '3px 8px', borderRadius: 4, letterSpacing: '0.06em' }}>
           ↑↓←→ orbit · +/- zoom · R reset
+        </div>
+      )}
+      {attribution && !loading && !error && (
+        <div style={{ position: 'absolute', bottom: 6, left: 8, maxWidth: '70%',
+          background: 'rgba(0,0,0,0.45)', color: '#9FB4CC', fontSize: 8.5,
+          fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '2px 7px',
+          borderRadius: 4, letterSpacing: '0.03em', pointerEvents: 'none', lineHeight: 1.4,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {attribution}
         </div>
       )}
       {partHighlight && partLabel && (
