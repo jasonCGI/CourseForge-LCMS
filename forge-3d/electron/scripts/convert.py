@@ -123,6 +123,58 @@ def patch_fbx_light_bug():
     _imp.blen_read_light = safe_blen_read_light
 
 
+IMG_EXTS = ('.png', '.jpg', '.jpeg', '.tga', '.bmp', '.tif', '.tiff',
+            '.webp', '.exr', '.hdr', '.dds', '.gif', '.ktx2')
+
+
+def _norm_stem(name):
+    """Lowercase basename with all trailing image extensions stripped.
+    'Tex_A.tga.png' -> 'tex_a' ; 'Tex_A.tga' (the FBX's stale ref) -> 'tex_a'.
+    Lets a renamed map match its original reference."""
+    b = os.path.basename(name).lower()
+    while True:
+        stem, ext = os.path.splitext(b)
+        if ext in IMG_EXTS and stem:
+            b = stem
+        else:
+            return b
+
+
+def reconnect_textures(search_dir):
+    """Relink any image that failed to load to the best filename match in
+    search_dir (the flat staging dir). Salvages the common Sketchfab case where
+    a TGA reference was re-saved as '<name>.tga.png', so Blender's basename
+    image-search misses it and the map imports as missing/pink."""
+    if not search_dir or not os.path.isdir(search_dir):
+        return
+    index = {}
+    for f in os.listdir(search_dir):
+        full = os.path.join(search_dir, f)
+        if os.path.isfile(full) and os.path.splitext(f)[1].lower() in IMG_EXTS:
+            index.setdefault(_norm_stem(f), full)   # first match wins
+    if not index:
+        return
+
+    reconnected = 0
+    for img in bpy.data.images:
+        if img.source == 'FILE' and img.has_data and img.size[0] > 0:
+            continue   # already resolved on import
+        want = _norm_stem(img.name) or _norm_stem(img.filepath or '')
+        match = index.get(want) or index.get(_norm_stem(img.filepath_raw or ''))
+        if not match:
+            continue
+        try:
+            img.filepath = match
+            img.source = 'FILE'
+            img.reload()
+            reconnected += 1
+            log(f"Reconnected texture: '{img.name}' -> {os.path.basename(match)}")
+        except Exception as e:
+            log(f"WARN: couldn't reconnect '{img.name}' ({e}).")
+    if reconnected:
+        log(f"Reconnected {reconnected} texture(s) from the staging folder.")
+
+
 def import_model(fmt, path, options):
     """Import the source into the (empty) scene using the right Blender importer.
     op_retry drops any kwarg this Blender version doesn't accept."""
@@ -202,6 +254,12 @@ def main():
         # report SUCCESS — fail loudly instead.
         log("ERROR: No meshes were imported — the input is empty or unreadable.")
         sys.exit(1)
+
+    # FBX maps live as external files (in the flat staging dir alongside the
+    # model); relink any the importer's basename search missed. GLB/glTF embed
+    # their own images, so this is a no-op there.
+    if fmt == 'fbx':
+        reconnect_textures(os.path.dirname(os.path.abspath(src_path)))
 
     if options.get('apply_transforms', True):
         log("Applying transforms...")

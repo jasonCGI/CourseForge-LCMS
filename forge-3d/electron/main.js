@@ -1,7 +1,13 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
+const stage = require('./scripts/stage')
+
+// The flat temp dir holding the current model + its textures (see stage.js).
+// Cleaned when a new model is resolved, on clear, and on quit.
+let currentStageDir = null
+function disposeStage() { stage.cleanup(currentStageDir); currentStageDir = null }
 
 // ── Config store (simple JSON, no electron-store dependency) ──────────────
 const CONFIG_PATH = path.join(app.getPath('userData'), 'forge3d-config.json')
@@ -71,9 +77,133 @@ function createWindow() {
   mainWindow.loadFile('src/index.html')
 }
 
-app.whenReady().then(createWindow)
+// ── Application menu ──────────────────────────────────────────────────────
+function sendMenu(action) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('menu:action', action)
+}
+
+function showQuickStart() {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info', title: 'Forge3D — Quick Start', message: 'Quick Start', buttons: ['Got it'],
+    detail:
+      'Forge3D converts FBX / glTF / GLB into a clean, self-contained GLB.\n\n' +
+      '1. Drop a model, a whole folder, or a model + its textures onto the drop zone ' +
+      '(or use Browse File / Browse Folder). Textures are staged automatically — including ' +
+      'the common source/ + textures/ download layout.\n' +
+      '2. Review the preflight scan and set options (animations, transforms, Draco, force metallic).\n' +
+      '3. Convert — the output GLB embeds all textures and animations.\n' +
+      '4. In the preview: orbit/zoom, switch Studio/Day/Night lighting, play animations, and use ' +
+      '📷 Capture to save a PNG of the current view.\n\n' +
+      'Blender must be installed — set its path under Help ▸ Set Blender Path.'
+  })
+}
+
+function showArtistGuide() {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info', title: 'Forge3D — Preparing Models', message: 'Preparing models for Forge3D', buttons: ['Close'],
+    detail:
+      '• Keep texture image files with the model. A sibling textures/ folder is fine — Forge3D stages ' +
+      'them flat so Blender resolves them (and relinks renamed maps like foo.tga → foo.tga.png).\n\n' +
+      '• PBR metal: 3ds Max metalness doesn\'t always survive FBX. Name metal materials with words like ' +
+      '"metal", "chrome", "steel" (auto-detected), or tick Force Metallic.\n\n' +
+      '• Animations export and play automatically — keep the rig/armature in the FBX.\n\n' +
+      '• For part-highlighting downstream, keep objects as SEPARATE, NAMED meshes (don\'t merge).\n\n' +
+      '• Deprecated spec-gloss glTF is baked to metallic-roughness on convert.'
+  })
+}
+
+function showAbout() {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info', title: 'About Forge3D', message: `Forge3D ${app.getVersion()}`, buttons: ['Close'],
+    detail: 'FBX → GLB conversion pipeline.\nPart of the CourseForge ecosystem · Cardona Creative Technology Lab.'
+  })
+}
+
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin'
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    { label: 'File', submenu: [
+      { label: 'Open Model…',   accelerator: 'CmdOrCtrl+O',       click: () => sendMenu('open-model') },
+      { label: 'Open Folder…',  accelerator: 'CmdOrCtrl+Shift+O', click: () => sendMenu('open-folder') },
+      { label: 'Preview GLB…',                                    click: () => sendMenu('preview-glb') },
+      { type: 'separator' },
+      isMac ? { role: 'close' } : { role: 'quit' }
+    ]},
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+    { role: 'help', submenu: [
+      { label: 'Quick Start',                       click: showQuickStart },
+      { label: 'Preparing Models (Artist Guide)',   click: showArtistGuide },
+      { type: 'separator' },
+      { label: 'Set Blender Path…',                 click: () => sendMenu('open-settings') },
+      { label: 'Forge3D on the Web',                click: () => shell.openExternal('https://cardonalab.dev/forge3d/') },
+      { type: 'separator' },
+      { label: 'About Forge3D',                     click: showAbout }
+    ]}
+  ]
+  return Menu.buildFromTemplate(template)
+}
+
+app.whenReady().then(() => {
+  createWindow()
+  Menu.setApplicationMenu(buildAppMenu())
+})
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+app.on('will-quit', disposeStage)   // don't leave staging temp dirs behind
+
+// ── IPC: Resolve a dropped folder / multi-file set / single model ─────────
+// Stages the model + textures flat into a temp dir (see stage.js) and returns
+// the staged model path the rest of the flow (preflight, convert) runs against.
+ipcMain.handle('model:resolve', (_, inputPaths) => {
+  disposeStage()
+  const res = stage.stageInputs(inputPaths)
+  if (res.error) return res
+  currentStageDir = res.stageDir
+  rememberDir(res.sourceDir)
+  return {
+    modelPath: res.modelPath, modelName: res.modelName,
+    sourceDir: res.sourceDir, textures: res.textures
+  }
+})
+
+// ── IPC: Dispose the current staging dir (on clear) ──────────────────────
+ipcMain.handle('model:cleanup', () => { disposeStage(); return true })
+
+// ── IPC: Pick a model FOLDER (model + textures) ──────────────────────────
+ipcMain.handle('dialog:openModelFolder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select a model folder (model + textures)',
+    defaultPath: dialogDefaultDir(),
+    properties: ['openDirectory']
+  })
+  if (result.canceled) return null
+  rememberDir(result.filePaths[0])
+  return result.filePaths[0]
+})
+
+// ── IPC: Save a viewer screenshot (PNG data URL) to a chosen location ─────
+ipcMain.handle('screenshot:save', async (_, { dataUrl, suggestedName }) => {
+  if (!dataUrl || !dataUrl.startsWith('data:image/png;base64,')) {
+    return { saved: false, error: 'No image to save.' }
+  }
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save screenshot',
+    defaultPath: path.join(dialogDefaultDir() || app.getPath('pictures'), suggestedName || 'forge3d-capture.png'),
+    filters: [{ name: 'PNG Image', extensions: ['png'] }]
+  })
+  if (result.canceled || !result.filePath) return { saved: false }
+  try {
+    const b64 = dataUrl.replace(/^data:image\/png;base64,/, '')
+    fs.writeFileSync(result.filePath, Buffer.from(b64, 'base64'))
+    rememberDir(result.filePath)
+    return { saved: true, path: result.filePath }
+  } catch (e) {
+    return { saved: false, error: e.message }
+  }
+})
 
 // ── IPC: Open model file dialog (conversion input) ────────────────────────
 ipcMain.handle('dialog:openFBX', async () => {

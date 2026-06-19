@@ -48,7 +48,7 @@
 
       <div class="f3d-drop-zone" id="drop-zone"
            role="button" tabindex="0"
-           aria-label="Drop an FBX, glTF, or GLB file here or press Enter to browse"
+           aria-label="Drop a model, a folder, or a model and its textures here, or press Enter to browse"
            aria-describedby="drop-hint">
         <div class="f3d-drop-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48" fill="none">
@@ -57,8 +57,11 @@
             <path d="M24 22v12M18 28l6-6 6 6" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </div>
-        <p class="f3d-drop-label">Drop FBX / glTF / GLB to convert</p>
-        <p class="f3d-drop-sub" id="drop-hint">or <button class="f3d-link" id="btn-browse">click to browse</button> · glTF/GLB is normalized (spec-gloss baked)</p>
+        <p class="f3d-drop-label">Drop a model, a folder, or a model + its textures</p>
+        <p class="f3d-drop-sub" id="drop-hint">FBX / glTF / GLB —
+          <button class="f3d-link" id="btn-browse">browse file</button> or
+          <button class="f3d-link" id="btn-browse-folder">browse folder</button>
+          · textures are auto-staged · glTF/GLB normalized (spec-gloss baked)</p>
       </div>
 
       <button class="f3d-btn f3d-btn-ghost f3d-btn-sm f3d-btn-full" id="btn-preview-glb"

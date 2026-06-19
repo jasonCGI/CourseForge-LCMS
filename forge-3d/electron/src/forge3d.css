@@ -157,6 +157,9 @@ button, [role="button"] { min-height: 32px; min-width: 32px; }
 .status-warn .f3d-preflight-icon { color: var(--forge-warn); }
 .status-fail .f3d-preflight-icon { color: var(--forge-error); }
 .f3d-preflight-cat { color: var(--forge-text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; padding-top: 1px; }
+/* min-width:0 lets the 1fr grid track shrink; overflow-wrap breaks long tokens
+   (e.g. KHR_materials_transmission) so the message wraps instead of clipping. */
+.f3d-preflight-msg { min-width: 0; color: var(--forge-text); overflow-wrap: anywhere; line-height: 1.4; }
 .f3d-scanning { color: var(--forge-text-muted); font-size: 12px; }
 
 /* ── Options ─────────────────────────────────────────────────────────────── */
@@ -234,6 +237,8 @@ button[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
 .f3d-viewer-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px;
   border-bottom: 1px solid var(--forge-border); background: var(--forge-surface); }
 .f3d-viewer-bar-label { font-size: 11px; color: var(--forge-text-muted); letter-spacing: 0.04em; }
+.f3d-viewer-bar-spacer { flex: 1 1 auto; }
+.f3d-viewer-bar [data-capture] { border-color: var(--forge-amber); color: var(--forge-amber); }
 .f3d-env-group { display: flex; align-items: center; gap: 4px; }
 .f3d-viewer-bar button { background: none; border: 1px solid var(--forge-border); border-radius: 4px;
   color: var(--forge-text-muted); cursor: pointer; font-size: 11px; font-family: var(--forge-font);

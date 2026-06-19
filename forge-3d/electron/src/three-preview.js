@@ -14,7 +14,10 @@ window.initForge3DPreview = function(container, glbPath) {
       '<button type="button" data-env="day" aria-pressed="false">Day</button>' +
       '<button type="button" data-env="night" aria-pressed="false">Night</button>' +
     '</div>' +
-    '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>'
+    '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
+    '<span class="f3d-viewer-bar-spacer"></span>' +
+    '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
+    '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
   container.appendChild(bar)
@@ -32,7 +35,9 @@ window.initForge3DPreview = function(container, glbPath) {
     import(V + '/loaders/DRACOLoader.js'),
   ]).then(([THREE, { GLTFLoader }, { RGBELoader }, { OrbitControls }, { DRACOLoader }]) => {
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    // preserveDrawingBuffer keeps the WebGL backbuffer readable so the Capture
+    // button can pull a PNG of exactly what's on screen.
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
     renderer.setPixelRatio(window.devicePixelRatio)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -90,6 +95,9 @@ window.initForge3DPreview = function(container, glbPath) {
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
     draco.setDecoderPath(V + '/draco/')
+    let mixer = null
+    const clock = new THREE.Clock()
+
     const gltfLoader = new GLTFLoader()
     gltfLoader.setDRACOLoader(draco)
     gltfLoader.load(fileUrl, (gltf) => {
@@ -100,6 +108,30 @@ window.initForge3DPreview = function(container, glbPath) {
       camera.position.set(size.x * 1.5, size.y * 1.5, size.z * 2 || 3)
       controls.update()
       scene.add(model)
+
+      // Play every animation clip the GLB carries — confirms animation survived
+      // conversion, and gives the viewer a live preview.
+      if (gltf.animations && gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(model)
+        gltf.animations.forEach((clip) => mixer.clipAction(clip).play())
+        const animBtn = bar.querySelector('[data-anim]')
+        animBtn.style.display = ''
+        animBtn.textContent = `⏸ Anim (${gltf.animations.length})`
+        animBtn.addEventListener('click', () => {
+          const playing = mixer.timeScale !== 0
+          mixer.timeScale = playing ? 0 : 1
+          animBtn.setAttribute('aria-pressed', String(!playing))
+          animBtn.textContent = `${playing ? '▶' : '⏸'} Anim (${gltf.animations.length})`
+        })
+      }
+    })
+
+    // ── Capture: save a PNG of the current view to a chosen location ──────────
+    bar.querySelector('[data-capture]').addEventListener('click', () => {
+      renderer.render(scene, camera)                    // ensure the buffer is current
+      const dataUrl = renderer.domElement.toDataURL('image/png')
+      const base = (glbPath.split(/[\\/]/).pop() || 'forge3d').replace(/\.(glb|gltf)$/i, '')
+      window.forge3d.saveScreenshot(dataUrl, base + '.png')
     })
 
     function fit() {
@@ -112,6 +144,8 @@ window.initForge3DPreview = function(container, glbPath) {
     let rafId
     ;(function animate() {
       rafId = requestAnimationFrame(animate)
+      const dt = clock.getDelta()
+      if (mixer) mixer.update(dt)
       controls.update()
       renderer.render(scene, camera)
     })()
@@ -119,6 +153,7 @@ window.initForge3DPreview = function(container, glbPath) {
     // Expose teardown for the next initForge3DPreview call.
     window.__forge3dCleanup = function () {
       cancelAnimationFrame(rafId)
+      try { if (mixer) mixer.stopAllAction() } catch (e) {}
       try { controls.dispose() } catch (e) {}
       try { if (curEnvRT) curEnvRT.dispose() } catch (e) {}
       try { if (curBg) curBg.dispose() } catch (e) {}

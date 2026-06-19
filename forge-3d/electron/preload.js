@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('forge3d', {
   getPathForFile:    (file)   => { try { return webUtils.getPathForFile(file) } catch { return '' } },
   openFBX:           ()       => ipcRenderer.invoke('dialog:openFBX'),
   openGLB:           ()       => ipcRenderer.invoke('dialog:openGLB'),
+  openModelFolder:   ()       => ipcRenderer.invoke('dialog:openModelFolder'),
+  resolveModel:      (paths)  => ipcRenderer.invoke('model:resolve', paths),
+  cleanupStage:      ()       => ipcRenderer.invoke('model:cleanup'),
+  saveScreenshot:    (d, n)   => ipcRenderer.invoke('screenshot:save', { dataUrl: d, suggestedName: n }),
   openOutputDir:     ()       => ipcRenderer.invoke('dialog:openOutputDir'),
   setLastDir:        (p)      => ipcRenderer.invoke('config:setLastDir', p),
   openBlender:       ()       => ipcRenderer.invoke('dialog:openBlender'),
@@ -15,5 +19,6 @@ contextBridge.exposeInMainWorld('forge3d', {
   convert:           (params) => ipcRenderer.invoke('fbx:convert', params),
   showInFolder:      (p)      => ipcRenderer.invoke('shell:showItem', p),
   onLog: (cb) => ipcRenderer.on('convert:log', (_, line) => cb(line)),
-  removeLogListener: ()       => ipcRenderer.removeAllListeners('convert:log')
+  removeLogListener: ()       => ipcRenderer.removeAllListeners('convert:log'),
+  onMenu: (cb) => ipcRenderer.on('menu:action', (_, action) => cb(action))
 })

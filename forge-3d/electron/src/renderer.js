@@ -4,7 +4,8 @@
  */
 
 // ── State ─────────────────────────────────────────────────────────────────
-let currentFBXPath  = null
+let currentFBXPath  = null   // staged model path Blender converts
+let currentModel    = null   // { modelPath, modelName, sourceDir, textures }
 let outputDir       = null
 let lastGLBPath     = null
 let settingsTrigger = null
@@ -63,6 +64,16 @@ async function init() {
   setupButtons()
   setupTabs()
   setupLogStream()
+
+  // Application-menu actions (File / Help ▸ Set Blender Path)
+  window.forge3d.onMenu?.((action) => handleMenuAction(action))
+}
+
+function handleMenuAction(action) {
+  if (action === 'open-model')        browseForFBX()
+  else if (action === 'open-folder')  browseForFolder()
+  else if (action === 'preview-glb')  document.getElementById('btn-preview-glb')?.click()
+  else if (action === 'open-settings') { settingsTrigger = document.activeElement; openSettings() }
 }
 
 // ── Drop zone ─────────────────────────────────────────────────────────────
@@ -73,16 +84,13 @@ function setupDropZone() {
   zone.addEventListener('drop', async (e) => {
     e.preventDefault()
     zone.classList.remove('drag-over')
-    const file = e.dataTransfer?.files?.[0]
-    if (!file) return
-    const p = window.forge3d.getPathForFile(file)   // resolve the dropped path (no dialog)
-    // Drop = load for conversion (FBX or glTF/GLB). glTF/GLB is re-exported to
-    // normalize it (e.g. bake spec-gloss → metallic-roughness). Preview-only
-    // lives on the dedicated "Preview GLB" button.
-    if (p && /\.(fbx|glb|gltf)$/i.test(p)) { await loadFBX(p); return }
-    announceToSR('Please drop a .fbx, .glb, or .gltf file.')
-    zone.classList.add('drop-reject')
-    setTimeout(() => zone.classList.remove('drop-reject'), 1200)
+    // Accept a whole folder, a model + its textures dropped together, or a lone
+    // model file. Everything routes through staging (main), which finds the
+    // model, gathers textures, and returns the staged path to convert.
+    const files = [...(e.dataTransfer?.files || [])]
+    const paths = files.map(f => window.forge3d.getPathForFile(f)).filter(Boolean)
+    if (!paths.length) return
+    await loadFromInputs(paths)
   })
   zone.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); browseForFBX() }
@@ -92,6 +100,7 @@ function setupDropZone() {
 // ── Buttons ───────────────────────────────────────────────────────────────
 function setupButtons() {
   document.getElementById('btn-browse').addEventListener('click', browseForFBX)
+  document.getElementById('btn-browse-folder')?.addEventListener('click', browseForFolder)
   document.getElementById('btn-preview-glb')?.addEventListener('click', async () => {
     const p = await window.forge3d.openGLB()
     if (p) previewGLB(p)
@@ -135,7 +144,25 @@ function switchTab(tabName) {
 // ── File selection ────────────────────────────────────────────────────────
 async function browseForFBX() {
   const fbxPath = await window.forge3d.openFBX()
-  if (fbxPath) await loadFBX(fbxPath)
+  if (fbxPath) await loadFromInputs([fbxPath])
+}
+
+async function browseForFolder() {
+  const dir = await window.forge3d.openModelFolder()
+  if (dir) await loadFromInputs([dir])
+}
+
+// Stage the input(s) in main, then load the staged model for preflight/convert.
+async function loadFromInputs(paths) {
+  const zone = document.getElementById('drop-zone')
+  const res = await window.forge3d.resolveModel(paths)
+  if (!res || res.error) {
+    announceToSR(res?.error || 'No FBX, glTF, or GLB found in what you dropped.')
+    zone.classList.add('drop-reject')
+    setTimeout(() => zone.classList.remove('drop-reject'), 1200)
+    return
+  }
+  await loadResolved(res)
 }
 
 // Preview a GLB/glTF directly (no conversion).
@@ -149,25 +176,28 @@ function previewGLB(glbPath) {
   loadPreview(glbPath)
 }
 
-async function loadFBX(fbxPath) {
-  currentFBXPath = fbxPath
-  const sep  = fbxPath.includes('/') ? '/' : '\\'
-  const name = fbxPath.split(sep).pop()
-  outputDir  = fbxPath.substring(0, fbxPath.lastIndexOf(sep))
-  window.forge3d.setLastDir(fbxPath)
+// res = { modelPath (staged temp), modelName, sourceDir, textures[] }
+async function loadResolved(res) {
+  currentModel   = res
+  currentFBXPath = res.modelPath            // Blender reads the staged copy
+  outputDir      = res.sourceDir            // but the GLB is written by the source
+
+  const nTex = res.textures ? res.textures.length : 0
+  const texNote = nTex ? ` · ${nTex} texture${nTex === 1 ? '' : 's'} staged` : ''
 
   document.getElementById('drop-zone').style.display    = 'none'
   document.getElementById('file-info').style.display    = 'block'
-  document.getElementById('file-name').textContent      = name
-  document.getElementById('file-meta').textContent      = fbxPath
+  document.getElementById('file-name').textContent      = res.modelName
+  document.getElementById('file-meta').textContent      = res.sourceDir + texNote
   document.getElementById('output-path-display').textContent = outputDir
   document.getElementById('options-panel').style.display = 'block'
 
-  await runPreflight(fbxPath)
+  await runPreflight(res.modelPath)
 }
 
 function clearFile() {
-  currentFBXPath = null; outputDir = null
+  currentFBXPath = null; outputDir = null; currentModel = null
+  window.forge3d.cleanupStage()
   document.getElementById('drop-zone').style.display    = 'flex'
   document.getElementById('file-info').style.display    = 'none'
   document.getElementById('preflight-panel').style.display = 'none'
@@ -218,11 +248,13 @@ async function runConversion() {
   if (!currentFBXPath || !outputDir) return
 
   const sep     = outputDir.includes('/') ? '/' : '\\'
-  const name    = currentFBXPath.split(sep).pop().replace(/\.(fbx|glb|gltf)$/i, '')
+  const name    = (currentModel?.modelName || currentFBXPath.split(/[\\/]/).pop())
+                    .replace(/\.(fbx|glb|gltf)$/i, '')
   let   glbPath = outputDir + sep + name + '.glb'
   // Converting a .glb/.gltf in its own folder would otherwise overwrite the
-  // source — write a distinct file instead.
-  if (glbPath.toLowerCase() === currentFBXPath.toLowerCase())
+  // ORIGINAL source (the staged copy lives in temp) — write a distinct file.
+  const sourceModel = outputDir + sep + (currentModel?.modelName || '')
+  if (glbPath.toLowerCase() === sourceModel.toLowerCase())
     glbPath = outputDir + sep + name + '_forge.glb'
   const options = {
     include_animations: document.getElementById('opt-animations').checked,
