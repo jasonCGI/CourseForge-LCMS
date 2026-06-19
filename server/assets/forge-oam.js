@@ -37,25 +37,42 @@
   // at publish) or a forge:config message (preview live-update).
   var HS = {
     strokeColor: '#F59E0B', strokeWidth: 3, fill: 'rgba(245,158,11,0.12)',
-    radius: 6, shadow: '0 0 0 3px rgba(245,158,11,0.25)',
+    radius: 6, shape: 'rounded', shadow: '0 0 0 3px rgba(245,158,11,0.25)',
     overColor: '#FFC04D', outColor: '#F59E0B', cursor: 'pointer',
     hitPadding: 0, pulse: true, focusOutline: '#F59E0B'
   };
-  var HS_KEYS = ['strokeColor', 'strokeWidth', 'fill', 'radius', 'shadow', 'overColor',
+  var HS_KEYS = ['strokeColor', 'strokeWidth', 'fill', 'radius', 'shape', 'shadow', 'overColor',
                 'outColor', 'cursor', 'hitPadding', 'pulse', 'focusOutline'];
+  // Resolve the effective style for one hotspot: per-instance opts override the
+  // global HS defaults; anything left undefined inherits the global value.
+  function hsStyle(opts) {
+    var hs = {};
+    for (var i = 0; i < HS_KEYS.length; i++) { var k = HS_KEYS[i]; hs[k] = (opts && opts[k] != null) ? opts[k] : HS[k]; }
+    hs.radiusCss = hs.shape === 'circle' ? '50%' : hs.shape === 'square' ? '0'
+                 : ((parseFloat(hs.radius) || 0) + 'px');   // 'rounded'/default -> radius px
+    return hs;
+  }
   function applyConfig(cfg) {
     if (!cfg || !cfg.hotspot) return;
     for (var i = 0; i < HS_KEYS.length; i++) {           // whitelist only (no for..in pollution)
       var k = HS_KEYS[i];
       if (cfg.hotspot[k] != null) HS[k] = cfg.hotspot[k];
     }
-    var st = document.getElementById('forge-hs-style');  // rebuild keyframes/focus on next draw
-    if (st && st.parentNode) st.parentNode.removeChild(st);
   }
-  if (window.FORGE_CONFIG) applyConfig(window.FORGE_CONFIG);
+  // The author's frame-0 FORGE_CONFIG.hotspot is applied ONCE, and never over a
+  // CourseForge forge:config (the project-level override always wins).
+  function ensureCfg() {
+    if (forge._cfgDone || forge._cfDone) return;
+    if (window.FORGE_CONFIG) { applyConfig(window.FORGE_CONFIG); forge._cfgDone = true; }
+  }
+  ensureCfg();
 
+  // Up-front list of stop FRAMES — from the frame-0 config object
+  // (FORGE_CONFIG.stops or .frameTracker) or the legacy window.forgeStops.
   function declared() {
-    return Array.isArray(window.forgeStops) ? window.forgeStops.slice() : null;
+    var cfg = window.FORGE_CONFIG || {};
+    var arr = cfg.stops || cfg.frameTracker || window.forgeStops;
+    return Array.isArray(arr) ? arr.slice() : null;
   }
   function stopFrames() {
     var d = declared();
@@ -166,6 +183,7 @@
 
     MC.prototype.forgeStop = function () {
       this.stop();
+      ensureCfg();                                  // apply frame-0 FORGE_CONFIG before stops/hotspots
       if (!root) root = this;                       // first forgeStop = root timeline
       clearHotspots();                              // a new stop clears the prior stop's hotspots
       var fr = this.currentFrame || 0;
@@ -207,7 +225,7 @@
 
   // Compute the clip's on-screen (viewport) rect. position:fixed coords, so it's
   // immune to body margin/scroll. Re-runnable on resize for responsive canvases.
-  function hotspotRect(clip) {
+  function hotspotRect(clip, hs) {
     var canvas = stage && stage.canvas;
     if (!canvas || !clip || !clip.localToGlobal) return null;
     var b = clip.nominalBounds || (clip.getBounds && clip.getBounds());
@@ -220,19 +238,22 @@
     var gw = Math.max.apply(null, xs) - gx, gh = Math.max.apply(null, ys) - gy;
     var rect = canvas.getBoundingClientRect();              // canvas-internal px -> CSS px
     var sx = rect.width / (canvas.width || rect.width), sy = rect.height / (canvas.height || rect.height);
-    var pad = HS.hitPadding || 0;
+    var pad = (hs && parseFloat(hs.hitPadding)) || 0;
     return { left: rect.left + gx * sx - pad, top: rect.top + gy * sy - pad,
              width: gw * sx + pad * 2, height: gh * sy + pad * 2 };
   }
   function positionHotspot(desc) {
-    var r = hotspotRect(desc.clip); if (!r) return;
+    var r = hotspotRect(desc.clip, desc.hs); if (!r) return;
     var s = desc.el.style;
     s.left = r.left + 'px'; s.top = r.top + 'px'; s.width = r.width + 'px'; s.height = r.height + 'px';
   }
 
   function drawHotspot(clip, opts) {
+    ensureCfg();                       // honor a frame-0 FORGE_CONFIG.hotspot if not yet applied
+    opts = opts || {};
     resolveRoot();
-    var r = hotspotRect(clip); if (!r) return;
+    var hs = hsStyle(opts);            // per-instance opts over global defaults
+    var r = hotspotRect(clip, hs); if (!r) return;
     var el = document.createElement('div');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
@@ -242,17 +263,21 @@
       'position:fixed',                                    // viewport coords (no body-margin/scroll offset)
       'left:' + r.left + 'px', 'top:' + r.top + 'px',
       'width:' + r.width + 'px', 'height:' + r.height + 'px',
-      'border:' + HS.strokeWidth + 'px solid ' + HS.outColor,
-      'border-radius:' + HS.radius + 'px',
-      'background:' + HS.fill,
-      'box-shadow:' + HS.shadow,
-      'cursor:' + HS.cursor,
+      'border:' + hs.strokeWidth + 'px solid ' + hs.outColor,
+      'border-radius:' + hs.radiusCss,
+      'background:' + hs.fill,
+      'box-shadow:var(--hs-shadow)',
+      'cursor:' + hs.cursor,
       'box-sizing:border-box',
       'z-index:2147483000',
-      HS.pulse ? 'animation:forgeHsPulse 1.2s ease-in-out infinite' : ''
+      hs.pulse ? 'animation:forgeHsPulse 1.2s ease-in-out infinite' : ''
     ].join(';');
-    el.addEventListener('mouseenter', function () { el.style.borderColor = HS.overColor; });
-    el.addEventListener('mouseleave', function () { el.style.borderColor = HS.outColor; });
+    // Per-instance vars so the shared keyframe / focus rule pulse in this hotspot's colors.
+    el.style.setProperty('--hs-shadow', hs.shadow);
+    el.style.setProperty('--hs-pulse-mid', hs.fill);
+    el.style.setProperty('--hs-focus', hs.focusOutline);
+    el.addEventListener('mouseenter', function () { el.style.borderColor = hs.overColor; });
+    el.addEventListener('mouseleave', function () { el.style.borderColor = hs.outColor; });
     var fired = false;
     function activate(ev) {
       if (ev) ev.preventDefault();
@@ -266,12 +291,11 @@
     el.addEventListener('click', activate);
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') activate(e); });
     document.body.appendChild(el);
-    hotspots.push({ el: el, clip: clip, opts: opts });
-    if (!document.getElementById('forge-hs-style')) {
+    hotspots.push({ el: el, clip: clip, opts: opts, hs: hs });
+    if (!document.getElementById('forge-hs-style')) {        // generic, var-driven — built once
       var st = document.createElement('style'); st.id = 'forge-hs-style';
-      var pulseMid = 'box-shadow:0 0 0 6px ' + (HS.fill || 'rgba(245,158,11,0.10)');
-      st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:' + HS.shadow + '}50%{' + pulseMid + '}}' +
-        '[role=button]:focus-visible{outline:2px solid ' + HS.focusOutline + ';outline-offset:2px}';
+      st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:var(--hs-shadow)}50%{box-shadow:0 0 0 6px var(--hs-pulse-mid)}}' +
+        '[role=button]:focus-visible{outline:2px solid var(--hs-focus,' + HS.focusOutline + ');outline-offset:2px}';
       document.head.appendChild(st);
     }
   }
@@ -284,6 +308,7 @@
       case 'oam:getState':
         postState(); break;
       case 'forge:config':
+        forge._cfDone = true;           // project override wins over any frame-0 FORGE_CONFIG
         applyConfig(d.config || d); break;
       case 'oam:play':
         r = resolveRoot();
@@ -330,6 +355,7 @@
     // forge:end when the timeline naturally reaches the final frame even if the
     // author didn't put forgeStop/forgeEnd there (prevents a gate_next soft-lock).
     forge._pump = setInterval(function () {
+      ensureCfg();                         // pick up a frame-0 FORGE_CONFIG (stops + hotspot defaults)
       if (!root) return;
       var p = playing(), cf = curFrame(), tf = totalFrames();
       if (p !== lastPlaying) {
