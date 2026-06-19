@@ -471,6 +471,11 @@
     ⬉ Figma
   </button>
   <button class="btn btn-outline btn-sm"
+    onclick="window.open('/static/figma-guide.html','figma-guide','width=540,height=780,menubar=no,toolbar=no,location=no')"
+    aria-label="Open the Figma naming guide in a popout window" title="Naming guide — keep open beside Figma">
+    ? Naming
+  </button>
+  <button class="btn btn-outline btn-sm"
     onclick="importGUI()" aria-label="Import existing GUI shell">
     ↑ Import
   </button>
@@ -1402,7 +1407,7 @@ function renderZoneList() {
     item.className = 'list-item' + (selectedEl === 'zone-' + zone.id ? ' active' : '')
     item.innerHTML = `
       <span class="list-item-type">${zone.type.replace('_',' ')}</span>
-      <span class="list-item-label">${zone.type}</span>
+      <span class="list-item-label">${Math.round(zone.x)}, ${Math.round(zone.y)}</span>
       <button class="list-item-del"
         onclick="deleteZone('${zone.id}');event.stopPropagation()"
         aria-label="Delete zone ${zone.type}">✕</button>`
