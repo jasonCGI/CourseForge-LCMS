@@ -307,7 +307,21 @@ def _inject_forge_runtime(extract_dir: Path, entry_point: str) -> None:
         tag = f'<script src="{rel}"></script>'
 
         if re.search(r'<script[^>]*forge-oam\.js', html, re.IGNORECASE):
-            return  # already injected (match the actual tag, not a stray mention)
+            # Already referenced (e.g. the author bundled it via the Animate
+            # publish template). Don't add a duplicate tag — but DO overwrite the
+            # file(s) the entry points at with our canonical runtime, so uploads
+            # always run the latest even if the bundled copy is stale.
+            pkg = extract_dir.resolve()
+            for src in re.findall(r'<script[^>]*\bsrc\s*=\s*["\']([^"\']*forge-oam\.js)["\']',
+                                  html, re.IGNORECASE):
+                try:
+                    target = (entry_path.parent / src).resolve()
+                    if pkg in target.parents:          # stay inside the package (no path traversal)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(_forge_runtime_src(), encoding='utf-8')
+                except OSError:
+                    pass
+            return
 
         # Prefer: right after the CreateJS script (forge must load before init()).
         # Match the OPENING <script ...createjs...> tag (a `>` closes it before
