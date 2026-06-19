@@ -199,6 +199,8 @@ _OAM_PLAYER_TPL = """
       var idx=(d.index!=null)?d.index:(d.n-1)/2, p=(idx>=0 && idx<PROMPTS.length)?PROMPTS[idx]:null;
       lastStopFrame=d.frame; lastWasDefined=(p!=null && p!=='');
       if(lastWasDefined) showPrompt(p);
+    } else if(d.type==='forge:command' && d.parity==='start'){
+      showPrompt(''); lastWasDefined=false;   // button press / resume clears the prompt until the next stop
     } else if(d.type==='forge:end'){
       // generic end prompt — unless a defined prompt coincided with the final frame.
       if(END_PROMPT && !(lastWasDefined && lastStopFrame===d.frame)) showPrompt(END_PROMPT);

@@ -114,6 +114,17 @@
   }
 
   function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
+
+  // ForgeEventSystem — when running OUTSIDE CourseForge (standalone, e.g. an
+  // Animate preview), log the event stream to the console so the author can
+  // verify it. Events are numbered from the first stop: stop=1, its start=2,
+  // next stop=3, … (the same `n` the engine receives). Silent inside CourseForge.
+  var STANDALONE = true;
+  try { STANDALONE = (window.parent === window); } catch (e) { STANDALONE = true; }
+  function logEvent(text) {
+    if (!STANDALONE) return;
+    try { console.log('%c[ForgeEventSystem] ' + text, 'color:#F59E0B;font-weight:600'); } catch (e) {}
+  }
   function postState() {
     resolveRoot();   // resolve up-front so duration is known before the first play
     post({ type: 'oam:state', t: curFrame() / fps(), duration: duration(),
@@ -126,8 +137,11 @@
     // index = resolved stop index (-1 if the stop isn't a known stop) so the
     // consumer maps prompts by index directly instead of decoding it from n
     // (an unresolved stop must NOT fall back to prompt 0).
-    post({ type: 'forge:command', n: n, parity: (n % 2 === 1 ? 'stop' : 'start'),
+    var parity = (n % 2 === 1 ? 'stop' : 'start');
+    post({ type: 'forge:command', n: n, parity: parity,
            frame: frame, index: (index == null ? -1 : index) });
+    logEvent('event ' + n + ' — ' + parity.toUpperCase() + ' @frame ' + frame +
+             (index >= 0 ? ' · prompt#' + index : ''));
   }
 
   function resolveRoot() {
@@ -191,22 +205,33 @@
       var idx = stopIndexAtFrame(fr);
       postState();
       postCommand(idx >= 0 ? 2 * idx + 1 : 1, fr, idx);  // odd = stop
-      if (fr >= totalFrames() - 1 && !endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: fr }); }
+      // Completion inferred from the frame tracker: reaching the LAST declared
+      // stop means the guided content is done -> forge:end (releases the NEXT
+      // gate / drives completion), as well as the natural final-frame end.
+      var stops = stopFrames();
+      var atLastStop = stops.length && idx >= 0 && idx === stops.length - 1;
+      if ((atLastStop || fr >= totalFrames() - 1) && !endedPosted) {
+        endedPosted = true; post({ type: 'forge:end', frame: fr });
+        logEvent('content complete (forge:end) @frame ' + fr);
+      }
     };
     MC.prototype.forgeEnd = function () {
       this.stop();
       if (!root) root = this;
       postState();
-      if (!endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: this.currentFrame || 0 }); }
+      if (!endedPosted) { endedPosted = true; post({ type: 'forge:end', frame: this.currentFrame || 0 });
+        logEvent('content complete (forge:end) @frame ' + (this.currentFrame || 0)); }
     };
     // Report completion / score to the LMS (through the parent SCO page, since
     // the OAM iframe is sandboxed and can't reach window.API directly).
     MC.prototype.forgeComplete = function (score) {
       post({ type: 'forge:complete', score: (score == null ? null : score) });
+      logEvent('LMS completion' + (score != null ? ' · score ' + score : ''));
     };
     MC.prototype.forgeScore = function (score) {
       if (score == null) return;                  // never report an empty score
       post({ type: 'forge:score', score: score });
+      logEvent('LMS score ' + score);
     };
     // forgeHotspot is fleshed out in task 4; reserve it so frame scripts don't throw.
     if (!MC.prototype.forgeHotspot) {
@@ -261,7 +286,10 @@
     var el = document.createElement('div');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
-    el.setAttribute('aria-label', (opts.label || 'Hotspot') + ' — activate to continue');
+    // Student-led "read the prompt, select to continue": no label needed (the
+    // shell's prompt zone carries the instruction). id/label are optional and
+    // mainly used by 3D-model annotations, not these click-to-continue hotspots.
+    el.setAttribute('aria-label', opts.label ? (opts.label + ' — select to continue') : 'Select to continue');
     if (opts.label) el.title = opts.label;
     el.style.cssText = [
       'position:fixed',                                    // viewport coords (no body-margin/scroll offset)
@@ -286,10 +314,15 @@
     function activate(ev) {
       if (ev) ev.preventDefault();
       if (fired) return; fired = true;                     // guard double-activation
+      var i = stopIndexAtFrame(curFrame());                // the stop this button resumes from
       post({ type: 'forge:hotspot', hotspot: { id: opts.id, label: opts.label, description: opts.description } });
+      logEvent('hotspot selected' + (opts.label ? ' — ' + opts.label : '') + ' (resumes stop#' + (i >= 0 ? i : '?') + ')');
       clearHotspots();
       var rr = resolveRoot();
-      if (rr) { lastCmdKey = null; rr.play(); try { createjs.Ticker.paused = false; } catch (e) {} }
+      if (rr) {
+        lastCmdKey = null; rr.play(); try { createjs.Ticker.paused = false; } catch (e) {}
+        postCommand(i >= 0 ? 2 * i + 2 : 0, curFrame(), i);   // even = start (a button press resumes)
+      }
       postState();
     }
     el.addEventListener('click', activate);

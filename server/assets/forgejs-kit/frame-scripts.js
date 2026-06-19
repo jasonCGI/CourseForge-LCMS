@@ -31,25 +31,22 @@ window.FORGE_CONFIG = {
  * Put on each frame where playback should hold until the learner continues. */
 if (this.forgeStop) this.forgeStop(); else this.stop();
 
-/* ---- 3. Hotspot: click the artwork to continue ----------------------------
- * Put on FRAME 1 INSIDE a MovieClip placed over the clickable area. `this` is
- * the hotspot clip — it acts as an invisible PROXY: its own artwork is hidden at
- * runtime and ForgeJS draws the shape over its (transformed) bounding box, so a
- * plain rectangle clip is all you need. With just id/label/description it
- * inherits the frame-0 hotspot defaults above. (Opt out of hiding: hideClip:false.) */
-if (this.forgeHotspot) this.forgeHotspot({
-  id: "valve",                       // any unique id
-  label: "Open the valve",           // hover text / screen-reader label
-  description: "Turn it clockwise"   // optional
-});
+/* ---- 3. Hotspot: "select to continue" -------------------------------------
+ * Put on FRAME 1 INSIDE a MovieClip placed over the clickable area. The clip is
+ * an invisible PROXY — its artwork is hidden at runtime and ForgeJS draws the
+ * shape over its (transformed) bounding box, so a plain rectangle is all you
+ * need. For student-led training the call is GENERIC (no args) and inherits the
+ * frame-0 hotspot defaults; the shell's prompt zone carries the instruction.
+ * Use the SAME symbol for as many instances as you want — clicking any one
+ * resumes the timeline. (id/label are optional, mainly for 3D-model annotations;
+ * opt out of hiding the clip with hideClip:false.) */
+if (this.forgeHotspot) this.forgeHotspot();
 
-/* ---- 3b. Per-instance hotspot override (optional) -------------------------
- * Any style key here overrides the frame-0 default for THIS hotspot only;
- * omitted keys still inherit. */
-if (this.forgeHotspot) this.forgeHotspot({
-  id: "emergency", label: "Emergency stop",
-  shape: "circle", strokeColor: "#E2473F", fill: "rgba(226,71,63,0.15)"
-});
+/* ---- 3b. Variant symbols (overrides baked into the symbol) ----------------
+ * Instances share their symbol's frame script, so per-instance args aren't a
+ * thing — instead make a few symbols (hotspot_square, hotspot_circle, …) each
+ * with its own override here. Omitted keys still inherit the frame-0 default. */
+if (this.forgeHotspot) this.forgeHotspot({ shape: "circle", strokeColor: "#E2473F", fill: "rgba(226,71,63,0.15)" });
 
 /* ---- 4. Report completion + score to the LMS -----------------------------
  * Put on the final (or "you passed") frame. Score is optional, 0–100. */
