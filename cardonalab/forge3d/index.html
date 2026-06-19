@@ -108,7 +108,14 @@ kbd{font-family:var(--mono);font-size:9px;font-weight:600;background:var(--ink);
 .paper-footer{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.06em;padding-top:24px;border-top:1px solid var(--paper2)}
 @media(max-width:900px){
   .layout{flex-direction:column}
-  .viewer-panel{position:static;width:100%;height:70vw;min-height:320px;max-height:500px;border-right:none;border-bottom:1px solid var(--border)}
+  /* Panel height is content-driven; the canvas gets an explicit height so the
+     footer can't squeeze it (it was collapsing flex:1 to ~67px on phones). */
+  .viewer-panel{position:static;width:100%;height:auto;border-right:none;border-bottom:1px solid var(--border)}
+  .canvas-wrap{flex:none;height:56vh;min-height:340px}
+  .viewer-hint{display:none}               /* mouse hints aren't useful on touch + free footer space */
+  .viewer-controls{margin-left:0;flex-wrap:wrap;justify-content:center;width:100%}
+  #btn-pins{display:none}                   /* no pins toggle on mobile */
+  #ann-overlay{display:none!important}      /* hide annotation callout dots at mobile scale */
   .paper{padding:28px 20px 60px}
   .feature-grid{grid-template-columns:1fr}
 }
