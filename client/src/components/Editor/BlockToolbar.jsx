@@ -1,7 +1,7 @@
 import React from 'react'
 import useEditorStore from '../../store/editorStore'
 
-const BLOCK_TYPES = [
+export const BLOCK_TYPES = [
   { type: 'text',    label: 'Text',    icon: '¶',  color: '#185FA5', available: true  },
   { type: 'media',   label: 'Media',   icon: '🖼',  color: '#3B6D11', available: true  },
   { type: 'quiz',    label: 'Quiz',    icon: '?',   color: '#854F0B', available: true  },

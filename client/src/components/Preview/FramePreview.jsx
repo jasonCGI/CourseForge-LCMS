@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
@@ -6,7 +6,7 @@ import OamMediaBar from './OamMediaBar'
 
 const FRAME_BG = '#ffffff'
 
-export default function FramePreview({ frame }) {
+export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null }) {
   if (!frame) return null
 
   const blocks = frame.content?.blocks || []
@@ -59,8 +59,31 @@ export default function FramePreview({ frame }) {
       )}
 
       {blocks.map(block => (
-        <PreviewBlock key={block.id} block={block} />
+        <SelectableBlock key={block.id} block={block}
+          active={block.id === activeBlockId} onSelect={onBlockSelect} />
       ))}
+    </div>
+  )
+}
+
+// Wraps a preview block so clicking it selects that block in the inspector
+// (preview → tab), and so the active block outlines + scrolls into view when
+// selected from the inspector (tab → preview). No-ops to a plain block when no
+// onSelect handler is provided (e.g. read-only previews).
+function SelectableBlock({ block, active, onSelect }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (active && ref.current) ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [active])
+  if (!onSelect) return <PreviewBlock block={block} />
+  return (
+    <div ref={ref} onClick={() => onSelect(block.id)}
+      style={{
+        position: 'relative', cursor: 'pointer', borderRadius: 6,
+        outline: active ? '2px solid var(--forge-amber)' : '2px solid transparent',
+        outlineOffset: 3, transition: 'outline-color 0.15s',
+      }}>
+      <PreviewBlock block={block} />
     </div>
   )
 }

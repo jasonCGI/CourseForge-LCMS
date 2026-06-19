@@ -18,6 +18,8 @@ import useProjectStore from '../../store/projectStore'
 export default function PersistentPreviewPane() {
   const activeFrame  = useEditorStore(s => s.activeFrame)
   const navigateFrame = useEditorStore(s => s.navigateFrame)
+  const activeBlockId = useEditorStore(s => s.activeBlockId)
+  const setActiveBlock = useEditorStore(s => s.setActiveBlock)
   const activeProject = useProjectStore(s => s.activeProject)
 
   const shellId = activeProject?.gui_shell_id || null
@@ -81,7 +83,8 @@ export default function PersistentPreviewPane() {
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
           <PreviewErrorBoundary resetKey={activeFrame.id}>
-            <FramePreview frame={activeFrame} />
+            <FramePreview frame={activeFrame}
+              activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
           </PreviewErrorBoundary>
         </div>
       )}

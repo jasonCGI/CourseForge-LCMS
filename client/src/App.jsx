@@ -2,7 +2,7 @@ import React, { useEffect, useState, lazy, Suspense } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
-import FrameEditor from './components/Editor/FrameEditor'
+import InspectorPane from './components/Editor/InspectorPane'
 import CourseConfigPanel from './components/Editor/CourseConfigPanel'
 import PersistentPreviewPane, { flatFrameOrder } from './components/Preview/PersistentPreviewPane'
 import { ThemeProvider } from './theme/ThemeContext'
@@ -120,13 +120,13 @@ export default function App() {
       <PanelResizeHandle className="cf-vsplit-handle" />
       <Panel minSize={25} style={{ overflow: 'hidden' }}>
         <div className="cf-block-config-pane" style={{ height: '100%' }}>
-          <FrameEditor />
+          <InspectorPane />
         </div>
       </Panel>
     </PanelGroup>
   ) : (
     <div className="cf-block-config-pane" style={{ height: '100%' }}>
-      <FrameEditor />
+      <InspectorPane />
     </div>
   )
   const editorInner = (
