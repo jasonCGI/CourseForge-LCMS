@@ -673,6 +673,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             env_name_raw = str(data.get('environment', 'studio') or 'studio').lower()
             env_name = env_name_raw if env_name_raw in ('studio', 'day', 'night', 'none') else 'studio'
             hdri_src = f'assets/hdri/{env_name}.hdr' if env_name in ('day', 'night') else ''
+            auto_rotate_js = 'true' if data.get('auto_rotate') else 'false'
             try:
                 env_int = float(data.get('env_intensity', 1))
             except (TypeError, ValueError):
@@ -736,6 +737,8 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
   var ENV_NAME = '{env_name}', HDRI_SRC = '{hdri_src}';   // 'studio' procedural | 'day'/'night' HDRI | 'none'
+  var AUTO_ROTATE = {auto_rotate_js};
+  var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   function loadScript(local, cdn, cb) {{
     if (document.querySelector('script[src="' + local + '"]') || document.querySelector('script[src="' + cdn + '"]')) {{ cb(); return; }}
     var s = document.createElement('script'); s.src = local; s.onload = cb;
@@ -858,7 +861,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     }}, undefined, function() {{
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
     }});
-    (function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); projectDots(); }})();
+    (function animate() {{ requestAnimationFrame(animate);
+      if (AUTO_ROTATE && !orbit.dragging && !REDUCE_MOTION) {{ orbit.theta += 0.005; updateCamera(); }}
+      renderer.render(scene, camera); projectDots(); }})();
     var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w; renderer.setSize(w2, height); camera.aspect = w2/height; camera.updateProjectionMatrix(); }});
     ro.observe(canvas);
     canvas.addEventListener('pointerdown', function(e) {{ if (e.button !== 0) return; orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); }});

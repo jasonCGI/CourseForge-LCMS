@@ -687,6 +687,7 @@ function PreviewModel3D({ block }) {
         envIntensity={block.data.env_intensity ?? 1}
         decorative={block.data.decorative}
         annotations={block.data.annotations || []}
+        autoRotate={block.data.auto_rotate}
       />
     </div>
   )

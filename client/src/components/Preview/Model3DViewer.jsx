@@ -78,7 +78,7 @@ function applyEnvIntensity(model, intensity) {
 export default function Model3DViewer({
   modelUrl, caption, bgColor = '#0d1017', height = 400,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
-  environment = 'studio', envIntensity = 1, decorative = false,
+  environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -106,6 +106,12 @@ export default function Model3DViewer({
   const viewerId = useId()
 
   useEffect(() => { annsRef.current = annotations }, [annotations])
+
+  // Read autoRotate/pinMode in the animation loop without re-creating the scene.
+  const autoRotateRef = useRef(autoRotate)
+  useEffect(() => { autoRotateRef.current = autoRotate }, [autoRotate])
+  const pinModeRef = useRef(pinMode)
+  useEffect(() => { pinModeRef.current = pinMode }, [pinMode])
 
   const updateCamera = (camera, orbit) => {
     const THREE = window.THREE
@@ -225,6 +231,14 @@ export default function Model3DViewer({
 
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate)
+      // Auto-rotate by orbiting the CAMERA (not the model) so annotation pins
+      // stay glued to the surface. Pauses while dragging, in pin-placement mode,
+      // and for reduced-motion users.
+      const o = orbitRef.current
+      if (autoRotateRef.current && !o.dragging && !pinModeRef.current && !REDUCE_MOTION) {
+        o.theta += 0.005
+        updateCamera(camera, o)
+      }
       renderer.render(scene, camera)
       projectAnnotations(camera, renderer)
     }
