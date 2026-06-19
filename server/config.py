@@ -30,10 +30,16 @@ class Config:
     # storage in prod — containers are ephemeral, so the default repo-local
     # uploads/ dir is wiped on every redeploy. All upload subdirs (media/, oam/,
     # models/, exports/, cache/, gui*/) are created on demand under this root.
-    UPLOAD_FOLDER = os.environ.get(
+    # Always store an ABSOLUTE path: stored_path values are saved verbatim and
+    # later handed to Flask's send_file, which resolves relative paths against
+    # app.root_path (server/) — NOT the cwd the file was written from. A relative
+    # override (e.g. UPLOAD_FOLDER=uploads) would write under <cwd>/uploads but
+    # serve from server/uploads, so freshly-seeded media 404s. abspath() is
+    # idempotent for the already-absolute default and Railway's /data mount.
+    UPLOAD_FOLDER = os.path.abspath(os.environ.get(
         'UPLOAD_FOLDER',
         os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads'),
-    )
+    ))
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 104857600))  # 100MB default
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:5173').split(',')
 
