@@ -75,12 +75,12 @@ app.whenReady().then(createWindow)
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 
-// ── IPC: Open FBX file dialog ─────────────────────────────────────────────
+// ── IPC: Open model file dialog (conversion input) ────────────────────────
 ipcMain.handle('dialog:openFBX', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select FBX File',
+    title: 'Select model to convert (FBX, glTF, or GLB)',
     defaultPath: dialogDefaultDir(),
-    filters: [{ name: 'FBX Files', extensions: ['fbx'] }],
+    filters: [{ name: '3D Models', extensions: ['fbx', 'glb', 'gltf'] }],
     properties: ['openFile']
   })
   if (result.canceled) return null

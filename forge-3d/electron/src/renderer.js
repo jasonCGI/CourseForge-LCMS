@@ -76,8 +76,10 @@ function setupDropZone() {
     const file = e.dataTransfer?.files?.[0]
     if (!file) return
     const p = window.forge3d.getPathForFile(file)   // resolve the dropped path (no dialog)
-    if (p && /\.fbx$/i.test(p)) { await loadFBX(p); return }
-    if (p && /\.(glb|gltf)$/i.test(p)) { previewGLB(p); return }   // drop a GLB to preview it
+    // Drop = load for conversion (FBX or glTF/GLB). glTF/GLB is re-exported to
+    // normalize it (e.g. bake spec-gloss → metallic-roughness). Preview-only
+    // lives on the dedicated "Preview GLB" button.
+    if (p && /\.(fbx|glb|gltf)$/i.test(p)) { await loadFBX(p); return }
     announceToSR('Please drop a .fbx, .glb, or .gltf file.')
     zone.classList.add('drop-reject')
     setTimeout(() => zone.classList.remove('drop-reject'), 1200)
@@ -216,8 +218,12 @@ async function runConversion() {
   if (!currentFBXPath || !outputDir) return
 
   const sep     = outputDir.includes('/') ? '/' : '\\'
-  const name    = currentFBXPath.split(sep).pop().replace(/\.fbx$/i, '')
-  const glbPath = outputDir + sep + name + '.glb'
+  const name    = currentFBXPath.split(sep).pop().replace(/\.(fbx|glb|gltf)$/i, '')
+  let   glbPath = outputDir + sep + name + '.glb'
+  // Converting a .glb/.gltf in its own folder would otherwise overwrite the
+  // source — write a distinct file instead.
+  if (glbPath.toLowerCase() === currentFBXPath.toLowerCase())
+    glbPath = outputDir + sep + name + '_forge.glb'
   const options = {
     include_animations: document.getElementById('opt-animations').checked,
     apply_transforms:   document.getElementById('opt-transforms').checked,
