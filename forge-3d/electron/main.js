@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron')
+const { app, BrowserWindow, Menu, clipboard, ipcMain, dialog, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
@@ -130,7 +130,12 @@ function buildAppMenu() {
       { type: 'separator' },
       isMac ? { role: 'close' } : { role: 'quit' }
     ]},
-    { role: 'editMenu' },
+    { label: 'Edit', submenu: [
+      { label: 'Copy Log', accelerator: 'CmdOrCtrl+Shift+C', click: () => sendMenu('copy-log') },
+      { type: 'separator' },
+      { role: 'copy' },
+      { role: 'selectAll' }
+    ]},
     { role: 'viewMenu' },
     { role: 'windowMenu' },
     { role: 'help', submenu: [
@@ -168,6 +173,9 @@ ipcMain.handle('model:resolve', (_, inputPaths) => {
     sourceDir: res.sourceDir, textures: res.textures
   }
 })
+
+// ── IPC: Copy text (the conversion log) to the clipboard ─────────────────
+ipcMain.handle('clipboard:write', (_, text) => { clipboard.writeText(String(text || '')); return true })
 
 // ── IPC: Dispose the current staging dir (on clear) ──────────────────────
 ipcMain.handle('model:cleanup', () => { disposeStage(); return true })

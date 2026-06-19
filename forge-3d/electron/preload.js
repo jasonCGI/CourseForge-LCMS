@@ -20,5 +20,6 @@ contextBridge.exposeInMainWorld('forge3d', {
   showInFolder:      (p)      => ipcRenderer.invoke('shell:showItem', p),
   onLog: (cb) => ipcRenderer.on('convert:log', (_, line) => cb(line)),
   removeLogListener: ()       => ipcRenderer.removeAllListeners('convert:log'),
+  copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
   onMenu: (cb) => ipcRenderer.on('menu:action', (_, action) => cb(action))
 })

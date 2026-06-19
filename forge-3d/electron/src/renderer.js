@@ -74,6 +74,15 @@ function handleMenuAction(action) {
   else if (action === 'open-folder')  browseForFolder()
   else if (action === 'preview-glb')  document.getElementById('btn-preview-glb')?.click()
   else if (action === 'open-settings') { settingsTrigger = document.activeElement; openSettings() }
+  else if (action === 'copy-log')      copyLog()
+}
+
+// Copy the full conversion log to the clipboard (Edit ▸ Copy Log).
+function copyLog() {
+  const lines = [...document.querySelectorAll('#conversion-log .f3d-log-line')].map(l => l.textContent)
+  if (!lines.length) { announceToSR('Conversion log is empty.'); return }
+  window.forge3d.copyText(lines.join('\n'))
+  announceToSR(`Copied ${lines.length} log line${lines.length === 1 ? '' : 's'} to the clipboard.`)
 }
 
 // ── Drop zone ─────────────────────────────────────────────────────────────

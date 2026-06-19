@@ -17,6 +17,8 @@ window.initForge3DPreview = function(container, glbPath) {
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
+    '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
+    '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
     '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
@@ -95,19 +97,59 @@ window.initForge3DPreview = function(container, glbPath) {
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
     draco.setDecoderPath(V + '/draco/')
-    let mixer = null
+    let mixer = null, model = null, followTarget = null, following = false
     const clock = new THREE.Clock()
+    const modelBox = new THREE.Box3()
+    const tmpC = new THREE.Vector3(), tmpD = new THREE.Vector3(), tmpS = new THREE.Vector3()
+    const lastCenter = new THREE.Vector3()
+
+    // Reframe the camera to the model's current position (Recenter / on load).
+    // Centers on the follow target (skeleton root for skinned motion, else the
+    // model) and keeps the current orbit direction.
+    function frameModel() {
+      if (!model) return
+      modelBox.setFromObject(model)
+      if (modelBox.isEmpty()) return
+      modelBox.getSize(tmpS)
+      const maxDim = Math.max(tmpS.x, tmpS.y, tmpS.z) || 1
+      if (followTarget) followTarget.getWorldPosition(tmpC); else modelBox.getCenter(tmpC)
+      tmpD.subVectors(camera.position, controls.target)
+      if (tmpD.lengthSq() < 1e-6) tmpD.set(1, 0.7, 1)
+      tmpD.normalize().multiplyScalar(maxDim * 2.2)
+      controls.target.copy(tmpC)
+      camera.position.copy(tmpC).add(tmpD)
+      controls.update()
+      lastCenter.copy(tmpC)
+    }
+
+    // Translate the camera rig by the follow target's per-frame motion so an
+    // animating model stays centered (orbit/zoom still work). Box3 ignores
+    // skinning, so we track the skeleton root bone's world position instead.
+    function followModel() {
+      if (!followTarget) return
+      followTarget.getWorldPosition(tmpC)
+      tmpD.subVectors(tmpC, lastCenter)
+      camera.position.add(tmpD)
+      controls.target.add(tmpD)
+      lastCenter.copy(tmpC)
+    }
 
     const gltfLoader = new GLTFLoader()
     gltfLoader.setDRACOLoader(draco)
     gltfLoader.load(fileUrl, (gltf) => {
-      const model = gltf.scene
-      const box   = new THREE.Box3().setFromObject(model)
-      const size  = box.getSize(new THREE.Vector3())
-      model.position.sub(box.getCenter(new THREE.Vector3()))
-      camera.position.set(size.x * 1.5, size.y * 1.5, size.z * 2 || 3)
-      controls.update()
+      model = gltf.scene
+      const box = new THREE.Box3().setFromObject(model)
+      model.position.sub(box.getCenter(new THREE.Vector3()))   // rest pose at origin
       scene.add(model)
+
+      // Follow the skeleton root for skinned root-motion; else the model node.
+      model.traverse((o) => {
+        if (!followTarget && o.isSkinnedMesh && o.skeleton && o.skeleton.bones.length) {
+          followTarget = o.skeleton.bones[0]
+        }
+      })
+      if (!followTarget) followTarget = model
+      frameModel()
 
       // Play every animation clip the GLB carries — confirms animation survived
       // conversion, and gives the viewer a live preview.
@@ -123,7 +165,19 @@ window.initForge3DPreview = function(container, glbPath) {
           animBtn.setAttribute('aria-pressed', String(!playing))
           animBtn.textContent = `${playing ? '▶' : '⏸'} Anim (${gltf.animations.length})`
         })
+        // Follow only matters when something moves — reveal it for animated models.
+        bar.querySelector('[data-follow]').style.display = ''
       }
+    })
+
+    // ── Recenter / Follow ────────────────────────────────────────────────────
+    bar.querySelector('[data-recenter]').addEventListener('click', frameModel)
+    const followBtn = bar.querySelector('[data-follow]')
+    followBtn.addEventListener('click', () => {
+      following = !following
+      if (following && followTarget) followTarget.getWorldPosition(lastCenter)  // baseline; no jump
+      followBtn.classList.toggle('active', following)
+      followBtn.setAttribute('aria-pressed', String(following))
     })
 
     // ── Capture: save a PNG of the current view to a chosen location ──────────
@@ -146,6 +200,7 @@ window.initForge3DPreview = function(container, glbPath) {
       rafId = requestAnimationFrame(animate)
       const dt = clock.getDelta()
       if (mixer) mixer.update(dt)
+      if (following) followModel()
       controls.update()
       renderer.render(scene, camera)
     })()
