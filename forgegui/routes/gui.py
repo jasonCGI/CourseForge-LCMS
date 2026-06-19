@@ -166,15 +166,9 @@ def update_gui(gui_id):
     return jsonify(data)
 
 
-@gui_bp.get('/api/gui/<gui_id>/export')
-def export_gui(gui_id):
-    """
-    Export gui_shell.html + gui_shell.json as a ZIP.
-    """
-    if gui_id not in GUIS:
-        return jsonify({'error': 'Not found.'}), 404
-
-    gui       = GUIS[gui_id]
+def _build_shell_zip(gui):
+    """Build the shell export ZIP in memory. Returns (BytesIO buf, safe_name).
+    Shared by the download export and the server-to-server send-to-LCMS."""
     safe_name = ''.join(
         c for c in gui['name'] if c.isalnum() or c in '-_ '
     ).strip().replace(' ', '_')[:40] or 'gui_shell'
@@ -255,9 +249,45 @@ SCORM BRIDGE
         zf.writestr('README.txt', readme)
 
     buf.seek(0)
+    return buf, safe_name
+
+
+@gui_bp.get('/api/gui/<gui_id>/export')
+def export_gui(gui_id):
+    """Export gui_shell.html + gui_shell.json as a downloadable ZIP."""
+    if gui_id not in GUIS:
+        return jsonify({'error': 'Not found.'}), 404
+    buf, safe_name = _build_shell_zip(GUIS[gui_id])
     return send_file(
-        buf,
-        mimetype='application/zip',
-        as_attachment=True,
+        buf, mimetype='application/zip', as_attachment=True,
         download_name=f"ForgeGUI_{safe_name}.zip",
     )
+
+
+@gui_bp.post('/api/gui/<gui_id>/send-to-lcms')
+def send_to_lcms(gui_id):
+    """Build the shell ZIP and POST it server-to-server to CourseForge's shell
+    library (POST /api/gui-shells), so the author skips download → locate →
+    import. Cross-origin CORS doesn't apply (this is server-side, not browser)."""
+    if gui_id not in GUIS:
+        return jsonify({'error': 'Not found.'}), 404
+    base = (current_app.config.get('COURSEFORGE_URL') or '').rstrip('/')
+    if not base:
+        return jsonify({'error': 'COURSEFORGE_URL is not configured.'}), 500
+    buf, safe_name = _build_shell_zip(GUIS[gui_id])
+    try:
+        import httpx
+        resp = httpx.post(
+            f"{base}/api/gui-shells",
+            files={'file': (f"ForgeGUI_{safe_name}.zip", buf.getvalue(), 'application/zip')},
+            timeout=60,
+        )
+    except Exception as e:
+        return jsonify({'error': f'Could not reach CourseForge at {base}: {e}'}), 502
+    if resp.status_code >= 400:
+        return jsonify({'error': f'CourseForge rejected the shell ({resp.status_code}).'}), 502
+    try:
+        shell = resp.json()
+    except Exception:
+        shell = {}
+    return jsonify({'ok': True, 'shell': shell, 'target': base})

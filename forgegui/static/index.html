@@ -794,6 +794,14 @@
         ⬇ Export ForgeGUI ZIP
       </button>
 
+      <button class="btn btn-outline" style="width:100%;margin-top:8px"
+        onclick="sendToLCMS()" id="btn-send-lcms" disabled
+        aria-label="Send this shell straight to CourseForge">
+        → Send to CourseForge
+      </button>
+      <p id="send-lcms-status" role="status" aria-live="polite"
+        style="font-size:11px;line-height:1.5;margin-top:8px;min-height:14px;color:var(--text2)"></p>
+
       <div style="margin-top:16px;padding-top:14px;
         border-top:1px solid var(--border);
         font-family:var(--mono);font-size:10px;color:var(--text3);
@@ -934,6 +942,7 @@ function newShell() {
     renderStage()
     document.getElementById('btn-export').disabled     = false
     document.getElementById('btn-export-2').disabled   = false
+    document.getElementById('btn-send-lcms').disabled  = false
     document.getElementById('empty-state').style.display    = 'none'
     document.getElementById('stage-preview').style.display  = 'block'
     updateExportSummary()
@@ -1425,6 +1434,36 @@ function exportGUI() {
   })
 }
 
+// Send the built shell straight to CourseForge's shell library (server-to-server),
+// so the author skips download → locate → import.
+function sendToLCMS() {
+  if (!guiId) return
+  var btn    = document.getElementById('btn-send-lcms')
+  var status = document.getElementById('send-lcms-status')
+  btn.disabled = true
+  status.style.color = 'var(--text2)'
+  status.textContent = 'Saving + sending to CourseForge…'
+  saveGUI(function() {
+    fetch('/api/gui/' + guiId + '/send-to-lcms', { method: 'POST' })
+      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d } }) })
+      .then(function(res) {
+        if (res.ok && res.d.ok) {
+          var nm = (res.d.shell && res.d.shell.name) ? ' (“' + res.d.shell.name + '”)' : ''
+          status.style.color = 'var(--ok, #3FB950)'
+          status.textContent = '✓ Sent to CourseForge' + nm + ' — open the ▣ Shell picker there to apply it.'
+        } else {
+          status.style.color = 'var(--err, #E5534B)'
+          status.textContent = '✕ ' + ((res.d && res.d.error) || 'Send failed.')
+        }
+      })
+      .catch(function(e) {
+        status.style.color = 'var(--err, #E5534B)'
+        status.textContent = '✕ ' + e.message
+      })
+      .finally(function() { btn.disabled = false })
+  })
+}
+
 function updateExportSummary() {
   if (!gui) return
   var el = document.getElementById('export-summary')
@@ -1528,6 +1567,7 @@ function importGUI() {
           renderZoneList()
           document.getElementById('btn-export').disabled     = false
           document.getElementById('btn-export-2').disabled   = false
+          document.getElementById('btn-send-lcms').disabled  = false
           saveGUI()
         })
       } catch(err) {
@@ -1561,6 +1601,7 @@ function loadGuiIntoUI(g) {
   renderStage(); renderButtonList(); renderZoneList()
   document.getElementById('btn-export').disabled     = false
   document.getElementById('btn-export-2').disabled   = false
+  document.getElementById('btn-send-lcms').disabled  = false
 }
 
 function importFigma() {
