@@ -267,6 +267,30 @@
       overflow:   hidden;
     }
 
+    /* Selected zone — high-contrast "marching ants" so you can tell which zone
+       you're editing (e.g. three same-typed 'prompt' zones). */
+    .zone-placeholder.zone-selected {
+      border: none;
+      background-color: rgba(245,158,11,0.14);
+      background-image:
+        repeating-linear-gradient(90deg, #fff 0 6px, #111 6px 12px),
+        repeating-linear-gradient(90deg, #fff 0 6px, #111 6px 12px),
+        repeating-linear-gradient(0deg,  #fff 0 6px, #111 6px 12px),
+        repeating-linear-gradient(0deg,  #fff 0 6px, #111 6px 12px);
+      background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+      background-position: 0 0, 0 100%, 0 0, 100% 0;
+      background-repeat: no-repeat;
+      color: #fff;
+      z-index: 6;
+      animation: marchingAnts 0.5s linear infinite;
+    }
+    @keyframes marchingAnts {
+      to { background-position: 12px 0, -12px 100%, 0 -12px, 100% 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .zone-placeholder.zone-selected { animation: none; }
+    }
+
     /* -- Form controls -- */
     .field { margin-bottom: 12px; }
 
@@ -1121,6 +1145,7 @@ function renderZonePlaceholders() {
     el.setAttribute('aria-label', 'Zone: ' + zone.type)
     stage.appendChild(el)
   })
+  highlightSelectedZone()   // keep the marching-ants outline across re-renders
 }
 
 // -- Buttons ----------------------------------------------------
@@ -1402,6 +1427,15 @@ function selectZone(id) {
   document.getElementById('zone-color').value    = zone.color   || '#C8D8E8'
   document.getElementById('zone-color-picker').value = zone.color || '#C8D8E8'
   document.getElementById('zone-format').value   = zone.format  || ''
+  highlightSelectedZone()
+}
+
+// Marching-ants the selected zone's placeholder on the stage; clear the others.
+function highlightSelectedZone() {
+  var selId = (selectedEl && selectedEl.indexOf('zone-') === 0) ? selectedEl.slice(5) : null
+  document.querySelectorAll('.zone-placeholder').forEach(function(el) {
+    el.classList.toggle('zone-selected', el.id === 'stage-zone-' + selId)
+  })
 }
 
 function updateSelectedZone(field, val) {
