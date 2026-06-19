@@ -75,10 +75,36 @@ function applyEnvIntensity(model, intensity) {
   })
 }
 
+// Highlight a part by swapping each of its meshes to an emissive material clone
+// — isolated so meshes that share a material (e.g. cup + saucer both on cup_Mat)
+// highlight independently. level: 0 none · 1 hover · 2 selected.
+function setEntryLevel(THREE, entry, level) {
+  if (entry.level === level) return
+  entry.level = level
+  entry.meshes.forEach((mesh, i) => {
+    const orig = entry.origMats[i]
+    if (level === 0) {
+      mesh.material = orig
+      const cl = entry.clones[i]
+      if (cl) { (Array.isArray(cl) ? cl : [cl]).forEach(m => m.dispose?.()); entry.clones[i] = null }
+      return
+    }
+    if (!entry.clones[i]) entry.clones[i] = Array.isArray(orig) ? orig.map(m => m.clone()) : orig.clone()
+    const intensity = level === 2 ? 0.6 : 0.28
+    const cl = entry.clones[i]
+    ;(Array.isArray(cl) ? cl : [cl]).forEach(m => {
+      if ('emissive' in m) { m.emissive = new THREE.Color(0xF59E0B); m.emissiveIntensity = intensity; m.needsUpdate = true }
+    })
+    mesh.material = cl
+  })
+}
+
 export default function Model3DViewer({
   modelUrl, caption, bgColor = '#0d1017', height = 400,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
+  partHighlight = false, parts = {}, selectedPartKey = null,
+  onPartSelect = null, onPartsDetected = null,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -112,6 +138,42 @@ export default function Model3DViewer({
   useEffect(() => { autoRotateRef.current = autoRotate }, [autoRotate])
   const pinModeRef = useRef(pinMode)
   useEffect(() => { pinModeRef.current = pinMode }, [pinMode])
+
+  // Part-highlighting: parts[] = {key, meshes[], origMats[], clones[], level, centroid}.
+  const partsRef       = useRef([])
+  const partHLRef      = useRef(partHighlight)
+  const partsCfgRef    = useRef(parts)
+  const selKeyRef      = useRef(selectedPartKey)
+  const hoverKeyRef    = useRef(null)
+  const downPosRef     = useRef(null)   // click-vs-drag discrimination
+  const [partLabel, setPartLabel] = useState(null)   // {x,y,text,visible}
+  useEffect(() => { partHLRef.current = partHighlight }, [partHighlight])
+  useEffect(() => { partsCfgRef.current = parts }, [parts])
+
+  // Repaint every part's highlight from the current selected/hover keys.
+  const applyLevels = useCallback(() => {
+    const THREE = window.THREE
+    if (!THREE) return
+    const sel = selKeyRef.current, hov = hoverKeyRef.current
+    partsRef.current.forEach(e => setEntryLevel(THREE, e, e.key === sel ? 2 : (e.key === hov ? 1 : 0)))
+  }, [])
+
+  // Raycast a screen point to the part (entry) it hits, or null.
+  const pickEntry = useCallback((clientX, clientY) => {
+    const THREE = window.THREE, canvas = canvasRef.current, camera = cameraRef.current, model = modelRef.current
+    if (!THREE || !canvas || !camera || !model) return null
+    const rect = canvas.getBoundingClientRect()
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1
+    const rc = raycasterRef.current || (raycasterRef.current = new THREE.Raycaster())
+    rc.setFromCamera({ x, y }, camera)
+    const hits = rc.intersectObject(model, true)
+    if (!hits.length) return null
+    return partsRef.current.find(e => e.meshes.includes(hits[0].object)) || null
+  }, [])
+
+  // Controlled selection: repaint when the parent changes selectedPartKey.
+  useEffect(() => { selKeyRef.current = selectedPartKey; applyLevels() }, [selectedPartKey, applyLevels])
 
   const updateCamera = (camera, orbit) => {
     const THREE = window.THREE
@@ -175,6 +237,28 @@ export default function Model3DViewer({
     if (changed) { lastPinsRef.current = pins; setScreenPins(pins) }
   }, [])
 
+  // Float a label over the active (selected, else hovered) part each frame.
+  const lastPartLabelRef = useRef(null)
+  const projectPartLabel = useCallback((camera, renderer) => {
+    const clear = () => { if (lastPartLabelRef.current) { lastPartLabelRef.current = null; setPartLabel(null) } }
+    const THREE = window.THREE
+    const key = selKeyRef.current || hoverKeyRef.current
+    const entry = key && partsRef.current.find(e => e.key === key)
+    if (!partHLRef.current || !entry || !camera || !THREE) { clear(); return }
+    const canvas = renderer.domElement
+    const w = canvas.clientWidth, h = canvas.clientHeight
+    const ndc = entry.centroid.clone().project(camera)
+    const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
+    const visible = ndc.z < 1 && Number.isFinite(x) && Number.isFinite(y)
+    const text = (partsCfgRef.current[key] || {}).label || key
+    const prev = lastPartLabelRef.current
+    if (!visible) { clear(); return }
+    if (!prev || prev.text !== text || Math.abs(prev.x - x) > 0.5 || Math.abs(prev.y - y) > 0.5) {
+      const next = { x, y, text }
+      lastPartLabelRef.current = next; setPartLabel(next)
+    }
+  }, [])
+
   useEffect(() => {
     // Sequential, NOT Promise.all: the legacy global GLTFLoader references
     // window.THREE at execution time, so THREE must finish loading first —
@@ -225,6 +309,26 @@ export default function Model3DViewer({
       scene.add(model)
       modelRef.current = model
       if (scene.environment) applyEnvIntensity(model, envIntensity)   // env may already be set
+
+      // Detect selectable PARTS: group meshes by name (each named mesh is a part;
+      // meshes sharing a name merge into one). Centroid is the part's world-space
+      // bounding-box center, for the floating label anchor.
+      const byKey = new Map()
+      model.updateMatrixWorld(true)
+      model.traverse(o => {
+        if (!o.isMesh) return
+        const key = o.name || `Part ${byKey.size + 1}`
+        if (!byKey.has(key)) byKey.set(key, { key, meshes: [], origMats: [], clones: [], level: 0, box: new THREE.Box3() })
+        const e = byKey.get(key)
+        e.meshes.push(o); e.origMats.push(o.material); e.clones.push(null)
+        e.box.expandByObject(o)
+      })
+      const partsList = [...byKey.values()]
+      partsList.forEach(e => { e.centroid = e.box.getCenter(new THREE.Vector3()) })
+      partsRef.current = partsList
+      onPartsDetected?.(partsList.map(e => ({ key: e.key })))
+      applyLevels()   // reflect any pre-set selection
+
       orbitRef.current.radius = 3; updateCamera(camera, orbitRef.current)
       setLoading(false); onLoad?.()
     }, undefined, () => { setError('Failed to load 3D model.'); setLoading(false) })
@@ -241,6 +345,7 @@ export default function Model3DViewer({
       }
       renderer.render(scene, camera)
       projectAnnotations(camera, renderer)
+      projectPartLabel(camera, renderer)
     }
     animate()
 
@@ -253,7 +358,9 @@ export default function Model3DViewer({
     return () => {
       cancelAnimationFrame(frameRef.current); ro.disconnect()
       if (envRef.current) { envRef.current.dispose(); envRef.current = null }
-      modelRef.current = null; renderer.dispose()
+      modelRef.current = null; partsRef.current = []
+      hoverKeyRef.current = null; lastPartLabelRef.current = null
+      renderer.dispose()
     }
     // bgColor/height are intentionally NOT deps — changing them must not tear
     // down the scene + re-download the GLB. They're applied in place below.
@@ -316,6 +423,17 @@ export default function Model3DViewer({
   }, [height])
 
   const handleCanvasClick = useCallback((e) => {
+    // Part-highlight select (takes priority when enabled, not while placing a pin).
+    if (partHighlight && !pinMode) {
+      const dp = downPosRef.current
+      if (dp && Math.hypot(e.clientX - dp.x, e.clientY - dp.y) > 6) return   // was a drag
+      const entry = pickEntry(e.clientX, e.clientY)
+      const key = entry ? entry.key : null
+      const next = selKeyRef.current === key ? null : key
+      if (onPartSelect) onPartSelect(next)
+      else { selKeyRef.current = next; applyLevels() }
+      return
+    }
     if (!pinMode || !onPinPlaced) return
     const THREE = window.THREE
     const canvas = canvasRef.current, camera = cameraRef.current, scene = sceneRef.current
@@ -332,25 +450,37 @@ export default function Model3DViewer({
         z: parseFloat(hits[0].point.z.toFixed(4)),
       })
     }
-  }, [pinMode, onPinPlaced])
+  }, [pinMode, onPinPlaced, partHighlight, onPartSelect, pickEntry, applyLevels])
 
   const onPointerDown = useCallback((e) => {
     if (pinMode) return
     if (e.button !== undefined && e.button !== 0) return
+    downPosRef.current = { x: e.clientX, y: e.clientY }
     orbitRef.current.dragging = true
     orbitRef.current.lastX = e.clientX; orbitRef.current.lastY = e.clientY
     setHint(false); e.currentTarget.setPointerCapture?.(e.pointerId)
   }, [pinMode])
   const onPointerMove = useCallback((e) => {
     const orbit = orbitRef.current
-    if (!orbit.dragging) return
+    if (!orbit.dragging) {
+      // Hover-highlight the part under the cursor (when enabled, not placing a pin).
+      if (partHighlight && !pinMode) {
+        const entry = pickEntry(e.clientX, e.clientY)
+        const k = entry ? entry.key : null
+        if (k !== hoverKeyRef.current) {
+          hoverKeyRef.current = k; applyLevels()
+          const c = canvasRef.current; if (c) c.style.cursor = k ? 'pointer' : 'grab'
+        }
+      }
+      return
+    }
     orbit.theta -= (e.clientX - orbit.lastX) * 0.01
     // Drag DOWN tilts the model's top toward the viewer (grab-the-model feel),
     // not flight-stick pitch where pulling down looks up at the underside.
     orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - (e.clientY - orbit.lastY) * 0.01))
     orbit.lastX = e.clientX; orbit.lastY = e.clientY
     updateCamera(cameraRef.current, orbit)
-  }, [])
+  }, [partHighlight, pinMode, pickEntry, applyLevels])
   const onPointerUp = useCallback((e) => { orbitRef.current.dragging = false; e.currentTarget?.releasePointerCapture?.(e.pointerId) }, [])
   const onWheel = useCallback((e) => {
     e.preventDefault()
@@ -468,6 +598,15 @@ export default function Model3DViewer({
       {!loading && !error && (
         <div aria-hidden="true" style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', color: '#3A5A7A', fontSize: 9, fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '3px 8px', borderRadius: 4, letterSpacing: '0.06em' }}>
           ↑↓←→ orbit · +/- zoom · R reset
+        </div>
+      )}
+      {partHighlight && partLabel && (
+        <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
+          transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
+          background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
+          borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
+          fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
+          {partLabel.text}
         </div>
       )}
       </div>

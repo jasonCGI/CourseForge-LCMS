@@ -21,9 +21,15 @@ export default function Model3DBlock({ block }) {
   const [newDesc, setNewDesc]     = useState('')
   const [editingId, setEditingId] = useState(null)
 
+  const [detectedParts, setDetectedParts] = useState([])   // [{key}] from the loaded GLB
+  const [selPart, setSelPart] = useState(null)             // selected part key (bidirectional w/ viewer)
+
   const update      = (field, val) => updateBlock(block.id, { [field]: val })
   const annotations = block.data.annotations || []
   const hasModel    = !!block.data.model_asset_id
+  const partsCfg    = block.data.parts || {}
+  const updatePart  = (key, field, val) =>
+    update('parts', { ...partsCfg, [key]: { ...(partsCfg[key] || {}), [field]: val } })
 
   const handleUpload = useCallback(async (file) => {
     if (!activeProject?.id) return
@@ -124,12 +130,14 @@ export default function Model3DBlock({ block }) {
           </div>
         )}
 
-        {preview && hasModel && (
+        {(preview || block.data.part_highlight) && hasModel && (
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               height={block.data.viewer_height || 400} bgColor={block.data.bg_color || '#0d1017'}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
+              partHighlight={!!block.data.part_highlight} parts={partsCfg}
+              selectedPartKey={selPart} onPartSelect={setSelPart} onPartsDetected={setDetectedParts}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
         )}
@@ -211,6 +219,48 @@ export default function Model3DBlock({ block }) {
                 </span>
               </label>
             </div>
+
+            <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <input type="checkbox" id={`m3d-parthl-${block.id}`} checked={!!block.data.part_highlight}
+                onChange={e => update('part_highlight', e.target.checked)} style={{ marginTop: 2 }} />
+              <label htmlFor={`m3d-parthl-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)', lineHeight: 1.4 }}>
+                Part highlighting — hover/click model parts to highlight + label
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>
+                  Needs a model with separate, named meshes (e.g. cup, saucer).
+                </span>
+              </label>
+            </div>
+
+            {block.data.part_highlight && (
+              <div style={{ marginBottom: 14, border: '1px solid var(--cf-border-tertiary)', borderRadius: 6, padding: '10px 12px', background: 'var(--cf-input-bg, #060810)' }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--forge-font)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--cf-text-tertiary)', marginBottom: 8 }}>
+                  Parts {detectedParts.length ? `(${detectedParts.length})` : '— load a model to detect'}
+                </div>
+                {detectedParts.map(p => {
+                  const cfg = partsCfg[p.key] || {}
+                  const isSel = selPart === p.key
+                  return (
+                    <div key={p.key} style={{ marginBottom: 8, padding: 8, borderRadius: 5,
+                      border: `1px solid ${isSel ? 'var(--forge-amber)' : 'transparent'}`,
+                      background: isSel ? 'color-mix(in srgb, var(--forge-amber) 10%, transparent)' : 'transparent' }}>
+                      <button onClick={() => setSelPart(isSel ? null : p.key)}
+                        aria-pressed={isSel}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                          color: isSel ? 'var(--forge-amber)' : 'var(--cf-text-secondary)', cursor: 'pointer',
+                          fontSize: 11, fontFamily: 'var(--forge-font)', marginBottom: 6, padding: 0 }}>
+                        ◷ {cfg.label || p.key}
+                      </button>
+                      <input value={cfg.label || ''} onChange={e => updatePart(p.key, 'label', e.target.value)}
+                        placeholder={`Label (mesh: ${p.key})`} aria-label={`Label for ${p.key}`}
+                        style={{ ...inputStyle, width: '100%', marginBottom: 5 }} />
+                      <input value={cfg.description || ''} onChange={e => updatePart(p.key, 'description', e.target.value)}
+                        placeholder="Description (optional)" aria-label={`Description for ${p.key}`}
+                        style={{ ...inputStyle, width: '100%' }} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <input type="checkbox" id={`m3d-decorative-${block.id}`} checked={!!block.data.decorative}
