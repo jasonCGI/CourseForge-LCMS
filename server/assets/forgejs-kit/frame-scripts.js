@@ -33,8 +33,10 @@ if (this.forgeStop) this.forgeStop(); else this.stop();
 
 /* ---- 3. Hotspot: click the artwork to continue ----------------------------
  * Put on FRAME 1 INSIDE a MovieClip placed over the clickable area. `this` is
- * the hotspot clip. With just id/label/description it inherits the frame-0
- * hotspot defaults above. */
+ * the hotspot clip — it acts as an invisible PROXY: its own artwork is hidden at
+ * runtime and ForgeJS draws the shape over its (transformed) bounding box, so a
+ * plain rectangle clip is all you need. With just id/label/description it
+ * inherits the frame-0 hotspot defaults above. (Opt out of hiding: hideClip:false.) */
 if (this.forgeHotspot) this.forgeHotspot({
   id: "valve",                       // any unique id
   label: "Open the valve",           // hover text / screen-reader label

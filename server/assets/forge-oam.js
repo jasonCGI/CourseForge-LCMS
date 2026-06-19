@@ -39,10 +39,10 @@
     strokeColor: '#F59E0B', strokeWidth: 3, fill: 'rgba(245,158,11,0.12)',
     radius: 6, shape: 'rounded', shadow: '0 0 0 3px rgba(245,158,11,0.25)',
     overColor: '#FFC04D', outColor: '#F59E0B', cursor: 'pointer',
-    hitPadding: 0, pulse: true, focusOutline: '#F59E0B'
+    hitPadding: 0, pulse: true, focusOutline: '#F59E0B', hideClip: true
   };
   var HS_KEYS = ['strokeColor', 'strokeWidth', 'fill', 'radius', 'shape', 'shadow', 'overColor',
-                'outColor', 'cursor', 'hitPadding', 'pulse', 'focusOutline'];
+                'outColor', 'cursor', 'hitPadding', 'pulse', 'focusOutline', 'hideClip'];
   // Resolve the effective style for one hotspot: per-instance opts override the
   // global HS defaults; anything left undefined inherits the global value.
   function hsStyle(opts) {
@@ -253,7 +253,11 @@
     opts = opts || {};
     resolveRoot();
     var hs = hsStyle(opts);            // per-instance opts over global defaults
-    var r = hotspotRect(clip, hs); if (!r) return;
+    var r = hotspotRect(clip, hs); if (!r) return;   // read transformed bounds first
+    // The MovieClip is just an invisible proxy for the box/transform — hide its
+    // artwork so only the drawn shape shows (localToGlobal still works hidden,
+    // so resize-reposition is fine). Opt out with hideClip:false.
+    if (hs.hideClip !== false) { try { clip.visible = false; } catch (e) {} }
     var el = document.createElement('div');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
