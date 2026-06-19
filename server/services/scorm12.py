@@ -698,6 +698,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
                 # purely visual content needs no text alternative).
                 canvas_a11y = ('tabindex="-1" aria-hidden="true"' if decorative
                                else f'tabindex="0" role="img" aria-label="{aria}"')
+                # WCAG 2.2.2 Pause/Stop/Hide: auto-rotation needs a visible pause
+                # control (only rendered when auto-rotate is on).
+                rotate_btn_html = (f'''<button id="rotbtn-{block_id}" type="button" aria-label="Pause auto-rotation" style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.55);color:#F59E0B;border:1px solid rgba(245,158,11,0.5);border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;cursor:pointer;letter-spacing:0.04em;z-index:5">Pause spin</button>''' if auto_rotate_js == 'true' else '')
                 parts.append(f'''
 <div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
   <canvas id="canvas3d-{block_id}" {canvas_a11y}
@@ -712,6 +715,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);color:#3A5A7A;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;border-radius:4px;letter-spacing:0.06em" aria-hidden="true">
     arrows orbit · +/- zoom · R reset
   </div>
+  {rotate_btn_html}
   {cap_html}
 </div>
 <style>
@@ -755,6 +759,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
 
   function init3DViewer(blockId, modelSrc, bgColor, height, annotations, envName, envIntensity, hdriSrc) {{
     var envOn = envName !== 'none';
+    var rotating = AUTO_ROTATE && !REDUCE_MOTION;   // toggled by the Pause/Resume control
     var THREE = window.THREE;
     var canvas = document.getElementById('canvas3d-' + blockId);
     var loading = document.getElementById('loading3d-' + blockId);
@@ -862,8 +867,18 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
     }});
     (function animate() {{ requestAnimationFrame(animate);
-      if (AUTO_ROTATE && !orbit.dragging && !REDUCE_MOTION) {{ orbit.theta += 0.005; updateCamera(); }}
+      if (rotating && !orbit.dragging) {{ orbit.theta += 0.005; updateCamera(); }}
       renderer.render(scene, camera); projectDots(); }})();
+    var rotBtn = document.getElementById('rotbtn-' + blockId);
+    if (rotBtn) {{
+      var paintRot = function() {{
+        rotBtn.textContent = rotating ? 'Pause spin' : 'Resume spin';
+        rotBtn.setAttribute('aria-pressed', String(rotating));
+        rotBtn.setAttribute('aria-label', rotating ? 'Pause auto-rotation' : 'Resume auto-rotation');
+      }};
+      rotBtn.addEventListener('click', function() {{ rotating = !rotating; paintRot(); }});
+      paintRot();
+    }}
     var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w; renderer.setSize(w2, height); camera.aspect = w2/height; camera.updateProjectionMatrix(); }});
     ro.observe(canvas);
     canvas.addEventListener('pointerdown', function(e) {{ if (e.button !== 0) return; orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); }});
