@@ -388,8 +388,10 @@ export default function Model3DViewer({
   }, [])
 
   return (
-    <div style={{ position: 'relative', width: '100%', marginBottom: 12, userSelect: 'none',
-                  overflow: 'hidden', borderRadius: 8 }}>
+    <div style={{ width: '100%', marginBottom: 12, userSelect: 'none' }}>
+      {/* Stage wraps the canvas + absolute overlays so the bottom hint pill
+          anchors to the canvas, not the caption that flows below it. */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 8 }}>
       <canvas ref={canvasRef} width={800} height={height}
         style={{ width: '100%', height, display: 'block', borderRadius: 8,
                  cursor: pinMode ? 'crosshair' : 'grab', outline: 'none', touchAction: 'none' }}
@@ -468,6 +470,7 @@ export default function Model3DViewer({
           ↑↓←→ orbit · +/- zoom · R reset
         </div>
       )}
+      </div>
       {caption && <p style={{ fontSize: 12, color: 'var(--cf-text-tertiary)', marginTop: 6, fontFamily: 'var(--cf-font)' }}>{caption}</p>}
 
       <style>{`

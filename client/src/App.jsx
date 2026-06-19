@@ -47,7 +47,7 @@ export default function App() {
 
   useKeyboardShortcuts({
     onSave:    () => useEditorStore.getState().flushSave(),
-    onPreview: () => { if (useEditorStore.getState().activeFrame) useEditorStore.getState().setPreviewOpen(true) },
+    onPreview: () => { const f = useEditorStore.getState().activeFrame; if (f) window.open(`/api/frames/${f.id}/preview-html`, '_blank', 'noopener') },
     onCloseModal: () => {
       setShowPublish(false)
       setShowThemeEditor(false)

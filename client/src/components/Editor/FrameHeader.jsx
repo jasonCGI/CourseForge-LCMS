@@ -2,19 +2,11 @@ import React from 'react'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 
-const FRAME_TYPE_COLOR = {
-  content:    { bg: '#0C447C', text: '#B5D4F4' },
-  assessment: { bg: '#633806', text: '#FAC775' },
-  branch:     { bg: '#3C3489', text: '#CECBF6' },
-}
-
 export default function FrameHeader({ onPreview }) {
   const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName, setOptional } = useEditorStore()
   const activeProject = useProjectStore(s => s.activeProject)
 
   if (!activeFrame) return null
-
-  const tc = FRAME_TYPE_COLOR[activeFrame.frame_type] || FRAME_TYPE_COLOR.content
 
   const savedLabel = isSaving
     ? 'Saving…'
@@ -49,21 +41,6 @@ export default function FrameHeader({ onPreview }) {
         }}
       />
 
-      {/* Frame type badge */}
-      <span style={{
-        padding: '3px 10px',
-        borderRadius: 4,
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        background: tc.bg,
-        color: tc.text,
-        textTransform: 'uppercase',
-        flexShrink: 0,
-      }}>
-        {activeFrame.frame_type}
-      </span>
-
       {/* Optional toggle — excluded from completion count */}
       <label title="Optional frames are excluded from the completion count"
         style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
@@ -85,9 +62,11 @@ export default function FrameHeader({ onPreview }) {
         {savedLabel}
       </span>
 
-      {/* Preview button */}
+      {/* Preview button — opens the real frame render directly (the in-app live
+          preview already shows the approximation, so no intermediate modal). */}
       <button
-        onClick={onPreview}
+        onClick={() => window.open(`/api/frames/${activeFrame.id}/preview-html`, '_blank', 'noopener')}
+        title="Open the live frame render in a new tab"
         style={{
           padding: '6px 14px',
           background: 'transparent',
