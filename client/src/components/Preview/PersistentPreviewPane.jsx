@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import FramePreview, { renderBlockToHTML } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
@@ -59,27 +59,23 @@ export default function PersistentPreviewPane() {
 
   if (!activeFrame) return null
 
-  const ar    = stage ? `${stage.w} / ${stage.h}` : '16 / 9'
-  const maxW  = stage ? `${stage.w}px` : '100%'
-
   return (
     <div className="cf-preview-pane">
       <PreviewHeader human={human} total={total} shell={!!shellId} />
       {shellId ? (
-        // Center + fit the whole shell to the pane width at its real aspect
-        // ratio; scrolls if the pane is shorter than the fitted height.
-        <div style={{ flex: 1, overflow: 'auto', background: '#000', padding: 10, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-          <div style={{ width: '100%', maxWidth: `min(100%, ${maxW})`, aspectRatio: ar, flexShrink: 0 }}>
-            <GUIShellRenderer
-              key={shellId}
-              shellUrl={`/api/gui-shells/${shellId}/shell.html`}
-              frameHtml={frameHtml}
-              frameData={frameData}
-              onAction={(a) => { if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a) }}
-              height="100%"
-            />
-          </div>
-        </div>
+        // Always show the WHOLE GUI: contain-fit the stage within the pane (both
+        // width AND height), scaled down (or up) so nothing is clipped and there's
+        // no scroll. The shell scales its own stage to fill this sized wrapper.
+        <ShellFit stage={stage}>
+          <GUIShellRenderer
+            key={shellId}
+            shellUrl={`/api/gui-shells/${shellId}/shell.html`}
+            frameHtml={frameHtml}
+            frameData={frameData}
+            onAction={(a) => { if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a) }}
+            height="100%"
+          />
+        </ShellFit>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
           <PreviewErrorBoundary resetKey={activeFrame.id}>
@@ -88,6 +84,37 @@ export default function PersistentPreviewPane() {
           </PreviewErrorBoundary>
         </div>
       )}
+    </div>
+  )
+}
+
+// Sizes its child to the largest box with the stage's aspect ratio that fits
+// entirely inside the pane (contain). Measured via ResizeObserver because pure
+// CSS can't contain-fit an aspect-ratio box against both dimensions at once.
+function ShellFit({ stage, children }) {
+  const ref = useRef(null)
+  const [box, setBox] = useState(null)
+  const sw = stage?.w || 1024, sh = stage?.h || 768
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const PAD = 20
+    const compute = () => {
+      const w = el.clientWidth - PAD, h = el.clientHeight - PAD
+      if (w <= 0 || h <= 0) return
+      const s = Math.min(w / sw, h / sh)
+      setBox({ w: Math.round(sw * s), h: Math.round(sh * s) })
+    }
+    const ro = new ResizeObserver(compute)
+    ro.observe(el); compute()
+    return () => ro.disconnect()
+  }, [sw, sh])
+  return (
+    <div ref={ref} style={{ flex: 1, overflow: 'hidden', background: '#000',
+      display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ width: box ? box.w : '100%', height: box ? box.h : '100%', flexShrink: 0 }}>
+        {children}
+      </div>
     </div>
   )
 }
