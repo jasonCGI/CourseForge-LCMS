@@ -49,13 +49,18 @@ export default function PersistentPreviewPane() {
     () => (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join(''),
     [activeFrame?.content?.blocks],
   )
+  // Lesson/course names for the lesson_title / section_title shell zones (mirrors
+  // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
+  const ctx = useMemo(() => frameContext(activeProject, activeFrame?.id), [activeProject, activeFrame?.id])
   const frameData = useMemo(() => ({
     frameIndex: human, totalFrames: total,
-    lessonTitle: '', sectionTitle: '',
+    lessonTitle: ctx.lessonName, sectionTitle: ctx.courseName,
     frameTitle: activeFrame?.name || '',
     prompt: activeFrame?.name || '',
-    isFirst: idx <= 0, isLast: idx === total - 1,
-  }), [human, total, activeFrame?.name, idx])
+    // Single-frame live preview: disable NEXT/PREV (isFirst && isLast). Real
+    // navigation is exercised in the full-course preview, not here.
+    isFirst: true, isLast: true,
+  }), [human, total, activeFrame?.name, ctx])
 
   if (!activeFrame) return null
 
@@ -139,6 +144,18 @@ function PreviewHeader({ human, total, shell }) {
       </span>
     </div>
   )
+}
+
+// The lesson + course a frame belongs to (for the lesson_title/section_title
+// shell zones). Mirrors the publish hierarchy: lesson.name / course.name.
+export function frameContext(project, frameId) {
+  if (!project || !frameId) return { lessonName: '', courseName: '' }
+  for (const c of project.courses || [])
+    for (const m of c.modules || [])
+      for (const l of m.lessons || [])
+        for (const f of l.frames || [])
+          if (f.id === frameId) return { lessonName: l.name || '', courseName: c.name || '' }
+  return { lessonName: '', courseName: '' }
 }
 
 // Flat in-order frame-id list across the whole project (project→course→…→frame).

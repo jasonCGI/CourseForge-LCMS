@@ -38,13 +38,19 @@ ACTION_MAP = {
     'help': 'HELP', 'check': 'CHECK', 'tryagain': 'TRY_AGAIN', 'try_again': 'TRY_AGAIN',
     'yes': 'YES', 'no': 'NO', 'confirm': 'CONFIRM', 'cancel': 'CANCEL',
 }
+# Keys are matched against _suffix(), which _norm()s the layer name: lowercased,
+# spaces stripped, '_' -> '-'. So every key here must be in that dash form (an
+# underscore key like 'frame_title' could never match and would be dead).
 ZONE_MAP = {
     'prompt': 'prompt', 'feedback': 'feedback',
-    'counter': 'frame_counter', 'frame_counter': 'frame_counter',
+    'counter': 'frame_counter', 'frame-counter': 'frame_counter',
     'framecounter': 'frame_counter', 'count': 'frame_counter',
-    'lesson': 'lesson_title', 'lesson_title': 'lesson_title', 'lessontitle': 'lesson_title',
-    'section': 'section_title', 'section_title': 'section_title',
-    'frame_title': 'frame_title', 'frametitle': 'frame_title', 'title': 'frame_title',
+    'lesson': 'lesson_title', 'lesson-title': 'lesson_title', 'lessontitle': 'lesson_title',
+    'lesson-name': 'lesson_title', 'lessonname': 'lesson_title',
+    'section': 'section_title', 'section-title': 'section_title', 'sectiontitle': 'section_title',
+    'section-name': 'section_title', 'sectionname': 'section_title',
+    'frame-title': 'frame_title', 'frametitle': 'frame_title', 'title': 'frame_title',
+    'frame-name': 'frame_title', 'framename': 'frame_title',
 }
 
 
