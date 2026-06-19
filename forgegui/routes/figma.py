@@ -74,6 +74,29 @@ def _suffix(name: str, prefix: str) -> str:
     return n[len(prefix):] if n.startswith(prefix) else ''
 
 
+# Keyword → zone type, checked in order (specific before general) so a layer name
+# only needs to *contain* the keyword. 'count' before 'frame' so frame-counter
+# wins; 'lesson'/'section' before 'frame'/'title'.
+_ZONE_KEYWORDS = [
+    ('feedback', 'feedback'),
+    ('count',    'frame_counter'),
+    ('lesson',   'lesson_title'),
+    ('section',  'section_title'), ('module', 'section_title'),
+    ('frame',    'frame_title'),  ('title',  'frame_title'),
+    ('prompt',   'prompt'),
+]
+
+def _zone_type(suffix: str) -> str:
+    """Resolve a zone's type from its (normalized) layer-name suffix: exact
+    ZONE_MAP hit first, else the closest keyword match, else 'prompt'."""
+    if suffix in ZONE_MAP:
+        return ZONE_MAP[suffix]
+    for kw, ztype in _ZONE_KEYWORDS:
+        if kw in suffix:
+            return ztype
+    return 'prompt'
+
+
 def _figma_get(path: str, token: str):
     r = urllib.request.Request(FIGMA_API + path)
     r.add_header('X-Figma-Token', token)
@@ -154,7 +177,7 @@ def map_layout(frame: dict) -> dict:
             tab += 1
         elif n.startswith('zone-'):
             suf = _suffix(node.get('name'), 'zone-')
-            ztype = ZONE_MAP.get(suf, 'prompt')
+            ztype = _zone_type(suf)
             zone = {
                 'id': 'zone-' + uuid.uuid4().hex[:8], 'type': ztype,
                 'x': x, 'y': y, 'width': w, 'height': h,
