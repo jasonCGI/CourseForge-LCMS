@@ -148,23 +148,53 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName }) {
   )
 }
 
-// Minimal block-to-HTML renderer for injecting into the GUI shell preview.
+// A clean "interactive in the published course" note for block types that can't
+// be represented as static injected HTML in the preview (3D, iVideo, OAM…).
+function injectedNote(label) {
+  return `<div style="padding:14px;border:1px dashed #9aa4b2;border-radius:6px;`
+       + `color:#6a7686;font-family:'IBM Plex Mono',monospace;font-size:11px;`
+       + `margin:8px 0;text-align:center">${label} — interactive in the published course</div>`
+}
+
+// Block-to-HTML renderer for injecting into the GUI shell preview. Renders the
+// real media/quiz/WCN/hotspot so demo content actually appears in the shell
+// content area (instead of "[type block]" stubs that read as "covered up").
 export function renderBlockToHTML(block) {
+  const d = block.data || {}
   switch (block.type) {
     case 'text':
-      return `<div class="cf-injected-text">${block.data.body || ''}</div>`
-    case 'media':
-      if (block.data.kind === 'image' && block.data.serve_url) {
-        return `<img src="${block.data.serve_url}" alt="${block.data.alt_text || ''}" `
-             + `style="max-width:100%;height:auto;display:block">`
-      }
-      return `<div style="padding:20px;text-align:center;color:#3A5A7A;`
-           + `font-family:'IBM Plex Mono',monospace;font-size:11px">`
-           + `[${block.data.kind || 'media'} block]</div>`
+      return `<div class="cf-injected-text">${d.body || ''}</div>`
+    case 'media': {
+      const k = d.kind
+      if (k === 'image' && d.serve_url)
+        return `<img src="${d.serve_url}" alt="${d.alt_text || ''}" `
+             + `style="max-width:100%;height:auto;display:block;margin:8px 0;border-radius:4px">`
+      if (k === 'video' && d.serve_url)
+        return `<video src="${d.serve_url}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+             + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
+      if (k === 'audio' && d.serve_url)
+        return `<audio src="${d.serve_url}" controls style="width:100%;margin:8px 0"></audio>`
+      return injectedNote(`${k || 'media'} block`)
+    }
+    case 'quiz': {
+      const choices = (d.choices || []).map(c => `<li style="margin:3px 0">${c}</li>`).join('')
+      return `<div style="margin:8px 0">`
+           + `<p style="font-weight:600;margin-bottom:6px">${d.question || 'Knowledge check'}</p>`
+           + `<ol style="margin:0 0 0 20px;padding:0">${choices}</ol></div>`
+    }
+    case 'wcn': {
+      const c = { warning: '#D23B3B', caution: '#E6A100', note: '#2B6CB0' }[d.wcn_type] || '#2B6CB0'
+      return `<div style="margin:8px 0;padding:10px 14px;border-left:4px solid ${c};background:rgba(0,0,0,0.03);border-radius:4px">`
+           + `<p style="font-weight:700;color:${c};margin:0 0 4px;font-size:12px;letter-spacing:.04em">`
+           + `${(d.wcn_type || 'note').toUpperCase()}${d.title ? ' — ' + d.title : ''}</p>`
+           + `<p style="margin:0">${d.text || ''}</p></div>`
+    }
+    case 'hotspot':
+      return d.background_url
+        ? `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block;margin:8px 0;border-radius:4px">`
+        : injectedNote('hotspot block')
     default:
-      return `<div style="padding:12px;border:1px dashed #1c2a3a;border-radius:4px;`
-           + `color:#3A5A7A;font-family:'IBM Plex Mono',monospace;font-size:10px;`
-           + `margin-bottom:8px">[${block.type} block]</div>`
+      return injectedNote(`${block.type} block`)
   }
 }
 
