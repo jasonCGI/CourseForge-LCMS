@@ -191,12 +191,14 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
     ]},
     {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Image Block</h2><p>The Image block displays a single image with an optional caption '
-                   'and alt text. Process images through ForgePack first — it outputs WebP, PNG, retina, '
-                   'thumbnail, and OG variants with EXIF stripped.</p>',
-              narration='The Image block displays a single optimized image. Process images through '
-                        'ForgePack first to generate WebP and PNG variants and strip EXIF metadata.'),
-        _image(label='Example Course Image',
-               caption='Replace this placeholder — process your image with ForgePack and upload the WebP output',
+                   'and alt text. The photo below is a live example — cropped to the content area, optimized, '
+                   'and EXIF-stripped. Run your own through ForgePack to output WebP, PNG, retina, thumbnail, '
+                   'and OG variants automatically.</p>',
+              narration='The Image block displays a single optimized image. This photo is a live example, '
+                        'cropped and EXIF-stripped. Process your images through ForgePack to generate WebP and '
+                        'PNG variants automatically.'),
+        _image(label='Barista presenting a latte',
+               caption='Live example — cropped to a 16:9 content fit, optimized and EXIF-stripped',
                color='#185FA5', icon='🖼'),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
