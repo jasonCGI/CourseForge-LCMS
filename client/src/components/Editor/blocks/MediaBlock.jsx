@@ -125,6 +125,24 @@ export default function MediaBlock({ block }) {
           />
         </div>
 
+        {/* Alt text (508) — text alternative for screen readers. Images require it;
+            video uses it as an accessible description. */}
+        {(kind === 'image' || kind === 'video') && (
+          <div style={{ marginTop: 12 }}>
+            <label style={fieldLabel}>
+              Alt text{kind === 'image' && <span style={{ color: 'var(--cf-amber, #D4820A)', fontWeight: 600 }}> · required for 508</span>}
+            </label>
+            <input
+              value={block.data.alt_text || ''}
+              onChange={e => update('alt_text', e.target.value)}
+              placeholder={kind === 'image'
+                ? 'Describe the image for screen readers'
+                : 'Describe the video for screen readers'}
+              style={inputStyle}
+            />
+          </div>
+        )}
+
         {/* Upload / linked asset */}
         <div style={{ marginTop: 16 }}>
           {!block.data.asset_id ? (

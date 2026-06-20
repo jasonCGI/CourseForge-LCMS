@@ -191,10 +191,27 @@ export function renderBlockToHTML(block) {
            + `${(d.wcn_type || 'note').toUpperCase()}${d.title ? ' — ' + d.title : ''}</p>`
            + `<p style="margin:0">${d.text || ''}</p></div>`
     }
-    case 'hotspot':
-      return d.background_url
-        ? `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block;margin:8px 0;border-radius:4px">`
-        : injectedNote('hotspot block')
+    case 'hotspot': {
+      if (!d.background_url) return injectedNote('hotspot block')
+      const esc = s => String(s || '').replace(/"/g, '&quot;')
+      const regions = (d.regions || []).map(r =>
+        `<div style="position:absolute;left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;`
+        + `box-sizing:border-box;border:2px solid var(--forge-amber,#D4820A);`
+        + `background:rgba(212,130,10,0.18);border-radius:4px" title="${esc(r.label)}">`
+        + `<span style="position:absolute;left:0;top:-17px;font:600 10px 'IBM Plex Mono',monospace;`
+        + `color:#fff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:3px;white-space:nowrap">`
+        + `${r.label || ''}</span></div>`,
+      ).join('')
+      return `<div style="position:relative;margin:8px 0">`
+        + `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block;border-radius:4px">`
+        + regions + `</div>`
+    }
+    case 'branch': {
+      const opt = lbl => `<span style="display:inline-block;margin:4px 6px 0 0;padding:5px 12px;`
+        + `border:1px solid #3A5A8A;border-radius:6px;font-size:12px;color:#1a2a3a">${lbl}</span>`
+      return `<div style="margin:8px 0"><p style="margin-bottom:6px">${d.condition || 'Decision point'}</p>`
+        + `${opt(d.true_label || 'Yes')}${opt(d.false_label || 'No')}</div>`
+    }
     default:
       return injectedNote(`${block.type} block`)
   }

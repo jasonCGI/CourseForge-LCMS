@@ -21,10 +21,6 @@ export default function TextBlock({ block }) {
     },
   })
 
-  const handleNarration = useCallback(e => {
-    updateBlock(block.id, { narrator_script: e.target.value })
-  }, [block.id, updateBlock])
-
   return (
     <div style={{
       background: 'var(--color-background-primary)',
@@ -47,42 +43,14 @@ export default function TextBlock({ block }) {
         <EditorContent editor={editor} />
       </div>
 
-      {/* Narration script field */}
+      {/* Body word count (narration script field removed — narration lives on
+          audio/video blocks, not text). */}
       <div style={{
         borderTop: '1px solid var(--color-border-tertiary)',
-        padding: '10px 16px',
+        padding: '8px 16px',
         background: 'var(--color-background-secondary)',
       }}>
-        <label style={{
-          display: 'block',
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--color-text-secondary)',
-          letterSpacing: '0.08em',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-        }}>
-          Narration script
-        </label>
-        <textarea
-          value={block.data.narrator_script || ''}
-          onChange={handleNarration}
-          rows={3}
-          placeholder="Narrator reads this aloud…"
-          style={{
-            width: '100%',
-            background: 'var(--color-background-primary)',
-            border: '1px solid var(--color-border-tertiary)',
-            borderRadius: 4,
-            padding: '8px 10px',
-            fontSize: 13,
-            color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-sans)',
-            resize: 'vertical',
-            boxSizing: 'border-box',
-          }}
-        />
-        <WordCount body={block.data.body} script={block.data.narrator_script} />
+        <WordCount body={block.data.body} />
       </div>
     </div>
   )
