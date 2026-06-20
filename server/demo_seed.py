@@ -209,13 +209,16 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                caption='Replace this placeholder — use the ForgePack Video module first'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio. Process source '
-                   'WAV/AIFF through ForgePack Audio to normalize loudness to the DoD standard (−16 LUFS, '
-                   'EBU R128) and output MP3, OGG, and M4A — auto-paired in CourseForge.</p>',
-              narration='The Audio block plays processed narration. Use ForgePack Audio to normalize to '
-                        'negative sixteen LUFS and generate MP3, OGG, and M4A before uploading.'),
-        _audio(label='Example Narration Audio',
-               caption='Replace this placeholder — process with ForgePack Audio for −16 LUFS normalization'),
+        _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in an accessible '
+                   'HTML5 player. This live example — <em>“Beneath the Still Water,”</em> an instrumental '
+                   'cinematic cue — is normalized to the DoD broadcast standard (−16 LUFS, EBU R128) and '
+                   'served as MP3. Process source WAV/AIFF through ForgePack Audio to normalize loudness and '
+                   'output MP3, OGG, and M4A — auto-paired in CourseForge.</p>',
+              narration='The Audio block plays processed narration or ambient audio. This cue is normalized to '
+                        'negative sixteen LUFS. Use ForgePack Audio to normalize your source and generate MP3, '
+                        'OGG, and M4A before uploading.'),
+        _audio(label='Beneath the Still Water',
+               caption='Instrumental cinematic cue · normalized to −16 LUFS (EBU R128)'),
     ]},
 
     # ── Assessment Blocks ──
@@ -434,7 +437,7 @@ def _wire_demo_assets(project):
         'webm_asset_id': webm.id, 'poster_asset_id': poster.id,
         'vtt_asset_id': vtt.id, 'has_audio': True})
     img = reg('sample_image.jpg', 'image', 'image/jpeg')
-    aud = reg('sample_audio.mp3', 'audio', 'audio/mpeg')
+    aud = reg('beneath-the-still-water.mp3', 'audio', 'audio/mpeg')
     glb = reg('coffee_cup.glb', 'model3d', 'model/gltf-binary')
     hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
     db.session.flush()
@@ -487,7 +490,7 @@ def _wire_demo_assets(project):
                          original_name='sample_video.mp4', use_videojs=True, asset_meta=mp4_meta); changed = True
             elif fr.name == 'Audio Block' and t == 'media' and d.get('kind') == 'audio':
                 d.update(asset_id=aud.id, serve_url=f'/api/media/serve/{aud.id}',
-                         original_name='sample_audio.mp3', asset_meta=_serialize_media(aud)); changed = True
+                         original_name='beneath-the-still-water.mp3', asset_meta=_serialize_media(aud)); changed = True
             elif fr.name == '3D Model Block' and t == 'model3d':
                 d.update(model_asset_id=glb.id, model_serve_url=f'/api/media/serve/{glb.id}',
                          model_filename='coffee_cup.glb',
