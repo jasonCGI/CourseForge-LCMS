@@ -167,6 +167,8 @@ function ShellFit({ stage, children, contentArea, overlay }) {
             overflow: 'auto',
             background: '#fff',
             zIndex: 5,
+            // larger body text inside the shell (clean shell-off view stays 18px)
+            '--cf-preview-body': '26px',
           }}>
             {overlay}
           </div>
