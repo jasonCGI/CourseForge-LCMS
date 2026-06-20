@@ -23,6 +23,9 @@ export default function PersistentPreviewPane() {
   const activeProject = useProjectStore(s => s.activeProject)
 
   const shellId = activeProject?.gui_shell_id || null
+  // Live-preview GUI toggle: ON = render inside the shell (learner view),
+  // OFF = clean block stack (author/content view). Only meaningful with a shell.
+  const [guiOn, setGuiOn] = useState(true)
 
   // Fetch the shell's stage dimensions so the preview can show the ENTIRE GUI
   // at its true aspect ratio (the shell scales its stage to fit the iframe).
@@ -66,8 +69,9 @@ export default function PersistentPreviewPane() {
 
   return (
     <div className="cf-preview-pane">
-      <PreviewHeader human={human} total={total} shell={!!shellId} />
-      {shellId ? (
+      <PreviewHeader human={human} total={total} shell={!!shellId}
+        guiOn={guiOn} onToggleGui={shellId ? () => setGuiOn(v => !v) : null} />
+      {shellId && guiOn ? (
         // Always show the WHOLE GUI: contain-fit the stage within the pane (both
         // width AND height), scaled down (or up) so nothing is clipped and there's
         // no scroll. The shell scales its own stage to fill this sized wrapper.
@@ -84,7 +88,7 @@ export default function PersistentPreviewPane() {
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
           <PreviewErrorBoundary resetKey={activeFrame.id}>
-            <FramePreview frame={activeFrame}
+            <FramePreview frame={activeFrame} ignoreGui={!!shellId}
               activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
           </PreviewErrorBoundary>
         </div>
@@ -124,7 +128,7 @@ function ShellFit({ stage, children }) {
   )
 }
 
-function PreviewHeader({ human, total, shell }) {
+function PreviewHeader({ human, total, shell, guiOn, onToggleGui }) {
   return (
     <div style={{
       background: 'var(--cf-navy, #042C53)',
@@ -142,6 +146,25 @@ function PreviewHeader({ human, total, shell }) {
       <span style={{ color: '#C8D8E8', opacity: 0.6 }}>
         {shell ? 'GUI shell · SCORM API stubbed' : 'SCORM API stubbed'}
       </span>
+      {onToggleGui && (
+        <button
+          type="button"
+          onClick={onToggleGui}
+          aria-pressed={guiOn}
+          title={guiOn ? 'GUI shell ON — showing the learner view. Click for the clean content view.'
+                       : 'GUI shell OFF — showing the clean content view. Click to wrap in the shell.'}
+          style={{
+            marginLeft: 'auto', flexShrink: 0,
+            fontFamily: 'inherit', fontSize: 10, letterSpacing: '0.06em', fontWeight: 600,
+            cursor: 'pointer', padding: '3px 9px', borderRadius: 5,
+            border: '1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent)',
+            background: guiOn ? 'var(--forge-amber, #D4820A)' : 'transparent',
+            color: guiOn ? '#042C53' : 'var(--forge-amber, #D4820A)',
+          }}
+        >
+          GUI {guiOn ? 'ON' : 'OFF'}
+        </button>
+      )}
     </div>
   )
 }

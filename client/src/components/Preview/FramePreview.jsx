@@ -6,14 +6,16 @@ import OamMediaBar from './OamMediaBar'
 
 const FRAME_BG = '#ffffff'
 
-export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null }) {
+export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false }) {
   if (!frame) return null
 
-  const blocks = frame.content?.blocks || []
+  const allBlocks = frame.content?.blocks || []
+  const blocks = ignoreGui ? allBlocks.filter(b => b.type !== 'gui') : allBlocks
 
   // GUI-shell frame: the shell is the whole canvas; all other blocks are
   // injected into its content area. Render it instead of the normal stack.
-  const guiBlock = blocks.find(b => b.type === 'gui')
+  // ignoreGui = the live preview's GUI toggle is OFF → show the clean block stack.
+  const guiBlock = ignoreGui ? null : blocks.find(b => b.type === 'gui')
   if (guiBlock) {
     const contentBlocks = blocks.filter(b => b.type !== 'gui')
     return (
