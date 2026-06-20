@@ -445,10 +445,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         elif btype == 'hotspot':
             regions_html = ''
             for r in data.get('regions', []):
+                radius = '50%' if r.get('shape') == 'circle' else '4px'
                 regions_html += (
                     f'<div class="cf-hotspot-region" '
                     f'style="left:{r["x"]}%;top:{r["y"]}%;'
-                    f'width:{r["w"]}%;height:{r["h"]}%">'
+                    f'width:{r["w"]}%;height:{r["h"]}%;border-radius:{radius}">'
                     f'<span class="cf-hotspot-label">{r.get("label","")}</span>'
                     f'</div>'
                 )

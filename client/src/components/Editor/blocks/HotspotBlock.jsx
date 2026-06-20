@@ -1,79 +1,112 @@
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import { BlockHeader } from './TextBlock'
 import { blockWrap, fieldLabel, inputStyle, helpText, btnDanger } from './blockStyles'
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+const round = g => ({ x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h) })
+const HANDLES = {
+  nw: { left: -5, top: -5, cursor: 'nwse-resize' },
+  ne: { right: -5, top: -5, cursor: 'nesw-resize' },
+  sw: { left: -5, bottom: -5, cursor: 'nesw-resize' },
+  se: { right: -5, bottom: -5, cursor: 'nwse-resize' },
+}
 
 export default function HotspotBlock({ block }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
   const removeBlock = useEditorStore(s => s.removeBlock)
   const moveBlock   = useEditorStore(s => s.moveBlock)
 
-  const canvasRef  = useRef(null)
-  const [drawing, setDrawing] = useState(false)
-  const [startPt, setStartPt] = useState(null)
-  const [draft, setDraft]     = useState(null)
+  const canvasRef = useRef(null)
+  const drag = useRef(null)                       // { mode, id, handle, ox, oy, base }
+  const [draft, setDraft] = useState(null)        // { x, y, w, h } while drawing a new region
+  const [live, setLive]   = useState(null)        // { id, x, y, w, h } while moving/resizing
+  const [newShape, setNewShape] = useState('rect')
 
   const regions = block.data.regions || []
+  const hasImg  = !!(block.data.image_id || block.data.background_url)
+  const commit  = next => updateBlock(block.id, { regions: next })
 
-  const getRelPos = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect()
-    return {
-      x: Math.round(((e.clientX - rect.left) / rect.width)  * 100),
-      y: Math.round(((e.clientY - rect.top)  / rect.height) * 100),
-    }
+  const relPos = e => {
+    const r = canvasRef.current.getBoundingClientRect()
+    return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }
   }
 
-  const handleMouseDown = useCallback((e) => {
-    if (!block.data.image_id) return
-    const pos = getRelPos(e)
-    setDrawing(true)
-    setStartPt(pos)
-    setDraft(null)
-  }, [block.data.image_id])
+  // Empty canvas → draw a new region
+  const onCanvasDown = e => {
+    if (!hasImg || drag.current) return
+    const p = relPos(e)
+    drag.current = { mode: 'draw', ox: p.x, oy: p.y }
+    setDraft({ x: p.x, y: p.y, w: 0, h: 0 })
+  }
+  // Region body → move; corner handle → resize
+  const startMove = (e, r) => {
+    e.stopPropagation()
+    const p = relPos(e)
+    drag.current = { mode: 'move', id: r.id, ox: p.x, oy: p.y, base: { ...r } }
+    setLive({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })
+  }
+  const startResize = (e, r, handle) => {
+    e.stopPropagation()
+    const p = relPos(e)
+    drag.current = { mode: 'resize', id: r.id, handle, ox: p.x, oy: p.y, base: { ...r } }
+    setLive({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })
+  }
 
-  const handleMouseMove = useCallback((e) => {
-    if (!drawing || !startPt) return
-    const pos = getRelPos(e)
-    setDraft({
-      x: Math.min(startPt.x, pos.x),
-      y: Math.min(startPt.y, pos.y),
-      w: Math.abs(pos.x - startPt.x),
-      h: Math.abs(pos.y - startPt.y),
-    })
-  }, [drawing, startPt])
-
-  const handleMouseUp = useCallback(() => {
-    if (!drawing || !draft || draft.w < 2 || draft.h < 2) {
-      setDrawing(false)
-      setDraft(null)
+  const onMove = e => {
+    const d = drag.current
+    if (!d) return
+    const p = relPos(e)
+    if (d.mode === 'draw') {
+      setDraft({ x: Math.min(d.ox, p.x), y: Math.min(d.oy, p.y), w: Math.abs(p.x - d.ox), h: Math.abs(p.y - d.oy) })
       return
     }
-    const newRegion = { ...draft, label: `Region ${regions.length + 1}`, id: crypto.randomUUID() }
-    updateBlock(block.id, { regions: [...regions, newRegion] })
-    setDrawing(false)
+    const b = d.base
+    if (d.mode === 'move') {
+      setLive({ id: d.id, w: b.w, h: b.h,
+        x: clamp(b.x + (p.x - d.ox), 0, 100 - b.w),
+        y: clamp(b.y + (p.y - d.oy), 0, 100 - b.h) })
+    } else { // resize — anchor the opposite edge(s)
+      let { x, y, w, h } = b
+      const right = b.x + b.w, bottom = b.y + b.h
+      if (d.handle.includes('e')) w = clamp(p.x, b.x + 3, 100) - x
+      if (d.handle.includes('s')) h = clamp(p.y, b.y + 3, 100) - y
+      if (d.handle.includes('w')) { x = clamp(p.x, 0, right - 3); w = right - x }
+      if (d.handle.includes('n')) { y = clamp(p.y, 0, bottom - 3); h = bottom - y }
+      setLive({ id: d.id, x, y, w, h })
+    }
+  }
+
+  const onUp = () => {
+    const d = drag.current
+    if (d?.mode === 'draw' && draft && draft.w >= 2 && draft.h >= 2) {
+      commit([...regions, { ...round(draft), shape: newShape, label: `Region ${regions.length + 1}`, description: '', id: crypto.randomUUID() }])
+    } else if ((d?.mode === 'move' || d?.mode === 'resize') && live) {
+      commit(regions.map(r => (r.id === live.id ? { ...r, ...round(live) } : r)))
+    }
+    drag.current = null
     setDraft(null)
-    setStartPt(null)
-  }, [drawing, draft, regions, block.id, updateBlock])
-
-  const updateRegionLabel = (regionId, label) => {
-    updateBlock(block.id, {
-      regions: regions.map(r => r.id === regionId ? { ...r, label } : r)
-    })
+    setLive(null)
   }
 
-  const removeRegion = (regionId) => {
-    updateBlock(block.id, { regions: regions.filter(r => r.id !== regionId) })
-  }
+  const geomOf  = r => (live && live.id === r.id ? live : r)
+  const setLabel = (id, label) => commit(regions.map(r => (r.id === id ? { ...r, label } : r)))
+  const setShape = (id, shape) => commit(regions.map(r => (r.id === id ? { ...r, shape } : r)))
+  const removeRegion = id => commit(regions.filter(r => r.id !== id))
+
+  const shapeBtn = (val, glyph, label) => (
+    <button type="button" onClick={() => setNewShape(val)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12,
+        borderRadius: 6, cursor: 'pointer', border: '1px solid var(--forge-amber)',
+        background: newShape === val ? 'var(--forge-amber)' : 'transparent',
+        color: newShape === val ? '#042C53' : 'var(--forge-amber)', fontWeight: 600,
+      }}>{glyph} {label}</button>
+  )
 
   return (
     <div style={blockWrap}>
-      <BlockHeader
-        label="Hotspot"
-        color="#533AB7"
-        blockId={block.id}
-        onRemove={removeBlock}
-        onMove={moveBlock}
-      />
+      <BlockHeader label="Hotspot" color="#533AB7" blockId={block.id} onRemove={removeBlock} onMove={moveBlock} />
       <div style={{ padding: 16 }}>
 
         {/* Image ID field */}
@@ -88,99 +121,90 @@ export default function HotspotBlock({ block }) {
           <p style={helpText}>Upload the image via the Media block first, then paste its asset ID here.</p>
         </div>
 
+        {/* New-region shape toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ ...fieldLabel, margin: 0 }}>New region shape</span>
+          {shapeBtn('rect', '▭', 'Rectangle')}
+          {shapeBtn('circle', '◯', 'Circle')}
+        </div>
+
         {/* Canvas */}
         <div
           ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
+          onMouseDown={onCanvasDown}
+          onMouseMove={onMove}
+          onMouseUp={onUp}
+          onMouseLeave={onUp}
           style={{
-            position: 'relative',
-            width: '100%',
-            paddingBottom: '56.25%', // 16:9
-            background: block.data.image_id ? '#0a1628' : '#0d1a2e',
-            border: `2px dashed ${block.data.image_id ? '#533AB7' : 'var(--color-border-tertiary)'}`,
-            borderRadius: 6,
-            cursor: block.data.image_id ? 'crosshair' : 'default',
-            userSelect: 'none',
-            marginBottom: 14,
-            overflow: 'hidden',
+            position: 'relative', width: '100%', paddingBottom: '56.25%', // 16:9
+            background: hasImg ? '#0a1628' : '#0d1a2e',
+            border: `2px dashed ${hasImg ? '#533AB7' : 'var(--color-border-tertiary)'}`,
+            borderRadius: 6, cursor: hasImg ? 'crosshair' : 'default',
+            userSelect: 'none', marginBottom: 14, overflow: 'hidden',
           }}
         >
-          {/* Placeholder/asset backdrop — demo blocks seed an SVG data-URI in
-              background_url. Shows the hotspot canvas with its regions in place. */}
           {block.data.background_url && (
-            <img
-              src={block.data.background_url}
-              alt={block.data.alt_text || 'Hotspot background'}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover', pointerEvents: 'none' }}
-            />
+            <img src={block.data.background_url} alt={block.data.alt_text || 'Hotspot background'}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
           )}
 
-          {!block.data.image_id && !block.data.background_url && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 8, color: 'var(--color-text-secondary)',
-            }}>
+          {!hasImg && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 8, color: 'var(--color-text-secondary)' }}>
               <span style={{ fontSize: 28 }}>⊕</span>
               <span style={{ fontSize: 12 }}>Set an image asset ID above to draw hotspot regions</span>
             </div>
           )}
 
-          {/* Existing regions */}
-          {regions.map(r => (
-            <div key={r.id} style={{
-              position: 'absolute',
-              left: `${r.x}%`, top: `${r.y}%`,
-              width: `${r.w}%`, height: `${r.h}%`,
-              border: '2px solid var(--forge-amber)',
-              background: 'color-mix(in srgb, var(--forge-amber) 15%, transparent)',
-              borderRadius: 2,
-              boxSizing: 'border-box',
-            }}>
-              <span style={{
-                position: 'absolute', top: 2, left: 4,
-                fontSize: 10, color: 'var(--forge-amber)', fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}>{r.label}</span>
-            </div>
-          ))}
+          {/* Existing regions — drag the body to move, corners to resize */}
+          {regions.map(r => {
+            const g = geomOf(r)
+            return (
+              <div key={r.id}
+                onMouseDown={e => startMove(e, r)}
+                style={{
+                  position: 'absolute', left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, height: `${g.h}%`,
+                  border: '2px solid var(--forge-amber)',
+                  background: 'color-mix(in srgb, var(--forge-amber) 15%, transparent)',
+                  borderRadius: r.shape === 'circle' ? '50%' : 2,
+                  boxSizing: 'border-box', cursor: 'move',
+                }}>
+                <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: 'var(--forge-amber)', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.label}</span>
+                {Object.entries(HANDLES).map(([h, pos]) => (
+                  <div key={h} onMouseDown={e => startResize(e, r, h)}
+                    style={{ position: 'absolute', width: 10, height: 10, background: 'var(--forge-amber)',
+                      border: '1px solid #042C53', borderRadius: 2, ...pos }} />
+                ))}
+              </div>
+            )
+          })}
 
-          {/* Draft region while drawing */}
+          {/* Draft while drawing */}
           {draft && (
             <div style={{
-              position: 'absolute',
-              left: `${draft.x}%`, top: `${draft.y}%`,
-              width: `${draft.w}%`, height: `${draft.h}%`,
-              border: '2px dashed var(--forge-amber)',
-              background: 'color-mix(in srgb, var(--forge-amber) 10%, transparent)',
-              borderRadius: 2,
-              pointerEvents: 'none',
-            }}/>
+              position: 'absolute', left: `${draft.x}%`, top: `${draft.y}%`, width: `${draft.w}%`, height: `${draft.h}%`,
+              border: '2px dashed var(--forge-amber)', background: 'color-mix(in srgb, var(--forge-amber) 10%, transparent)',
+              borderRadius: newShape === 'circle' ? '50%' : 2, pointerEvents: 'none',
+            }} />
           )}
         </div>
 
-        {/* Region list */}
+        {/* Region list — label, shape, delete */}
         {regions.length > 0 && (
           <div>
             <label style={fieldLabel}>Regions ({regions.length})</label>
             {regions.map(r => (
               <div key={r.id} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <div style={{
-                  width: 12, height: 12, borderRadius: 2,
-                  border: '2px solid var(--forge-amber)', flexShrink: 0,
-                }}/>
-                <input
-                  value={r.label}
-                  onChange={e => updateRegionLabel(r.id, e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button
-                  onClick={() => removeRegion(r.id)}
-                  style={{ ...btnDanger, flexShrink: 0 }}
-                >✕</button>
+                <div style={{ width: 14, height: 14, flexShrink: 0, border: '2px solid var(--forge-amber)',
+                  borderRadius: r.shape === 'circle' ? '50%' : 2 }} />
+                <input value={r.label} onChange={e => setLabel(r.id, e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <button type="button" title="Toggle shape (rectangle / circle)"
+                  onClick={() => setShape(r.id, r.shape === 'circle' ? 'rect' : 'circle')}
+                  style={{ flexShrink: 0, padding: '6px 10px', fontSize: 13, borderRadius: 6, cursor: 'pointer',
+                    border: '1px solid var(--forge-amber)', background: 'transparent', color: 'var(--forge-amber)' }}>
+                  {r.shape === 'circle' ? '◯' : '▭'}
+                </button>
+                <button onClick={() => removeRegion(r.id)} style={{ ...btnDanger, flexShrink: 0 }}>✕</button>
               </div>
             ))}
           </div>

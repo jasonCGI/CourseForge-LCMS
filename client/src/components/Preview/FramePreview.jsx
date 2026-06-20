@@ -199,7 +199,7 @@ export function renderBlockToHTML(block) {
       const regions = (d.regions || []).map(r =>
         `<div style="position:absolute;left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;`
         + `box-sizing:border-box;border:2px solid var(--forge-amber,#D4820A);`
-        + `background:rgba(212,130,10,0.18);border-radius:4px" title="${esc(r.label)}">`
+        + `background:rgba(212,130,10,0.18);border-radius:${r.shape === 'circle' ? '50%' : '4px'}" title="${esc(r.label)}">`
         + `<span style="position:absolute;left:0;top:-17px;font:600 10px 'IBM Plex Mono',monospace;`
         + `color:#fff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:3px;white-space:nowrap">`
         + `${r.label || ''}</span></div>`,
@@ -464,7 +464,7 @@ function PreviewHotspot({ block }) {
               width: `${r.w}%`, height: `${r.h}%`,
               border: `2px solid ${active === r.id ? 'var(--forge-amber)' : '#185FA5'}`,
               background: active === r.id ? 'color-mix(in srgb, var(--forge-amber) 20%, transparent)' : 'rgba(24,95,165,0.1)',
-              borderRadius: 2,
+              borderRadius: r.shape === 'circle' ? '50%' : 2,
               cursor: 'pointer',
               boxSizing: 'border-box',
               transition: 'all 0.15s',
@@ -474,10 +474,11 @@ function PreviewHotspot({ block }) {
               <div style={{
                 position: 'absolute', bottom: '100%', left: 0,
                 background: '#042C53', color: '#fff',
-                fontSize: 11, padding: '4px 8px',
-                borderRadius: '4px 4px 0 0', whiteSpace: 'nowrap',
+                fontSize: 11, padding: '6px 9px', lineHeight: 1.4,
+                borderRadius: '4px 4px 0 0', width: 'max-content', maxWidth: 240,
               }}>
-                {r.label}
+                <strong>{r.label}</strong>
+                {r.description ? <div style={{ marginTop: 2, opacity: 0.85 }}>{r.description}</div> : null}
               </div>
             )}
           </div>
