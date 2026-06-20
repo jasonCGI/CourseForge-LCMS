@@ -2,11 +2,11 @@
   "tool": "ForgeClip",
   "schema_version": "1.0",
   "tool_version": "1.0.0",
-  "video": { "filename": "sample_video.mp4", "duration": 5, "width": 640, "height": 360 },
+  "video": { "filename": "sample_video.mp4", "duration": 10, "width": 1280, "height": 720 },
   "interactions": [
-    { "id": "ix-annot", "type": "annotation", "timecode": 1.0, "end_timecode": 4.0, "pause_on_reach": false,
+    { "id": "ix-annot", "type": "annotation", "timecode": 2.0, "end_timecode": 8.0, "pause_on_reach": false,
       "data": { "x": 24, "y": 28, "text": "Sample annotation — authored in ForgeClip" } },
-    { "id": "ix-hot", "type": "hotspot", "timecode": 2.0, "end_timecode": 4.5, "pause_on_reach": true,
+    { "id": "ix-hot", "type": "hotspot", "timecode": 4.0, "end_timecode": 9.0, "pause_on_reach": true,
       "data": { "x": 70, "y": 60, "label": "Sample hotspot", "description": "The video holds here until you click the highlighted area." } }
   ]
 }

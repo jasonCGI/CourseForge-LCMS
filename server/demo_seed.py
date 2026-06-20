@@ -435,7 +435,7 @@ def _wire_demo_assets(project):
     db.session.flush()
     mp4 = reg('sample_video.mp4', 'video', 'video/mp4', companions={
         'webm_asset_id': webm.id, 'poster_asset_id': poster.id,
-        'vtt_asset_id': vtt.id, 'has_audio': True})
+        'vtt_asset_id': vtt.id, 'has_audio': False})
     img = reg('sample_image.jpg', 'image', 'image/jpeg')
     aud = reg('beneath-the-still-water.mp3', 'audio', 'audio/mpeg')
     glb = reg('coffee_cup.glb', 'model3d', 'model/gltf-binary')
