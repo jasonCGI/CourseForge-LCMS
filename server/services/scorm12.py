@@ -671,6 +671,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             annotations = data.get('annotations', [])
             decorative = bool(data.get('decorative'))
             ann_json = json.dumps(annotations).replace('</', '<\\/')
+            # Part highlighting (mirrors the editor's Model3DViewer): per-mesh
+            # hover/click highlight + a centroid-anchored label. parts maps a
+            # mesh name -> {label, description}.
+            part_hl = bool(data.get('part_highlight'))
+            parts_cfg = data.get('parts', {}) if part_hl else {}
+            parts_json = json.dumps(parts_cfg).replace('</', '<\\/')
+            part_hl_js = 'true' if part_hl else 'false'
             env_name_raw = str(data.get('environment', 'studio') or 'studio').lower()
             env_name = env_name_raw if env_name_raw in ('studio', 'day', 'night', 'none') else 'studio'
             hdri_src = f'assets/hdri/{env_name}.hdr' if env_name in ('day', 'night') else ''
@@ -733,6 +740,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   #viewer3d-{block_id} .ann-popover-title {{ font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:700; color:#F59E0B; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px; }}
   #viewer3d-{block_id} .ann-popover-body {{ font-size:12px; color:#8AAAC0; line-height:1.55; }}
   #viewer3d-{block_id} .ann-popover-close {{ position:absolute; top:6px; right:8px; background:none; border:none; color:#3A5A7A; font-size:12px; cursor:pointer; padding:2px 4px; }}
+  #viewer3d-{block_id} .part-label {{ position:absolute; transform:translate(-50%,calc(-100% - 10px)); background:rgba(13,16,23,0.92); color:#F59E0B; border:1px solid rgba(245,158,11,0.6); border-radius:5px; padding:3px 9px; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; pointer-events:none; z-index:30; box-shadow:0 2px 10px rgba(0,0,0,0.4); }}
   @media (prefers-reduced-motion: reduce) {{ .cf-spin3d, #viewer3d-{block_id} .ann-dot, #viewer3d-{block_id} .ann-popover {{ animation: none !important; transition: none !important; }} }}
 </style>
 <script>
@@ -745,6 +753,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   var RGBE_LOCAL ='assets/three/RGBELoader.js', RGBE_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js';
   var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
+  var PARTS_CFG = {parts_json}, PART_HL = {part_hl_js};   // per-mesh part highlighting config
   var ENV_NAME = '{env_name}', HDRI_SRC = '{hdri_src}';   // 'studio' procedural | 'day'/'night' HDRI | 'none'
   var AUTO_ROTATE = {auto_rotate_js};
   var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -833,6 +842,63 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
 
     var _v3 = new THREE.Vector3();
     var loadedModel = null, _ray = new THREE.Raycaster();
+
+    // ── Part highlighting (per-mesh hover/click + centroid-anchored label) ──
+    var parts = [], hoverKey = null, selKey = null, partLabelEl = null, _pray = new THREE.Raycaster();
+    if (PART_HL && overlay) {{
+      partLabelEl = document.createElement('div');
+      partLabelEl.className = 'part-label'; partLabelEl.style.display = 'none';
+      overlay.appendChild(partLabelEl);
+    }}
+    function findPart(key) {{ for (var i = 0; i < parts.length; i++) {{ if (parts[i].key === key) return parts[i]; }} return null; }}
+    function setPartLevel(entry, level) {{
+      if (entry.level === level) return;
+      entry.level = level;
+      for (var i = 0; i < entry.meshes.length; i++) {{
+        var mesh = entry.meshes[i], orig = entry.origMats[i];
+        if (level === 0) {{
+          mesh.material = orig;
+          var cl = entry.clones[i];
+          if (cl) {{ (Array.isArray(cl) ? cl : [cl]).forEach(function(m) {{ if (m.dispose) m.dispose(); }}); entry.clones[i] = null; }}
+          continue;
+        }}
+        // Cup & saucer can share one material, so highlight via a per-mesh clone
+        // (tinting the shared material would light up both).
+        if (!entry.clones[i]) entry.clones[i] = Array.isArray(orig) ? orig.map(function(m) {{ return m.clone(); }}) : orig.clone();
+        var inten = level === 2 ? 0.6 : 0.28, c2 = entry.clones[i];
+        (Array.isArray(c2) ? c2 : [c2]).forEach(function(m) {{ if ('emissive' in m) {{ m.emissive = new THREE.Color(0xF59E0B); m.emissiveIntensity = inten; m.needsUpdate = true; }} }});
+        mesh.material = c2;
+      }}
+    }}
+    function applyPartLevels() {{
+      for (var i = 0; i < parts.length; i++) {{
+        var e = parts[i];
+        setPartLevel(e, e.key === selKey ? 2 : (e.key === hoverKey ? 1 : 0));
+      }}
+    }}
+    function pickPart(clientX, clientY) {{
+      if (!loadedModel || !parts.length) return null;
+      var rect = canvas.getBoundingClientRect();
+      var x = ((clientX - rect.left) / rect.width) * 2 - 1, y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      _pray.setFromCamera({{ x: x, y: y }}, camera);
+      var hits = _pray.intersectObject(loadedModel, true);
+      if (!hits.length) return null;
+      for (var i = 0; i < parts.length; i++) {{ if (parts[i].meshes.indexOf(hits[0].object) !== -1) return parts[i]; }}
+      return null;
+    }}
+    function projectPartLabel() {{
+      if (!partLabelEl) return;
+      var key = selKey || hoverKey, entry = key && findPart(key);
+      if (!entry) {{ partLabelEl.style.display = 'none'; return; }}
+      var ndc = entry.centroid.clone().project(camera);
+      if (ndc.z >= 1 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {{ partLabelEl.style.display = 'none'; return; }}
+      var cw = canvas.clientWidth, ch = canvas.clientHeight, cfg = PARTS_CFG[key] || {{}};
+      partLabelEl.textContent = cfg.label || key;
+      partLabelEl.style.display = 'block';
+      partLabelEl.style.left = ((ndc.x * 0.5 + 0.5) * cw) + 'px';
+      partLabelEl.style.top = ((-ndc.y * 0.5 + 0.5) * ch) + 'px';
+    }}
+
     function projectDots() {{
       if (!overlay) return;
       var cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -867,13 +933,25 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
       scene.add(model); loadedModel = model;
       if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; }} }}); }} }});
+      // Group meshes by name into parts; centroid (world space) anchors the label.
+      if (PART_HL) {{
+        model.updateMatrixWorld(true);
+        var byKey = {{}}, order = [];
+        model.traverse(function(o) {{
+          if (!o.isMesh) return;
+          var k = o.name || ('Part ' + (order.length + 1));
+          if (!byKey[k]) {{ byKey[k] = {{ key:k, meshes:[], origMats:[], clones:[], level:0, box:new THREE.Box3() }}; order.push(k); }}
+          var e = byKey[k]; e.meshes.push(o); e.origMats.push(o.material); e.clones.push(null); e.box.expandByObject(o);
+        }});
+        parts = order.map(function(k) {{ var e = byKey[k]; e.centroid = e.box.getCenter(new THREE.Vector3()); return e; }});
+      }}
       if (loading) loading.style.display = 'none';
     }}, undefined, function() {{
       if (loading) loading.innerHTML = '<span style="color:#E87070;font-size:13px">Failed to load model</span>';
     }});
     (function animate() {{ requestAnimationFrame(animate);
       if (rotating && !orbit.dragging) {{ orbit.theta += 0.005; updateCamera(); }}
-      renderer.render(scene, camera); projectDots(); }})();
+      renderer.render(scene, camera); projectDots(); if (PART_HL) projectPartLabel(); }})();
     var rotBtn = document.getElementById('rotbtn-' + blockId);
     if (rotBtn) {{
       var paintRot = function() {{
@@ -890,6 +968,22 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     canvas.addEventListener('pointermove', function(e) {{ if (!orbit.dragging) return; orbit.theta -= (e.clientX-orbit.lastX)*0.01; orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - (e.clientY-orbit.lastY)*0.01)); orbit.lastX = e.clientX; orbit.lastY = e.clientY; updateCamera(); }});
     canvas.addEventListener('pointerup', function(e) {{ orbit.dragging = false; try {{ canvas.releasePointerCapture(e.pointerId); }} catch(x) {{}} }});
     canvas.addEventListener('wheel', function(e) {{ e.preventDefault(); orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius + e.deltaY*0.01)); updateCamera(); }}, {{ passive:false }});
+    if (PART_HL) {{
+      var _pdx = 0, _pdy = 0;
+      canvas.addEventListener('pointerdown', function(e) {{ if (e.button === 0) {{ _pdx = e.clientX; _pdy = e.clientY; }} }});
+      canvas.addEventListener('pointermove', function(e) {{
+        if (orbit.dragging) return;
+        var entry = pickPart(e.clientX, e.clientY), k = entry ? entry.key : null;
+        if (k !== hoverKey) {{ hoverKey = k; applyPartLevels(); canvas.style.cursor = k ? 'pointer' : 'grab'; }}
+      }});
+      canvas.addEventListener('pointerup', function(e) {{
+        if (e.button !== 0) return;
+        if (Math.abs(e.clientX - _pdx) > 6 || Math.abs(e.clientY - _pdy) > 6) return;   // dragged, not a click
+        var entry = pickPart(e.clientX, e.clientY), k = entry ? entry.key : null;
+        selKey = (selKey === k) ? null : k; applyPartLevels();
+      }});
+      canvas.addEventListener('pointerleave', function() {{ if (hoverKey) {{ hoverKey = null; applyPartLevels(); }} }});
+    }}
     canvas.addEventListener('keydown', function(e) {{
       var step = 0.05;
       if (e.key === 'ArrowLeft') orbit.theta -= step;
@@ -899,7 +993,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
       else if (e.key === '+' || e.key === '=') orbit.radius = Math.max(orbit.minRadius, orbit.radius - 0.2);
       else if (e.key === '-') orbit.radius = Math.min(orbit.maxRadius, orbit.radius + 0.2);
       else if (e.key === 'r' || e.key === 'R') {{ orbit.theta = 0; orbit.phi = Math.PI/4; orbit.radius = 3; }}
-      else if (e.key === 'Escape') {{ if (activePopover) {{ activePopover.style.display = 'none'; activePopover = null; }} return; }}
+      else if (e.key === 'Escape') {{ if (activePopover) {{ activePopover.style.display = 'none'; activePopover = null; }} if (PART_HL && selKey) {{ selKey = null; applyPartLevels(); }} return; }}
       else return;
       e.preventDefault(); updateCamera();
     }});
