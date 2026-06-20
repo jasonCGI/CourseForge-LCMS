@@ -80,9 +80,10 @@ def _hotspot(regions=None):
         'background_asset_id': None, 'image_id': None,
         'background_url': _svg('Hotspot Background', '#7A3A9A', '⊕', sub='upload image — then place hotspot regions'),
         'regions': regions or [
-            {'id': str(uuid.uuid4()), 'x': 18, 'y': 22, 'w': 20, 'h': 24, 'label': 'Dose & distribute', 'description': 'Weigh ~18 g of fresh grounds into the basket and level them so water flows evenly through the puck.'},
-            {'id': str(uuid.uuid4()), 'x': 52, 'y': 35, 'w': 22, 'h': 20, 'label': 'Tamp', 'description': 'Compress with firm, level pressure so water can\'t channel around the edges of the coffee bed.'},
-            {'id': str(uuid.uuid4()), 'x': 70, 'y': 18, 'w': 18, 'h': 22, 'label': 'Extract', 'description': 'Lock in and pull — aim for a 25–30 second shot with a steady, glossy mouse-tail stream.'},
+            {'id': str(uuid.uuid4()), 'x': 17, 'y': 7,  'w': 24, 'h': 42, 'label': 'Dose — fresh beans', 'description': 'Freshly roasted beans in the dosing cup. Grind just before brewing and weigh out about 18 g for a double shot.'},
+            {'id': str(uuid.uuid4()), 'x': 9,  'y': 55, 'w': 13, 'h': 33, 'label': 'Tamp — the tamper', 'description': 'A calibrated tamper compresses the grounds flat and level so water cannot channel around the puck.'},
+            {'id': str(uuid.uuid4()), 'x': 28, 'y': 49, 'w': 22, 'h': 35, 'label': 'The portafilter', 'description': '18 g dosed and tamped into the portafilter basket, ready to lock into the group head.'},
+            {'id': str(uuid.uuid4()), 'x': 52, 'y': 37, 'w': 22, 'h': 45, 'label': 'The finished drink', 'description': 'A balanced shot pulled in 25–30 seconds, topped with steamed milk for a cappuccino.'},
         ]}}
 
 def _branch(condition, true_label='Yes', false_label='No'):
