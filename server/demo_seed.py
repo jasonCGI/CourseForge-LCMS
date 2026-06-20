@@ -201,12 +201,15 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Video Block</h2><p>The Video block uses the Video.js player for accessible, '
-                   'cross-browser delivery. Process source video through ForgePack to generate MP4, WebM '
-                   'fallback, poster, and VTT caption file — auto-paired by base name on upload.</p>',
-              narration='The Video block uses Video.js for accessible delivery. Process your source video '
-                        'through ForgePack to generate the MP4, WebM, poster, and caption file.'),
-        _video(label='Example Course Video',
-               caption='Replace this placeholder — use the ForgePack Video module first'),
+                   'cross-browser delivery. The clip below is a live example — an AI-generated sample '
+                   'processed into an MP4 (H.264, faststart) with a WebM fallback, poster frame, and VTT '
+                   'track, auto-paired by base name on upload. Run your own source through ForgePack to '
+                   'produce the same set.</p>',
+              narration='The Video block uses Video.js for accessible delivery. This clip is a processed '
+                        'sample with an MP4, WebM fallback, poster, and caption track. Process your source '
+                        'video through ForgePack to generate the same outputs.'),
+        _video(label='Sample Clip',
+               caption='Live example — a 10-second AI-generated clip run through the ForgePack video pipeline'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in an accessible '
@@ -322,7 +325,8 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
     {'name': 'Interactive Video Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
         _text(body='<h2>Interactive Video Block</h2><p>The Interactive Video block (ivideo) combines video '
                    'playback with timecode-triggered interactions authored in <strong>ForgeClip</strong> — '
-                   'quiz checkpoints, hotspot overlays, branch points, WCN overlays, and annotations.</p>'
+                   'quiz checkpoints, hotspot overlays, branch points, WCN overlays, and annotations. The '
+                   'example below is live: a timed annotation plus a pause-on-reach hotspot.</p>'
                    '<p><strong>Workflow:</strong></p><ol>'
                    '<li>Process source video in ForgePack (Interactive Video preset — CFR 30fps)</li>'
                    '<li>Author interactions in ForgeClip — place markers at timecodes</li>'
@@ -331,7 +335,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
               narration='The Interactive Video block plays a processed video with timecode-triggered '
                         'interactions authored in ForgeClip. After authoring, Bake and Export inserts hold '
                         'frames, then upload the baked MP4 and clip JSON here.'),
-        _ivideo(caption='Upload _baked.mp4 + _baked.clip.json from the ForgeClip mediaPackage to activate'),
+        _ivideo(caption='Live example — annotation (2-8s) + pause-on-reach hotspot (4-9s), authored in ForgeClip'),
     ]},
     {'name': 'OAM Block — Adobe Animate', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
         _text(body='<h2>OAM Block — Adobe Animate Canvas</h2><p>The OAM block embeds Adobe Animate Canvas '
