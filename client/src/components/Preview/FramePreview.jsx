@@ -167,7 +167,7 @@ export function renderBlockToHTML(block) {
   const d = block.data || {}
   switch (block.type) {
     case 'text':
-      return `<div class="cf-injected-text">${d.body || ''}</div>`
+      return `<div class="cf-injected-text" style="font-size:18px;line-height:1.7">${d.body || ''}</div>`
     case 'media': {
       const k = d.kind
       if (k === 'image' && d.serve_url)
@@ -245,7 +245,7 @@ function PreviewText({ block }) {
     <div style={previewBlockWrap}>
       {block.data.body && (
         <div
-          style={{ fontSize: 15, lineHeight: 1.7, color: '#1a1a1a', marginBottom: 12 }}
+          style={{ fontSize: 18, lineHeight: 1.7, color: '#1a1a1a', marginBottom: 12 }}
           dangerouslySetInnerHTML={{ __html: block.data.body }}
         />
       )}

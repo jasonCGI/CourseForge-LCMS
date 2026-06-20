@@ -58,16 +58,19 @@ export default function PersistentPreviewPane() {
   const total = order.length || 1
   const human = idx >= 0 ? idx + 1 : 1
 
-  // Rich-media blocks (3D / iVideo / OAM) are WebGL/runtime React components that
-  // can't be injected as static HTML — when a frame has any, render the whole
-  // block stack as a scaled React overlay over the content area instead of injecting.
-  const hasRich = useMemo(
-    () => (activeFrame?.content?.blocks || []).some(b => ['model3d', 'ivideo', 'oam'].includes(b.type)),
+  // Interactive / runtime blocks (3D, iVideo, OAM, hotspot, quiz, branch, WCN)
+  // must render as live React rather than static injected HTML — so the shell
+  // preview is actually clickable and matches the learner experience. When a frame
+  // has any, render the whole block stack as a scaled React overlay over the
+  // content area. Static-only frames (text/image/video/audio) keep HTML injection.
+  const needsOverlay = useMemo(
+    () => (activeFrame?.content?.blocks || []).some(
+      b => ['model3d', 'ivideo', 'oam', 'hotspot', 'quiz', 'branch', 'wcn'].includes(b.type)),
     [activeFrame?.content?.blocks],
   )
   const frameHtml = useMemo(
-    () => (hasRich ? '' : (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join('')),
-    [hasRich, activeFrame?.content?.blocks],
+    () => (needsOverlay ? '' : (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join('')),
+    [needsOverlay, activeFrame?.content?.blocks],
   )
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
@@ -94,8 +97,8 @@ export default function PersistentPreviewPane() {
         // no scroll. The shell scales its own stage to fill this sized wrapper.
         <ShellFit
           stage={stage}
-          contentArea={hasRich ? contentArea : null}
-          overlay={hasRich ? (
+          contentArea={needsOverlay ? contentArea : null}
+          overlay={needsOverlay ? (
             <PreviewErrorBoundary resetKey={activeFrame.id}>
               <FramePreview frame={activeFrame} ignoreGui hideTitle
                 activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
