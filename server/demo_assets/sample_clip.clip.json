@@ -5,8 +5,8 @@
   "video": { "filename": "sample_video.mp4", "duration": 10, "width": 1280, "height": 720 },
   "interactions": [
     { "id": "ix-annot", "type": "annotation", "timecode": 2.0, "end_timecode": 8.0, "pause_on_reach": false,
-      "data": { "x": 24, "y": 28, "text": "Sample annotation — authored in ForgeClip" } },
+      "data": { "x": 24, "y": 28, "text": "Tamp level and lock in for an even extraction — authored in ForgeClip" } },
     { "id": "ix-hot", "type": "hotspot", "timecode": 4.0, "end_timecode": 9.0, "pause_on_reach": true,
-      "data": { "x": 70, "y": 60, "label": "Sample hotspot", "description": "The video holds here until you click the highlighted area." } }
+      "data": { "x": 70, "y": 60, "label": "Check the pour", "description": "The video holds here until you click the highlighted area — your cue to check the shot before serving." } }
   ]
 }

@@ -80,9 +80,9 @@ def _hotspot(regions=None):
         'background_asset_id': None, 'image_id': None,
         'background_url': _svg('Hotspot Background', '#7A3A9A', '⊕', sub='upload image — then place hotspot regions'),
         'regions': regions or [
-            {'id': str(uuid.uuid4()), 'x': 18, 'y': 22, 'w': 20, 'h': 24, 'label': 'Region A', 'description': 'Click to reveal information about Region A.'},
-            {'id': str(uuid.uuid4()), 'x': 52, 'y': 35, 'w': 22, 'h': 20, 'label': 'Region B', 'description': 'Click to reveal information about Region B.'},
-            {'id': str(uuid.uuid4()), 'x': 70, 'y': 18, 'w': 18, 'h': 22, 'label': 'Region C', 'description': 'Click to reveal information about Region C.'},
+            {'id': str(uuid.uuid4()), 'x': 18, 'y': 22, 'w': 20, 'h': 24, 'label': 'Dose & distribute', 'description': 'Weigh ~18 g of fresh grounds into the basket and level them so water flows evenly through the puck.'},
+            {'id': str(uuid.uuid4()), 'x': 52, 'y': 35, 'w': 22, 'h': 20, 'label': 'Tamp', 'description': 'Compress with firm, level pressure so water can\'t channel around the edges of the coffee bed.'},
+            {'id': str(uuid.uuid4()), 'x': 70, 'y': 18, 'w': 18, 'h': 22, 'label': 'Extract', 'description': 'Lock in and pull — aim for a 25–30 second shot with a steady, glossy mouse-tail stream.'},
         ]}}
 
 def _branch(condition, true_label='Yes', false_label='No'):
@@ -101,13 +101,14 @@ def _model3d(caption=''):
         'environment': 'studio', 'env_intensity': 1.4,
         'caption': caption or '3D model placeholder — upload .glb exported from 3ds Max or Blender',
         'annotations': [
-            {'id': str(uuid.uuid4()), 'label': 'Example annotation A',
-             'description': 'Click pins on the model to reveal part labels and descriptions. '
-                            'Place pins in the editor by enabling preview then clicking the Place pin button.',
+            {'id': str(uuid.uuid4()), 'label': 'Crema & latte art',
+             'description': 'The espresso crema and poured microfoam sit on top. Click pins on the model to '
+                            'reveal part labels — place your own in the editor by enabling Preview, then '
+                            'clicking the Place pin button.',
              'position': {'x': 0.5, 'y': 0.8, 'z': 0.0}, 'color': '#F59E0B'},
-            {'id': str(uuid.uuid4()), 'label': 'Example annotation B',
-             'description': 'Pins track the model as learners orbit and zoom. '
-                            'Pins behind the model are hidden automatically.',
+            {'id': str(uuid.uuid4()), 'label': 'Mug handle',
+             'description': 'Pins track the model as learners orbit and zoom; pins behind the mug are hidden '
+                            'automatically so the callouts never overlap.',
              'position': {'x': -0.5, 'y': 0.3, 'z': 0.4}, 'color': '#F59E0B'},
         ]}}
 
@@ -228,26 +229,26 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
 
     # ── Assessment Blocks ──
     {'name': 'Quiz Block', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
-        _text(body='<h2>Quiz Block</h2><p>Test your understanding of the CourseForge workflow. Select the '
+        _text(body='<h2>Quiz Block</h2><p>Test your understanding of espresso fundamentals. Select the '
                    'best answer and click Submit. You have two attempts.</p>',
               narration='Test your understanding with this knowledge check. Select the best answer and '
                         'click Submit. You have two attempts.'),
         _quiz(
-            question='A courseware developer receives a raw .mov file from a video producer. What should '
-                     'they do before uploading it to a CourseForge Video block?',
+            question='A barista pulls an espresso shot that finishes in about 12 seconds and tastes sharp '
+                     'and sour. What is the most reliable fix?',
             choices=[
-                'Upload it directly — CourseForge converts formats automatically',
-                'Rename the file to .mp4 and upload it',
-                'Process it through ForgePack Video to generate MP4, WebM, poster, and caption file',
-                'Convert it in QuickTime Player and upload the result',
+                'Use a coarser grind so the water flows through faster',
+                'Grind finer so the shot slows down and extracts more sweetness',
+                'Raise the water temperature to boiling (100 °C)',
+                'Pull a much longer shot to dilute the sourness',
             ],
-            correct_index=2,
-            feedback_correct='Correct! ForgePack Video processes the source file and generates all required '
-                             'output formats — MP4 (primary), WebM (fallback), poster, and VTT caption file. '
-                             'CourseForge auto-pairs them by base name on upload.',
-            feedback_incorrect='Not quite. CourseForge does not transcode video internally. Source files '
-                               'should be processed through ForgePack Video first, which generates the MP4, '
-                               'WebM, poster, and VTT caption file the Video block needs.'),
+            correct_index=1,
+            feedback_correct='Correct! A ~12-second shot is under-extracted — water rushed through the puck. '
+                             'A finer grind adds resistance, slowing the flow toward the 25–30 second target so '
+                             'the shot develops the sweetness that balances the sourness.',
+            feedback_incorrect='Not quite. A fast, sour shot is under-extracted. The fix is a finer grind to '
+                               'slow the flow toward 25–30 seconds — hotter water or a longer pull won\'t '
+                               'correct a grind that is letting water race through.'),
     ]},
     {'name': 'Hotspot Block', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
         _text(body='<h2>Hotspot Block</h2><p>The Hotspot block overlays clickable regions on an image. '
@@ -264,10 +265,10 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                    '<p>Select an option below to see the branch interaction.</p>',
               narration='The Branch block routes learners to different frames based on their response. '
                         'Set the target frame for each path in the block editor.'),
-        _branch(condition='Has the learner completed the prerequisite ForgePack training before authoring '
-                          'video content?',
-                true_label='Yes — continue to advanced content',
-                false_label='No — review ForgePack first'),
+        _branch(condition='Has the barista completed the Espresso Foundations module before moving on to '
+                          'milk steaming and latte art?',
+                true_label='Yes — continue to milk steaming',
+                false_label='No — review Espresso Foundations first'),
     ]},
 
     # ── Safety Blocks ──
@@ -278,11 +279,11 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                    'acknowledgment before they continue.</p>',
               narration='Warning blocks use MIL-SPEC hazard symbols for safety-critical information. In inline '
                         'mode, the warning appears within the frame and requires acknowledgment before proceeding.'),
-        _wcn(wcn_type='warning', title='Critical Safety Requirement',
-             text='All personnel must verify system power-down and lockout/tagout procedures are complete '
-                  'before accessing internal components. Failure to confirm system state prior to any '
-                  'maintenance action may result in serious injury or death. This step is mandatory and '
-                  'cannot be bypassed.',
+        _wcn(wcn_type='warning', title='Steam Wand Burn Hazard',
+             text='The steam wand and its tip exceed 150 °C and stay dangerously hot after use. Never grip the '
+                  'wand by the metal tip, always purge and wipe it pointed into the drip tray, and keep hands '
+                  'and forearms clear of the steam path. Contact with live steam or the tip can cause severe '
+                  'burns. This acknowledgment is required before proceeding.',
              modal=False, ack_label='I understand — proceed'),
     ]},
     {'name': 'Caution Block (Modal)', 'frame_type': 'content', 'lesson': 'Safety Blocks', 'blocks': [
@@ -292,12 +293,12 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                    'missed.</p><p>Click the Caution button below to trigger the modal.</p>',
               narration='In modal mode, the caution block interrupts the frame entirely and requires explicit '
                         'acknowledgment before any other content is accessible.'),
-        _wcn(wcn_type='caution', title='Torque Specification — Do Not Exceed',
-             text='Fasteners on this assembly must be torqued to 35 ft-lbs using a calibrated torque wrench. '
-                  'Over-torquing will strip threads in the composite housing and require full panel '
-                  'replacement. Verify torque wrench calibration date before beginning. Do not proceed if '
-                  'calibration is out of date.',
-             modal=True, ack_label='I have verified torque specifications — continue'),
+        _wcn(wcn_type='caution', title='Lock the Portafilter Before Brewing',
+             text='Always seat the portafilter fully and lock it into the group head before starting a shot. '
+                  'A loose or partially seated portafilter can release under roughly 9 bar of brewing pressure, '
+                  'spraying scalding water and grounds across the workspace. Confirm a snug, square lock and '
+                  'clear the area before you press brew.',
+             modal=True, ack_label='I have locked the portafilter — continue'),
     ]},
     {'name': 'Note Block (Inline)', 'frame_type': 'content', 'lesson': 'Safety Blocks', 'blocks': [
         _text(body='<h2>Note Block — Inline Mode</h2><p>The Note block provides supplementary information, '
@@ -305,10 +306,11 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                    'the acknowledge button is present but not required for progression.</p>',
               narration='Note blocks communicate helpful supplementary information. Unlike warnings and '
                         'cautions, notes do not interrupt the learning flow or block progression.'),
-        _wcn(wcn_type='note', title='Keyboard Navigation',
-             text='CourseForge-published courses are fully keyboard navigable. In the 3D model viewer: arrow '
-                  'keys orbit, +/- zoom, R resets the camera. Tab navigates between annotation pins and Enter '
-                  'opens the popover. All interactions meet WCAG 2.1 AA and Section 508 requirements.',
+        _wcn(wcn_type='note', title='Milk Steaming Tip',
+             text='Steam whole milk to about 60–65 °C — warm to the touch, not scalding — for the sweetest, '
+                  'glossiest microfoam. Past roughly 70 °C the milk proteins break down, the foam turns stiff '
+                  'and bubbly, and the natural sweetness is lost. Wipe and purge the steam wand after every '
+                  'pitcher to keep it clean.',
              modal=False, ack_label='Got it — continue'),
     ]},
 
