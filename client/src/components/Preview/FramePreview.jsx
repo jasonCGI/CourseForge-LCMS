@@ -6,7 +6,7 @@ import OamMediaBar from './OamMediaBar'
 
 const FRAME_BG = '#ffffff'
 
-export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false }) {
+export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false }) {
   if (!frame) return null
 
   const allBlocks = frame.content?.blocks || []
@@ -50,17 +50,19 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       padding: '28px 0 40px',
       boxSizing: 'border-box',
     }}>
-      {/* Frame title */}
-      <h1 style={{
-        fontSize: 22,
-        fontWeight: 600,
-        color: '#042C53',
-        margin: '0 25px 24px',
-        paddingBottom: 12,
-        borderBottom: '2px solid var(--forge-amber)',
-      }}>
-        {frame.name}
-      </h1>
+      {/* Frame title (hidden when the shell already shows it in its chrome) */}
+      {!hideTitle && (
+        <h1 style={{
+          fontSize: 22,
+          fontWeight: 600,
+          color: '#042C53',
+          margin: '0 25px 24px',
+          paddingBottom: 12,
+          borderBottom: '2px solid var(--forge-amber)',
+        }}>
+          {frame.name}
+        </h1>
+      )}
 
       {blocks.length === 0 && (
         <p style={{ color: '#888', fontStyle: 'italic', padding: '0 25px' }}>No content blocks in this frame.</p>

@@ -30,13 +30,23 @@ export default function PersistentPreviewPane() {
   // Fetch the shell's stage dimensions so the preview can show the ENTIRE GUI
   // at its true aspect ratio (the shell scales its stage to fit the iframe).
   const [stage, setStage] = useState(null)
+  // content_area rect (stage coords) so rich-media (3D/iVideo/OAM) React
+  // components can be overlaid exactly over the shell's #fgui-content.
+  const [contentArea, setContentArea] = useState(null)
   useEffect(() => {
-    if (!shellId) { setStage(null); return }
+    if (!shellId) { setStage(null); setContentArea(null); return }
     let live = true
     fetch(`/api/gui-shells/${shellId}/shell.json`)
       .then(r => (r.ok ? r.json() : null))
-      .then(cfg => { if (live) { const s = cfg?.stage || {}; setStage({ w: s.width || 1024, h: s.height || 768 }) } })
-      .catch(() => { if (live) setStage({ w: 1024, h: 768 }) })
+      .then(cfg => {
+        if (!live) return
+        const s = cfg?.stage || {}
+        const sw = s.width || 1024, sh = s.height || 768
+        setStage({ w: sw, h: sh })
+        const ca = cfg?.content_area || cfg?.contentArea || {}
+        setContentArea({ x: ca.x ?? 0, y: ca.y ?? 0, width: ca.width ?? sw, height: ca.height ?? sh })
+      })
+      .catch(() => { if (live) { setStage({ w: 1024, h: 768 }); setContentArea({ x: 0, y: 0, width: 1024, height: 768 }) } })
     return () => { live = false }
   }, [shellId])
 
@@ -48,9 +58,16 @@ export default function PersistentPreviewPane() {
   const total = order.length || 1
   const human = idx >= 0 ? idx + 1 : 1
 
-  const frameHtml = useMemo(
-    () => (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join(''),
+  // Rich-media blocks (3D / iVideo / OAM) are WebGL/runtime React components that
+  // can't be injected as static HTML — when a frame has any, render the whole
+  // block stack as a scaled React overlay over the content area instead of injecting.
+  const hasRich = useMemo(
+    () => (activeFrame?.content?.blocks || []).some(b => ['model3d', 'ivideo', 'oam'].includes(b.type)),
     [activeFrame?.content?.blocks],
+  )
+  const frameHtml = useMemo(
+    () => (hasRich ? '' : (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join('')),
+    [hasRich, activeFrame?.content?.blocks],
   )
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
@@ -75,7 +92,16 @@ export default function PersistentPreviewPane() {
         // Always show the WHOLE GUI: contain-fit the stage within the pane (both
         // width AND height), scaled down (or up) so nothing is clipped and there's
         // no scroll. The shell scales its own stage to fill this sized wrapper.
-        <ShellFit stage={stage}>
+        <ShellFit
+          stage={stage}
+          contentArea={hasRich ? contentArea : null}
+          overlay={hasRich ? (
+            <PreviewErrorBoundary resetKey={activeFrame.id}>
+              <FramePreview frame={activeFrame} ignoreGui hideTitle
+                activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
+            </PreviewErrorBoundary>
+          ) : null}
+        >
           <GUIShellRenderer
             key={shellId}
             shellUrl={`/api/gui-shells/${shellId}/shell.html`}
@@ -100,7 +126,7 @@ export default function PersistentPreviewPane() {
 // Sizes its child to the largest box with the stage's aspect ratio that fits
 // entirely inside the pane (contain). Measured via ResizeObserver because pure
 // CSS can't contain-fit an aspect-ratio box against both dimensions at once.
-function ShellFit({ stage, children }) {
+function ShellFit({ stage, children, contentArea, overlay }) {
   const ref = useRef(null)
   const [box, setBox] = useState(null)
   const sw = stage?.w || 1024, sh = stage?.h || 768
@@ -118,11 +144,30 @@ function ShellFit({ stage, children }) {
     ro.observe(el); compute()
     return () => ro.disconnect()
   }, [sw, sh])
+  const scale = box ? box.w / sw : 1
   return (
     <div ref={ref} style={{ flex: 1, overflow: 'hidden', background: '#000',
       display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ width: box ? box.w : '100%', height: box ? box.h : '100%', flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: box ? box.w : '100%', height: box ? box.h : '100%', flexShrink: 0 }}>
         {children}
+        {overlay && box && contentArea && (
+          // Rich-media React stack, rendered at the content area's NATIVE size then
+          // scaled with the shell so it overlays #fgui-content pixel-for-pixel.
+          <div style={{
+            position: 'absolute',
+            left: Math.round(contentArea.x * scale),
+            top: Math.round(contentArea.y * scale),
+            width: contentArea.width,
+            height: contentArea.height,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            overflow: 'auto',
+            background: '#fff',
+            zIndex: 5,
+          }}>
+            {overlay}
+          </div>
+        )}
       </div>
     </div>
   )
