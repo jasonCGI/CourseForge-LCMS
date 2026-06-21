@@ -8,7 +8,7 @@ import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
 
 const FRAME_BG = '#ffffff'
 
-export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false }) {
+export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false, contentArea = null }) {
   if (!frame) return null
 
   const allBlocks = frame.content?.blocks || []
@@ -36,8 +36,13 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
     )
   }
 
-  const textBlocks  = blocks.filter(b => b.type === 'text')
-  const otherBlocks = blocks.filter(b => b.type !== 'text')
+  // In the GUI-shell overlay (contentArea present), blocks with custom bounds
+  // break out of the stack and render as absolute boxes positioned in content-area
+  // pixels; the rest keep flowing. Without a contentArea, bounds are ignored.
+  const bounded = contentArea ? blocks.filter(b => b.data?.bounds) : []
+  const flow    = contentArea ? blocks.filter(b => !b.data?.bounds) : blocks
+  const textBlocks  = flow.filter(b => b.type === 'text')
+  const otherBlocks = flow.filter(b => b.type !== 'text')
   const renderBlock = (block) => (
     <SelectableBlock key={block.id} block={block}
       active={block.id === activeBlockId} onSelect={onBlockSelect} />
@@ -73,7 +78,7 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       {/* Basic two-zone layout: text on the left half, media/image/3D on the right
           half — each 50%, 25px padding. A layout-preset dropdown (text-left/
           image-right, image-left/text-right, …) will replace this default later. */}
-      {blocks.length > 0 && (
+      {flow.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 25 }}>
             {textBlocks.map(renderBlock)}
@@ -83,6 +88,14 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           </div>
         </div>
       )}
+      {/* Custom-bounds blocks: absolute boxes in content-area pixels (anchor to the
+          scaled shell overlay). */}
+      {bounded.map(b => (
+        <div key={b.id} style={{ position: 'absolute', left: b.data.bounds.x, top: b.data.bounds.y,
+          width: b.data.bounds.width, height: b.data.bounds.height, overflow: 'hidden', zIndex: 1 }}>
+          {renderBlock(b)}
+        </div>
+      ))}
     </div>
   )
 }
@@ -756,13 +769,14 @@ function PreviewModel3D({ block }) {
       </div>
     )
   }
+  const bounded = !!block.data.bounds
   return (
-    <div style={previewBlockWrap}>
+    <div style={bounded ? { width: '100%', height: '100%' } : previewBlockWrap}>
       <Model3DViewer
         modelUrl={block.data.model_serve_url}
         caption={block.data.caption}
         attribution={block.data.attribution}
-        height={block.data.viewer_height || 400}
+        height={block.data.bounds?.height || block.data.viewer_height || 400}
         bgColor={block.data.bg_color || '#0d1017'}
         environment={block.data.environment || 'studio'}
         envIntensity={block.data.env_intensity ?? 1}

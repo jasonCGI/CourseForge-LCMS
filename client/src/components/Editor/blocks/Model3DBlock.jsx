@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import Model3DViewer   from '../../Preview/Model3DViewer'
+import BoundsControl    from './BoundsControl'
 import { uploadModel } from '../../../api/client'
 
 const DOT_COLOR = '#F59E0B'  // concrete forge amber — stored + used in SCORM
@@ -30,18 +31,20 @@ export default function Model3DBlock({ block }) {
   // the model blends into the shell. Resolve it from the shell config, then seed
   // a not-yet-set bg_color once (existing blocks keep their explicit color).
   const [caBg, setCaBg] = useState(null)
+  const [caDims, setCaDims] = useState(null)   // content-area {width,height} for per-block bounds
   const shellId = activeProject?.gui_shell_id || null
   useEffect(() => {
-    if (!shellId) { setCaBg('#0d1017'); return }   // no shell -> classic dark default
+    if (!shellId) { setCaBg('#0d1017'); setCaDims({ width: 600, height: 500 }); return }   // no shell -> defaults
     let live = true
     fetch(`/api/gui-shells/${shellId}/shell.json`)
       .then(r => (r.ok ? r.json() : null))
       .then(cfg => {
         if (!live) return
-        const c = (cfg?.content_area || cfg?.contentArea || {}).bg_color
-        setCaBg(c && c !== 'transparent' ? c : '#0d1017')   // only real colors inherit
+        const ca = cfg?.content_area || cfg?.contentArea || {}
+        setCaBg(ca.bg_color && ca.bg_color !== 'transparent' ? ca.bg_color : '#0d1017')   // only real colors inherit
+        setCaDims({ width: Math.round(ca.width || 600), height: Math.round(ca.height || 500) })
       })
-      .catch(() => { if (live) setCaBg('#0d1017') })
+      .catch(() => { if (live) { setCaBg('#0d1017'); setCaDims({ width: 600, height: 500 }) } })
     return () => { live = false }
   }, [shellId])
   useEffect(() => {
@@ -158,7 +161,7 @@ export default function Model3DBlock({ block }) {
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               attribution={block.data.attribution}
-              height={block.data.viewer_height || 400} bgColor={bg}
+              height={block.data.bounds?.height || block.data.viewer_height || 400} bgColor={bg}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
@@ -209,6 +212,9 @@ export default function Model3DBlock({ block }) {
                 </div>
               </div>
             </div>
+
+            <BoundsControl bounds={block.data.bounds} contentArea={caDims}
+              onChange={b => update('bounds', b)} labelStyle={labelStyle} inputStyle={inputStyle} />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
               <div>

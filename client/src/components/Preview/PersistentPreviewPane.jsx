@@ -100,7 +100,7 @@ export default function PersistentPreviewPane() {
           contentArea={needsOverlay ? contentArea : null}
           overlay={needsOverlay ? (
             <PreviewErrorBoundary resetKey={activeFrame.id}>
-              <FramePreview frame={activeFrame} ignoreGui hideTitle
+              <FramePreview frame={activeFrame} ignoreGui hideTitle contentArea={contentArea}
                 activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
             </PreviewErrorBoundary>
           ) : null}
