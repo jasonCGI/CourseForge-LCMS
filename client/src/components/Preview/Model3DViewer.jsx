@@ -90,7 +90,7 @@ function setEntryLevel(THREE, entry, level) {
       return
     }
     if (!entry.clones[i]) entry.clones[i] = Array.isArray(orig) ? orig.map(m => m.clone()) : orig.clone()
-    const intensity = level === 2 ? 0.6 : 0.28
+    const intensity = level === 2 ? 0.7 : 0.28
     const cl = entry.clones[i]
     ;(Array.isArray(cl) ? cl : [cl]).forEach(m => {
       if ('emissive' in m) { m.emissive = new THREE.Color(0xF59E0B); m.emissiveIntensity = intensity; m.needsUpdate = true }
@@ -610,13 +610,26 @@ export default function Model3DViewer({
         </div>
       )}
       {partHighlight && partLabel && (
-        <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
-          transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
-          background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
-          borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
-          fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
-          {partLabel.text}
-        </div>
+        <>
+          {/* leader line: part centroid -> label pill (10px gap above the dot) */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y - 10,
+            width: 2, height: 10, transform: 'translateX(-50%)', background: 'var(--forge-amber, #F59E0B)',
+            zIndex: 24, pointerEvents: 'none' }} />
+          {/* dot anchored on the highlighted part */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
+            width: 9, height: 9, borderRadius: '50%', transform: 'translate(-50%, -50%)',
+            background: 'var(--forge-amber, #F59E0B)', border: '2px solid rgba(255,255,255,0.9)',
+            boxShadow: '0 0 0 3px rgba(245,158,11,0.25), 0 2px 6px rgba(0,0,0,0.45)',
+            zIndex: 26, pointerEvents: 'none' }} />
+          {/* label pill */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
+            transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
+            background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
+            borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
+            fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
+            {partLabel.text}
+          </div>
+        </>
       )}
       </div>
       {caption && <p style={{ fontSize: 12, color: 'var(--cf-text-tertiary)', marginTop: 6, fontFamily: 'var(--cf-font)' }}>{caption}</p>}

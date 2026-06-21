@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import Model3DViewer   from '../../Preview/Model3DViewer'
@@ -25,6 +25,30 @@ export default function Model3DBlock({ block }) {
   const [selPart, setSelPart] = useState(null)             // selected part key (bidirectional w/ viewer)
 
   const update      = (field, val) => updateBlock(block.id, { [field]: val })
+
+  // The 3D viewer background defaults to the project's GUI content-area color so
+  // the model blends into the shell. Resolve it from the shell config, then seed
+  // a not-yet-set bg_color once (existing blocks keep their explicit color).
+  const [caBg, setCaBg] = useState(null)
+  const shellId = activeProject?.gui_shell_id || null
+  useEffect(() => {
+    if (!shellId) { setCaBg('#0d1017'); return }   // no shell -> classic dark default
+    let live = true
+    fetch(`/api/gui-shells/${shellId}/shell.json`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(cfg => {
+        if (!live) return
+        const c = (cfg?.content_area || cfg?.contentArea || {}).bg_color
+        setCaBg(c && c !== 'transparent' ? c : '#0d1017')   // only real colors inherit
+      })
+      .catch(() => { if (live) setCaBg('#0d1017') })
+    return () => { live = false }
+  }, [shellId])
+  useEffect(() => {
+    if (block.data.bg_color == null && caBg) update('bg_color', caBg)   // seed once
+  }, [block.data.bg_color, caBg])   // eslint-disable-line react-hooks/exhaustive-deps
+  const bg = block.data.bg_color || caBg || '#0d1017'
+
   const annotations = block.data.annotations || []
   const hasModel    = !!block.data.model_asset_id
   const partsCfg    = block.data.parts || {}
@@ -134,7 +158,7 @@ export default function Model3DBlock({ block }) {
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               attribution={block.data.attribution}
-              height={block.data.viewer_height || 400} bgColor={block.data.bg_color || '#0d1017'}
+              height={block.data.viewer_height || 400} bgColor={bg}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
@@ -179,8 +203,8 @@ export default function Model3DBlock({ block }) {
               <div>
                 <label style={labelStyle}>Background</label>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input type="color" value={block.data.bg_color || '#0d1017'} onChange={e => update('bg_color', e.target.value)} aria-label="Viewer background color" style={{ width: 36, height: 32, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 2 }} />
-                  <input type="text" value={block.data.bg_color || '#0d1017'} onChange={e => update('bg_color', e.target.value)} aria-label="Background color hex" style={{ ...inputStyle, flex: 1 }} />
+                  <input type="color" value={bg} onChange={e => update('bg_color', e.target.value)} aria-label="Viewer background color" style={{ width: 36, height: 32, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 2 }} />
+                  <input type="text" value={bg} onChange={e => update('bg_color', e.target.value)} aria-label="Background color hex" style={{ ...inputStyle, flex: 1 }} />
                 </div>
               </div>
             </div>

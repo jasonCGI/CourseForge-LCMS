@@ -254,7 +254,7 @@ function _makeBlock(type) {
     oam:   { oam_asset_id: null, width: 800, height: 600, responsive: false, scorm_bridge_enabled: false, caption: '' },
     wcn:   { wcn_type: 'note', title: '', text: '', modal: false, ack_label: 'I understand — proceed' },
     ivideo: { video_asset_id: null, clip_asset_id: null, video_filename: null, video_serve_url: null, interaction_count: null, video_duration: null, caption: '' },
-    model3d: { model_asset_id: null, model_filename: null, model_serve_url: null, file_size_mb: null, viewer_height: 400, bg_color: '#0d1017', caption: '', annotations: [] },
+    model3d: { model_asset_id: null, model_filename: null, model_serve_url: null, file_size_mb: null, viewer_height: 400, bg_color: null, caption: '', annotations: [] },
     gui:     { gui_asset_id: null, shell_name: null, stage_width: 1024, stage_height: 768, button_count: 0, zone_count: 0, html_serve_url: null, json_serve_url: null },
   }
   return { id, type, data: defaults[type] || {} }
