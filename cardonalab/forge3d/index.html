@@ -38,6 +38,8 @@ body{font-family:var(--mono);background:var(--bg);color:var(--t1);min-height:100
 .paper-panel{flex:1;background:var(--paper);overflow-y:auto;min-height:100vh}
 .viewer-header{padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--navy)}
 .wordmark{font-size:15px;display:flex;align-items:baseline;flex-shrink:0}
+/* GLOBAL DESIGN RULE — Non-selectable brand marks: the wordmark logo is a brand mark, not selectable text, so no text-selection / copy highlight. May expand to other brand elements later. */
+.wordmark{-webkit-user-select:none;user-select:none}
 .wm-root{font-weight:300;color:#9C9CC0}
 .wm-sl{font-weight:300;color:var(--amber)}
 .wm-tool{font-weight:600;color:#fff}

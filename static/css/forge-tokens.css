@@ -165,3 +165,17 @@
   --forge-text-tertiary:   #AAAAAA;
   --forge-text-muted:      #666666;
 }
+
+/* ============================================================
+   GLOBAL DESIGN RULE — Non-selectable brand marks
+   Wordmark logos are brand marks, not selectable text, so they
+   must not show a text-selection / copy highlight in the browser.
+   Applies to the Path logo system (.forge-path) and the inline
+   wordmark variant (.wordmark). May expand to other brand
+   elements later — add selectors to this single rule.
+   ============================================================ */
+.forge-path,
+.wordmark {
+  -webkit-user-select: none;
+  user-select: none;
+}
