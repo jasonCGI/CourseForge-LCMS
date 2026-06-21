@@ -3,6 +3,8 @@ import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import MediaUploader   from './MediaUploader'
 import { uploadMedia, uploadClip, getMediaAsset } from '../../../api/client'
+import BoundsControl from './BoundsControl'
+import useContentArea from '../../../hooks/useContentArea'
 
 const VIDEO_ACCEPT = {
   'video/mp4':       ['.mp4'],
@@ -63,6 +65,7 @@ export default function IVideoBlock({ block }) {
   }, [activeProject, block.id, updateBlock, videoId])
 
   const update = (field, val) => updateBlock(block.id, { [field]: val })
+  const caDims = useContentArea()
 
   return (
     <div style={{
@@ -165,6 +168,13 @@ export default function IVideoBlock({ block }) {
             placeholder="Optional caption shown below the player"
             aria-label="Interactive video caption" style={inputStyle} />
         </div>
+
+        {videoId && (
+          <div style={{ marginTop: 14 }}>
+            <BoundsControl bounds={block.data.bounds} contentArea={caDims}
+              onChange={b => update('bounds', b)} labelStyle={sectionLabel} inputStyle={inputStyle} />
+          </div>
+        )}
 
         {/* ForgeClip link */}
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--cf-border-tertiary)' }}>

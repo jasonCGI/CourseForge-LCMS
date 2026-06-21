@@ -6,6 +6,8 @@ import MediaUploader    from './MediaUploader'
 import { uploadOam, getOamAsset } from '../../../api/client'
 import OamMediaBar from '../../Preview/OamMediaBar'
 import useForgeConfigStore, { DEFAULT_HS } from '../../../store/forgeConfigStore'
+import BoundsControl from './BoundsControl'
+import useContentArea from '../../../hooks/useContentArea'
 
 const OAM_ACCEPT = {
   'application/vnd.adobe.oam+zip': ['.oam'],
@@ -71,6 +73,7 @@ export default function OamBlock({ block }) {
   }, [activeProject, block.id, updateBlock])
 
   const update = (field, val) => updateBlock(block.id, { [field]: val })
+  const caDims = useContentArea()
 
   return (
     <div style={{
@@ -216,6 +219,9 @@ export default function OamBlock({ block }) {
                 Responsive (fills container width)
               </label>
             </div>
+
+            <BoundsControl bounds={block.data.bounds} contentArea={caDims}
+              onChange={b => update('bounds', b)} labelStyle={fieldLabel} inputStyle={inputStyle} />
 
             {/* SCORM bridge toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>

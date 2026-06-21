@@ -292,14 +292,15 @@ function PreviewMedia({ block }) {
     const cf = d.asset_meta?.companion_files
     const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
       ? `/api/media/serve/${cf.poster_asset_id}` : undefined
+    const b = d.bounds
     return (
-      <div style={{ ...previewBlockWrap, textAlign: 'center' }}>
+      <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
-          style={{ maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
+          style={b ? { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
           {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
             <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
         </video>
-        {d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
+        {!b && d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
       </div>
     )
   }
@@ -318,14 +319,15 @@ function PreviewMedia({ block }) {
   // If a placeholder/asset image is available (demo blocks seed an SVG data-URI
   // in serve_url), render it so the preview shows the intended media slot.
   if (block.data.serve_url && (kind === 'image' || kind === 'video')) {
+    const b = d.bounds
     return (
-      <div style={{ ...previewBlockWrap, textAlign: 'center' }}>
+      <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <img
           src={block.data.serve_url}
           alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
-          style={{ maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
+          style={b ? { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
         />
-        {block.data.caption && (
+        {!b && block.data.caption && (
           <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{block.data.caption}</div>
         )}
       </div>
@@ -735,14 +737,15 @@ function PreviewIVideo({ block }) {
     )
   }
 
+  const b = block.data.bounds
   return (
-    <div style={previewBlockWrap}>
+    <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
       <IVideoRuntime
         videoSrc={block.data.video_serve_url || `/api/media/serve/${videoId}`}
         clipData={clipData}
         onComplete={() => {}}
       />
-      {block.data.caption && (
+      {!b && block.data.caption && (
         <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{block.data.caption}</p>
       )}
     </div>
@@ -808,9 +811,10 @@ function PreviewOAM({ block }) {
     )
   }
   const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
+  const b = d.bounds
   return (
-    <div style={previewBlockWrap}>
-      <OamMediaBar src={src} width={d.width || 800} height={d.height || 500} caption={d.caption} />
+    <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
+      <OamMediaBar src={src} width={b ? b.width : (d.width || 800)} height={b ? b.height : (d.height || 500)} caption={d.caption} />
     </div>
   )
 }

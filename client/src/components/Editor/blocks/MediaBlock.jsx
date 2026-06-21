@@ -4,6 +4,8 @@ import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './TextBlock'
 import MediaUploader from './MediaUploader'
 import { uploadMedia } from '../../../api/client'
+import BoundsControl from './BoundsControl'
+import useContentArea from '../../../hooks/useContentArea'
 
 // video.js is the single biggest dependency — only load it when a video block
 // actually renders a player.
@@ -35,6 +37,7 @@ export default function MediaBlock({ block }) {
   }, [block.id, updateBlock])
 
   const kind = block.data.kind || 'image'
+  const caDims = useContentArea()
 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState(null)
@@ -140,6 +143,13 @@ export default function MediaBlock({ block }) {
                 : 'Describe the video for screen readers'}
               style={inputStyle}
             />
+          </div>
+        )}
+
+        {(kind === 'image' || kind === 'video') && (
+          <div style={{ marginTop: 12 }}>
+            <BoundsControl bounds={block.data.bounds} contentArea={caDims}
+              onChange={b => update('bounds', b)} labelStyle={fieldLabel} inputStyle={inputStyle} />
           </div>
         )}
 
