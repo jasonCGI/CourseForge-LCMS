@@ -472,10 +472,10 @@ def _wire_demo_assets(project):
     oam_dir  = up / 'oam' / oam_aid
     oam_dir.mkdir(parents=True, exist_ok=True)
     oam_orig = oam_dir / 'original.oam'
-    shutil.copyfile(base / 'Animate_Demo_1920x900.oam', oam_orig)
+    shutil.copyfile(base / 'ForgeJS_Demo.oam', oam_orig)
     oam_meta = ingest_oam(oam_orig, oam_aid, up)
     db.session.add(MediaAsset(id=oam_aid, project_id=project.id, kind='oam',
-                              original_name='Animate_Demo_1920x900.oam', stored_path=str(oam_orig),
+                              original_name='ForgeJS_Demo.oam', stored_path=str(oam_orig),
                               file_size=oam_orig.stat().st_size,
                               mime_type='application/vnd.adobe.oam+zip'))
     db.session.flush()
