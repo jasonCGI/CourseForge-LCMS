@@ -3,6 +3,7 @@ import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
 import OamMediaBar from './OamMediaBar'
+import useEditorStore from '../../store/editorStore'
 
 const FRAME_BG = '#ffffff'
 
@@ -731,6 +732,13 @@ function PreviewIVideo({ block }) {
 }
 
 function PreviewModel3D({ block }) {
+  const updateBlock = useEditorStore(s => s.updateBlock)
+  const [selPart, setSelPart] = useState(null)
+  // Label parts inline, right in the live preview — persists to block.data.parts.
+  const setPartLabel = (key, label) => {
+    const ps = block.data.parts || {}
+    updateBlock(block.id, { parts: { ...ps, [key]: { ...(ps[key] || {}), label } } })
+  }
   if (!block.data.model_serve_url) {
     return (
       <div style={{
@@ -756,6 +764,11 @@ function PreviewModel3D({ block }) {
         decorative={block.data.decorative}
         annotations={block.data.annotations || []}
         autoRotate={block.data.auto_rotate}
+        partHighlight={!!block.data.part_highlight}
+        parts={block.data.parts || {}}
+        selectedPartKey={selPart}
+        onPartSelect={setSelPart}
+        onPartLabel={setPartLabel}
       />
     </div>
   )

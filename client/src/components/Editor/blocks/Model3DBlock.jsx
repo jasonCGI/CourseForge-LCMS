@@ -163,6 +163,7 @@ export default function Model3DBlock({ block }) {
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
               selectedPartKey={selPart} onPartSelect={setSelPart} onPartsDetected={setDetectedParts}
+              onPartLabel={(key, label) => updatePart(key, 'label', label)}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
         )}

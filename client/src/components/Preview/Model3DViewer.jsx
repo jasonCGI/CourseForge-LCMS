@@ -104,7 +104,7 @@ export default function Model3DViewer({
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
-  onPartSelect = null, onPartsDetected = null,
+  onPartSelect = null, onPartsDetected = null, onPartLabel = null,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -147,8 +147,18 @@ export default function Model3DViewer({
   const hoverKeyRef    = useRef(null)
   const downPosRef     = useRef(null)   // click-vs-drag discrimination
   const [partLabel, setPartLabel] = useState(null)   // {x,y,text,visible}
+  // Authoring mode: when an onPartLabel commit callback is supplied, parts become
+  // selectable AND the floating label pill turns into an inline name field.
+  const editable = !!onPartLabel
+  const editableRef = useRef(editable)
+  const [partEdit, setPartEdit] = useState(null)     // {key, value} while naming a part inline
+  const partEditRef = useRef(null)
+  useEffect(() => { editableRef.current = editable }, [editable])
+  useEffect(() => { partEditRef.current = partEdit }, [partEdit])
   useEffect(() => { partHLRef.current = partHighlight }, [partHighlight])
   useEffect(() => { partsCfgRef.current = parts }, [parts])
+  const commitPartEdit = () => { if (partEdit && onPartLabel) onPartLabel(partEdit.key, (partEdit.value || '').trim()); setPartEdit(null) }
+  const cancelPartEdit = () => setPartEdit(null)
 
   // Repaint every part's highlight from the current selected/hover keys.
   const applyLevels = useCallback(() => {
@@ -244,7 +254,7 @@ export default function Model3DViewer({
     const THREE = window.THREE
     const key = selKeyRef.current || hoverKeyRef.current
     const entry = key && partsRef.current.find(e => e.key === key)
-    if (!partHLRef.current || !entry || !camera || !THREE) { clear(); return }
+    if ((!partHLRef.current && !editableRef.current) || !entry || !camera || !THREE) { clear(); return }
     const canvas = renderer.domElement
     const w = canvas.clientWidth, h = canvas.clientHeight
     const ndc = entry.centroid.clone().project(camera)
@@ -339,7 +349,7 @@ export default function Model3DViewer({
       // stay glued to the surface. Pauses while dragging, in pin-placement mode,
       // and for reduced-motion users.
       const o = orbitRef.current
-      if (autoRotateRef.current && !o.dragging && !pinModeRef.current && !REDUCE_MOTION) {
+      if (autoRotateRef.current && !o.dragging && !pinModeRef.current && !partEditRef.current && !REDUCE_MOTION) {
         o.theta += 0.005
         updateCamera(camera, o)
       }
@@ -423,8 +433,8 @@ export default function Model3DViewer({
   }, [height])
 
   const handleCanvasClick = useCallback((e) => {
-    // Part-highlight select (takes priority when enabled, not while placing a pin).
-    if (partHighlight && !pinMode) {
+    // Part select (highlighting on, OR authoring/label mode), not while placing a pin.
+    if ((partHighlight || editable) && !pinMode) {
       const dp = downPosRef.current
       if (dp && Math.hypot(e.clientX - dp.x, e.clientY - dp.y) > 6) return   // was a drag
       const entry = pickEntry(e.clientX, e.clientY)
@@ -432,6 +442,8 @@ export default function Model3DViewer({
       const next = selKeyRef.current === key ? null : key
       if (onPartSelect) onPartSelect(next)
       else { selKeyRef.current = next; applyLevels() }
+      // Authoring: open the inline name field on the freshly selected part.
+      if (editable) setPartEdit(next ? { key: next, value: (partsCfgRef.current[next] || {}).label || next } : null)
       return
     }
     if (!pinMode || !onPinPlaced) return
@@ -450,7 +462,7 @@ export default function Model3DViewer({
         z: parseFloat(hits[0].point.z.toFixed(4)),
       })
     }
-  }, [pinMode, onPinPlaced, partHighlight, onPartSelect, pickEntry, applyLevels])
+  }, [pinMode, onPinPlaced, partHighlight, editable, onPartSelect, pickEntry, applyLevels])
 
   const onPointerDown = useCallback((e) => {
     if (pinMode) return
@@ -463,8 +475,8 @@ export default function Model3DViewer({
   const onPointerMove = useCallback((e) => {
     const orbit = orbitRef.current
     if (!orbit.dragging) {
-      // Hover-highlight the part under the cursor (when enabled, not placing a pin).
-      if (partHighlight && !pinMode) {
+      // Hover-highlight the part under the cursor (highlight on or authoring, not placing a pin).
+      if ((partHighlight || editable) && !pinMode) {
         const entry = pickEntry(e.clientX, e.clientY)
         const k = entry ? entry.key : null
         if (k !== hoverKeyRef.current) {
@@ -480,7 +492,7 @@ export default function Model3DViewer({
     orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - (e.clientY - orbit.lastY) * 0.01))
     orbit.lastX = e.clientX; orbit.lastY = e.clientY
     updateCamera(cameraRef.current, orbit)
-  }, [partHighlight, pinMode, pickEntry, applyLevels])
+  }, [partHighlight, editable, pinMode, pickEntry, applyLevels])
   const onPointerUp = useCallback((e) => { orbitRef.current.dragging = false; e.currentTarget?.releasePointerCapture?.(e.pointerId) }, [])
   const onWheel = useCallback((e) => {
     e.preventDefault()
@@ -609,7 +621,7 @@ export default function Model3DViewer({
           {attribution}
         </div>
       )}
-      {partHighlight && partLabel && (
+      {(partHighlight || editable) && partLabel && (
         <>
           {/* leader line: part centroid -> label pill (10px gap above the dot) */}
           <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y - 10,
@@ -621,14 +633,30 @@ export default function Model3DViewer({
             background: 'var(--forge-amber, #F59E0B)', border: '2px solid rgba(255,255,255,0.9)',
             boxShadow: '0 0 0 3px rgba(245,158,11,0.25), 0 2px 6px rgba(0,0,0,0.45)',
             zIndex: 26, pointerEvents: 'none' }} />
-          {/* label pill */}
-          <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
-            transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
-            background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
-            borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
-            fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
-            {partLabel.text}
-          </div>
+          {/* label pill — becomes an inline name field while editing this part */}
+          {partEdit ? (
+            <input autoFocus value={partEdit.value}
+              onChange={(e) => setPartEdit({ key: partEdit.key, value: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitPartEdit() }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelPartEdit() }
+              }}
+              onBlur={commitPartEdit}
+              placeholder="name this part" aria-label="Part name"
+              style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
+                transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 27, pointerEvents: 'auto',
+                background: 'rgba(4,44,83,0.97)', color: '#FFE3AE', border: '1px solid var(--forge-amber, #F59E0B)',
+                borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
+                fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', width: 150, outline: 'none', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }} />
+          ) : (
+            <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
+              transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
+              background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
+              borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
+              {partLabel.text}
+            </div>
+          )}
         </>
       )}
       </div>
