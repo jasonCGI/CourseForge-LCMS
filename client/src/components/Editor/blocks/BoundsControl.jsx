@@ -17,15 +17,19 @@ export function clampBounds(b, ca) {
   return { x, y, width: w, height: h }
 }
 
-// The full-content-area box (what "Custom bounds" seeds to when first enabled).
-export function fullBounds(ca) {
-  return clampBounds({ x: 0, y: 0, width: ca?.width || 600, height: ca?.height || 500 }, ca)
+// The box "Custom bounds" seeds to when first enabled: ~2/3 of the content area,
+// centered, so there's immediately room to drag/position it. (A full-size box
+// would clamp x/y to 0, making them look stuck.)
+export function defaultBounds(ca) {
+  const W = Math.round(ca?.width || 600), H = Math.round(ca?.height || 500)
+  const w = Math.round(W * 0.66), h = Math.round(H * 0.66)
+  return clampBounds({ x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), width: w, height: h }, ca)
 }
 
 export default function BoundsControl({ bounds, contentArea, onChange, labelStyle, inputStyle }) {
   const ca = contentArea || { width: 600, height: 500 }
   const on = !!bounds
-  const b = bounds || fullBounds(ca)
+  const b = bounds || defaultBounds(ca)
   const lbl = labelStyle || { display: 'block', fontSize: 11, color: 'var(--cf-text-secondary)', marginBottom: 4 }
   const inp = inputStyle || { width: '100%', padding: '6px 8px', fontSize: 13, borderRadius: 4, border: '1px solid var(--cf-border-tertiary)', background: 'var(--cf-bg)', color: 'var(--cf-text)' }
 
@@ -45,7 +49,7 @@ export default function BoundsControl({ bounds, contentArea, onChange, labelStyl
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: on ? 10 : 0 }}>
         <input type="checkbox" checked={on} style={{ marginTop: 2 }}
-          onChange={e => onChange(e.target.checked ? fullBounds(ca) : null)} aria-label="Custom bounds" />
+          onChange={e => onChange(e.target.checked ? defaultBounds(ca) : null)} aria-label="Custom bounds" />
         <span style={{ fontSize: 12, color: 'var(--cf-text-secondary)', lineHeight: 1.4 }}>
           Custom bounds — position &amp; size this block inside the content area (otherwise it fills the width)
         </span>
