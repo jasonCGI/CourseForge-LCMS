@@ -317,8 +317,12 @@ def _hotspot_radius(shape):
     return '50%' if shape in ('circle', 'round') else ('14%' if shape == 'rounded' else '4px')
 
 
-def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None):
+def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False):
     """Convert block list to HTML string.
+
+    shelled: True when injecting into a GUI shell's #fgui-content (positioned
+    content area). Blocks with custom `bounds` are then wrapped as absolute boxes
+    in content-area pixels; otherwise bounds are ignored (normal flow).
 
     asset_map: optional {asset_id: MediaAsset} for the whole project so media
     blocks resolve via dict lookup instead of one DB query per block.
@@ -335,6 +339,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         btype = block.get('type')
         data  = block.get('data', {})
         bid   = block.get('id', str(uuid.uuid4()))
+        start = len(parts)   # where this block's HTML begins (for bounds-wrapping)
 
         if btype == 'gui':
             # GUI shell blocks only render as the SCO page in SCORM 1.2 (handled
@@ -686,7 +691,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             model_id = data.get('model_asset_id', '')
             caption  = data.get('caption', '')
             attribution = data.get('attribution', '')
-            height   = data.get('viewer_height', 400)
+            height   = (data.get('bounds') or {}).get('height') or data.get('viewer_height', 400)
             bg_color = data.get('bg_color') or '#0d1017'   # null (unseeded inherit) -> classic dark
             block_id = bid[:8]
             annotations = data.get('annotations', [])
@@ -1033,6 +1038,20 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
 }})();
 </script>''')
 
+        # Custom-bounds (GUI shell): wrap this block as an absolute box positioned
+        # in content-area pixels inside #fgui-content.
+        b = data.get('bounds')
+        if shelled and isinstance(b, dict) and len(parts) > start:
+            x = max(0, int(b.get('x') or 0)); y = max(0, int(b.get('y') or 0))
+            w = max(1, int(b.get('width') or 0)); h = max(1, int(b.get('height') or 0))
+            seg = '\n'.join(parts[start:]); del parts[start:]
+            # #fgui-content carries 12px padding; offset by it so the box anchors to
+            # the content-area top-left (matching the unpadded editor preview).
+            parts.append(
+                f'<div class="cf-bounds" style="position:absolute;left:{x - 12}px;top:{y - 12}px;'
+                f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
+            )
+
     return '\n'.join(parts)
 
 
@@ -1072,7 +1091,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         html_path = candidates[0]
 
     injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
-                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg)
+                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True)
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1091,7 +1110,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
             return None, None
         html_path = cands[0]
     injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
-                                   hotspot_cfg=hotspot_cfg)
+                                   hotspot_cfg=hotspot_cfg, shelled=True)
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1214,7 +1233,8 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     'overflow-y:auto;height:100%}}' +
     '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
     '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
-    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto;border-radius:4px}}';
+    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto;border-radius:4px}}' +
+    '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);
