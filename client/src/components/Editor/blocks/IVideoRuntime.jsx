@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import MediaBar from '../../Preview/MediaBar'
+import { hotspotStyle, shapeRadius, rgba } from '../../../utils/hotspotStyle'
 
 export default function IVideoRuntime({
   videoSrc, webmSrc, vttSrc, posterSrc,
@@ -178,12 +179,13 @@ export default function IVideoRuntime({
 function Overlay({ i }) {
   const d = i.data || {}
   if (i.type === 'hotspot' && d.x != null) {
+    const st = hotspotStyle(d.color)
     return (
-      <div style={{ position: 'absolute', left: d.x + '%', top: d.y + '%', transform: 'translate(-50%,-50%)', zIndex: 10 }}>
-        <div role="button" tabIndex={0} aria-label={d.label} title={d.label}
-          style={{ width: 64, height: 64, borderRadius: 4, background: 'rgba(245,158,11,0.12)',
-                   border: '3px solid #F59E0B', cursor: 'pointer' }} />
-      </div>
+      <div role="button" tabIndex={0} aria-label={d.label} title={d.label}
+        style={{ position: 'absolute', left: d.x + '%', top: d.y + '%',
+          width: (d.w ?? 22) + '%', height: (d.h ?? 22) + '%', transform: 'translate(-50%,-50%)',
+          border: `3px solid ${st.border}`, background: st.fill, borderRadius: shapeRadius(d.shape),
+          boxSizing: 'border-box', cursor: 'pointer', zIndex: 10 }} />
     )
   }
   if (i.type === 'annotation' && d.x != null) {
@@ -220,9 +222,10 @@ function Blocking({ i, answered, quizSelected, onQuizSelect, onQuizSubmit, onBra
         <button onClick={() => onAck(i)} title={d.label}
           aria-label={(d.label || 'Hotspot') + ' — click to continue'}
           style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: (d.y ?? 50) + '%',
-                   transform: 'translate(-50%,-50%)', width: 72, height: 72, borderRadius: 4,
-                   background: 'rgba(245,158,11,0.18)', border: '3px solid #F59E0B', cursor: 'pointer',
-                   boxShadow: '0 0 0 4px rgba(245,158,11,0.25)' }} />
+                   transform: 'translate(-50%,-50%)', width: (d.w ?? 22) + '%', height: (d.h ?? 22) + '%',
+                   borderRadius: shapeRadius(d.shape), boxSizing: 'border-box',
+                   background: hotspotStyle(d.color).fill, border: `3px solid ${hotspotStyle(d.color).border}`,
+                   cursor: 'pointer', boxShadow: `0 0 0 4px ${rgba(hotspotStyle(d.color).stroke, 0.25)}` }} />
         {d.description && (
           <div style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: `calc(${d.y ?? 50}% + 52px)`,
             transform: 'translateX(-50%)', background: '#0d1017', color: '#B5D4F4', border: '1px solid #185FA5',

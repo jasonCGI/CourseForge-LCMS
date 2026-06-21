@@ -174,6 +174,8 @@
     }
     /* Letterbox the whole frame inside the panel — no crop, no stretch. */
     #player-video .vjs-tech { object-fit: contain; }
+    /* No center play overlay — it blocks dragging/clicking hotspots in the middle. */
+    #player-video .vjs-big-play-button { display: none !important; }
 
     .overlay-item {
       position: absolute;
@@ -735,7 +737,7 @@ function initPlayer(url, filename) {
   document.getElementById('upload-state').style.display = 'none'
   document.getElementById('video-wrap').style.display   = 'flex'
   state.player = videojs('player-video', {
-    controls: true, fill: true, sources: [{ src: url, type: 'video/mp4' }],
+    controls: true, fill: true, bigPlayButton: false, sources: [{ src: url, type: 'video/mp4' }],
   })
   state.player.ready(function() {
     state.player.on('timeupdate', onTimeUpdate)
@@ -937,7 +939,7 @@ var INT_COLORS = {
 function addInteraction(type) {
   if (!state.clip) return
   var defaults = {
-    hotspot:    { x:50, y:50, label:'New Hotspot', description:'' },
+    hotspot:    { x:50, y:50, w:22, h:22, shape:'round', color:null, label:'New Hotspot', description:'' },
     quiz:       { question:'', choices:['Option A','Option B','Option C'], correct_index:0, feedback_correct:'', feedback_incorrect:'', resume_on_correct:true, resume_on_incorrect:false },
     branch:     { prompt:'', true_label:'Yes', false_label:'No', true_timecode:0, false_timecode:0 },
     wcn:        { wcn_type:'note', title:'', text:'', modal:false },
@@ -946,9 +948,11 @@ function addInteraction(type) {
   var interaction = {
     type: type,
     timecode: parseFloat(state.currentTime.toFixed(2)),
-    end_timecode: (type === 'annotation' || type === 'hotspot' || type === 'wcn')
+    // Hotspots are stops (single timecode; the bake creates the pause slippage), so
+    // they carry no end_timecode. Annotations / WCN can still window over playback.
+    end_timecode: (type === 'annotation' || type === 'wcn')
                     ? parseFloat((state.currentTime + 5).toFixed(2)) : null,
-    pause_on_reach: type === 'quiz' || type === 'branch',
+    pause_on_reach: type === 'quiz' || type === 'branch' || type === 'hotspot',
     data: defaults[type] || {},
   }
   fetch(`/api/clip/${state.clipId}/interaction`, {
@@ -1035,29 +1039,79 @@ function renderTimelineMarkers() {
 }
 
 // ── Render overlays ────────────────────────────────────────────
+// Mirror utils/hotspotStyle.js (forge-oam.js HS model): strokeColor -> border + tint, shape -> radius.
+function hotspotCss(color, shape) {
+  var c = color || '#F59E0B'
+  var radius = shape === 'square' ? '4px' : (shape === 'rounded' ? '16%' : '50%')
+  var fill = c, m = /^#([0-9a-fA-F]{6})$/.exec(c) || /^#([0-9a-fA-F]{3})$/.exec(c)
+  if (m) {
+    var h = m[1]; if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2]
+    fill = 'rgba(' + parseInt(h.slice(0,2),16) + ',' + parseInt(h.slice(2,4),16) + ',' + parseInt(h.slice(4,6),16) + ',0.15)'
+  }
+  return { border: c, fill: fill, radius: radius }
+}
+
+// Drag a hotspot box on the video to reposition it — updates x/y % live, then the data table.
+function attachHotspotDrag(el, interaction) {
+  el.addEventListener('pointerdown', function(e) {
+    e.preventDefault(); e.stopPropagation()
+    state.selectedId = interaction.id
+    var rect = document.getElementById('overlays').getBoundingClientRect()
+    var move = function(ev) {
+      interaction.data.x = Math.max(0, Math.min(100, parseFloat((((ev.clientX - rect.left) / rect.width) * 100).toFixed(1))))
+      interaction.data.y = Math.max(0, Math.min(100, parseFloat((((ev.clientY - rect.top) / rect.height) * 100).toFixed(1))))
+      el.style.left = interaction.data.x + '%'; el.style.top = interaction.data.y + '%'
+    }
+    var up = function() {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
+      if (state.selectedId === interaction.id) renderProperties(interaction)   // sync the data table
+      renderInteractionList(); scheduleAutoSave()
+    }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+  })
+}
+
+// "M:SS.s" or raw seconds -> seconds.
+function parseTimecode(str) {
+  str = String(str == null ? '' : str).trim()
+  if (/^\d+:\d{1,2}(\.\d+)?$/.test(str)) { var p = str.split(':'); return parseInt(p[0], 10) * 60 + parseFloat(p[1]) }
+  var n = parseFloat(str); return isNaN(n) ? 0 : n
+}
+
 function renderOverlays(currentTime) {
   var container = document.getElementById('overlays')
   container.innerHTML = ''
   if (!state.clip) return
   state.clip.interactions.forEach(function(i) {
-    var inRange = currentTime >= i.timecode && (!i.end_timecode || currentTime <= i.end_timecode)
+    // The selected interaction always shows (so you can drag/size it); otherwise it
+    // shows within its window (end_timecode if set, else a short stop-preview window).
+    var win = i.end_timecode != null ? i.end_timecode : (i.timecode + 2)
+    var inRange = (i.id === state.selectedId) || (currentTime >= i.timecode && currentTime <= win)
     if (!inRange) return
     if (i.type === 'hotspot' && i.data.x != null) {
+      var hs = hotspotCss(i.data.color, i.data.shape)
       var el = document.createElement('div')
       el.className = 'overlay-item'
-      el.style.left = i.data.x + '%'
-      el.style.top  = i.data.y + '%'
+      el.style.left = i.data.x + '%'; el.style.top = i.data.y + '%'
+      el.style.width = (i.data.w != null ? i.data.w : 22) + '%'
+      el.style.height = (i.data.h != null ? i.data.h : 22) + '%'
       el.style.transform = 'translate(-50%, -50%)'
-      el.innerHTML = `<div class="hotspot-dot" title="${i.data.label}" aria-label="${i.data.label}" role="button" tabindex="0"></div>`
+      el.style.border = '2px solid ' + hs.border
+      el.style.background = hs.fill
+      el.style.borderRadius = hs.radius
+      el.style.boxSizing = 'border-box'
+      el.style.cursor = 'move'
+      el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0')
+      el.setAttribute('aria-label', i.data.label || 'Hotspot'); el.title = i.data.label || ''
+      attachHotspotDrag(el, i)
       container.appendChild(el)
     }
     if (i.type === 'annotation' && i.data.x != null) {
-      var el = document.createElement('div')
-      el.className = 'overlay-item'
-      el.style.left = i.data.x + '%'
-      el.style.top  = i.data.y + '%'
-      el.innerHTML  = `<div class="annotation-label">${i.data.text}</div>`
-      container.appendChild(el)
+      var ae = document.createElement('div')
+      ae.className = 'overlay-item'
+      ae.style.left = i.data.x + '%'; ae.style.top = i.data.y + '%'
+      ae.innerHTML = `<div class="annotation-label">${i.data.text}</div>`
+      container.appendChild(ae)
     }
   })
 }
@@ -1069,9 +1123,10 @@ function renderProperties(int) {
   var commonFields = `
     <div class="prop-row">
       <label class="prop-label" for="prop-tc">Timecode</label>
-      <input class="prop-input" id="prop-tc" type="number" step="0.1" min="0"
-        value="${int.timecode}" onchange="updateProp(null,'timecode',parseFloat(this.value))"
-        aria-label="Interaction timecode in seconds">
+      <input class="prop-input" id="prop-tc" type="text" inputmode="decimal"
+        value="${formatTC(int.timecode)}" onchange="updateProp(null,'timecode',parseTimecode(this.value))"
+        aria-label="Interaction timecode (M:SS.s)" placeholder="0:00.0"
+        title="Type a timecode (e.g. 1:23.5) — the playhead snaps to it">
     </div>
     <div class="prop-row">
       <label class="prop-label" for="prop-pause">Pause video</label>
@@ -1086,12 +1141,22 @@ function renderProperties(int) {
         <input class="prop-input" value="${int.data.label||''}" onchange="updateProp('data','label',this.value)" aria-label="Hotspot label"></div>
       <div class="prop-row"><label class="prop-label">Description</label>
         <input class="prop-input" value="${int.data.description||''}" onchange="updateProp('data','description',this.value)" aria-label="Hotspot description"></div>
-      <div class="prop-row"><label class="prop-label">X position %</label>
-        <input class="prop-input" type="number" min="0" max="100" value="${int.data.x||50}" onchange="updateProp('data','x',parseFloat(this.value))" aria-label="Hotspot X position"></div>
-      <div class="prop-row"><label class="prop-label">Y position %</label>
-        <input class="prop-input" type="number" min="0" max="100" value="${int.data.y||50}" onchange="updateProp('data','y',parseFloat(this.value))" aria-label="Hotspot Y position"></div>
-      <div class="prop-row"><label class="prop-label">End timecode</label>
-        <input class="prop-input" type="number" step="0.1" value="${int.end_timecode||''}" onchange="updateProp(null,'end_timecode',parseFloat(this.value))" aria-label="End timecode"></div>`
+      <div class="prop-row"><label class="prop-label">Shape</label>
+        <select class="prop-input" onchange="updateProp('data','shape',this.value)" aria-label="Hotspot shape">
+          <option value="round"   ${(int.data.shape||'round')==='round'  ?'selected':''}>Round</option>
+          <option value="square"  ${int.data.shape==='square' ?'selected':''}>Square</option>
+          <option value="rounded" ${int.data.shape==='rounded'?'selected':''}>Rounded</option>
+        </select></div>
+      <div class="prop-row"><label class="prop-label">Color (508 override)</label>
+        <input class="prop-input" type="color" value="${int.data.color||'#F59E0B'}" onchange="updateProp('data','color',this.value)" aria-label="Hotspot color"></div>
+      <div class="prop-row"><label class="prop-label">X %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.x!=null?int.data.x:50}" onchange="updateProp('data','x',parseFloat(this.value))" aria-label="Hotspot X position"></div>
+      <div class="prop-row"><label class="prop-label">Y %</label>
+        <input class="prop-input" type="number" min="0" max="100" value="${int.data.y!=null?int.data.y:50}" onchange="updateProp('data','y',parseFloat(this.value))" aria-label="Hotspot Y position"></div>
+      <div class="prop-row"><label class="prop-label">Width %</label>
+        <input class="prop-input" type="number" min="1" max="100" value="${int.data.w!=null?int.data.w:22}" onchange="updateProp('data','w',parseFloat(this.value))" aria-label="Hotspot width"></div>
+      <div class="prop-row"><label class="prop-label">Height %</label>
+        <input class="prop-input" type="number" min="1" max="100" value="${int.data.h!=null?int.data.h:22}" onchange="updateProp('data','h',parseFloat(this.value))" aria-label="Hotspot height"></div>`
   }
   else if (int.type === 'quiz') {
     typeFields = `
@@ -1115,9 +1180,9 @@ function renderProperties(int) {
       <div class="prop-row"><label class="prop-label">No label</label>
         <input class="prop-input" value="${int.data.false_label||'No'}" onchange="updateProp('data','false_label',this.value)" aria-label="False path label"></div>
       <div class="prop-row"><label class="prop-label">Yes → timecode</label>
-        <input class="prop-input" type="number" step="0.1" value="${int.data.true_timecode||0}" onchange="updateProp('data','true_timecode',parseFloat(this.value))" aria-label="True path timecode"></div>
+        <input class="prop-input" type="text" inputmode="decimal" value="${formatTC(int.data.true_timecode||0)}" onchange="updateProp('data','true_timecode',parseTimecode(this.value))" aria-label="True path timecode (M:SS.s)" placeholder="0:00.0"></div>
       <div class="prop-row"><label class="prop-label">No → timecode</label>
-        <input class="prop-input" type="number" step="0.1" value="${int.data.false_timecode||0}" onchange="updateProp('data','false_timecode',parseFloat(this.value))" aria-label="False path timecode"></div>`
+        <input class="prop-input" type="text" inputmode="decimal" value="${formatTC(int.data.false_timecode||0)}" onchange="updateProp('data','false_timecode',parseTimecode(this.value))" aria-label="False path timecode (M:SS.s)" placeholder="0:00.0"></div>`
   }
   else if (int.type === 'wcn') {
     typeFields = `
@@ -1165,6 +1230,7 @@ function updateProp(scope, field, value) {
   }
   renderInteractionList()
   renderTimelineMarkers()
+  renderOverlays(state.currentTime)   // reflect shape/color/size/position edits on the video immediately
   scheduleAutoSave()
 }
 
