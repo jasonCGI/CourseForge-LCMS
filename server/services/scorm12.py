@@ -667,7 +667,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
             caption  = data.get('caption', '')
             attribution = data.get('attribution', '')
             height   = data.get('viewer_height', 400)
-            bg_color = data.get('bg_color', '#0d1017')
+            bg_color = data.get('bg_color') or '#0d1017'   # null (unseeded inherit) -> classic dark
             block_id = bid[:8]
             annotations = data.get('annotations', [])
             decorative = bool(data.get('decorative'))
@@ -742,6 +742,8 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
   #viewer3d-{block_id} .ann-popover-body {{ font-size:12px; color:#8AAAC0; line-height:1.55; }}
   #viewer3d-{block_id} .ann-popover-close {{ position:absolute; top:6px; right:8px; background:none; border:none; color:#3A5A7A; font-size:12px; cursor:pointer; padding:2px 4px; }}
   #viewer3d-{block_id} .part-label {{ position:absolute; transform:translate(-50%,calc(-100% - 10px)); background:rgba(13,16,23,0.92); color:#F59E0B; border:1px solid rgba(245,158,11,0.6); border-radius:5px; padding:3px 9px; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; pointer-events:none; z-index:30; box-shadow:0 2px 10px rgba(0,0,0,0.4); }}
+  #viewer3d-{block_id} .part-dot {{ position:absolute; width:9px; height:9px; border-radius:50%; transform:translate(-50%,-50%); background:#F59E0B; border:2px solid rgba(255,255,255,0.9); box-shadow:0 0 0 3px rgba(245,158,11,0.25),0 2px 6px rgba(0,0,0,0.45); pointer-events:none; z-index:31; }}
+  #viewer3d-{block_id} .part-leader {{ position:absolute; width:2px; height:10px; transform:translateX(-50%); background:#F59E0B; pointer-events:none; z-index:29; }}
   @media (prefers-reduced-motion: reduce) {{ .cf-spin3d, #viewer3d-{block_id} .ann-dot, #viewer3d-{block_id} .ann-popover {{ animation: none !important; transition: none !important; }} }}
 </style>
 <script>
@@ -845,11 +847,15 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     var loadedModel = null, _ray = new THREE.Raycaster();
 
     // ── Part highlighting (per-mesh hover/click + centroid-anchored label) ──
-    var parts = [], hoverKey = null, selKey = null, partLabelEl = null, _pray = new THREE.Raycaster();
+    var parts = [], hoverKey = null, selKey = null, partLabelEl = null, partDotEl = null, partLeaderEl = null, _pray = new THREE.Raycaster();
     if (PART_HL && overlay) {{
+      partLeaderEl = document.createElement('div');
+      partLeaderEl.className = 'part-leader'; partLeaderEl.style.display = 'none';
+      partDotEl = document.createElement('div');
+      partDotEl.className = 'part-dot'; partDotEl.style.display = 'none';
       partLabelEl = document.createElement('div');
       partLabelEl.className = 'part-label'; partLabelEl.style.display = 'none';
-      overlay.appendChild(partLabelEl);
+      overlay.appendChild(partLeaderEl); overlay.appendChild(partDotEl); overlay.appendChild(partLabelEl);
     }}
     function findPart(key) {{ for (var i = 0; i < parts.length; i++) {{ if (parts[i].key === key) return parts[i]; }} return null; }}
     function setPartLevel(entry, level) {{
@@ -866,7 +872,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         // Cup & saucer can share one material, so highlight via a per-mesh clone
         // (tinting the shared material would light up both).
         if (!entry.clones[i]) entry.clones[i] = Array.isArray(orig) ? orig.map(function(m) {{ return m.clone(); }}) : orig.clone();
-        var inten = level === 2 ? 0.6 : 0.28, c2 = entry.clones[i];
+        var inten = level === 2 ? 0.7 : 0.28, c2 = entry.clones[i];
         (Array.isArray(c2) ? c2 : [c2]).forEach(function(m) {{ if ('emissive' in m) {{ m.emissive = new THREE.Color(0xF59E0B); m.emissiveIntensity = inten; m.needsUpdate = true; }} }});
         mesh.material = c2;
       }}
@@ -890,14 +896,19 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
     function projectPartLabel() {{
       if (!partLabelEl) return;
       var key = selKey || hoverKey, entry = key && findPart(key);
-      if (!entry) {{ partLabelEl.style.display = 'none'; return; }}
+      var hide = function() {{ partLabelEl.style.display = 'none'; if (partDotEl) partDotEl.style.display = 'none'; if (partLeaderEl) partLeaderEl.style.display = 'none'; }};
+      if (!entry) {{ hide(); return; }}
       var ndc = entry.centroid.clone().project(camera);
-      if (ndc.z >= 1 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {{ partLabelEl.style.display = 'none'; return; }}
+      if (ndc.z >= 1 || ndc.x < -1 || ndc.x > 1 || ndc.y < -1 || ndc.y > 1) {{ hide(); return; }}
       var cw = canvas.clientWidth, ch = canvas.clientHeight, cfg = PARTS_CFG[key] || {{}};
+      var px = (ndc.x * 0.5 + 0.5) * cw, py = (-ndc.y * 0.5 + 0.5) * ch;
       partLabelEl.textContent = cfg.label || key;
       partLabelEl.style.display = 'block';
-      partLabelEl.style.left = ((ndc.x * 0.5 + 0.5) * cw) + 'px';
-      partLabelEl.style.top = ((-ndc.y * 0.5 + 0.5) * ch) + 'px';
+      partLabelEl.style.left = px + 'px';
+      partLabelEl.style.top = py + 'px';
+      // dot anchored on the part centroid + a leader line up to the label pill
+      if (partDotEl) {{ partDotEl.style.display = 'block'; partDotEl.style.left = px + 'px'; partDotEl.style.top = py + 'px'; }}
+      if (partLeaderEl) {{ partLeaderEl.style.display = 'block'; partLeaderEl.style.left = px + 'px'; partLeaderEl.style.top = (py - 10) + 'px'; }}
     }}
 
     function projectDots() {{
