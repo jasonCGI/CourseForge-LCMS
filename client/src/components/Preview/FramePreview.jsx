@@ -5,10 +5,12 @@ import GUIShellRenderer from './GUIShellRenderer'
 import OamMediaBar from './OamMediaBar'
 import useEditorStore from '../../store/editorStore'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
+import { clampBounds } from '../Editor/blocks/BoundsControl'
 
 const FRAME_BG = '#ffffff'
 
 export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false, contentArea = null }) {
+  const updateBlock = useEditorStore(s => s.updateBlock)   // for drag/resize of bounded blocks
   if (!frame) return null
 
   const allBlocks = frame.content?.blocks || []
@@ -91,10 +93,10 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       {/* Custom-bounds blocks: absolute boxes in content-area pixels (anchor to the
           scaled shell overlay). */}
       {bounded.map(b => (
-        <div key={b.id} style={{ position: 'absolute', left: b.data.bounds.x, top: b.data.bounds.y,
-          width: b.data.bounds.width, height: b.data.bounds.height, overflow: 'hidden', zIndex: 1 }}>
-          {renderBlock(b)}
-        </div>
+        <BoundsBox key={b.id} block={b} contentArea={contentArea} updateBlock={updateBlock}
+          active={b.id === activeBlockId} onSelect={onBlockSelect}>
+          <PreviewBlock block={b} />
+        </BoundsBox>
       ))}
     </div>
   )
@@ -118,6 +120,61 @@ function SelectableBlock({ block, active, onSelect }) {
         outlineOffset: 3, transition: 'outline-color 0.15s',
       }}>
       <PreviewBlock block={block} />
+    </div>
+  )
+}
+
+// A custom-bounds block in the live preview: an absolute box you can drag (the
+// grip) and resize (corner handles). Deltas are divided by the ShellFit scale
+// (measured from the box's own rendered rect) so 1 screen px maps to the right
+// number of content-area px. Persists clamped bounds back to the block.
+function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children }) {
+  const ref = useRef(null)
+  const b = block.data.bounds
+  const AC = '#6366F1'
+
+  const startDrag = (mode, handle) => (e) => {
+    e.preventDefault(); e.stopPropagation()
+    const rect = ref.current.getBoundingClientRect()
+    const scale = (b.width ? rect.width / b.width : 1) || 1
+    const base = { ...b }, sx = e.clientX, sy = e.clientY
+    const move = (ev) => {
+      const dx = (ev.clientX - sx) / scale, dy = (ev.clientY - sy) / scale
+      let { x, y, width, height } = base
+      if (mode === 'move') { x += dx; y += dy }
+      else {
+        if (handle.indexOf('e') >= 0) width += dx
+        if (handle.indexOf('s') >= 0) height += dy
+        if (handle.indexOf('w') >= 0) { x += dx; width -= dx }
+        if (handle.indexOf('n') >= 0) { y += dy; height -= dy }
+      }
+      updateBlock(block.id, { bounds: clampBounds({ x, y, width, height }, contentArea) })
+    }
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    if (onSelect) onSelect(block.id)
+  }
+
+  const corners = {
+    nw: { left: -6, top: -6, cursor: 'nwse-resize' }, ne: { right: -6, top: -6, cursor: 'nesw-resize' },
+    sw: { left: -6, bottom: -6, cursor: 'nesw-resize' }, se: { right: -6, bottom: -6, cursor: 'nwse-resize' },
+  }
+
+  return (
+    <div ref={ref} onClick={() => onSelect && onSelect(block.id)}
+      style={{ position: 'absolute', left: b.x, top: b.y, width: b.width, height: b.height, zIndex: 2,
+        boxShadow: active ? `0 0 0 2px ${AC}` : `0 0 0 1px ${AC}99` }}>
+      <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>{children}</div>
+      <div onPointerDown={startDrag('move')} title="Drag to move" aria-hidden="true"
+        style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', width: 38, height: 16,
+          background: AC, borderRadius: 8, cursor: 'move', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 11, lineHeight: 1, zIndex: 4, userSelect: 'none' }}>✥</div>
+      {Object.keys(corners).map(h => (
+        <div key={h} onPointerDown={startDrag('resize', h)} title="Drag to resize" aria-hidden="true"
+          style={{ position: 'absolute', width: 11, height: 11, background: '#fff', border: `2px solid ${AC}`,
+            borderRadius: 2, zIndex: 4, ...corners[h] }} />
+      ))}
     </div>
   )
 }
