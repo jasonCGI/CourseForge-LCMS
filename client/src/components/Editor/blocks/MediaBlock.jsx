@@ -149,7 +149,8 @@ export default function MediaBlock({ block }) {
         {(kind === 'image' || kind === 'video') && (
           <div style={{ marginTop: 12 }}>
             <BoundsControl bounds={block.data.bounds} contentArea={caDims}
-              onChange={b => update('bounds', b)} labelStyle={fieldLabel} inputStyle={inputStyle} />
+              onChange={b => update('bounds', b)} fit={block.data.fit} onFitChange={v => update('fit', v)}
+              labelStyle={fieldLabel} inputStyle={inputStyle} />
           </div>
         )}
 

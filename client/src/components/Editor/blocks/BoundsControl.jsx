@@ -26,7 +26,7 @@ export function defaultBounds(ca) {
   return clampBounds({ x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), width: w, height: h }, ca)
 }
 
-export default function BoundsControl({ bounds, contentArea, onChange, labelStyle, inputStyle }) {
+export default function BoundsControl({ bounds, contentArea, onChange, fit, onFitChange, labelStyle, inputStyle }) {
   const ca = contentArea || { width: 600, height: 500 }
   const on = !!bounds
   const b = bounds || defaultBounds(ca)
@@ -60,6 +60,22 @@ export default function BoundsControl({ bounds, contentArea, onChange, labelStyl
           {field('y', 'Y (px)', ca.height)}
           {field('width', 'Width (px)', ca.width)}
           {field('height', 'Height (px)', ca.height)}
+          {onFitChange && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={lbl}>Fit</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['contain', 'Contain (fit, no crop)'], ['cover', 'Cover (fill, crops)']].map(([f, label]) => (
+                  <button key={f} type="button" onClick={() => onFitChange(f)} aria-pressed={(fit || 'contain') === f}
+                    style={{ flex: 1, padding: '6px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+                      border: '1px solid var(--cf-border-tertiary)',
+                      background: (fit || 'contain') === f ? 'var(--forge-amber, #D4820A)' : 'transparent',
+                      color: (fit || 'contain') === f ? '#042C53' : 'var(--cf-text-secondary)' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: 11, color: 'var(--cf-text-tertiary)' }}>
             Content area: {ca.width} × {ca.height}px. The box is clamped to stay inside it.
           </p>

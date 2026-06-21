@@ -1045,10 +1045,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             x = max(0, int(b.get('x') or 0)); y = max(0, int(b.get('y') or 0))
             w = max(1, int(b.get('width') or 0)); h = max(1, int(b.get('height') or 0))
             seg = '\n'.join(parts[start:]); del parts[start:]
+            fit = 'cover' if data.get('fit') == 'cover' else 'contain'
             # #fgui-content carries 12px padding; offset by it so the box anchors to
             # the content-area top-left (matching the unpadded editor preview).
             parts.append(
-                f'<div class="cf-bounds" style="position:absolute;left:{x - 12}px;top:{y - 12}px;'
+                f'<div class="cf-bounds cf-fit-{fit}" style="position:absolute;left:{x - 12}px;top:{y - 12}px;'
                 f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
             )
 
@@ -1234,7 +1235,8 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
     '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
     '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto;border-radius:4px}}' +
-    '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}';
+    '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}' +
+    '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);

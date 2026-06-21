@@ -353,7 +353,7 @@ function PreviewMedia({ block }) {
     return (
       <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
-          style={b ? { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
+          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
           {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
             <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
         </video>
@@ -382,7 +382,7 @@ function PreviewMedia({ block }) {
         <img
           src={block.data.serve_url}
           alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
-          style={b ? { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
+          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
         />
         {!b && block.data.caption && (
           <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{block.data.caption}</div>
