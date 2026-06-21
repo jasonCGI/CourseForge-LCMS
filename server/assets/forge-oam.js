@@ -35,19 +35,48 @@
 
   // Hotspot style tokens — defaults, overridden by FORGE_CONFIG.hotspot (baked
   // at publish) or a forge:config message (preview live-update).
+  // strokeColor is the SINGLE SOURCE. Every other color (resting border, hover,
+  // fill, glow, pulse, focus) DERIVES from it unless explicitly set in
+  // FORGE_CONFIG.hotspot or per-instance opts. So "set strokeColor" is all you need.
   var HS = {
-    strokeColor: '#F59E0B', strokeWidth: 3, fill: 'rgba(245,158,11,0.12)',
-    radius: 6, shape: 'rounded', shadow: '0 0 0 3px rgba(245,158,11,0.25)',
-    overColor: '#FFC04D', outColor: '#F59E0B', cursor: 'pointer',
-    hitPadding: 0, pulse: true, focusOutline: '#F59E0B', hideClip: true
+    strokeColor: '#F59E0B', strokeWidth: 3,
+    radius: 6, shape: 'rounded', cursor: 'pointer',
+    hitPadding: 0, pulse: true, hideClip: true,
+    // null => derive from strokeColor (see hsStyle); set any one to override it.
+    outColor: null, overColor: null, fill: null, shadow: null,
+    pulseColor: null, focusOutline: null
   };
   var HS_KEYS = ['strokeColor', 'strokeWidth', 'fill', 'radius', 'shape', 'shadow', 'overColor',
-                'outColor', 'cursor', 'hitPadding', 'pulse', 'focusOutline', 'hideClip'];
+                'outColor', 'cursor', 'hitPadding', 'pulse', 'pulseColor', 'focusOutline', 'hideClip'];
+  // #rgb / #rrggbb / rgb()/rgba() -> {r,g,b}; null if unparseable (e.g. named colors).
+  function parseRGB(c) {
+    if (!c) return null; c = ('' + c).trim();
+    if (c.charAt(0) === '#') {
+      var h = c.slice(1);
+      if (h.length === 3) h = h.charAt(0)+h.charAt(0)+h.charAt(1)+h.charAt(1)+h.charAt(2)+h.charAt(2);
+      if (h.length < 6) return null;
+      return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
+    }
+    var m = c.match(/rgba?\(([^)]+)\)/i);
+    if (m) { var p = m[1].split(','); return { r:+p[0]||0, g:+p[1]||0, b:+p[2]||0 }; }
+    return null;
+  }
+  function rgbaOf(o, a) { return 'rgba(' + o.r + ',' + o.g + ',' + o.b + ',' + a + ')'; }
+  function lightenOf(o, amt) {
+    return 'rgb(' + Math.round(o.r+(255-o.r)*amt) + ',' + Math.round(o.g+(255-o.g)*amt) + ',' + Math.round(o.b+(255-o.b)*amt) + ')';
+  }
   // Resolve the effective style for one hotspot: per-instance opts override the
-  // global HS defaults; anything left undefined inherits the global value.
+  // global HS defaults; any color left null derives from strokeColor.
   function hsStyle(opts) {
     var hs = {};
     for (var i = 0; i < HS_KEYS.length; i++) { var k = HS_KEYS[i]; hs[k] = (opts && opts[k] != null) ? opts[k] : HS[k]; }
+    var base = parseRGB(hs.strokeColor) || { r:245, g:158, b:11 };                 // strokeColor as RGB (amber fallback)
+    if (hs.outColor     == null) hs.outColor     = hs.strokeColor;                 // resting border = strokeColor
+    if (hs.overColor    == null) hs.overColor    = lightenOf(base, 0.30);          // hover = brighter strokeColor
+    if (hs.fill         == null) hs.fill         = rgbaOf(base, 0.12);             // background tint
+    if (hs.shadow       == null) hs.shadow       = '0 0 0 3px ' + rgbaOf(base, 0.25); // resting glow + pulse base
+    if (hs.pulseColor   == null) hs.pulseColor   = rgbaOf(base, 0.40);             // pulse peak ring (independent of fill)
+    if (hs.focusOutline == null) hs.focusOutline = hs.strokeColor;                 // focus ring
     hs.radiusCss = hs.shape === 'circle' ? '50%' : hs.shape === 'square' ? '0'
                  : ((parseFloat(hs.radius) || 0) + 'px');   // 'rounded'/default -> radius px
     return hs;
@@ -306,7 +335,7 @@
     ].join(';');
     // Per-instance vars so the shared keyframe / focus rule pulse in this hotspot's colors.
     el.style.setProperty('--hs-shadow', hs.shadow);
-    el.style.setProperty('--hs-pulse-mid', hs.fill);
+    el.style.setProperty('--hs-pulse-mid', hs.pulseColor);
     el.style.setProperty('--hs-focus', hs.focusOutline);
     el.addEventListener('mouseenter', function () { el.style.borderColor = hs.overColor; });
     el.addEventListener('mouseleave', function () { el.style.borderColor = hs.outColor; });
@@ -332,7 +361,7 @@
     if (!document.getElementById('forge-hs-style')) {        // generic, var-driven — built once
       var st = document.createElement('style'); st.id = 'forge-hs-style';
       st.textContent = '@keyframes forgeHsPulse{0%,100%{box-shadow:var(--hs-shadow)}50%{box-shadow:0 0 0 6px var(--hs-pulse-mid)}}' +
-        '[role=button]:focus-visible{outline:2px solid var(--hs-focus,' + HS.focusOutline + ');outline-offset:2px}';
+        '[role=button]:focus-visible{outline:2px solid var(--hs-focus,' + (HS.focusOutline || HS.strokeColor) + ');outline-offset:2px}';
       document.head.appendChild(st);
     }
   }
