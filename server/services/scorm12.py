@@ -299,6 +299,24 @@ def _read_clip_cached(path, mtime):
     return Path(path).read_text(encoding='utf-8')
 
 
+def _hotspot_colors(color):
+    """Mirror client utils/hotspotStyle.js: strokeColor -> (border color, translucent fill)."""
+    import re
+    c = (color or '#F59E0B').strip()
+    m = re.match(r'^#([0-9a-fA-F]{3})$', c)
+    if m:
+        h = m.group(1)
+        rgb = (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))
+    else:
+        m = re.match(r'^#([0-9a-fA-F]{6})$', c)
+        rgb = (int(m.group(1)[0:2], 16), int(m.group(1)[2:4], 16), int(m.group(1)[4:6], 16)) if m else None
+    return (c, f'rgba({rgb[0]},{rgb[1]},{rgb[2]},0.15)') if rgb else (c, c)
+
+
+def _hotspot_radius(shape):
+    return '50%' if shape in ('circle', 'round') else ('14%' if shape == 'rounded' else '4px')
+
+
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None):
     """Convert block list to HTML string.
 
@@ -445,11 +463,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None)
         elif btype == 'hotspot':
             regions_html = ''
             for r in data.get('regions', []):
-                radius = '50%' if r.get('shape') == 'circle' else '4px'
+                radius = _hotspot_radius(r.get('shape'))
+                stroke, fill = _hotspot_colors(r.get('color'))
                 regions_html += (
                     f'<div class="cf-hotspot-region" '
                     f'style="left:{r["x"]}%;top:{r["y"]}%;'
-                    f'width:{r["w"]}%;height:{r["h"]}%;border-radius:{radius}">'
+                    f'width:{r["w"]}%;height:{r["h"]}%;border-radius:{radius};'
+                    f'border:2px solid {stroke};background:{fill}">'
                     f'<span class="cf-hotspot-label">{r.get("label","")}</span>'
                     f'</div>'
                 )

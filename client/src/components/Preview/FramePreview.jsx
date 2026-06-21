@@ -4,6 +4,7 @@ import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
 import OamMediaBar from './OamMediaBar'
 import useEditorStore from '../../store/editorStore'
+import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
 
 const FRAME_BG = '#ffffff'
 
@@ -197,14 +198,15 @@ export function renderBlockToHTML(block) {
     case 'hotspot': {
       if (!d.background_url) return injectedNote('hotspot block')
       const esc = s => String(s || '').replace(/"/g, '&quot;')
-      const regions = (d.regions || []).map(r =>
-        `<div style="position:absolute;left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;`
-        + `box-sizing:border-box;border:2px solid var(--forge-amber,#D4820A);`
-        + `background:rgba(212,130,10,0.18);border-radius:${r.shape === 'circle' ? '50%' : '4px'}" title="${esc(r.label)}">`
+      const regions = (d.regions || []).map(r => {
+        const st = hotspotStyle(r.color)
+        return `<div style="position:absolute;left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;`
+        + `box-sizing:border-box;border:2px solid ${st.border};`
+        + `background:${st.fill};border-radius:${shapeRadius(r.shape)}" title="${esc(r.label)}">`
         + `<span style="position:absolute;left:0;top:-17px;font:600 10px 'IBM Plex Mono',monospace;`
         + `color:#fff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:3px;white-space:nowrap">`
-        + `${r.label || ''}</span></div>`,
-      ).join('')
+        + `${r.label || ''}</span></div>`
+      }).join('')
       return `<div style="position:relative;margin:8px 0">`
         + `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block;border-radius:4px">`
         + regions + `</div>`
@@ -455,7 +457,9 @@ function PreviewHotspot({ block }) {
           </div>
         )}
 
-        {regions.map(r => (
+        {regions.map(r => {
+          const st = hotspotStyle(r.color)
+          return (
           <div
             key={r.id}
             onClick={() => setActive(active === r.id ? null : r.id)}
@@ -463,9 +467,9 @@ function PreviewHotspot({ block }) {
               position: 'absolute',
               left: `${r.x}%`, top: `${r.y}%`,
               width: `${r.w}%`, height: `${r.h}%`,
-              border: `2px solid ${active === r.id ? 'var(--forge-amber)' : '#185FA5'}`,
-              background: active === r.id ? 'color-mix(in srgb, var(--forge-amber) 20%, transparent)' : 'rgba(24,95,165,0.1)',
-              borderRadius: r.shape === 'circle' ? '50%' : 2,
+              border: `2px solid ${st.border}`,
+              background: active === r.id ? rgba(st.stroke, 0.3) : st.fill,
+              borderRadius: shapeRadius(r.shape),
               cursor: 'pointer',
               boxSizing: 'border-box',
               transition: 'all 0.15s',
@@ -483,7 +487,8 @@ function PreviewHotspot({ block }) {
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
       {regions.length > 0 && (
         <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>

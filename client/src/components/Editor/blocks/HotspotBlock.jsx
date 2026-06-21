@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import { BlockHeader } from './TextBlock'
 import { blockWrap, fieldLabel, inputStyle, helpText, btnDanger } from './blockStyles'
+import { hotspotStyle, shapeRadius, HOTSPOT_AMBER } from '../../../utils/hotspotStyle'
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const round = g => ({ x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h) })
@@ -92,7 +93,10 @@ export default function HotspotBlock({ block }) {
   const geomOf  = r => (live && live.id === r.id ? live : r)
   const setLabel = (id, label) => commit(regions.map(r => (r.id === id ? { ...r, label } : r)))
   const setShape = (id, shape) => commit(regions.map(r => (r.id === id ? { ...r, shape } : r)))
+  const setColor = (id, color) => commit(regions.map(r => (r.id === id ? { ...r, color } : r)))
   const removeRegion = id => commit(regions.filter(r => r.id !== id))
+  const nextShape = s => (s === 'rect' ? 'rounded' : s === 'rounded' ? 'circle' : 'rect')   // square -> rounded -> round
+  const shapeGlyph = s => (s === 'circle' ? '◯' : s === 'rounded' ? '▢' : '▭')
 
   const shapeBtn = (val, glyph, label) => (
     <button type="button" onClick={() => setNewShape(val)}
@@ -124,8 +128,9 @@ export default function HotspotBlock({ block }) {
         {/* New-region shape toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <span style={{ ...fieldLabel, margin: 0 }}>New region shape</span>
-          {shapeBtn('rect', '▭', 'Rectangle')}
-          {shapeBtn('circle', '◯', 'Circle')}
+          {shapeBtn('rect', '▭', 'Square')}
+          {shapeBtn('rounded', '▢', 'Rounded')}
+          {shapeBtn('circle', '◯', 'Round')}
         </div>
 
         {/* Canvas */}
@@ -159,17 +164,18 @@ export default function HotspotBlock({ block }) {
           {/* Existing regions — drag the body to move, corners to resize */}
           {regions.map(r => {
             const g = geomOf(r)
+            const st = hotspotStyle(r.color)
             return (
               <div key={r.id}
                 onMouseDown={e => startMove(e, r)}
                 style={{
                   position: 'absolute', left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, height: `${g.h}%`,
-                  border: '2px solid var(--forge-amber)',
-                  background: 'color-mix(in srgb, var(--forge-amber) 15%, transparent)',
-                  borderRadius: r.shape === 'circle' ? '50%' : 2,
+                  border: `2px solid ${st.border}`,
+                  background: st.fill,
+                  borderRadius: shapeRadius(r.shape),
                   boxSizing: 'border-box', cursor: 'move',
                 }}>
-                <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: 'var(--forge-amber)', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.label}</span>
+                <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.label}</span>
                 {Object.entries(HANDLES).map(([h, pos]) => (
                   <div key={h} onMouseDown={e => startResize(e, r, h)}
                     style={{ position: 'absolute', width: 10, height: 10, background: 'var(--forge-amber)',
@@ -184,7 +190,7 @@ export default function HotspotBlock({ block }) {
             <div style={{
               position: 'absolute', left: `${draft.x}%`, top: `${draft.y}%`, width: `${draft.w}%`, height: `${draft.h}%`,
               border: '2px dashed var(--forge-amber)', background: 'color-mix(in srgb, var(--forge-amber) 10%, transparent)',
-              borderRadius: newShape === 'circle' ? '50%' : 2, pointerEvents: 'none',
+              borderRadius: shapeRadius(newShape), pointerEvents: 'none',
             }} />
           )}
         </div>
@@ -195,14 +201,18 @@ export default function HotspotBlock({ block }) {
             <label style={fieldLabel}>Regions ({regions.length})</label>
             {regions.map(r => (
               <div key={r.id} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <div style={{ width: 14, height: 14, flexShrink: 0, border: '2px solid var(--forge-amber)',
-                  borderRadius: r.shape === 'circle' ? '50%' : 2 }} />
+                <div style={{ width: 14, height: 14, flexShrink: 0, border: `2px solid ${hotspotStyle(r.color).border}`,
+                  background: hotspotStyle(r.color).fill, borderRadius: shapeRadius(r.shape) }} />
                 <input value={r.label} onChange={e => setLabel(r.id, e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <button type="button" title="Toggle shape (rectangle / circle)"
-                  onClick={() => setShape(r.id, r.shape === 'circle' ? 'rect' : 'circle')}
+                <input type="color" value={r.color || HOTSPOT_AMBER} onChange={e => setColor(r.id, e.target.value)}
+                  title="Hotspot color — overrides the inherited GUI color (use for 508 contrast, e.g. on a light background)"
+                  aria-label={`Color for ${r.label}`}
+                  style={{ flexShrink: 0, width: 30, height: 30, padding: 2, border: '1px solid var(--color-border-tertiary)', borderRadius: 6, cursor: 'pointer', background: 'transparent' }} />
+                <button type="button" title="Cycle shape (square / rounded / round)"
+                  onClick={() => setShape(r.id, nextShape(r.shape))}
                   style={{ flexShrink: 0, padding: '6px 10px', fontSize: 13, borderRadius: 6, cursor: 'pointer',
                     border: '1px solid var(--forge-amber)', background: 'transparent', color: 'var(--forge-amber)' }}>
-                  {r.shape === 'circle' ? '◯' : '▭'}
+                  {shapeGlyph(r.shape)}
                 </button>
                 <button onClick={() => removeRegion(r.id)} style={{ ...btnDanger, flexShrink: 0 }}>✕</button>
               </div>
