@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from ..extensions import db
 from ..models.project import Project, Course, Module, Lesson, Frame
-from ..version import SUPPORTED_SCHEMA_VERSIONS, MIN_SCHEMA_VERSION
+from ..version import SCHEMA_VERSION, MIN_SCHEMA_VERSION, is_schema_supported
 
 SUPPORTED_SCHEMA_VERSION = "1.0"
 
@@ -35,15 +35,15 @@ def validate_import(data: dict) -> None:
     if not version:
         raise ImportValidationError(
             "'schema_version' is required. "
-            f"Expected one of: {SUPPORTED_SCHEMA_VERSIONS}"
+            f"This CourseForge speaks schema {SCHEMA_VERSION}."
         )
 
-    if version not in SUPPORTED_SCHEMA_VERSIONS:
+    if not is_schema_supported(version):
         raise ImportValidationError(
-            f"Unsupported schema_version '{version}'. "
-            f"Supported versions: {SUPPORTED_SCHEMA_VERSIONS}. "
-            f"Please export from ForgeBlueprint v{MIN_SCHEMA_VERSION}+ "
-            f"or update your CourseForge instance."
+            f"Unsupported schema_version '{version}'. This CourseForge speaks "
+            f"schema {SCHEMA_VERSION} and accepts {MIN_SCHEMA_VERSION}+ within the "
+            f"same major version. Re-export from ForgeBlueprint, or update "
+            f"CourseForge for a newer major schema."
         )
 
     # Future: migration handlers per version
