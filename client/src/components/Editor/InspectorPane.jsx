@@ -25,7 +25,7 @@ export default function InspectorPane() {
           borderBottom: '1px solid var(--cf-border-primary)', background: 'var(--cf-header-bg, #042C53)',
           flexShrink: 0 }}>
           <span style={{ fontSize: 9, fontFamily: 'var(--forge-font)', letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: 'var(--cf-text-tertiary, #6A8AB0)' }}>Inspector</span>
+            textTransform: 'uppercase', color: 'var(--cf-text-secondary, #7A90A8)' }}>Inspector</span>
           <div style={{ flex: 1 }} />
           <div role="group" aria-label="Inspector layout" style={{ display: 'flex', gap: 2 }}>
             <SegBtn active={mode === 'stack'} onClick={() => choose('stack')} title="All blocks in a list">≡ Stack</SegBtn>
@@ -45,7 +45,7 @@ function SegBtn({ active, onClick, title, children }) {
     <button onClick={onClick} title={title} aria-pressed={active}
       style={{ padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
         fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
-        border: `1px solid ${active ? 'var(--forge-amber)' : 'rgba(255,255,255,0.15)'}`,
+        border: `1px solid ${active ? 'var(--forge-amber)' : 'rgba(255,255,255,0.32)'}`,
         background: active ? 'color-mix(in srgb, var(--forge-amber) 18%, transparent)' : 'transparent',
         color: active ? 'var(--forge-amber)' : 'var(--cf-text-secondary, #C8D8E8)' }}>
       {children}

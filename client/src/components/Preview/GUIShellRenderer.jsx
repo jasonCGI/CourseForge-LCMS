@@ -46,7 +46,7 @@ export default function GUIShellRenderer({
   return (
     <div style={{
       width: '100%', height, position: 'relative', overflow: 'hidden',
-      borderRadius: 8, border: '1px solid var(--cf-block-border, #1c2a3a)',
+      borderRadius: 0, border: '1px solid var(--cf-block-border, #1c2a3a)',
     }}>
       {!loaded && (
         <div style={{

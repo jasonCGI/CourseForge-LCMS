@@ -323,7 +323,7 @@ export default function App() {
             </>
           ) : (
             <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
-              <Panel defaultSize={28} minSize={24} maxSize={55}>{sidebarInner}</Panel>
+              <Panel defaultSize={24} minSize={14} maxSize={55}>{sidebarInner}</Panel>
               <PanelResizeHandle style={{ width: 4, background: 'var(--cf-border-primary)', cursor: 'col-resize', transition: 'background 0.15s' }} />
               <Panel minSize={40}>{editorInner}</Panel>
             </PanelGroup>

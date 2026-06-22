@@ -95,7 +95,7 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
     left:{bx}px; top:{by}px;
     width:{bw}px; height:{bh}px;
     border:none; padding:0; margin:0;
-    cursor:pointer; outline:none;
+    cursor:pointer; outline:none; background-color:transparent; -webkit-appearance:none; appearance:none;
     {sprite_css('normal')}
   }}
   #{bid}:hover    {{ {sprite_css('hover')} }}
@@ -126,7 +126,7 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
     left:{bx}px; top:{by}px;
     width:{bw}px; height:{bh}px;
     border:none; padding:0; margin:0;
-    cursor:pointer; outline:none;
+    cursor:pointer; outline:none; background-color:transparent; -webkit-appearance:none; appearance:none;
     {img_css('normal')}
   }}
   #{bid}:hover    {{ {img_css('hover')} }}
