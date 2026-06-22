@@ -1287,6 +1287,27 @@ applyMode(document.documentElement.getAttribute('data-mode') || 'dark')
 function downloadJSON() {
   if (!parsedData || hasErrors) return
 
+  // Flush the open Frame Content tab so the loss-check below sees its latest edits.
+  if (typeof saveCurrentFrame === 'function') saveCurrentFrame()
+
+  // Guard against silent data loss: the STRUCTURE-ONLY export drops all authored
+  // Frame Content (narration / media / WCN / knowledge checks / branching). If any
+  // exists, warn the author and point them at the enriched export before proceeding.
+  var authored = Object.keys(frameContent).filter(function (k) {
+    var c = frameContent[k] || {}
+    return (c.narration && c.narration.trim()) ||
+           (c.media && c.media.length) ||
+           (c.wcn && c.wcn.length) ||
+           c.kc || c.branch
+  }).length
+  if (authored > 0 && !window.confirm(
+        authored + ' frame(s) have authored content (narration, media, WCN, ' +
+        'knowledge checks or branching) that the structure-only export will NOT ' +
+        'include.\n\nUse "Export Enriched JSON" to keep that content.\n\n' +
+        'Download structure-only anyway?')) {
+    return
+  }
+
   const output = { ...parsedData }
   delete output._meta   // strip internal meta before export
 

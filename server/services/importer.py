@@ -259,13 +259,39 @@ def seed_project(data: dict) -> Project:
     return project
 
 
+def _collect_warnings(data: dict) -> list:
+    """
+    Non-fatal advisories surfaced after a successful seed. Catches the common
+    ForgeBlueprint footgun: a structure-only export (or a hand-edited file) where
+    an assessment/branch frame arrives with no content, so it imports empty.
+    """
+    warnings = []
+    for course in data.get("courses", []):
+        for module in course.get("modules", []):
+            for lesson in module.get("lessons", []):
+                for frame in lesson.get("frames", []):
+                    name = (frame.get("frame_name") or "frame").strip()
+                    ftype = frame.get("frame_type", "content")
+                    if ftype == "assessment" and not frame.get("knowledge_check"):
+                        warnings.append(
+                            f"Frame '{name}' is an assessment but has no knowledge "
+                            f"check — it imported empty. (Exported structure-only "
+                            f"instead of Enriched JSON?)")
+                    elif ftype == "branch" and not frame.get("branch"):
+                        warnings.append(
+                            f"Frame '{name}' is a branch but has no branching logic "
+                            f"— it imported empty. (Exported structure-only instead "
+                            f"of Enriched JSON?)")
+    return warnings
+
+
 def import_project(data: dict) -> tuple[Project, list]:
     """
     Main entry point. Validates then seeds.
     Returns (project, warnings_list).
     Raises ImportValidationError on validation failure.
     """
-    warnings = []
     validate_import(data)
+    warnings = _collect_warnings(data)
     project = seed_project(data)
     return project, warnings

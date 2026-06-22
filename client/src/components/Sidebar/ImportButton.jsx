@@ -47,9 +47,16 @@ export default function ImportButton() {
         </p>
       )}
       {result && result.success && result.warnings?.length > 0 && (
-        <p style={{ color: '#FF9800', fontSize: 12, marginTop: 6 }}>
-          Imported with {result.warnings.length} warning(s).
-        </p>
+        <div style={{ color: '#FF9800', fontSize: 12, marginTop: 6 }}>
+          <p style={{ margin: 0, fontWeight: 600 }}>
+            Imported with {result.warnings.length} warning(s):
+          </p>
+          <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+            {result.warnings.map((w, i) => (
+              <li key={i} style={{ marginTop: 2 }}>{w}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
