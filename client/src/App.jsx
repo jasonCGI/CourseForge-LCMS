@@ -67,6 +67,12 @@ export default function App() {
   // without a circular import on the project store.
   const selectedNode = useEditorStore(s => s.selectedNode)
   const activeFrame = useEditorStore(s => s.activeFrame)
+  // Resolved inspector dock orientation for the active frame ('bottom'|'right').
+  // Subscribe to the inputs so the split re-renders when either the global
+  // default or this frame's override changes.
+  const inspectorDockDefault = useEditorStore(s => s.inspectorDockDefault)
+  const inspectorDockByFrame = useEditorStore(s => s.inspectorDockByFrame)
+  const dock = (activeFrame && inspectorDockByFrame[activeFrame.id]) || inspectorDockDefault
   useEffect(() => {
     useEditorStore.getState().setProjectFrameOrder(
       () => flatFrameOrder(useProjectStore.getState().activeProject)
@@ -112,18 +118,35 @@ export default function App() {
   const rightPanelInner = selectedNode?.type === 'project' ? (
     <CourseConfigPanel />
   ) : (!isMobile && activeFrame) ? (
-    // Resizable vertical split: live preview on top, block editor below.
-    <PanelGroup direction="vertical" autoSaveId="cf-frame-vsplit" style={{ height: '100%' }}>
-      <Panel defaultSize={60} minSize={20} style={{ overflow: 'hidden' }}>
-        <PersistentPreviewPane />
-      </Panel>
-      <PanelResizeHandle className="cf-vsplit-handle" />
-      <Panel minSize={25} style={{ overflow: 'hidden' }}>
-        <div className="cf-block-config-pane" style={{ height: '100%' }}>
-          <InspectorPane />
-        </div>
-      </Panel>
-    </PanelGroup>
+    // Resizable split: live preview + block editor. Orientation is user-toggled
+    // per frame (carrying a global default) — 'bottom' = vertical (preview top),
+    // 'right' = horizontal (preview left). A distinct autoSaveId per direction
+    // keeps react-resizable-panels from choking when restoring saved sizes.
+    dock === 'right' ? (
+      <PanelGroup key="hsplit" direction="horizontal" autoSaveId="cf-frame-hsplit" style={{ height: '100%' }}>
+        <Panel defaultSize={58} minSize={25} style={{ overflow: 'hidden' }}>
+          <PersistentPreviewPane />
+        </Panel>
+        <PanelResizeHandle className="cf-hsplit-handle" />
+        <Panel minSize={28} style={{ overflow: 'hidden' }}>
+          <div className="cf-block-config-pane" style={{ height: '100%' }}>
+            <InspectorPane />
+          </div>
+        </Panel>
+      </PanelGroup>
+    ) : (
+      <PanelGroup key="vsplit" direction="vertical" autoSaveId="cf-frame-vsplit" style={{ height: '100%' }}>
+        <Panel defaultSize={60} minSize={20} style={{ overflow: 'hidden' }}>
+          <PersistentPreviewPane />
+        </Panel>
+        <PanelResizeHandle className="cf-vsplit-handle" />
+        <Panel minSize={25} style={{ overflow: 'hidden' }}>
+          <div className="cf-block-config-pane" style={{ height: '100%' }}>
+            <InspectorPane />
+          </div>
+        </Panel>
+      </PanelGroup>
+    )
   ) : (
     <div className="cf-block-config-pane" style={{ height: '100%' }}>
       <InspectorPane />

@@ -5,6 +5,18 @@ let autosaveTimer = null
 let saveStatusTimer = null
 const AUTOSAVE_DELAY = 1200
 
+// Inspector dock orientation — global default persisted in localStorage
+// (mirrors the cf-inspector-mode pattern in InspectorPane). 'bottom' = vertical
+// split (preview top / inspector below); 'right' = horizontal (preview left /
+// inspector right). Per-frame overrides live in-memory in the store.
+const DOCK_KEY = 'cf-inspector-dock'
+function _readDockDefault() {
+  try {
+    const v = localStorage.getItem(DOCK_KEY)
+    return v === 'right' ? 'right' : 'bottom'
+  } catch { return 'bottom' }
+}
+
 const useEditorStore = create((set, get) => ({
   // State
   activeFrame: null,
@@ -18,6 +30,33 @@ const useEditorStore = create((set, get) => ({
   _undoStack: [],             // snapshots of blocks arrays (most recent first)
   saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
   selectedNode: null,         // {type:'project'|'frame', id} — drives the context-sensitive right panel
+
+  // ── Inspector dock orientation ──────────────────────────────────────────
+  inspectorDockDefault: _readDockDefault(),  // global carry-over default
+  inspectorDockByFrame: {},                  // per-frame overrides, keyed by frame id
+
+  // Resolve the orientation for a frame: explicit per-frame override wins,
+  // else the global default. Pass a frame id (defaults to the active frame).
+  resolveDock: (frameId) => {
+    const id = frameId ?? get().activeFrame?.id
+    const override = id != null ? get().inspectorDockByFrame[id] : undefined
+    return override || get().inspectorDockDefault
+  },
+
+  // Set the CURRENT frame's orientation AND update the global default so the
+  // choice carries over to subsequent un-overridden frames. Frames with an
+  // explicit override keep it even when the global later changes.
+  setInspectorDock: (orientation) => {
+    const o = orientation === 'right' ? 'right' : 'bottom'
+    const id = get().activeFrame?.id
+    set(s => ({
+      inspectorDockDefault: o,
+      inspectorDockByFrame: id != null
+        ? { ...s.inspectorDockByFrame, [id]: o }
+        : s.inspectorDockByFrame,
+    }))
+    try { localStorage.setItem(DOCK_KEY, o) } catch {}
+  },
 
   // Load a frame by ID
   loadFrame: async (frameId) => {

@@ -46,7 +46,10 @@ export default function FrameHeader({ right = null }) {
           outline: 'none',
           fontSize: 14,
           fontWeight: 500,
-          color: 'var(--color-text-primary)',
+          // FIXED light value — the bar background is a fixed navy in every mode,
+          // so a mode-reactive token (--color-text-primary) flips dark and the
+          // name becomes invisible. #EAF1F8 = 12.37:1 on #042C53 (AA pass).
+          color: '#EAF1F8',
           fontFamily: 'var(--font-sans)',
         }}
       />
@@ -54,7 +57,7 @@ export default function FrameHeader({ right = null }) {
       {/* Optional toggle — excluded from completion count */}
       <label title="Optional frames are excluded from the completion count"
         style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
-          fontSize: 11, color: activeFrame.optional ? 'var(--forge-amber)' : 'var(--cf-text-secondary, #7A90A8)',
+          fontSize: 11, color: activeFrame.optional ? 'var(--forge-amber)' : '#9FB4C9',
           cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
         <input type="checkbox" checked={!!activeFrame.optional}
           onChange={e => setOptional(e.target.checked)} aria-label="Mark frame optional" />
@@ -64,7 +67,7 @@ export default function FrameHeader({ right = null }) {
       {/* Save status */}
       <span style={{
         fontSize: 11,
-        color: isDirty ? 'var(--forge-amber)' : 'var(--cf-text-secondary, #7A90A8)',
+        color: isDirty ? 'var(--forge-amber)' : '#9FB4C9',
         flexShrink: 0,
         minWidth: 96,
         textAlign: 'right',
@@ -79,8 +82,10 @@ export default function FrameHeader({ right = null }) {
         style={{
           padding: '5px 12px',
           background: 'transparent',
-          color: 'var(--cf-text-secondary, #C8D8E8)',
-          border: '1px solid var(--color-border-secondary)',
+          // Fixed light text/border — the bar is fixed navy in all modes.
+          // #C8D8E8 text = 9.69:1; #758BA0 border = 4.00:1 (UI ≥3:1 pass).
+          color: '#C8D8E8',
+          border: '1px solid #758BA0',
           borderRadius: 4,
           fontSize: 12,
           cursor: 'pointer',
@@ -99,8 +104,10 @@ export default function FrameHeader({ right = null }) {
         style={{
           padding: '5px 14px',
           background: isDirty ? '#185FA5' : 'transparent',
-          color: isDirty ? '#fff' : 'var(--cf-text-secondary, #C8D8E8)',
-          border: '1px solid var(--color-border-secondary)',
+          // Fixed light text/border (bar is fixed navy). #fff on #185FA5 = 6.51:1;
+          // idle #C8D8E8 on navy = 9.69:1; #758BA0 border = 4.00:1.
+          color: isDirty ? '#fff' : '#C8D8E8',
+          border: '1px solid #758BA0',
           borderRadius: 4,
           fontSize: 12,
           cursor: isDirty ? 'pointer' : 'default',

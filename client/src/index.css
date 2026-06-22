@@ -195,6 +195,26 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 }
 .cf-vsplit-handle:hover::after { background: var(--forge-amber); }
 
+/* Horizontal resize handle between preview (left) and inspector (right) */
+.cf-hsplit-handle {
+  width: 7px;
+  flex-shrink: 0;
+  background: var(--cf-border-primary, #1c2a3a);
+  border-left: 1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent);
+  cursor: col-resize;
+  position: relative;
+}
+.cf-hsplit-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 36px; border-radius: 2px;
+  background: color-mix(in srgb, var(--forge-amber) 55%, transparent);
+}
+.cf-hsplit-handle:hover::after { background: var(--forge-amber); }
+
 /* Delete (✕) on a shell tile */
 .cf-shell-del {
   position: absolute;
