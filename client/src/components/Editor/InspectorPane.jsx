@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import useEditorStore from '../../store/editorStore'
 import FrameEditor from './FrameEditor'
 import TabbedFrameEditor from './TabbedFrameEditor'
+import FrameHeader from './FrameHeader'
 
 /**
  * InspectorPane — wraps the bottom authoring pane with a Stack/Tabs toggle.
@@ -10,6 +11,10 @@ import TabbedFrameEditor from './TabbedFrameEditor'
  * the prototype TabbedFrameEditor (one tab per block + a Frame tab, drag to
  * reorder). The toggle is persisted so a creator's choice sticks. Kept behind
  * the toggle so the current editor stays fully intact.
+ *
+ * FrameHeader (frame name + Optional + Preview + Save) is hoisted here as a
+ * persistent action bar so those high-frequency controls stay reachable in both
+ * modes — in Tabs mode they used to be buried inside the Frame tab.
  */
 export default function InspectorPane() {
   const activeFrame = useEditorStore(s => s.activeFrame)
@@ -20,19 +25,12 @@ export default function InspectorPane() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {activeFrame && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px',
-          borderBottom: '1px solid var(--cf-border-primary)', background: 'var(--cf-header-bg, #042C53)',
-          flexShrink: 0 }}>
-          <span style={{ fontSize: 9, fontFamily: 'var(--forge-font)', letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: 'var(--cf-text-secondary, #7A90A8)' }}>Inspector</span>
-          <div style={{ flex: 1 }} />
-          <div role="group" aria-label="Inspector layout" style={{ display: 'flex', gap: 2 }}>
-            <SegBtn active={mode === 'stack'} onClick={() => choose('stack')} title="All blocks in a list">≡ Stack</SegBtn>
-            <SegBtn active={mode === 'tabs'} onClick={() => choose('tabs')} title="One tab per block (prototype)">⊞ Tabs</SegBtn>
-          </div>
+      <FrameHeader right={
+        <div role="group" aria-label="Inspector layout" style={{ display: 'flex', gap: 2 }}>
+          <SegBtn active={mode === 'stack'} onClick={() => choose('stack')} title="All blocks in a list">≡ Stack</SegBtn>
+          <SegBtn active={mode === 'tabs'} onClick={() => choose('tabs')} title="One tab per block (prototype)">⊞ Tabs</SegBtn>
         </div>
-      )}
+      } />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {mode === 'tabs' ? <TabbedFrameEditor /> : <FrameEditor />}
       </div>

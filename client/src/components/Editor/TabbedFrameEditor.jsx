@@ -10,7 +10,6 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import { BLOCK_TYPES } from './BlockToolbar'
-import FrameHeader from './FrameHeader'
 import FrameNotes from './FrameNotes'
 import BlockToolbar from './BlockToolbar'
 import TextBlock from './blocks/TextBlock'
@@ -149,7 +148,6 @@ export default function TabbedFrameEditor() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {tab === FRAME_TAB ? (
           <>
-            <FrameHeader onPreview={() => setPreviewOpen(true)} />
             <FrameNotes frame={activeFrame} />
             <LayoutPresetStub />
           </>

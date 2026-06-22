@@ -11,7 +11,6 @@ import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import useClipboardStore from '../../store/clipboardStore'
 import { countWords, formatTime } from '../../utils/wordCount'
-import FrameHeader from './FrameHeader'
 import FrameNotes from './FrameNotes'
 import BlockToolbar from './BlockToolbar'
 import TextBlock from './blocks/TextBlock'
@@ -168,8 +167,6 @@ export default function FrameEditor() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <FrameHeader onPreview={() => setPreviewOpen(true)} />
-
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         <FrameNotes frame={activeFrame} />
         {copiedBlock && (
