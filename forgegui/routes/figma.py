@@ -153,8 +153,24 @@ def map_layout(frame: dict) -> dict:
                          'bg_color': 'transparent', 'overflow': 'auto'},
         'buttons': [], 'zones': [], 'bg_node_id': None, 'warnings': [],
     }
+    # Collect named layers at ANY depth: an artist may group the footer arrows or
+    # header zones inside a Figma group/auto-layout frame. absoluteBoundingBox is
+    # absolute, so rel() yields correct stage coords no matter how deep the layer
+    # sits. We stop descending once a layer is named (its children are its art).
+    matched = []
+    def _collect(nodes):
+        for node in nodes or []:
+            nm = _norm(node.get('name'))
+            if (nm in ('bg', 'background')
+                    or nm in ('content-area', 'content', 'contentarea')
+                    or nm.startswith('btn-') or nm.startswith('zone-')):
+                matched.append(node)
+            else:
+                _collect(node.get('children'))
+    _collect(frame.get('children', []))
+
     tab = 1
-    for node in frame.get('children', []):
+    for node in matched:
         n = _norm(node.get('name'))
         x, y, w, h = rel(node)
         if n in ('bg', 'background'):

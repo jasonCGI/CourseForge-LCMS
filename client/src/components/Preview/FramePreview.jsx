@@ -33,7 +33,8 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           marginBottom: 24, paddingBottom: 12,
           borderBottom: '2px solid var(--forge-amber)',
         }}>{frame.name}</h1>
-        <PreviewGUI guiBlock={guiBlock} contentBlocks={contentBlocks} frameName={frame.name} />
+        <PreviewGUI guiBlock={guiBlock} contentBlocks={contentBlocks} frameName={frame.name}
+          framePrompt={frame.content?.prompt} />
       </div>
     )
   }
@@ -179,7 +180,7 @@ function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children
   )
 }
 
-function PreviewGUI({ guiBlock, contentBlocks, frameName }) {
+function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt }) {
   const [action, setAction] = useState(null)
 
   if (!guiBlock.data.gui_asset_id) {
@@ -206,7 +207,7 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName }) {
           frameIndex: 1, totalFrames: 1,
           lessonTitle: 'Preview', sectionTitle: 'Preview',
           frameTitle: frameName || 'Frame Preview',
-          prompt: frameName || '',
+          prompt: framePrompt || frameName || '',
           isFirst: true, isLast: true,
         }}
         onAction={(a) => setAction(a)}

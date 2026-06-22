@@ -12,12 +12,12 @@ import useProjectStore from '../../store/projectStore'
  * right authoring panel (above the block-config editor). Two modes:
  *   - Project has a GUI shell → render the frame inside the shell iframe
  *     (matches published SCO: shell is the page, blocks injected via window.fgui).
- *     Shell NEXT/PREVIOUS actions advance the active frame in the tree.
+ *     Shell NEXT/PREVIOUS are inert here — the preview is a single-frame WYSIWYG,
+ *     not a navigable runtime, so the buttons don't drive the frame tree.
  *   - No shell → render FramePreview directly (full WYSIWYG for every block type).
  */
 export default function PersistentPreviewPane() {
   const activeFrame  = useEditorStore(s => s.activeFrame)
-  const navigateFrame = useEditorStore(s => s.navigateFrame)
   const activeBlockId = useEditorStore(s => s.activeBlockId)
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
   const activeProject = useProjectStore(s => s.activeProject)
@@ -79,11 +79,13 @@ export default function PersistentPreviewPane() {
     frameIndex: human, totalFrames: total,
     lessonTitle: ctx.lessonName, sectionTitle: ctx.courseName,
     frameTitle: activeFrame?.name || '',
-    prompt: activeFrame?.name || '',
+    // Prompt zone: per-frame prompt (set in the Frame section), else inherit the
+    // frame title. Stored in content so it rides the content autosave.
+    prompt: activeFrame?.content?.prompt || activeFrame?.name || '',
     // Single-frame live preview: disable NEXT/PREV (isFirst && isLast). Real
     // navigation is exercised in the full-course preview, not here.
     isFirst: true, isLast: true,
-  }), [human, total, activeFrame?.name, ctx])
+  }), [human, total, activeFrame?.name, activeFrame?.content?.prompt, ctx])
 
   if (!activeFrame) return null
 
@@ -110,7 +112,7 @@ export default function PersistentPreviewPane() {
             shellUrl={`/api/gui-shells/${shellId}/shell.html`}
             frameHtml={frameHtml}
             frameData={frameData}
-            onAction={(a) => { if (a === 'NEXT' || a === 'PREVIOUS') navigateFrame(a) }}
+            onAction={null}
             height="100%"
           />
         </ShellFit>

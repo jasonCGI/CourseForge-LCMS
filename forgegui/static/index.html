@@ -201,7 +201,7 @@
 
     .canvas-wrap {
       flex:     1;
-      overflow: auto;
+      overflow: hidden;
       display:  flex;
       align-items: center;
       justify-content: center;
@@ -1638,6 +1638,8 @@ function loadGuiIntoUI(g) {
     document.getElementById('bg-dims').textContent  = gui.stage.width + ' × ' + gui.stage.height + 'px'
   }
   renderStage(); renderButtonList(); renderZoneList()
+  // Default to scale-to-fit once the canvas has its dimensions laid out.
+  requestAnimationFrame(zoomFit)
   document.getElementById('btn-export').disabled     = false
   document.getElementById('btn-export-2').disabled   = false
   document.getElementById('btn-send-lcms').disabled  = false
@@ -1674,7 +1676,7 @@ function importFigma() {
 function applyZoom() {
   var stage = document.getElementById('stage-preview')
   stage.style.transform       = 'scale(' + zoom + ')'
-  stage.style.transformOrigin = 'top left'
+  stage.style.transformOrigin = 'center center'
   document.getElementById('zoom-label').textContent =
     Math.round(zoom * 100) + '%'
 }

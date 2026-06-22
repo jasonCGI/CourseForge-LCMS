@@ -1139,6 +1139,10 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     # Escape '</' so an embedded </script> can't close the runtime's own tag.
     frame_html_js = json.dumps(injected_html).replace('</', '<\\/')
 
+    # Prompt zone: per-frame prompt (authored in the Frame section, stored in
+    # content.prompt), falling back to the frame title when empty.
+    frame_prompt = (frame.content or {}).get('prompt') or frame.name or ''
+
     cf_runtime = f"""
 <script>
 // CourseForge GUI Runtime — injected by CourseForge v{cf_version} at publish time
@@ -1153,7 +1157,7 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     lessonTitle:  {json.dumps(lesson_name or '')},
     sectionTitle: {json.dumps(section_name or '')},
     frameTitle:   {json.dumps(frame.name or '')},
-    prompt:       {json.dumps(frame.name or '')},
+    prompt:       {json.dumps(frame_prompt)},
     isFirst:      {'true' if is_first else 'false'},
     isLast:       {'true' if is_last else 'false'}
   }};

@@ -208,6 +208,16 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
+  // Per-frame prompt — drives the GUI shell's prompt zone. Stored inside content
+  // so it persists via the existing content autosave (no schema change). Empty
+  // means "inherit the frame title" at render time.
+  setFramePrompt: (val) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    set({ activeFrame: { ...activeFrame, content: { ...activeFrame.content, prompt: val } }, isDirty: true })
+    get()._scheduleAutosave()
+  },
+
   // Manual save
   save: async () => {
     if (autosaveTimer) clearTimeout(autosaveTimer)
