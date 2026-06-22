@@ -135,15 +135,36 @@ def _color_hex(node):
     return None
 
 
+def _box(node):
+    """Tight, visible-pixel bounds (`absoluteRenderBounds`) when present, else
+    the loose square layout box (`absoluteBoundingBox`). Render bounds exclude
+    transparent padding inside a node's box — e.g. a left/right-pointing triangle
+    VECTOR fills only half its square box, and the bounding box of two adjacent
+    arrows can overlap even though the visible art does not. Using render bounds
+    for such nodes prevents the exported PNGs from colliding. Render bounds can be
+    null for some node types, so we fall back to the bounding box."""
+    return node.get('absoluteRenderBounds') or node.get('absoluteBoundingBox') or {}
+
+
 def map_layout(frame: dict) -> dict:
     """Pure mapping: Figma frame node -> partial ForgeGUI gui dict.
     Buttons/bg carry a `_node_id` for later image export. No I/O."""
+    # Frame ORIGIN + size come from the frame's absoluteBoundingBox (NOT its
+    # render bounds): the bounding box is the full intended design canvas / stage
+    # bounds, whereas render bounds would tighten to visible ink and shift the
+    # coordinate origin. We want the full canvas, so keep the bounding box here.
     fb = frame.get('absoluteBoundingBox') or {}
     fx, fy = fb.get('x', 0), fb.get('y', 0)
     stage_w, stage_h = round(fb.get('width', 1024)), round(fb.get('height', 768))
 
-    def rel(node):
-        b = node.get('absoluteBoundingBox') or {}
+    def rel(node, tight=False):
+        # `tight=True` uses the visible-ink render bounds (see _box) — this is the
+        # fix for overlapping nav-arrow buttons whose square bounding boxes collide.
+        # `tight=False` (default) keeps the loose absoluteBoundingBox, which is
+        # what we want for full-rectangle nodes (content-area) and, conservatively,
+        # for text zones (render bounds there = tight text ink; left as boxes to
+        # avoid regressions). Only buttons request tight bounds.
+        b = _box(node) if tight else (node.get('absoluteBoundingBox') or {})
         return (round(b.get('x', 0) - fx), round(b.get('y', 0) - fy),
                 round(b.get('width', 0)), round(b.get('height', 0)))
 
@@ -172,13 +193,20 @@ def map_layout(frame: dict) -> dict:
     tab = 1
     for node in matched:
         n = _norm(node.get('name'))
-        x, y, w, h = rel(node)
         if n in ('bg', 'background'):
+            # bg carries only its node id (exported as a full-rectangle PNG); no
+            # geometry is read here, so the box choice is moot for it.
             out['bg_node_id'] = node.get('id')
         elif n in ('content-area', 'content', 'contentarea'):
+            # Full rectangle: keep the loose bounding box (render bounds could
+            # clip to visible ink and shrink the intended content region).
+            x, y, w, h = rel(node)
             out['content_area'] = {'x': x, 'y': y, 'width': w, 'height': h,
                                    'bg_color': 'transparent', 'overflow': 'auto'}
         elif n.startswith('btn-'):
+            # THE FIX: buttons use tight render bounds so adjacent triangle arrows
+            # (◄ ►) don't collide where their square bounding boxes overlap.
+            x, y, w, h = rel(node, tight=True)
             suf = _suffix(node.get('name'), 'btn-')
             action = ACTION_MAP.get(suf, suf.upper() or 'NEXT')
             out['buttons'].append({
@@ -192,6 +220,10 @@ def map_layout(frame: dict) -> dict:
             })
             tab += 1
         elif n.startswith('zone-'):
+            # Text zones: keep the bounding box (conservative). Render bounds here
+            # would be the tight text-ink rect; staying on the layout box avoids
+            # placement regressions in existing imports.
+            x, y, w, h = rel(node)
             suf = _suffix(node.get('name'), 'zone-')
             ztype = _zone_type(suf)
             zone = {
