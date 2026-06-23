@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getProjects, getProject, importJson, importJsonBody } from '../api/client'
 import demoProject from '../demoProject'
+import { isSchemaSupported, SCHEMA_VERSION } from '../version'
 
 const useProjectStore = create((set, get) => ({
   // State
@@ -56,6 +57,23 @@ const useProjectStore = create((set, get) => ({
   importProject: async (file) => {
     set({ loading: true, error: null })
     try {
+      // Client-side schema pre-flight, mirroring the server's import gate
+      // (server/version.py is_schema_supported). The file is still validated
+      // server-side; this just fails fast with a clear message before upload.
+      // Best-effort: if the file can't be read/parsed here, defer to the server.
+      try {
+        const text = await file.text()
+        const parsed = JSON.parse(text)
+        const stamped = parsed?.schema_version
+        if (stamped !== undefined && !isSchemaSupported(stamped)) {
+          const msg = `Unsupported schema version "${stamped}". This build of ` +
+            `CourseForge supports schema ${SCHEMA_VERSION} (same major line).`
+          set({ error: msg, loading: false })
+          return { success: false, error: msg }
+        }
+      } catch (preflightErr) {
+        // Unreadable/non-JSON file — let the server produce the canonical error.
+      }
       const { data } = await importJson(file)
       const project = data.project
       set(state => ({

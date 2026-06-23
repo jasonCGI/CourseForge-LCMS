@@ -2,7 +2,11 @@
 CourseForge version — single source of truth.
 Import this anywhere version info is needed.
 
-Keep in sync with client/src/version.js (manual until Sprint 7 build step).
+Source of truth for schema constants. client/src/version.js hand-mirrors
+SCHEMA_VERSION / MIN_SCHEMA_VERSION / SUPPORTED_SCHEMA_VERSIONS and reimplements
+is_schema_supported() with identical accept/reject behavior. Sync is MANUAL:
+if you change a schema constant here, change it there too (a codegen build step
+to derive the client values from this file is deferred until Sprint 7).
 
 Bump rules:
   MAJOR — JSON schema breaking change, DB migration required
