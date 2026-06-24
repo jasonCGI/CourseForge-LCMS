@@ -180,6 +180,40 @@ def _project_shell_for(project):
     return shell if (shell and shell.stored_path) else None
 
 
+def _frame_position(project, frame):
+    """This frame's place in the project's ordered frame sequence.
+
+    Mirrors the packager's ordering (course/module/lesson/frame by order_index)
+    and its visible counter, which excludes optional frames. Returns
+    (frame_idx, total, disp_index, disp_total) so the shell pager reads the real
+    "N / total" instead of a hardcoded "1 / 1". Falls back to (0, 1, 1, 1) when
+    the project tree can't be walked.
+    """
+    if not project:
+        return 0, 1, 1, 1
+    all_frames = []
+    for course in sorted(project.courses, key=lambda c: c.order_index):
+        for mod in sorted(course.modules, key=lambda m: m.order_index):
+            for lesson in sorted(mod.lessons, key=lambda l: l.order_index):
+                for fr in sorted(lesson.frames, key=lambda f: f.order_index):
+                    all_frames.append(fr)
+    total = len(all_frames) or 1
+    try:
+        frame_idx = next(i for i, fr in enumerate(all_frames) if fr.id == frame.id)
+    except StopIteration:
+        return 0, total, 1, total
+    req_total = sum(1 for fr in all_frames if not getattr(fr, "optional", False)) or total
+    run = 0
+    disp_index = 1
+    for i, fr in enumerate(all_frames):
+        if not getattr(fr, "optional", False):
+            run += 1
+        if i == frame_idx:
+            disp_index = run or 1
+            break
+    return frame_idx, total, disp_index, req_total
+
+
 def _build_shell_preview(shell, frame, project) -> str | None:
     """
     Render the frame wrapped in the project's GUI shell exactly as the published
@@ -190,11 +224,12 @@ def _build_shell_preview(shell, frame, project) -> str | None:
     lesson = getattr(frame, "lesson", None)
     module = getattr(lesson, "module", None) if lesson else None
     course = getattr(module, "course", None) if module else None
+    frame_idx, total, disp_index, disp_total = _frame_position(project, frame)
     html, _ = _build_project_shell_frame(
-        shell, frame, 0, 1,
+        shell, frame, frame_idx, total,
         getattr(lesson, "name", "") or "",
         getattr(course, "name", "") or "",
-        {0: ""}, VERSION, 1, 1,
+        {0: ""}, VERSION, disp_index, disp_total,
         hotspot_cfg=_project_hotspot_cfg(project),
         preview=True,
     )

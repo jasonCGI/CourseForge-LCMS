@@ -34,7 +34,7 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           borderBottom: '2px solid var(--forge-amber)',
         }}>{frame.name}</h1>
         <PreviewGUI guiBlock={guiBlock} contentBlocks={contentBlocks} frameName={frame.name}
-          framePrompt={frame.content?.prompt} />
+          framePrompt={frame.content?.prompt} frameId={frame.id} />
       </div>
     )
   }
@@ -180,8 +180,17 @@ function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children
   )
 }
 
-function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt }) {
+function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId }) {
   const [action, setAction] = useState(null)
+
+  // Resolve this frame's real 1-based position / total within the project's
+  // ordered frame list (same source the persistent pane uses) so the shell pager
+  // reads "N / total" instead of a hardcoded "1 / 1".
+  const frameOrderFn = useEditorStore(s => s._projectFrameOrder)
+  const order = frameOrderFn ? frameOrderFn() : []
+  const pos = frameId ? order.indexOf(frameId) : -1
+  const total = order.length || 1
+  const human = pos >= 0 ? pos + 1 : 1
 
   if (!guiBlock.data.gui_asset_id) {
     return (
@@ -204,11 +213,11 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt }) {
         shellUrl={guiBlock.data.html_serve_url}
         frameHtml={frameHtml}
         frameData={{
-          frameIndex: 1, totalFrames: 1,
+          frameIndex: human, totalFrames: total,
           lessonTitle: 'Preview', sectionTitle: 'Preview',
           frameTitle: frameName || 'Frame Preview',
           prompt: framePrompt || frameName || '',
-          isFirst: true, isLast: true,
+          isFirst: human <= 1, isLast: human >= total,
         }}
         onAction={(a) => setAction(a)}
         height={Math.round((guiBlock.data.stage_height || 768) * 0.6)}
