@@ -7,8 +7,28 @@ import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
+import { Play, Pause } from '../icons'
 
 const FRAME_BG = '#ffffff'
+
+// Raw Iconoir (MIT) Play/Pause SVG strings for the VANILLA audio bar (the GUI
+// shell injects HTML; there is no React there). Mirrors the React <Play>/<Pause>
+// above and the server's cf_icons.PLAY_SVG / PAUSE_SVG so all renderers match.
+const CF_PLAY_SVG =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.5" '
+  + 'color="currentColor" aria-hidden="true" focusable="false">'
+  + '<path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 '
+  + '6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 '
+  + '18.629 11.4838L6.90588 4.53682Z" fill="currentColor" stroke="currentColor" '
+  + 'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const CF_PAUSE_SVG =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.5" '
+  + 'color="currentColor" aria-hidden="true" focusable="false">'
+  + '<path d="M6 18.4V5.6C6 5.26863 6.26863 5 6.6 5H9.4C9.73137 5 10 5.26863 10 5.6V18.4C10 '
+  + '18.7314 9.73137 19 9.4 19H6.6C6.26863 19 6 18.7314 6 18.4Z" fill="currentColor" '
+  + 'stroke="currentColor"/><path d="M14 18.4V5.6C14 5.26863 14.2686 5 14.6 5H17.4C17.7314 5 '
+  + '18 5.26863 18 5.6V18.4C18 18.7314 17.7314 19 17.4 19H14.6C14.2686 19 14 18.7314 14 '
+  + '18.4Z" fill="currentColor" stroke="currentColor"/></svg>'
 
 export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false, contentArea = null }) {
   const updateBlock = useEditorStore(s => s.updateBlock)   // for drag/resize of bounded blocks
@@ -283,7 +303,7 @@ function audioBarHTML(src, caption = '', dock = 'inline') {
     + `<button type="button" data-cf-play aria-label="Play" `
     + `style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;`
     + `background:${AMBER};color:${NAVY};cursor:pointer;display:flex;align-items:center;`
-    + `justify-content:center;font-size:14px;line-height:1;padding:0">&#9654;</button>`
+    + `justify-content:center;font-size:14px;line-height:1;padding:0">${CF_PLAY_SVG}</button>`
     + `<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>`
     + `<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" `
     + `style="flex:1 1 auto;height:4px;accent-color:${AMBER};cursor:pointer;min-width:60px">`
@@ -318,7 +338,7 @@ export function wireAudioBars(doc) {
     const rates = (bar.getAttribute('data-rates') || '1').split(',').map(parseFloat)
     let ri = rates.indexOf(1); if (ri < 0) ri = 0
     let seeking = false
-    const ico = (p) => { play.innerHTML = p ? '&#10074;&#10074;' : '&#9654;'; play.setAttribute('aria-label', p ? 'Pause' : 'Play') }
+    const ico = (p) => { play.innerHTML = p ? CF_PAUSE_SVG : CF_PLAY_SVG; play.setAttribute('aria-label', p ? 'Pause' : 'Play') }
     play.addEventListener('click', () => { a.paused ? a.play() : a.pause() })
     a.addEventListener('play', () => ico(true))
     a.addEventListener('pause', () => ico(false))
@@ -343,7 +363,7 @@ function audioBarScriptHTML() {
     + 'seek=bar.querySelector("[data-cf-seek]"),cur=bar.querySelector("[data-cf-cur]"),'
     + 'dur=bar.querySelector("[data-cf-dur]"),rateBtn=bar.querySelector("[data-cf-rate]");'
     + 'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);if(ri<0)ri=0;var seeking=false;'
-    + 'function ico(p){play.innerHTML=p?"&#10074;&#10074;":"&#9654;";play.setAttribute("aria-label",p?"Pause":"Play");}'
+    + 'function ico(p){play.innerHTML=p?"' + CF_PAUSE_SVG.replace(/"/g, '\\"') + '":"' + CF_PLAY_SVG.replace(/"/g, '\\"') + '";play.setAttribute("aria-label",p?"Pause":"Play");}'
     + 'play.addEventListener("click",function(){a.paused?a.play():a.pause();});'
     + 'a.addEventListener("play",function(){ico(true);});a.addEventListener("pause",function(){ico(false);});'
     + 'a.addEventListener("loadedmetadata",function(){dur.textContent=fmt(a.duration);});'
@@ -574,7 +594,9 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 14, lineHeight: 1, padding: 0,
         }}>
-        {playing ? '❚❚' : '▶'}
+        {playing
+          ? <Pause width={18} height={18} color={CF_AUDIO_NAVY} />
+          : <Play width={18} height={18} color={CF_AUDIO_NAVY} />}
       </button>
       <span style={{ flex: '0 0 auto', fontSize: 12, letterSpacing: '.02em' }}>{fmtTime(cur)}</span>
       <input type="range" min={0} max={1000} step={1} aria-label="Seek"

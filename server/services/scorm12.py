@@ -27,6 +27,7 @@ def _read_text_cached(path):
     return Path(path).read_text(encoding='utf-8')
 from ..models.media import MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
+from ..services.cf_icons import PLAY_SVG, PLAY_SVG_JS, PAUSE_SVG_JS
 from ..version import VERSION, SCHEMA_VERSION
 
 
@@ -72,7 +73,7 @@ def _cf_audio_bar(src, caption='', dock='inline', bid=None):
         f'style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;'
         f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
         f'display:flex;align-items:center;justify-content:center;font-size:14px;'
-        f'line-height:1;padding:0">&#9654;</button>'
+        f'line-height:1;padding:0">{PLAY_SVG}</button>'
         f'<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>'
         f'<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" '
         f'aria-label="Seek" '
@@ -108,7 +109,7 @@ def _cf_audio_script():
         'rateBtn=bar.querySelector("[data-cf-rate]");'
         'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);'
         'if(ri<0)ri=0;var seeking=false;'
-        'function ico(p){play.innerHTML=p?"&#10074;&#10074;":"&#9654;";'
+        'function ico(p){play.innerHTML=p?"' + PAUSE_SVG_JS + '":"' + PLAY_SVG_JS + '";'
         'play.setAttribute("aria-label",p?"Pause":"Play");}'
         'play.addEventListener("click",function(){a.paused?a.play():a.pause();});'
         'a.addEventListener("play",function(){ico(true);});'

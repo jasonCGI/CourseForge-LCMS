@@ -18,6 +18,7 @@
     "@tiptap/starter-kit": "^3.26.1",
     "@videojs/themes": "^1.0.1",
     "axios": "^1.7.2",
+    "iconoir-react": "^7.11.1",
     "react": "^18.3.1",
     "react-arborist": "^3.4.0",
     "react-dnd": "^16.0.1",

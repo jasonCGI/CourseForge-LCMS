@@ -36,7 +36,8 @@ const FRAME_TAB = '__frame__'
 // A single draggable block tab. Click selects (dnd-kit's 8px activation
 // constraint lets a click through without starting a drag); drag reorders.
 function BlockTab({ block, idx, active, onSelect }) {
-  const meta = META[block.type] || { icon: '▢', label: block.type, color: '#888' }
+  const meta = META[block.type] || { Icon: null, label: block.type, color: '#888' }
+  const TabIcon = meta.Icon
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.id })
   const style = {
@@ -50,7 +51,7 @@ function BlockTab({ block, idx, active, onSelect }) {
       title={`${meta.label} block (drag to reorder)`}
       aria-label={`${meta.label} block ${idx + 1}`} aria-pressed={active}
     >
-      <span style={{ opacity: 0.85 }}>{meta.icon}</span>
+      {TabIcon && <span style={{ opacity: 0.85, display: 'inline-flex' }}><TabIcon width={14} height={14} /></span>}
       <span>{meta.label}</span>
       <span style={{ fontSize: 9, opacity: 0.5, fontFamily: 'var(--forge-font)' }}>{idx + 1}</span>
     </button>
