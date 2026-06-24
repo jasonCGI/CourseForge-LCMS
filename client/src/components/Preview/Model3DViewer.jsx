@@ -533,9 +533,9 @@ export default function Model3DViewer({
     <div style={{ width: '100%', marginBottom: 12, userSelect: 'none' }}>
       {/* Stage wraps the canvas + absolute overlays so the bottom hint pill
           anchors to the canvas, not the caption that flows below it. */}
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 8 }}>
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
       <canvas ref={canvasRef} width={800} height={height}
-        style={{ width: '100%', height, display: 'block', borderRadius: 8,
+        style={{ width: '100%', height, display: 'block',
                  cursor: pinMode ? 'crosshair' : 'grab', outline: 'none', touchAction: 'none' }}
         tabIndex={decorative ? -1 : 0} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined}
         aria-label={decorative ? undefined : (caption || '3D model viewer — arrow keys orbit, +/- zoom, R reset, Tab to navigate annotations')}
@@ -592,13 +592,13 @@ export default function Model3DViewer({
       })}
 
       {loading && !error && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: bgColor, borderRadius: 8, gap: 12 }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: bgColor, gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #1c2a3a', borderTopColor: 'var(--forge-amber)', animation: REDUCE_MOTION ? 'none' : 'spin3d 0.8s linear infinite' }} />
           <span style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 11, color: '#3A5A7A', letterSpacing: '0.08em' }}>Loading model…</span>
         </div>
       )}
       {error && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: bgColor, borderRadius: 8, gap: 8, padding: 24, textAlign: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: bgColor, gap: 8, padding: 24, textAlign: 'center' }}>
           <span style={{ fontSize: 28 }}>⚠</span><span style={{ fontSize: 13, color: '#E87070' }}>{error}</span>
         </div>
       )}

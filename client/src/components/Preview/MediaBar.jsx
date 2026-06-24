@@ -43,7 +43,7 @@ export default function MediaBar({
   const toggleMute = onToggleMute || (() => onVolume?.(vol > 0 ? 0 : 1))
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-      background: '#0d1017', border: '1px solid #1c2a3a', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
+      background: '#0d1017', border: '1px solid #1c2a3a', borderTop: 'none' }}>
       <button onClick={onPlayPause} disabled={disabled} aria-label={playing ? 'Pause' : 'Play'}
         style={barBtn(!disabled)}>{playing ? '⏸' : '▶'}</button>
 

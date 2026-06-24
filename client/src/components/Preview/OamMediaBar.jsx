@@ -105,7 +105,7 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption, h
   return (
     <div ref={wrapRef} style={{ marginBottom: 20, background: '#0d1017' }}>
       <div ref={stageRef} style={{ position: 'relative', width: '100%', height: stageH,
-        overflow: 'hidden', background: '#0d1017', borderRadius: '6px 6px 0 0' }}>
+        overflow: 'hidden', background: '#0d1017' }}>
         <iframe ref={iframeRef} src={src} width={SW} height={SH} onLoad={onLoad}
           title="Adobe Animate animation" scrolling="no" sandbox="allow-scripts allow-same-origin"
           style={{ position: 'absolute', top: 0, left: 0, border: 0, transformOrigin: 'top left',

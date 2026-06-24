@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
-import OamMediaBar from './OamMediaBar'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
@@ -274,7 +273,7 @@ function audioBarHTML(src, caption = '', dock = 'inline') {
   const dockAttr = docked ? ' data-cf-dock="bottom"' : ''
   const bar = `<div class="cf-audio" data-cf-audio data-rates="${rates}" `
     + `style="display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;`
-    + `border-radius:10px;box-sizing:border-box;background:${NAVY};color:#E8EEF6;`
+    + `box-sizing:border-box;background:${NAVY};color:#E8EEF6;`
     + `font-family:'IBM Plex Mono',ui-monospace,monospace">`
     + `<audio data-cf-src preload="metadata" src="${src}"></audio>`
     + `<button type="button" data-cf-play aria-label="Play" `
@@ -393,22 +392,23 @@ export function renderBlockToHTML(block) {
       if (k === 'video' && src) {
         // Cover video (fit:cover explicitly): fill the content box (object-fit:
         // cover, no rounding/letterbox), play seamlessly (muted/loop/autoplay/
-        // playsinline — no big play button), and, with a caption, overlay it on a
-        // bottom-up gradient scrim (white text) instead of below it. Mirrors the
-        // cover image branch. Non-cover videos keep the controls rendering.
+        // playsinline) WITH native controls so it's a usable content video. The
+        // control bar sits at the bottom, so a caption rides on a TOP-down
+        // gradient scrim (white text) and never overlaps the controls. Mirrors the
+        // cover image branch.
         const videoIsCover = d.fit === 'cover'
         if (videoIsCover && d.caption)
           return `<div style="position:relative;${b ? 'width:100%;height:100%' : 'display:block;margin:8px 0;line-height:0'}">`
-            + `<video src="${src}" muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+            + `<video src="${src}" controls muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block"></video>`
-            + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
+            + `<div style="position:absolute;left:0;right:0;top:0;padding:12px 16px 28px;`
             + `color:#fff;font-size:13px;line-height:1.45;`
-            + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">${d.caption}</div></div>`
+            + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,.45) 50%,transparent)">${d.caption}</div></div>`
         if (videoIsCover)
-          return `<video src="${src}" muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+          return `<video src="${src}" controls muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block;margin:${b ? '0' : '8px 0'}"></video>`
         return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
-             + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
+             + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000"></video>`
       }
       if (k === 'audio' && (src || d.asset_id)) {
         const asrc = src || `/api/media/serve/${d.asset_id}`
@@ -442,7 +442,7 @@ export function renderBlockToHTML(block) {
         + `${r.label || ''}</span></div>`
       }).join('')
       return `<div style="position:relative;margin:8px 0">`
-        + `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block;border-radius:4px">`
+        + `<img src="${d.background_url}" alt="${d.alt_text || 'Hotspot image'}" style="max-width:100%;display:block">`
         + regions + `</div>`
     }
     case 'branch': {
@@ -540,7 +540,7 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
   const bar = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, height: 48,
-      padding: '0 12px', borderRadius: 10, boxSizing: 'border-box',
+      padding: '0 12px', boxSizing: 'border-box',
       background: docked ? 'rgba(4,44,83,0.96)' : CF_AUDIO_NAVY, color: '#E8EEF6',
       fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
     }}>
@@ -612,7 +612,7 @@ function PreviewMedia({ block }) {
     return (
       <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
-          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6 }} aria-label={d.original_name || 'Video'}>
+          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain' } : { maxWidth: '100%' }} aria-label={d.original_name || 'Video'}>
           {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
             <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
         </video>
@@ -629,9 +629,10 @@ function PreviewMedia({ block }) {
   }
 
   // Live cover video: a real uploaded asset that fills its content area. Plays
-  // seamlessly (muted/loop/autoplay/playsinline — no big play button, no
-  // letterbox) and, with a caption, overlays it on a bottom-up gradient scrim
-  // (white text) instead of below the video. Mirrors the cover image branch.
+  // seamlessly (muted/loop/autoplay/playsinline) AND exposes native controls so
+  // it's a usable content video. Because the native control bar sits at the
+  // bottom, the caption rides on a TOP-down gradient scrim (white text) so it
+  // never overlaps the controls. Mirrors the cover image branch.
   if (kind === 'video' && d.asset_id && d.fit === 'cover') {
     const cf = d.asset_meta?.companion_files
     const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
@@ -643,7 +644,7 @@ function PreviewMedia({ block }) {
     return (
       <div style={{ position: 'relative', overflow: 'hidden',
         ...(coverWrap || { width: '100%', display: 'block', lineHeight: 0 }) }}>
-        <video muted loop autoPlay playsInline src={`/api/media/serve/${d.asset_id}`} poster={poster}
+        <video controls muted loop autoPlay playsInline src={`/api/media/serve/${d.asset_id}`} poster={poster}
           style={b ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
                    : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
           aria-label={d.original_name || 'Video'}>
@@ -652,9 +653,9 @@ function PreviewMedia({ block }) {
         </video>
         {d.caption && (
           <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0,
-            padding: '28px 16px 12px', color: '#fff', fontSize: 13, lineHeight: 1.45,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0))', textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+            position: 'absolute', left: 0, right: 0, top: 0,
+            padding: '12px 16px 28px', color: '#fff', fontSize: 13, lineHeight: 1.45,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0.45) 50%, transparent)', textShadow: '0 1px 3px rgba(0,0,0,0.85)',
           }}>{d.caption}</div>
         )}
       </div>
@@ -831,7 +832,6 @@ function PreviewHotspot({ block }) {
         paddingBottom: '56.25%',
         background: '#E8F0F8',
         border: '1px solid #B5D4F4',
-        borderRadius: 6,
         overflow: 'hidden',
       }}>
         {block.data.background_url && (
@@ -1117,6 +1117,7 @@ function PreviewIVideo({ block }) {
     )
   }
 
+  // Full layout: the interactive video fills the content area — no caption text.
   const b = block.data.bounds
   return (
     <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
@@ -1125,9 +1126,6 @@ function PreviewIVideo({ block }) {
         clipData={clipData}
         onComplete={() => {}}
       />
-      {!b && block.data.caption && (
-        <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{block.data.caption}</p>
-      )}
     </div>
   )
 }
@@ -1190,11 +1188,18 @@ function PreviewOAM({ block }) {
       </div>
     )
   }
+  // Full layout: the OAM embed fills the entire content area — no caption/label
+  // text, no media bar. Mirrors the cover image/video "fill" treatment as closely
+  // as an iframe allows (100% of the zone, square corners, object-fit-style fill).
   const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
   const b = d.bounds
   return (
-    <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
-      <OamMediaBar src={src} width={b ? b.width : (d.width || 800)} height={b ? b.height : (d.height || 500)} caption={d.caption} />
+    <div style={b
+      ? { width: '100%', height: '100%' }
+      : { width: '100%', aspectRatio: `${d.width || 16} / ${d.height || 9}`, maxHeight: '70vh' }}>
+      <iframe src={src} title="Adobe Animate animation" scrolling="no"
+        sandbox="allow-scripts allow-same-origin"
+        style={{ width: '100%', height: '100%', border: 0, display: 'block', background: '#0d1017' }} />
     </div>
   )
 }

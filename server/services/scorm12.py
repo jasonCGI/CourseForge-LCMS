@@ -64,7 +64,7 @@ def _cf_audio_bar(src, caption='', dock='inline', bid=None):
     bar = (
         f'<div class="cf-audio" data-cf-audio data-rates="{rates}" '
         f'style="display:flex;align-items:center;gap:12px;height:48px;'
-        f'padding:0 12px;border-radius:10px;box-sizing:border-box;'
+        f'padding:0 12px;box-sizing:border-box;'
         f'background:{CF_AUDIO_NAVY};color:#E8EEF6;'
         f"font-family:'IBM Plex Mono',ui-monospace,monospace;\">"
         f'<audio data-cf-src preload="metadata" src="{src}"></audio>'
@@ -190,12 +190,12 @@ def _int_dim(v, default):
 
 _OAM_PLAYER_TPL = """
 <div id="oamwrap-__BID__" style="margin-bottom:20px;width:100%">
-  <div id="oamstage-__BID__" style="position:relative;width:100%;overflow:hidden;background:#0d1117;border-radius:6px 6px 0 0">
+  <div id="oamstage-__BID__" style="position:relative;width:100%;overflow:hidden;background:#0d1117">
     <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
       title="Interactive animation" sandbox="allow-scripts allow-same-origin"
       style="position:absolute;top:0;left:0;border:0;transform-origin:top left;display:block;background:#0d1117"></iframe>
   </div>
-  <div id="oambar-__BID__" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none;border-radius:0 0 6px 6px">
+  <div id="oambar-__BID__" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none">
     <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
     <div id="oamtrack-__BID__" style="flex:1;position:relative;height:8px;background:#1c2a3a;border-radius:4px;cursor:pointer">
       <div id="oamfill-__BID__" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:#F59E0B;border-radius:4px"></div>
@@ -487,14 +487,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             poster_attr = f'poster="{poster}"' if poster else ''
             if is_cover:
                 # Cover video: fills its content box (object-fit:cover, no
-                # rounding/letterbox) and plays seamlessly (muted/loop/autoplay/
-                # playsinline — no big play button). With a caption, the caption
-                # rides over the bottom of the video on a bottom-up gradient scrim
-                # (white text, WCAG AA) instead of a below-video <p>, so it stays
-                # readable over any frame and never pushes content below the fold.
-                # Mirrors the cover Image Block preview branch below.
+                # rounding/letterbox), plays seamlessly (muted/loop/autoplay/
+                # playsinline) AND exposes native controls so it's a usable content
+                # video. Because the native control bar sits at the bottom, the
+                # caption rides on a TOP-down gradient scrim (white text, WCAG AA)
+                # so it never overlaps the controls. Mirrors the cover Image Block
+                # preview branch below.
                 video_html = (
-                    f'<video muted loop autoplay playsinline {poster_attr} '
+                    f'<video controls muted loop autoplay playsinline {poster_attr} '
                     f'style="display:block;width:100%;height:auto;object-fit:cover" '
                     f'aria-label="{title}"><source src="{src}">'
                     f'<p>Your browser does not support HTML5 video.</p></video>')
@@ -502,9 +502,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     parts.append(
                         f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
                         f'{video_html}'
-                        f'<div style="position:absolute;left:0;right:0;bottom:0;'
-                        f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
+                        f'<div style="position:absolute;left:0;right:0;top:0;'
+                        f'padding:12px 16px 28px;color:#fff;font-size:13px;line-height:1.45;'
+                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,.45) 50%,transparent)">'
                         f'{caption}</div></div>'
                     )
                 else:
@@ -553,15 +553,15 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
 
             if is_cover:
-                # Cover/fill video: bypass the Video.js controls chrome (which
-                # would fight the fill look) and render a plain seamless video
-                # that fills its content box (object-fit:cover, no rounding/
-                # letterbox), played muted/loop/autoplay/playsinline. With a
-                # caption, the caption rides over the bottom of the video on a
-                # bottom-up gradient scrim (white text, WCAG AA) instead of a
-                # below-video <p>. Mirrors the cover Image Block branch below.
+                # Cover/fill video: bypass the Video.js chrome (which would fight
+                # the fill look) and render a plain video that fills its content
+                # box (object-fit:cover, no rounding/letterbox), played muted/loop/
+                # autoplay/playsinline WITH native controls so it's a usable content
+                # video. The native control bar sits at the bottom, so the caption
+                # rides on a TOP-down gradient scrim (white text, WCAG AA) and never
+                # overlaps the controls. Mirrors the cover Image Block branch below.
                 video_html = (
-                    f'<video muted loop autoplay playsinline {poster_attr} '
+                    f'<video controls muted loop autoplay playsinline {poster_attr} '
                     f'style="display:block;width:100%;height:auto;object-fit:cover" '
                     f'aria-label="{title}">{sources}{track}'
                     f'<p>Your browser does not support HTML5 video.</p></video>')
@@ -569,9 +569,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     parts.append(
                         f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
                         f'{video_html}'
-                        f'<div style="position:absolute;left:0;right:0;bottom:0;'
-                        f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
+                        f'<div style="position:absolute;left:0;right:0;top:0;'
+                        f'padding:12px 16px 28px;color:#fff;font-size:13px;line-height:1.45;'
+                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,.45) 50%,transparent)">'
                         f'{caption}</div></div>'
                     )
                 else:
@@ -588,7 +588,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 )
             else:
                 parts.append(
-                    f'<video controls {poster_attr} style="width:100%;border-radius:6px;margin-bottom:20px" '
+                    f'<video controls {poster_attr} style="width:100%;margin-bottom:20px" '
                     f'aria-label="{title}">{sources}{track}'
                     f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}'
                 )
@@ -917,15 +917,15 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         clip_json = _read_clip_cached(c_asset.stored_path, os.path.getmtime(c_asset.stored_path))
                 clip_json = clip_json.replace('</', '<\\/')  # don't break the <script> tag
 
-                cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+                # Full layout: the interactive video fills the content area — no
+                # caption/label text, square corners (no corner mask).
                 parts.append(f'''
 <div id="ivideo-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
-  <video controls style="width:100%;border-radius:6px;display:block" aria-label="Interactive video">
+  <video controls style="width:100%;display:block" aria-label="Interactive video">
     <source src="{video_src}" type="video/{vext}">
     <p>Your browser does not support HTML5 video.</p>
   </video>
   <div class="ivideo-overlay" style="position:absolute;inset:0;pointer-events:none"></div>
-  {cap_html}
 </div>
 <script>
 (function() {{
@@ -988,9 +988,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 parts.append(f'''
 <div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
   <canvas id="canvas3d-{block_id}" {canvas_a11y}
-    style="width:100%;height:{height}px;display:block;border-radius:8px;cursor:grab;outline:none;touch-action:none"></canvas>
-  <div id="annoverlay-{block_id}" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:8px"></div>
-  <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color};border-radius:8px">
+    style="width:100%;height:{height}px;display:block;cursor:grab;outline:none;touch-action:none"></canvas>
+  <div id="annoverlay-{block_id}" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+  <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color}">
     <div style="text-align:center">
       <div class="cf-spin3d" style="width:28px;height:28px;border-radius:50%;border:3px solid #1c2a3a;border-top-color:#F59E0B;animation:spin3d 0.8s linear infinite;margin:0 auto 8px"></div>
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#3A5A7A;letter-spacing:0.08em">Loading model…</span>

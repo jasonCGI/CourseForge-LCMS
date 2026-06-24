@@ -126,7 +126,7 @@ export default function IVideoRuntime({
 
   return (
     <div ref={wrapRef} style={{ width: '100%', background: '#000' }}>
-      <div style={{ position: 'relative', width: '100%', background: '#000', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '100%', background: '#000', overflow: 'hidden' }}>
         <video ref={videoRef} controls={false} style={{ width: '100%', display: 'block' }}
           poster={posterSrc} aria-label="Interactive video">
           {webmSrc && <source src={webmSrc} type="video/webm" />}
