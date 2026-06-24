@@ -401,7 +401,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         f'{video_html}'
                         f'<div style="position:absolute;left:0;right:0;bottom:0;'
                         f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                        f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
                         f'{caption}</div></div>'
                     )
                 else:
@@ -470,7 +470,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         f'{video_html}'
                         f'<div style="position:absolute;left:0;right:0;bottom:0;'
                         f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                        f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                        f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
                         f'{caption}</div></div>'
                     )
                 else:
@@ -515,7 +515,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     f'style="display:block;width:100%;height:auto;object-fit:cover">'
                     f'<div style="position:absolute;left:0;right:0;bottom:0;'
                     f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                    f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                    f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
                     f'{caption}</div></div>'
                 )
             else:
@@ -546,7 +546,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     f'style="display:block;width:100%;height:auto;object-fit:cover">'
                     f'<div style="position:absolute;left:0;right:0;bottom:0;'
                     f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
-                    f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                    f'text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">'
                     f'{caption}</div></div>'
                 )
             else:

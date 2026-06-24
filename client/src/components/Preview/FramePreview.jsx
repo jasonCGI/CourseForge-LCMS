@@ -277,7 +277,7 @@ export function renderBlockToHTML(block) {
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block">`
             + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
             + `color:#fff;font-size:13px;line-height:1.45;`
-            + `background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">${d.caption}</div></div>`
+            + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">${d.caption}</div></div>`
         return b
           ? `<img src="${src}" alt="${d.alt_text || ''}" `
             + `style="width:100%;height:100%;object-fit:${d.fit === 'contain' ? 'contain' : 'cover'};display:block">`
@@ -297,7 +297,7 @@ export function renderBlockToHTML(block) {
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block"></video>`
             + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
             + `color:#fff;font-size:13px;line-height:1.45;`
-            + `background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">${d.caption}</div></div>`
+            + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">${d.caption}</div></div>`
         if (videoIsCover)
           return `<video src="${src}" muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block;margin:${b ? '0' : '8px 0'}"></video>`
@@ -455,7 +455,7 @@ function PreviewMedia({ block }) {
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,
             padding: '28px 16px 12px', color: '#fff', fontSize: 13, lineHeight: 1.45,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0))', textShadow: '0 1px 3px rgba(0,0,0,0.85)',
           }}>{d.caption}</div>
         )}
       </div>
@@ -494,7 +494,7 @@ function PreviewMedia({ block }) {
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,
             padding: '28px 16px 12px', color: '#fff', fontSize: 13, lineHeight: 1.45,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0))', textShadow: '0 1px 3px rgba(0,0,0,0.85)',
           }}>{caption}</div>
         </div>
       )
