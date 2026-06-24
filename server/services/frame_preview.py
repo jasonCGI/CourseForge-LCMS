@@ -309,6 +309,17 @@ def build_frame_preview_html(frame) -> str:
     title = escape(frame.name or "Untitled frame")
     runtime_js = _shell_runtime_js()
 
+    # Real "N / total" pager for the no-shell preview (the GUI-shell path renders
+    # its own counter in shell chrome). Without this the single-frame preview had
+    # no pager at all, so the popup never matched the React in-canvas counter.
+    _, _, disp_index, disp_total = _frame_position(project, frame)
+    pager = (
+        f'<div class="cf-preview-pager" style="text-align:center;color:#6a7686;'
+        f'font-family:\'IBM Plex Mono\',ui-monospace,monospace;font-size:12px;'
+        f'margin-top:32px;padding-top:16px;border-top:1px solid #e6e9ee">'
+        f'{disp_index} / {disp_total}</div>'
+    )
+
     return "".join([
         "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">",
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
@@ -316,7 +327,7 @@ def build_frame_preview_html(frame) -> str:
         _HEAD_ASSETS,
         "<style>", _BASE_CSS, theme_css, "</style></head><body>",
         _BANNER,
-        "<main class=\"cf-preview-main\">", blocks_html, "</main>",
+        "<main class=\"cf-preview-main\">", blocks_html, pager, "</main>",
         "<script>", _STUB_JS, "</script>",
         runtime_js,
         "</body></html>",

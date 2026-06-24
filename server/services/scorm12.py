@@ -449,11 +449,18 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     hotspot_js = ('null' if not (isinstance(hotspot_cfg, dict) and hotspot_cfg)
                   else json.dumps(hotspot_cfg).replace('<', '\\u003c'))
     parts = []
+    # Per-top-level-block tags so the two-zone (text-left / media-right) layout
+    # can group flow blocks the same way FramePreview.jsx does. Each entry is
+    # ('text'|'other', start_index) marking where that block's HTML begins in
+    # `parts`; populated only for the non-shelled flow path (see two-zone below).
+    block_tags = []
     for block in blocks:
         btype = block.get('type')
         data  = block.get('data', {})
         bid   = block.get('id', str(uuid.uuid4()))
         start = len(parts)   # where this block's HTML begins (for bounds-wrapping)
+        if btype != 'gui':
+            block_tags.append(('text' if btype == 'text' else 'other', start))
 
         if btype == 'gui':
             # GUI shell blocks only render as the SCO page in SCORM 1.2 (handled
@@ -1301,7 +1308,26 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
             )
 
-    out = '\n'.join(parts)
+    # Two-zone layout (parity with FramePreview.jsx): in the normal flow render
+    # (NOT the GUI-shell injection, which positions blocks via bounds) split the
+    # flow blocks into a left 50% column of text blocks and a right 50% column of
+    # everything else, each with 25px padding. Soft flex rule that wraps on narrow
+    # widths. Feeds both /preview-html and the published SCO.
+    if not shelled and block_tags:
+        text_html, other_html = [], []
+        for i, (kind, s) in enumerate(block_tags):
+            e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
+            seg = '\n'.join(parts[s:e])
+            (text_html if kind == 'text' else other_html).append(seg)
+        col = ('flex:1 1 0;min-width:0;box-sizing:border-box;padding:25px')
+        out = (
+            f'<div class="cf-two-zone" style="display:flex;flex-wrap:wrap;align-items:flex-start">'
+            f'<div class="cf-zone-text" style="{col}">{chr(10).join(text_html)}</div>'
+            f'<div class="cf-zone-media" style="{col}">{chr(10).join(other_html)}</div>'
+            f'</div>'
+        )
+    else:
+        out = '\n'.join(parts)
     # Wire every branded audio bar with one self-contained controller (emitted
     # once per rendered block list).
     if 'data-cf-audio' in out:
