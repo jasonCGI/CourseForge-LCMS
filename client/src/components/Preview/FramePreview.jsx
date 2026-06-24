@@ -4,6 +4,8 @@ import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
 import OamMediaBar from './OamMediaBar'
 import useEditorStore from '../../store/editorStore'
+import useProjectStore from '../../store/projectStore'
+import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 
@@ -184,13 +186,18 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId }
   const [action, setAction] = useState(null)
 
   // Resolve this frame's real 1-based position / total within the project's
-  // ordered frame list (same source the persistent pane uses) so the shell pager
-  // reads "N / total" instead of a hardcoded "1 / 1".
-  const frameOrderFn = useEditorStore(s => s._projectFrameOrder)
-  const order = frameOrderFn ? frameOrderFn() : []
-  const pos = frameId ? order.indexOf(frameId) : -1
+  // ordered frame list so the shell pager reads "N / total" instead of "1 / 1".
+  // Copies PersistentPreviewPane's proven computation EXACTLY: the same source
+  // list (flatFrameOrder of the live activeProject) matched on the same id field
+  // (frame.id), rather than the editor store's _projectFrameOrder() — which was
+  // resolving the index to -1 here (always falling back to "1"). Matching the
+  // persistent pane / NEXT-PREV path keeps the current position correct.
+  const activeProject = useProjectStore(s => s.activeProject)
+  const order = flatFrameOrder(activeProject)
   const total = order.length || 1
-  const human = pos >= 0 ? pos + 1 : 1
+  const pos = frameId ? order.indexOf(frameId) : -1
+  // Guard: a failed lookup must be obviously wrong (0), never silently stuck at 1.
+  const human = pos >= 0 ? pos + 1 : 0
 
   if (!guiBlock.data.gui_asset_id) {
     return (
