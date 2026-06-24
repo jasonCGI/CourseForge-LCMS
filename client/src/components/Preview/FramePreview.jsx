@@ -251,12 +251,23 @@ export function renderBlockToHTML(block) {
       // as-is: no engine-imposed rounding or crop.
       const src = d.serve_url || (d.asset_id ? `/api/media/serve/${d.asset_id}` : null)
       const b = d.bounds
-      if (k === 'image' && src)
+      const isCover = d.fit !== 'contain'
+      if (k === 'image' && src) {
+        // Cover image WITH a caption: overlay the caption on the image over a
+        // bottom-up gradient scrim (white text) instead of below it.
+        if (isCover && d.caption)
+          return `<div style="position:relative;${b ? 'width:100%;height:100%' : 'display:block;margin:8px 0;line-height:0'}">`
+            + `<img src="${src}" alt="${d.alt_text || ''}" `
+            + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block">`
+            + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
+            + `color:#fff;font-size:13px;line-height:1.45;`
+            + `background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">${d.caption}</div></div>`
         return b
           ? `<img src="${src}" alt="${d.alt_text || ''}" `
             + `style="width:100%;height:100%;object-fit:${d.fit === 'contain' ? 'contain' : 'cover'};display:block">`
           : `<img src="${src}" alt="${d.alt_text || ''}" `
             + `style="max-width:100%;height:auto;display:block;margin:8px 0">`
+      }
       if (k === 'video' && src)
         return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
              + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
@@ -389,8 +400,41 @@ function PreviewMedia({ block }) {
   // in serve_url), render it so the preview shows the intended media slot.
   if (block.data.serve_url && (kind === 'image' || kind === 'video')) {
     const b = d.bounds
+    const isCover = d.fit === 'cover'
+    const caption = block.data.caption
+    // A bounded cover image sized purely with height:100% collapses to nothing
+    // when it isn't inside a height-providing parent (the no-GUI flow column has
+    // no fixed height) — that degenerate layout is what pushed the title/caption
+    // off-screen. Drive the wrapper height from the bounds aspect ratio instead,
+    // and cap it to the viewport (70vh) so the frame + caption always stay above
+    // the fold. Inside a sized BoundsBox the wrapper still fills width and the box
+    // clips, so this is safe in both contexts.
+    const coverWrap = b
+      ? { width: '100%', aspectRatio: `${b.width || 16} / ${b.height || 9}`, maxHeight: '70vh' }
+      : null
+    // Cover image WITH a caption: overlay the caption on the image over a
+    // bottom-up gradient scrim (white text, WCAG AA) so it stays readable over
+    // any image and never pushes content below the fold. The relative wrapper
+    // anchors the caption pinned to the bottom.
+    if (isCover && caption) {
+      return (
+        <div style={{ position: 'relative', overflow: 'hidden',
+          ...(coverWrap || { width: '100%', display: 'inline-block', lineHeight: 0 }) }}>
+          <img
+            src={block.data.serve_url}
+            alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
+            style={b ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
+          />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: '28px 16px 12px', color: '#fff', fontSize: 13, lineHeight: 1.45,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))',
+          }}>{caption}</div>
+        </div>
+      )
+    }
     return (
-      <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
+      <div style={coverWrap ? { ...coverWrap, overflow: 'hidden' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <img
           src={block.data.serve_url}
           alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}

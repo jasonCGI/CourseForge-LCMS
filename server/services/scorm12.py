@@ -452,14 +452,30 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             name     = data.get('original_name') or ''
             alt      = data.get('alt_text') or data.get('placeholder_label') or name or 'Image'
             caption  = data.get('caption', '')
-            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
-                        if caption else '')
-            parts.append(
-                f'<div style="margin-bottom:20px">'
-                f'<img src="{src}" alt="{alt}" '
-                f'style="max-width:100%;height:auto">'
-                f'{cap_html}</div>'
-            )
+            is_cover = data.get('fit') == 'cover'
+            if caption and is_cover:
+                # Cover image WITH a caption: the caption is an overlay pinned to
+                # the bottom of the image over a bottom-up gradient scrim, so it
+                # stays readable (WCAG AA) over any image and never pushes content
+                # below the fold. Image stays as-sent (object-fit:cover, no crop).
+                parts.append(
+                    f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                    f'<img src="{src}" alt="{alt}" '
+                    f'style="display:block;width:100%;height:auto;object-fit:cover">'
+                    f'<div style="position:absolute;left:0;right:0;bottom:0;'
+                    f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
+                    f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                    f'{caption}</div></div>'
+                )
+            else:
+                cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
+                            if caption else '')
+                parts.append(
+                    f'<div style="margin-bottom:20px">'
+                    f'<img src="{src}" alt="{alt}" '
+                    f'style="max-width:100%;height:auto">'
+                    f'{cap_html}</div>'
+                )
 
         elif btype == 'media' and data.get('kind') == 'image' and data.get('asset_id'):
             asset_id = data['asset_id']
@@ -467,14 +483,30 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'jpg'
             alt      = data.get('placeholder_label') or name or 'Image'
             caption  = data.get('caption', '')
-            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
-                        if caption else '')
-            parts.append(
-                f'<div style="margin-bottom:20px">'
-                f'<img src="media/images/{asset_id}.{ext}" alt="{alt}" '
-                f'style="max-width:100%;height:auto">'
-                f'{cap_html}</div>'
-            )
+            is_cover = data.get('fit') == 'cover'
+            img_src  = f'media/images/{asset_id}.{ext}'
+            if caption and is_cover:
+                # Cover image WITH a caption: overlay the caption on the image over
+                # a bottom-up gradient scrim (white text, WCAG AA) instead of a
+                # below-image <p>, so it never pushes content below the fold.
+                parts.append(
+                    f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                    f'<img src="{img_src}" alt="{alt}" '
+                    f'style="display:block;width:100%;height:auto;object-fit:cover">'
+                    f'<div style="position:absolute;left:0;right:0;bottom:0;'
+                    f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
+                    f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                    f'{caption}</div></div>'
+                )
+            else:
+                cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
+                            if caption else '')
+                parts.append(
+                    f'<div style="margin-bottom:20px">'
+                    f'<img src="{img_src}" alt="{alt}" '
+                    f'style="max-width:100%;height:auto">'
+                    f'{cap_html}</div>'
+                )
 
         elif btype == 'media' and data.get('kind') == 'audio' and data.get('asset_id'):
             asset_id = data['asset_id']

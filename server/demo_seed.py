@@ -60,17 +60,19 @@ def _text(body, narration=''):
             'data': {'body': body, 'narrator_script': narration}}
 
 def _image(label='Course Image', caption='', color='#185FA5', icon='🖼', fill=False):
-    """fill=True: no caption text and the image covers its whole content area
-    (objectFit 'cover', full-area bounds) — used for the demo Image Block frame
-    where the image alone should fill the frame with no placeholder/label text."""
+    """fill=True: the image covers its whole content area (objectFit 'cover',
+    full-area bounds) — used for the demo Image Block frame where the image fills
+    the frame. The placeholder graphic stays text-free; any caption passed in
+    rides through to data so it renders as a bottom overlay on the cover image."""
     data = {
-        'kind': 'image', 'placeholder_label': label, 'caption': '' if fill else caption,
+        'kind': 'image', 'placeholder_label': label, 'caption': caption,
         'asset_id': None,
         'serve_url': _svg(label, color, icon, sub='replace with actual image'),
         'original_name': label.lower().replace(' ', '_') + '.jpg', 'alt_text': label}
     if fill:
-        # Image-only: a text-free 16:9 placeholder that covers the entire content
-        # area edge to edge. No caption, no labels, shown as-sent (no rounding).
+        # Image-only graphic: a text-free 16:9 placeholder that covers the entire
+        # content area edge to edge, shown as-sent (no rounding/crop). The caption
+        # (if any) renders as a scrim overlay pinned to the bottom of the image.
         data['serve_url'] = _svg(label, color, icon, w=1920, h=1080, plain=True)
         data['fit'] = 'cover'
         data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
@@ -212,9 +214,12 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                       'separate narrator script for audio narration. Keep on-screen text concise.'),
     ]},
     {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        # Image-only frame: no text/label/caption — the image fills the entire
-        # content area (cover fit), shown as-sent-in (no engine rounding or crop).
-        _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True),
+        # Image fills the entire content area (cover fit), shown as-sent-in (no
+        # engine rounding or crop). The caption rides over the bottom of the image
+        # as a scrim overlay (white text, readable over any image) — it never
+        # pushes content below the fold.
+        _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True,
+               caption='Live example: cropped to a 16:9 content fit, optimized and EXIF-stripped'),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Video Block</h2><p>The Video block uses the Video.js player for accessible, '
