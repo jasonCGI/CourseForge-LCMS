@@ -18,7 +18,16 @@ from .extensions import db
 
 # ── SVG placeholder generators ─────────────────────────────────────────────────
 
-def _svg(label, color, icon, sub='placeholder', w=800, h=450):
+def _svg(label, color, icon, sub='placeholder', w=800, h=450, plain=False):
+    if plain:
+        # Text-free image placeholder: a clean diagonal gradient with no labels,
+        # dimensions, or dev chrome, so it reads as an actual image filling the frame.
+        g = (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">'
+             f'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+             f'<stop offset="0" stop-color="{color}"/><stop offset="0.55" stop-color="#0E2A47"/>'
+             f'<stop offset="1" stop-color="#060810"/></linearGradient></defs>'
+             f'<rect width="{w}" height="{h}" fill="url(#g)"/></svg>')
+        return f"data:image/svg+xml;base64,{base64.b64encode(g.encode('utf-8')).decode('utf-8')}"
     svg = f"""<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}"
   xmlns="http://www.w3.org/2000/svg"
   font-family="'IBM Plex Mono', 'Courier New', monospace">
@@ -60,10 +69,11 @@ def _image(label='Course Image', caption='', color='#185FA5', icon='🖼', fill=
         'serve_url': _svg(label, color, icon, sub='replace with actual image'),
         'original_name': label.lower().replace(' ', '_') + '.jpg', 'alt_text': label}
     if fill:
-        # Cover-fit + full-content-area bounds so the image fills the frame edge to
-        # edge (suppresses the caption in the renderer's bounded path too).
+        # Image-only: a text-free 16:9 placeholder that covers the entire content
+        # area edge to edge. No caption, no labels, shown as-sent (no rounding).
+        data['serve_url'] = _svg(label, color, icon, w=1920, h=1080, plain=True)
         data['fit'] = 'cover'
-        data['bounds'] = {'x': 0, 'y': 0, 'width': 600, 'height': 500}
+        data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
 def _video(label='Course Video', caption=''):
