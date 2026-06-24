@@ -379,15 +379,41 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         or f"/api/media/serve/{data['asset_id']}")
             title    = data.get('original_name', 'Video')
             caption  = data.get('caption', '')
-            cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+            is_cover = data.get('fit') == 'cover'
             poster   = data.get('poster_url')
             poster_attr = f'poster="{poster}"' if poster else ''
-            parts.append(
-                f'<div style="margin-bottom:20px">'
-                f'<video controls playsinline {poster_attr} style="max-width:100%;height:auto" '
-                f'aria-label="{title}"><source src="{src}">'
-                f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}</div>'
-            )
+            if is_cover:
+                # Cover video: fills its content box (object-fit:cover, no
+                # rounding/letterbox) and plays seamlessly (muted/loop/autoplay/
+                # playsinline — no big play button). With a caption, the caption
+                # rides over the bottom of the video on a bottom-up gradient scrim
+                # (white text, WCAG AA) instead of a below-video <p>, so it stays
+                # readable over any frame and never pushes content below the fold.
+                # Mirrors the cover Image Block preview branch below.
+                video_html = (
+                    f'<video muted loop autoplay playsinline {poster_attr} '
+                    f'style="display:block;width:100%;height:auto;object-fit:cover" '
+                    f'aria-label="{title}"><source src="{src}">'
+                    f'<p>Your browser does not support HTML5 video.</p></video>')
+                if caption:
+                    parts.append(
+                        f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                        f'{video_html}'
+                        f'<div style="position:absolute;left:0;right:0;bottom:0;'
+                        f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
+                        f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                        f'{caption}</div></div>'
+                    )
+                else:
+                    parts.append(f'<div style="margin-bottom:20px;line-height:0">{video_html}</div>')
+            else:
+                cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+                parts.append(
+                    f'<div style="margin-bottom:20px">'
+                    f'<video controls playsinline {poster_attr} style="max-width:100%;height:auto" '
+                    f'aria-label="{title}"><source src="{src}">'
+                    f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}</div>'
+                )
 
         elif (preview and btype == 'media' and data.get('kind') == 'audio'
               and (data.get('serve_url') or data.get('asset_id'))):
@@ -410,6 +436,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             poster_id  = companions.get('poster_asset_id')
             title      = data.get('original_name', 'Video')
             caption    = data.get('caption', '')
+            is_cover   = data.get('fit') == 'cover'
 
             mp4_src    = f'media/video/{asset_id}.mp4'
             webm_src   = f'media/video/{webm_id}.webm'   if webm_id   else None
@@ -424,7 +451,31 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             poster_attr = f'poster="{poster_src}"' if poster_src else ''
             cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
 
-            if use_vjs:
+            if is_cover:
+                # Cover/fill video: bypass the Video.js controls chrome (which
+                # would fight the fill look) and render a plain seamless video
+                # that fills its content box (object-fit:cover, no rounding/
+                # letterbox), played muted/loop/autoplay/playsinline. With a
+                # caption, the caption rides over the bottom of the video on a
+                # bottom-up gradient scrim (white text, WCAG AA) instead of a
+                # below-video <p>. Mirrors the cover Image Block branch below.
+                video_html = (
+                    f'<video muted loop autoplay playsinline {poster_attr} '
+                    f'style="display:block;width:100%;height:auto;object-fit:cover" '
+                    f'aria-label="{title}">{sources}{track}'
+                    f'<p>Your browser does not support HTML5 video.</p></video>')
+                if caption:
+                    parts.append(
+                        f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                        f'{video_html}'
+                        f'<div style="position:absolute;left:0;right:0;bottom:0;'
+                        f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
+                        f'background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">'
+                        f'{caption}</div></div>'
+                    )
+                else:
+                    parts.append(f'<div style="margin-bottom:20px;line-height:0">{video_html}</div>')
+            elif use_vjs:
                 parts.append(
                     f'<div style="margin-bottom:20px">'
                     f'<video id="vid-{asset_id}" class="video-js vjs-big-play-centered cf-video-player" '

@@ -78,12 +78,26 @@ def _image(label='Course Image', caption='', color='#185FA5', icon='🖼', fill=
         data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
-def _video(label='Course Video', caption=''):
-    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
+def _video(label='Course Video', caption='', fill=False):
+    """fill=True: the video covers its whole content area (objectFit 'cover',
+    full-area bounds) — used for the demo Video Block frame where the clip fills
+    the frame. The placeholder graphic stays text-free; any caption passed in
+    rides through to data so it renders as a bottom overlay on the cover video,
+    mirroring the Image Block's cover+caption treatment."""
+    data = {
         'kind': 'video', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
         'serve_url': _svg(label, '#1A7A5E', '🎬', sub='process with ForgePack first'),
         'original_name': label.lower().replace(' ', '_') + '.mp4', 'use_videojs': True,
-        'asset_meta': {'has_captions': False, 'has_webm': False, 'has_poster': False}}}
+        'asset_meta': {'has_captions': False, 'has_webm': False, 'has_poster': False}}
+    if fill:
+        # Video-only media: a text-free 16:9 placeholder poster that covers the
+        # entire content area edge to edge, shown as-sent (no rounding/letterbox).
+        # The caption (if any) renders as a scrim overlay pinned to the bottom of
+        # the video — identical to the cover Image Block.
+        data['serve_url'] = _svg(label, '#1A7A5E', '🎬', w=1920, h=1080, plain=True)
+        data['fit'] = 'cover'
+        data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
+    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
 def _audio(label='Course Audio', caption=''):
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
@@ -222,16 +236,13 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                caption='Live example: cropped to a 16:9 content fit, optimized and EXIF-stripped'),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        _text(body='<h2>Video Block</h2><p>The Video block uses the Video.js player for accessible, '
-                   'cross-browser delivery. The clip below is a live example — an AI-generated sample '
-                   'processed into an MP4 (H.264, faststart) with a WebM fallback, poster frame, and VTT '
-                   'track, auto-paired by base name on upload. Run your own source through ForgePack to '
-                   'produce the same set.</p>',
-              narration='The Video block uses Video.js for accessible delivery. This clip is a processed '
-                        'sample with an MP4, WebM fallback, poster, and caption track. Process your source '
-                        'video through ForgePack to generate the same outputs.'),
-        _video(label='Sample Clip',
-               caption='Live example — a 10-second AI-generated clip run through the ForgePack video pipeline'),
+        # Video fills the entire content area (cover fit), shown as-sent-in (no
+        # engine rounding or letterbox) and played seamlessly (muted/looped/
+        # autoplay). The caption rides over the bottom of the video as a scrim
+        # overlay (white text, readable over any frame) — it never pushes content
+        # below the fold. Mirrors the cover Image Block above.
+        _video(label='Sample Clip', fill=True,
+               caption='Live example: muted, looped, and compressed for fast load'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in an accessible '

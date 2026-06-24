@@ -277,9 +277,26 @@ export function renderBlockToHTML(block) {
           : `<img src="${src}" alt="${d.alt_text || ''}" `
             + `style="max-width:100%;height:auto;display:block;margin:8px 0">`
       }
-      if (k === 'video' && src)
+      if (k === 'video' && src) {
+        // Cover video (fit:cover explicitly): fill the content box (object-fit:
+        // cover, no rounding/letterbox), play seamlessly (muted/loop/autoplay/
+        // playsinline — no big play button), and, with a caption, overlay it on a
+        // bottom-up gradient scrim (white text) instead of below it. Mirrors the
+        // cover image branch. Non-cover videos keep the controls rendering.
+        const videoIsCover = d.fit === 'cover'
+        if (videoIsCover && d.caption)
+          return `<div style="position:relative;${b ? 'width:100%;height:100%' : 'display:block;margin:8px 0;line-height:0'}">`
+            + `<video src="${src}" muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+            + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block"></video>`
+            + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
+            + `color:#fff;font-size:13px;line-height:1.45;`
+            + `background:linear-gradient(to top,rgba(0,0,0,0.72),rgba(0,0,0,0))">${d.caption}</div></div>`
+        if (videoIsCover)
+          return `<video src="${src}" muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+            + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block;margin:${b ? '0' : '8px 0'}"></video>`
         return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
              + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
+      }
       if (k === 'audio' && (src || d.asset_id))
         return `<audio src="${src}" controls style="width:100%;margin:8px 0"></audio>`
       return injectedNote(`${k || 'media'} block`)
@@ -401,6 +418,39 @@ function PreviewMedia({ block }) {
         <audio controls src={`/api/media/serve/${d.asset_id}`} style={{ width: '100%' }}
           aria-label={d.original_name || 'Audio'} />
         {d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
+      </div>
+    )
+  }
+
+  // Live cover video: a real uploaded asset that fills its content area. Plays
+  // seamlessly (muted/loop/autoplay/playsinline — no big play button, no
+  // letterbox) and, with a caption, overlays it on a bottom-up gradient scrim
+  // (white text) instead of below the video. Mirrors the cover image branch.
+  if (kind === 'video' && d.asset_id && d.fit === 'cover') {
+    const cf = d.asset_meta?.companion_files
+    const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
+      ? `/api/media/serve/${cf.poster_asset_id}` : undefined
+    const b = d.bounds
+    const coverWrap = b
+      ? { width: '100%', aspectRatio: `${b.width || 16} / ${b.height || 9}`, maxHeight: '70vh' }
+      : null
+    return (
+      <div style={{ position: 'relative', overflow: 'hidden',
+        ...(coverWrap || { width: '100%', display: 'block', lineHeight: 0 }) }}>
+        <video muted loop autoPlay playsInline src={`/api/media/serve/${d.asset_id}`} poster={poster}
+          style={b ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
+                   : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
+          aria-label={d.original_name || 'Video'}>
+          {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
+            <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
+        </video>
+        {d.caption && (
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            padding: '28px 16px 12px', color: '#fff', fontSize: 13, lineHeight: 1.45,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0))',
+          }}>{d.caption}</div>
+        )}
       </div>
     )
   }
