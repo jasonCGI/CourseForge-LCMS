@@ -50,11 +50,21 @@ def _text(body, narration=''):
     return {'id': str(uuid.uuid4()), 'type': 'text',
             'data': {'body': body, 'narrator_script': narration}}
 
-def _image(label='Course Image', caption='', color='#185FA5', icon='🖼'):
-    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
-        'kind': 'image', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
+def _image(label='Course Image', caption='', color='#185FA5', icon='🖼', fill=False):
+    """fill=True: no caption text and the image covers its whole content area
+    (objectFit 'cover', full-area bounds) — used for the demo Image Block frame
+    where the image alone should fill the frame with no placeholder/label text."""
+    data = {
+        'kind': 'image', 'placeholder_label': label, 'caption': '' if fill else caption,
+        'asset_id': None,
         'serve_url': _svg(label, color, icon, sub='replace with actual image'),
-        'original_name': label.lower().replace(' ', '_') + '.jpg', 'alt_text': label}}
+        'original_name': label.lower().replace(' ', '_') + '.jpg', 'alt_text': label}
+    if fill:
+        # Cover-fit + full-content-area bounds so the image fills the frame edge to
+        # edge (suppresses the caption in the renderer's bounded path too).
+        data['fit'] = 'cover'
+        data['bounds'] = {'x': 0, 'y': 0, 'width': 600, 'height': 500}
+    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
 def _video(label='Course Video', caption=''):
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
@@ -192,16 +202,9 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                       'separate narrator script for audio narration. Keep on-screen text concise.'),
     ]},
     {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        _text(body='<h2>Image Block</h2><p>The Image block displays a single image with an optional caption '
-                   'and alt text. The photo below is a live example — cropped to the content area, optimized, '
-                   'and EXIF-stripped. Run your own through ForgePack to output WebP, PNG, retina, thumbnail, '
-                   'and OG variants automatically.</p>',
-              narration='The Image block displays a single optimized image. This photo is a live example, '
-                        'cropped and EXIF-stripped. Process your images through ForgePack to generate WebP and '
-                        'PNG variants automatically.'),
-        _image(label='Barista presenting a latte',
-               caption='Live example — cropped to a 16:9 content fit, optimized and EXIF-stripped',
-               color='#185FA5', icon='🖼'),
+        # Image-only frame: no text/label/caption — the image fills the entire
+        # content area (cover fit), shown as-sent-in (no engine rounding or crop).
+        _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Video Block</h2><p>The Video block uses the Video.js player for accessible, '

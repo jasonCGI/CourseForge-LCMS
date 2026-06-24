@@ -317,7 +317,8 @@ def _hotspot_radius(shape):
     return '50%' if shape in ('circle', 'round') else ('14%' if shape == 'rounded' else '4px')
 
 
-def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False):
+def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
+                   preview=False):
     """Convert block list to HTML string.
 
     shelled: True when injecting into a GUI shell's #fgui-content (positioned
@@ -328,6 +329,15 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     blocks resolve via dict lookup instead of one DB query per block.
     hotspot_cfg: optional project-level ForgeJS config ({"hotspot": {...}})
     baked into each OAM player so its hotspots adopt the project style.
+
+    preview: True for the live single-frame / course preview (build_frame_preview_html).
+    Image/video/audio blocks then resolve their source as `serve_url ||
+    /api/media/serve/<asset_id>` and render even when `asset_id` is absent — a
+    fresh upload (or a demo placeholder) often carries only `serve_url`, which the
+    package-relative `media/...` path scheme can't express, so without this the
+    preview would drop the media to a "[image: …]" placeholder and look blank.
+    The published packager (preview=False) is unchanged: it keeps the
+    package-relative paths the SCORM ZIP bundles assets under.
     """
     # Escape every '<' so no stored value can break out of the inline player
     # <script> -- covers </script, <!--, <script. (json.dumps is ensure_ascii,
@@ -360,6 +370,36 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             if data.get('narrator_script'):
                 html += f'<div class="cf-narration">🎙 {data["narrator_script"]}</div>'
             parts.append(html)
+
+        elif (preview and btype == 'media' and data.get('kind') == 'video'
+              and (data.get('serve_url') or data.get('video_serve_url') or data.get('asset_id'))):
+            # Live preview: resolve via serve_url like the React renderer so a
+            # video carrying only serve_url (no asset_id) still plays.
+            src      = (data.get('serve_url') or data.get('video_serve_url')
+                        or f"/api/media/serve/{data['asset_id']}")
+            title    = data.get('original_name', 'Video')
+            caption  = data.get('caption', '')
+            cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+            poster   = data.get('poster_url')
+            poster_attr = f'poster="{poster}"' if poster else ''
+            parts.append(
+                f'<div style="margin-bottom:20px">'
+                f'<video controls playsinline {poster_attr} style="max-width:100%;height:auto" '
+                f'aria-label="{title}"><source src="{src}">'
+                f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}</div>'
+            )
+
+        elif (preview and btype == 'media' and data.get('kind') == 'audio'
+              and (data.get('serve_url') or data.get('asset_id'))):
+            src      = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
+            caption  = data.get('caption', '')
+            cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+            parts.append(
+                f'<div style="margin-bottom:20px">'
+                f'<audio controls src="{src}" style="width:100%">'
+                f'Your browser does not support audio playback.</audio>'
+                f'{cap_html}</div>'
+            )
 
         elif btype == 'media' and data.get('kind') == 'video' and data.get('asset_id'):
             asset_id   = data['asset_id']
@@ -401,6 +441,26 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     f'<p>Your browser does not support HTML5 video.</p></video>{cap_html}'
                 )
 
+        elif (preview and btype == 'media' and data.get('kind') == 'image'
+              and (data.get('serve_url') or data.get('asset_id'))):
+            # Live preview: resolve the image source the same way the React
+            # renderer does (serve_url, else the asset's serve route) so an image
+            # whose serve_url is set but asset_id isn't (fresh upload / demo
+            # placeholder) still shows instead of dropping to a placeholder card.
+            # Image comes in as-is: square, no rounding (matches the publish look).
+            src      = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
+            name     = data.get('original_name') or ''
+            alt      = data.get('alt_text') or data.get('placeholder_label') or name or 'Image'
+            caption  = data.get('caption', '')
+            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
+                        if caption else '')
+            parts.append(
+                f'<div style="margin-bottom:20px">'
+                f'<img src="{src}" alt="{alt}" '
+                f'style="max-width:100%;height:auto">'
+                f'{cap_html}</div>'
+            )
+
         elif btype == 'media' and data.get('kind') == 'image' and data.get('asset_id'):
             asset_id = data['asset_id']
             name     = data.get('original_name') or ''
@@ -412,7 +472,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             parts.append(
                 f'<div style="margin-bottom:20px">'
                 f'<img src="media/images/{asset_id}.{ext}" alt="{alt}" '
-                f'style="max-width:100%;height:auto;border-radius:6px">'
+                f'style="max-width:100%;height:auto">'
                 f'{cap_html}</div>'
             )
 
@@ -1101,8 +1161,11 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
                                section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                               asset_map=None, hotspot_cfg=None):
-    """Per-project GuiShell -> SCO page (ALL frame blocks injected)."""
+                               asset_map=None, hotspot_cfg=None, preview=False):
+    """Per-project GuiShell -> SCO page (ALL frame blocks injected).
+
+    preview: forwarded to _render_blocks so the live shell preview resolves media
+    via serve_url (the published packager leaves this False)."""
     sdir = Path(shell.stored_path)
     html_path = sdir / (shell.html_file or '')
     if not html_path.exists():
@@ -1111,7 +1174,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
             return None, None
         html_path = cands[0]
     injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
-                                   hotspot_cfg=hotspot_cfg, shelled=True)
+                                   hotspot_cfg=hotspot_cfg, shelled=True, preview=preview)
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1238,7 +1301,7 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     'overflow-y:auto;height:100%}}' +
     '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
     '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
-    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto;border-radius:4px}}' +
+    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto}}' +
     '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}' +
     '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}';
   document.head.appendChild(style);

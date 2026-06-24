@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 // Per-block bounds: position + size a size-agnostic media block inside the GUI
 // shell's content area, in content-area pixels (origin = content-area top-left).
@@ -33,15 +33,27 @@ export default function BoundsControl({ bounds, contentArea, onChange, fit, onFi
   const lbl = labelStyle || { display: 'block', fontSize: 11, color: 'var(--cf-text-secondary)', marginBottom: 4 }
   const inp = inputStyle || { width: '100%', padding: '6px 8px', fontSize: 13, borderRadius: 4, border: '1px solid var(--cf-border-tertiary)', background: 'var(--cf-bg)', color: 'var(--cf-text)' }
 
-  const set = (field, raw) => {
+  // Apply-on-entry: keep what the author types in a local draft so the field is
+  // freely editable (no mid-type clamping/snap-back), then commit clamped bounds
+  // on blur and on Enter — re-rendering the block immediately. The draft re-syncs
+  // whenever the committed bounds change (drag in the preview, fit toggle, etc.).
+  const [draft, setDraft] = useState(b)
+  useEffect(() => { setDraft(b) }, [b.x, b.y, b.width, b.height])
+
+  const commit = (field, raw) => {
     const val = parseInt(raw, 10)
-    onChange(clampBounds({ ...b, [field]: Number.isFinite(val) ? val : (b[field] || 0) }, ca))
+    const next = clampBounds({ ...b, [field]: Number.isFinite(val) ? val : (b[field] || 0) }, ca)
+    setDraft(next)            // reflect the clamped value back into the field
+    onChange(next)            // persist + re-render the block
   }
   const field = (key, label, max) => (
     <div>
       <label style={lbl}>{label}</label>
-      <input type="number" min="0" max={max} value={b[key]} aria-label={`Bounds ${label}`}
-        onChange={e => set(key, e.target.value)} style={inp} />
+      <input type="number" min="0" max={max} value={draft[key] ?? ''} aria-label={`Bounds ${label}`}
+        onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}
+        onBlur={e => commit(key, e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(key, e.target.value) } }}
+        style={inp} />
     </div>
   )
 

@@ -243,14 +243,25 @@ export function renderBlockToHTML(block) {
       return `<div class="cf-injected-text" style="font-size:26px;line-height:1.6">${d.body || ''}</div>`
     case 'media': {
       const k = d.kind
-      if (k === 'image' && d.serve_url)
-        return `<img src="${d.serve_url}" alt="${d.alt_text || ''}" `
-             + `style="max-width:100%;height:auto;display:block;margin:8px 0;border-radius:4px">`
-      if (k === 'video' && d.serve_url)
-        return `<video src="${d.serve_url}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+      // Resolve a playable source: prefer serve_url, else fall back to the
+      // uploaded asset's serve route. (Image content failed to appear in the
+      // shell preview whenever only asset_id was populated — e.g. a fresh upload
+      // whose serve_url hadn't been mirrored — leaving the GUI chrome with no
+      // image inside.) The image fills its content box (cover) and comes in
+      // as-is: no engine-imposed rounding or crop.
+      const src = d.serve_url || (d.asset_id ? `/api/media/serve/${d.asset_id}` : null)
+      const b = d.bounds
+      if (k === 'image' && src)
+        return b
+          ? `<img src="${src}" alt="${d.alt_text || ''}" `
+            + `style="width:100%;height:100%;object-fit:${d.fit === 'contain' ? 'contain' : 'cover'};display:block">`
+          : `<img src="${src}" alt="${d.alt_text || ''}" `
+            + `style="max-width:100%;height:auto;display:block;margin:8px 0">`
+      if (k === 'video' && src)
+        return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
              + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
-      if (k === 'audio' && d.serve_url)
-        return `<audio src="${d.serve_url}" controls style="width:100%;margin:8px 0"></audio>`
+      if (k === 'audio' && (src || d.asset_id))
+        return `<audio src="${src}" controls style="width:100%;margin:8px 0"></audio>`
       return injectedNote(`${k || 'media'} block`)
     }
     case 'quiz': {
@@ -383,7 +394,9 @@ function PreviewMedia({ block }) {
         <img
           src={block.data.serve_url}
           alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
-          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain', borderRadius: 6 } : { maxWidth: '100%', borderRadius: 6, border: '1px solid #D6E4F2' }}
+          // Image comes in as-is — no engine-imposed rounding/border/crop. When
+          // bounded with cover fit it fills the frame; otherwise natural size.
+          style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'cover', display: 'block' } : { maxWidth: '100%', display: 'block' }}
         />
         {!b && block.data.caption && (
           <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{block.data.caption}</div>

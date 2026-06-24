@@ -165,10 +165,8 @@ export default function MediaBlock({ block }) {
                 <img
                   src={block.data.serve_url}
                   alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
-                  style={{
-                    width: '100%', display: 'block', borderRadius: 6, marginBottom: 12,
-                    border: '1px solid var(--cf-border-tertiary)',
-                  }}
+                  // As-is: no engine rounding/border so the source image is shown unmodified.
+                  style={{ width: '100%', display: 'block', marginBottom: 12 }}
                 />
               )}
               <MediaUploader

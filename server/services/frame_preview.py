@@ -196,6 +196,7 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         getattr(course, "name", "") or "",
         {0: ""}, VERSION, 1, 1,
         hotspot_cfg=_project_hotspot_cfg(project),
+        preview=True,
     )
     if not html:
         return None
@@ -230,7 +231,8 @@ def build_frame_preview_html(frame) -> str:
 
     blocks = (frame.content or {}).get("blocks", []) if isinstance(frame.content, dict) else []
     blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False,
-                                                      hotspot_cfg=_project_hotspot_cfg(project)))
+                                                      hotspot_cfg=_project_hotspot_cfg(project),
+                                                      preview=True))
 
     try:
         theme_css = tokens_to_css(resolve_theme(project)) if project else ""
