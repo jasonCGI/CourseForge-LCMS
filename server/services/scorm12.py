@@ -30,6 +30,109 @@ from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..version import VERSION, SCHEMA_VERSION
 
 
+# ── Branded slim audio player ────────────────────────────────────────────────
+# A self-contained on-brand audio bar (navy surface, amber accent, mono time,
+# video-matched speed set) used by every vanilla renderer (live preview HTML,
+# published SCO, GUI shell injection). No React, no external CSS — each player
+# carries inline styles and the page-wide wiring script is emitted once.
+CF_AUDIO_NAVY  = '#042C53'   # matches the GUI/preview chrome navy
+CF_AUDIO_AMBER = '#F59E0B'   # play/pause + progress fill accent
+CF_AUDIO_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]   # mirrors the video playbackRates
+
+
+def _cf_audio_bar(src, caption='', dock='inline', bid=None):
+    """Emit the branded slim audio bar markup (no <script>).
+
+    dock='inline'  -> renders in content flow.
+    dock='bottom'  -> pinned full-width to the bottom of the content/frame
+                      container (position:absolute; the container is relative).
+    """
+    bid = bid or uuid.uuid4().hex[:8]
+    cap = (f'<div style="font-size:12px;color:#888;margin-top:6px">{caption}</div>'
+           if caption and dock != 'bottom' else '')
+    docked = dock == 'bottom'
+    # Outer wrapper: inline flows; bottom pins to the bottom of the nearest
+    # positioned ancestor (the content/frame container, made relative below).
+    wrap_style = (
+        'position:absolute;left:0;right:0;bottom:0;z-index:40;padding:8px 12px;'
+        'box-sizing:border-box;background:rgba(4,44,83,0.96);'
+        'box-shadow:0 -2px 12px rgba(0,0,0,0.18)'
+        if docked else 'margin:8px 0'
+    )
+    dock_attr = ' data-cf-dock="bottom"' if docked else ''
+    rates = ','.join(str(r) for r in CF_AUDIO_RATES)
+    bar = (
+        f'<div class="cf-audio" data-cf-audio data-rates="{rates}" '
+        f'style="display:flex;align-items:center;gap:12px;height:48px;'
+        f'padding:0 12px;border-radius:10px;box-sizing:border-box;'
+        f'background:{CF_AUDIO_NAVY};color:#E8EEF6;'
+        f"font-family:'IBM Plex Mono',ui-monospace,monospace;\">"
+        f'<audio data-cf-src preload="metadata" src="{src}"></audio>'
+        f'<button type="button" data-cf-play aria-label="Play" '
+        f'style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;'
+        f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
+        f'display:flex;align-items:center;justify-content:center;font-size:14px;'
+        f'line-height:1;padding:0">&#9654;</button>'
+        f'<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>'
+        f'<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" '
+        f'aria-label="Seek" '
+        f'style="flex:1 1 auto;height:4px;accent-color:{CF_AUDIO_AMBER};cursor:pointer;'
+        f'min-width:60px">'
+        f'<span data-cf-dur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em;'
+        f'color:#9FB4CC">0:00</span>'
+        f'<button type="button" data-cf-rate aria-label="Playback speed" '
+        f'style="flex:0 0 auto;min-width:42px;height:26px;border:1px solid rgba(245,158,11,.5);'
+        f'border-radius:6px;background:transparent;color:{CF_AUDIO_AMBER};cursor:pointer;'
+        f"font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px\">1x</button>"
+        f'</div>{cap}'
+    )
+    return f'<div{dock_attr} style="{wrap_style}">{bar}</div>'
+
+
+# One page-wide controller wires every [data-cf-audio] bar. Idempotent: guarded
+# by a global flag so multiple audio blocks (or repeated injections) don't double
+# the script. Self-contained vanilla JS — no React, no deps.
+def _cf_audio_script():
+    return (
+        '<script>(function(){'
+        'if(window.__cfAudioWired)return;window.__cfAudioWired=true;'
+        'function fmt(s){if(!isFinite(s)||s<0)s=0;var m=Math.floor(s/60),'
+        'x=Math.floor(s%60);return m+":"+(x<10?"0":"")+x;}'
+        'function wire(bar){'
+        'if(bar.__cfWired)return;bar.__cfWired=true;'
+        'var a=bar.querySelector("[data-cf-src]"),'
+        'play=bar.querySelector("[data-cf-play]"),'
+        'seek=bar.querySelector("[data-cf-seek]"),'
+        'cur=bar.querySelector("[data-cf-cur]"),'
+        'dur=bar.querySelector("[data-cf-dur]"),'
+        'rateBtn=bar.querySelector("[data-cf-rate]");'
+        'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);'
+        'if(ri<0)ri=0;var seeking=false;'
+        'function ico(p){play.innerHTML=p?"&#10074;&#10074;":"&#9654;";'
+        'play.setAttribute("aria-label",p?"Pause":"Play");}'
+        'play.addEventListener("click",function(){a.paused?a.play():a.pause();});'
+        'a.addEventListener("play",function(){ico(true);});'
+        'a.addEventListener("pause",function(){ico(false);});'
+        'a.addEventListener("loadedmetadata",function(){dur.textContent=fmt(a.duration);});'
+        'a.addEventListener("timeupdate",function(){'
+        'cur.textContent=fmt(a.currentTime);'
+        'if(!seeking&&a.duration)seek.value=String(Math.round(a.currentTime/a.duration*1000));});'
+        'a.addEventListener("ended",function(){ico(false);seek.value="0";cur.textContent="0:00";});'
+        'seek.addEventListener("input",function(){seeking=true;'
+        'if(a.duration)cur.textContent=fmt(seek.value/1000*a.duration);});'
+        'seek.addEventListener("change",function(){'
+        'if(a.duration)a.currentTime=seek.value/1000*a.duration;seeking=false;});'
+        'rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;'
+        'a.playbackRate=rates[ri];rateBtn.textContent=rates[ri]+"x";});'
+        '}'
+        'function scan(){var bars=document.querySelectorAll("[data-cf-audio]");'
+        'for(var i=0;i<bars.length;i++)wire(bars[i]);}'
+        'if(document.readyState!=="loading")scan();'
+        'else document.addEventListener("DOMContentLoaded",scan);'
+        '})();</script>'
+    )
+
+
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
                      disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None):
@@ -417,14 +520,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif (preview and btype == 'media' and data.get('kind') == 'audio'
               and (data.get('serve_url') or data.get('asset_id'))):
-            src      = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
-            caption  = data.get('caption', '')
-            cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
+            src   = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
+            dock  = data.get('dock', 'inline')
+            wrap  = '' if dock == 'bottom' else 'margin-bottom:20px'
             parts.append(
-                f'<div style="margin-bottom:20px">'
-                f'<audio controls src="{src}" style="width:100%">'
-                f'Your browser does not support audio playback.</audio>'
-                f'{cap_html}</div>'
+                f'<div style="{wrap}">'
+                f'{_cf_audio_bar(src, data.get("caption", ""), dock, bid)}</div>'
             )
 
         elif btype == 'media' and data.get('kind') == 'video' and data.get('asset_id'):
@@ -559,18 +660,21 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     f'{cap_html}</div>'
                 )
 
-        elif btype == 'media' and data.get('kind') == 'audio' and data.get('asset_id'):
-            asset_id = data['asset_id']
-            name     = data.get('original_name') or ''
-            ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'mp3'
-            caption  = data.get('caption', '')
-            cap_html = (f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>'
-                        if caption else '')
+        elif btype == 'media' and data.get('kind') == 'audio' and (data.get('asset_id') or data.get('serve_url')):
+            # Published SCO: package-relative path when an asset is bundled,
+            # else fall back to the seeded serve_url (demo placeholder data-URI).
+            if data.get('asset_id'):
+                asset_id = data['asset_id']
+                name     = data.get('original_name') or ''
+                ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'mp3'
+                src      = f'media/audio/{asset_id}.{ext}'
+            else:
+                src = data['serve_url']
+            dock = data.get('dock', 'inline')
+            wrap = '' if dock == 'bottom' else 'margin-bottom:20px'
             parts.append(
-                f'<div style="margin-bottom:20px">'
-                f'<audio controls src="media/audio/{asset_id}.{ext}" style="width:100%">'
-                f'Your browser does not support audio playback.</audio>'
-                f'{cap_html}</div>'
+                f'<div style="{wrap}">'
+                f'{_cf_audio_bar(src, data.get("caption", ""), dock, bid)}</div>'
             )
 
         elif btype == 'media':
@@ -1196,7 +1300,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
             )
 
-    return '\n'.join(parts)
+    out = '\n'.join(parts)
+    # Wire every branded audio bar with one self-contained controller (emitted
+    # once per rendered block list).
+    if 'data-cf-audio' in out:
+        out += '\n' + _cf_audio_script()
+    return out
 
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,

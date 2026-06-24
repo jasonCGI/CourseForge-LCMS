@@ -128,6 +128,38 @@ export default function MediaBlock({ block }) {
           />
         </div>
 
+        {/* Placement (audio only) — inline in the content flow, or docked as a
+            persistent slim bar pinned to the bottom of the content area. */}
+        {kind === 'audio' && (
+          <div style={{ marginTop: 12 }}>
+            <label style={fieldLabel}>Placement</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[['inline', 'Inline'], ['bottom', 'Docked (bottom)']].map(([val, lbl]) => {
+                const active = (block.data.dock || 'inline') === val
+                return (
+                  <button
+                    key={val}
+                    onClick={() => update('dock', val)}
+                    aria-pressed={active}
+                    style={{
+                      padding: '6px 14px', borderRadius: 4,
+                      border: `1px solid ${active ? KIND_COLOR.audio : 'var(--color-border-tertiary)'}`,
+                      background: active ? KIND_COLOR.audio : 'transparent',
+                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                )
+              })}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
+              Docked pins the player to the bottom of the content area so narration stays reachable.
+            </p>
+          </div>
+        )}
+
         {/* Alt text (508) — text alternative for screen readers. Images require it;
             video uses it as an accessible description. */}
         {(kind === 'image' || kind === 'video') && (

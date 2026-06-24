@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { wireAudioBars } from './FramePreview'
 
 /**
  * GUIShellRenderer
@@ -28,6 +29,9 @@ export default function GUIShellRenderer({
     try {
       win.fgui.injectContent(frameHtml || '')
       win.fgui.setFrameData(frameData || {})
+      // injectContent uses innerHTML, so the bar's inline <script> never runs —
+      // wire the branded audio bars directly in the iframe document instead.
+      wireAudioBars(win.document)
     } catch (e) {
       console.warn('[GUIShellRenderer] inject error:', e)
     }

@@ -45,7 +45,11 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // break out of the stack and render as absolute boxes positioned in content-area
   // pixels; the rest keep flowing. Without a contentArea, bounds are ignored.
   const bounded = contentArea ? blocks.filter(b => b.data?.bounds) : []
-  const flow    = contentArea ? blocks.filter(b => !b.data?.bounds) : blocks
+  // Docked audio bars pin to the bottom of the frame container — pull them out of
+  // the normal flow so they don't anchor to a per-block wrapper.
+  const isDockedAudio = b => b.type === 'media' && b.data?.kind === 'audio' && b.data?.dock === 'bottom'
+  const dockedAudio = blocks.filter(isDockedAudio)
+  const flow    = (contentArea ? blocks.filter(b => !b.data?.bounds) : blocks).filter(b => !isDockedAudio(b))
   const textBlocks  = flow.filter(b => b.type === 'text')
   const otherBlocks = flow.filter(b => b.type !== 'text')
   const renderBlock = (block) => (
@@ -59,8 +63,9 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       color: '#1a1a1a',
       fontFamily: 'Inter, system-ui, sans-serif',
       minHeight: '100%',
-      padding: '28px 0 40px',
+      padding: dockedAudio.length ? '28px 0 88px' : '28px 0 40px',
       boxSizing: 'border-box',
+      position: 'relative',   // anchor for docked audio bars
     }}>
       {/* Frame title (hidden when the shell already shows it in its chrome) */}
       {!hideTitle && (
@@ -101,6 +106,11 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           <PreviewBlock block={b} />
         </BoundsBox>
       ))}
+      {/* Docked audio bars — pinned to the bottom of the frame container. */}
+      {dockedAudio.map(b => {
+        const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
+        return src ? <AudioBar key={b.id} src={src} caption={b.data.caption} dock="bottom" /> : null
+      })}
     </div>
   )
 }
@@ -249,6 +259,102 @@ function injectedNote(label) {
        + `margin:8px 0;text-align:center">${label} — interactive in the published course</div>`
 }
 
+// Branded slim audio bar as an HTML string + a guarded, self-contained vanilla
+// controller (the GUI shell injects HTML; there is no React there). Mirrors the
+// React <AudioBar> and the server's _cf_audio_bar so all three renderers match.
+function audioBarHTML(src, caption = '', dock = 'inline') {
+  const NAVY = '#042C53', AMBER = '#F59E0B'
+  const rates = [0.5, 0.75, 1, 1.25, 1.5, 2].join(',')
+  const docked = dock === 'bottom'
+  const cap = caption && !docked
+    ? `<div style="font-size:12px;color:#888;margin-top:6px">${caption}</div>` : ''
+  const wrapStyle = docked
+    ? 'position:absolute;left:0;right:0;bottom:0;z-index:40;padding:8px 12px;box-sizing:border-box;background:rgba(4,44,83,0.96);box-shadow:0 -2px 12px rgba(0,0,0,0.18)'
+    : 'margin:8px 0'
+  const dockAttr = docked ? ' data-cf-dock="bottom"' : ''
+  const bar = `<div class="cf-audio" data-cf-audio data-rates="${rates}" `
+    + `style="display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;`
+    + `border-radius:10px;box-sizing:border-box;background:${NAVY};color:#E8EEF6;`
+    + `font-family:'IBM Plex Mono',ui-monospace,monospace">`
+    + `<audio data-cf-src preload="metadata" src="${src}"></audio>`
+    + `<button type="button" data-cf-play aria-label="Play" `
+    + `style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;`
+    + `background:${AMBER};color:${NAVY};cursor:pointer;display:flex;align-items:center;`
+    + `justify-content:center;font-size:14px;line-height:1;padding:0">&#9654;</button>`
+    + `<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>`
+    + `<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" `
+    + `style="flex:1 1 auto;height:4px;accent-color:${AMBER};cursor:pointer;min-width:60px">`
+    + `<span data-cf-dur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em;color:#9FB4CC">0:00</span>`
+    + `<button type="button" data-cf-rate aria-label="Playback speed" `
+    + `style="flex:0 0 auto;min-width:42px;height:26px;border:1px solid rgba(245,158,11,.5);`
+    + `border-radius:6px;background:transparent;color:${AMBER};cursor:pointer;`
+    + `font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px">1x</button>`
+    + `</div>`
+  return `<div${dockAttr} style="${wrapStyle}">${bar}${cap}</div>${audioBarScriptHTML()}`
+}
+
+// Wire every [data-cf-audio] bar in a given document (used by the GUI shell
+// iframe, where injectContent uses innerHTML and inline <script> won't run).
+// Idempotent per bar.
+export function wireAudioBars(doc) {
+  if (!doc) return
+  const fmt = (s) => {
+    if (!isFinite(s) || s < 0) s = 0
+    const m = Math.floor(s / 60), x = Math.floor(s % 60)
+    return `${m}:${x < 10 ? '0' : ''}${x}`
+  }
+  doc.querySelectorAll('[data-cf-audio]').forEach((bar) => {
+    if (bar.__cfWired) return
+    bar.__cfWired = true
+    const a = bar.querySelector('[data-cf-src]')
+    const play = bar.querySelector('[data-cf-play]')
+    const seek = bar.querySelector('[data-cf-seek]')
+    const cur = bar.querySelector('[data-cf-cur]')
+    const dur = bar.querySelector('[data-cf-dur]')
+    const rateBtn = bar.querySelector('[data-cf-rate]')
+    const rates = (bar.getAttribute('data-rates') || '1').split(',').map(parseFloat)
+    let ri = rates.indexOf(1); if (ri < 0) ri = 0
+    let seeking = false
+    const ico = (p) => { play.innerHTML = p ? '&#10074;&#10074;' : '&#9654;'; play.setAttribute('aria-label', p ? 'Pause' : 'Play') }
+    play.addEventListener('click', () => { a.paused ? a.play() : a.pause() })
+    a.addEventListener('play', () => ico(true))
+    a.addEventListener('pause', () => ico(false))
+    a.addEventListener('loadedmetadata', () => { dur.textContent = fmt(a.duration) })
+    a.addEventListener('timeupdate', () => {
+      cur.textContent = fmt(a.currentTime)
+      if (!seeking && a.duration) seek.value = String(Math.round(a.currentTime / a.duration * 1000))
+    })
+    a.addEventListener('ended', () => { ico(false); seek.value = '0'; cur.textContent = '0:00' })
+    seek.addEventListener('input', () => { seeking = true; if (a.duration) cur.textContent = fmt(seek.value / 1000 * a.duration) })
+    seek.addEventListener('change', () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; seeking = false })
+    rateBtn.addEventListener('click', () => { ri = (ri + 1) % rates.length; a.playbackRate = rates[ri]; rateBtn.textContent = rates[ri] + 'x' })
+  })
+}
+
+function audioBarScriptHTML() {
+  return '<script>(function(){'
+    + 'if(window.__cfAudioWired)return;window.__cfAudioWired=true;'
+    + 'function fmt(s){if(!isFinite(s)||s<0)s=0;var m=Math.floor(s/60),x=Math.floor(s%60);return m+":"+(x<10?"0":"")+x;}'
+    + 'function wire(bar){if(bar.__cfWired)return;bar.__cfWired=true;'
+    + 'var a=bar.querySelector("[data-cf-src]"),play=bar.querySelector("[data-cf-play]"),'
+    + 'seek=bar.querySelector("[data-cf-seek]"),cur=bar.querySelector("[data-cf-cur]"),'
+    + 'dur=bar.querySelector("[data-cf-dur]"),rateBtn=bar.querySelector("[data-cf-rate]");'
+    + 'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);if(ri<0)ri=0;var seeking=false;'
+    + 'function ico(p){play.innerHTML=p?"&#10074;&#10074;":"&#9654;";play.setAttribute("aria-label",p?"Pause":"Play");}'
+    + 'play.addEventListener("click",function(){a.paused?a.play():a.pause();});'
+    + 'a.addEventListener("play",function(){ico(true);});a.addEventListener("pause",function(){ico(false);});'
+    + 'a.addEventListener("loadedmetadata",function(){dur.textContent=fmt(a.duration);});'
+    + 'a.addEventListener("timeupdate",function(){cur.textContent=fmt(a.currentTime);'
+    + 'if(!seeking&&a.duration)seek.value=String(Math.round(a.currentTime/a.duration*1000));});'
+    + 'a.addEventListener("ended",function(){ico(false);seek.value="0";cur.textContent="0:00";});'
+    + 'seek.addEventListener("input",function(){seeking=true;if(a.duration)cur.textContent=fmt(seek.value/1000*a.duration);});'
+    + 'seek.addEventListener("change",function(){if(a.duration)a.currentTime=seek.value/1000*a.duration;seeking=false;});'
+    + 'rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;a.playbackRate=rates[ri];rateBtn.textContent=rates[ri]+"x";});}'
+    + 'function scan(){var bars=document.querySelectorAll("[data-cf-audio]");for(var i=0;i<bars.length;i++)wire(bars[i]);}'
+    + 'if(document.readyState!=="loading")scan();else document.addEventListener("DOMContentLoaded",scan);'
+    + '})();' + '</scr' + 'ipt>'
+}
+
 // Block-to-HTML renderer for injecting into the GUI shell preview. Renders the
 // real media/quiz/WCN/hotspot so demo content actually appears in the shell
 // content area (instead of "[type block]" stubs that read as "covered up").
@@ -304,8 +410,10 @@ export function renderBlockToHTML(block) {
         return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
              + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000;border-radius:4px"></video>`
       }
-      if (k === 'audio' && (src || d.asset_id))
-        return `<audio src="${src}" controls style="width:100%;margin:8px 0"></audio>`
+      if (k === 'audio' && (src || d.asset_id)) {
+        const asrc = src || `/api/media/serve/${d.asset_id}`
+        return audioBarHTML(asrc, d.caption || '', d.dock || 'inline')
+      }
       return injectedNote(`${k || 'media'} block`)
     }
     case 'quiz': {
@@ -395,6 +503,101 @@ function PreviewText({ block }) {
   )
 }
 
+// Branded slim audio player — navy surface, amber accent, IBM Plex Mono time,
+// video-matched playback rates. dock='bottom' pins it full-width to the bottom
+// of the nearest positioned ancestor (the content area); 'inline' flows.
+const CF_AUDIO_NAVY  = '#042C53'
+const CF_AUDIO_AMBER = '#F59E0B'
+const CF_AUDIO_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const fmtTime = (s) => {
+  if (!isFinite(s) || s < 0) s = 0
+  const m = Math.floor(s / 60), x = Math.floor(s % 60)
+  return `${m}:${x < 10 ? '0' : ''}${x}`
+}
+
+function AudioBar({ src, caption = '', dock = 'inline' }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [cur, setCur] = useState(0)
+  const [dur, setDur] = useState(0)
+  const [rateIdx, setRateIdx] = useState(CF_AUDIO_RATES.indexOf(1))
+  const docked = dock === 'bottom'
+
+  const toggle = () => {
+    const a = audioRef.current; if (!a) return
+    if (a.paused) a.play(); else a.pause()
+  }
+  const seek = (e) => {
+    const a = audioRef.current; if (!a || !dur) return
+    a.currentTime = (Number(e.target.value) / 1000) * dur
+  }
+  const cycleRate = () => {
+    const next = (rateIdx + 1) % CF_AUDIO_RATES.length
+    setRateIdx(next)
+    if (audioRef.current) audioRef.current.playbackRate = CF_AUDIO_RATES[next]
+  }
+
+  const bar = (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, height: 48,
+      padding: '0 12px', borderRadius: 10, boxSizing: 'border-box',
+      background: docked ? 'rgba(4,44,83,0.96)' : CF_AUDIO_NAVY, color: '#E8EEF6',
+      fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+    }}>
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false); setCur(0) }}
+        onLoadedMetadata={e => setDur(e.target.duration || 0)}
+        onTimeUpdate={e => setCur(e.target.currentTime || 0)}
+      />
+      <button type="button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}
+        style={{
+          flex: '0 0 auto', width: 32, height: 32, border: 'none', borderRadius: '50%',
+          background: CF_AUDIO_AMBER, color: CF_AUDIO_NAVY, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, lineHeight: 1, padding: 0,
+        }}>
+        {playing ? '❚❚' : '▶'}
+      </button>
+      <span style={{ flex: '0 0 auto', fontSize: 12, letterSpacing: '.02em' }}>{fmtTime(cur)}</span>
+      <input type="range" min={0} max={1000} step={1} aria-label="Seek"
+        value={dur ? Math.round((cur / dur) * 1000) : 0}
+        onChange={seek}
+        style={{ flex: '1 1 auto', height: 4, accentColor: CF_AUDIO_AMBER, cursor: 'pointer', minWidth: 60 }} />
+      <span style={{ flex: '0 0 auto', fontSize: 12, letterSpacing: '.02em', color: '#9FB4CC' }}>{fmtTime(dur)}</span>
+      <button type="button" onClick={cycleRate} aria-label="Playback speed"
+        style={{
+          flex: '0 0 auto', minWidth: 42, height: 26,
+          border: '1px solid rgba(245,158,11,.5)', borderRadius: 6,
+          background: 'transparent', color: CF_AUDIO_AMBER, cursor: 'pointer',
+          fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12, padding: '0 6px',
+        }}>
+        {CF_AUDIO_RATES[rateIdx]}x
+      </button>
+    </div>
+  )
+
+  if (docked) {
+    return (
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 40,
+        padding: '8px 12px', boxSizing: 'border-box',
+        background: 'rgba(4,44,83,0.96)', boxShadow: '0 -2px 12px rgba(0,0,0,0.18)',
+      }}>{bar}</div>
+    )
+  }
+  return (
+    <div style={{ margin: '8px 0' }}>
+      {bar}
+      {caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{caption}</div>}
+    </div>
+  )
+}
+
 function PreviewMedia({ block }) {
   const icons = { image: '🖼', video: '🎬', audio: '🎙', oam: '⚙' }
   const kind = block.data.kind
@@ -418,15 +621,11 @@ function PreviewMedia({ block }) {
     )
   }
 
-  // Live audio: render an <audio> player (was falling through to a placeholder).
-  if (kind === 'audio' && d.asset_id) {
-    return (
-      <div style={previewBlockWrap}>
-        <audio controls src={`/api/media/serve/${d.asset_id}`} style={{ width: '100%' }}
-          aria-label={d.original_name || 'Audio'} />
-        {d.caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{d.caption}</div>}
-      </div>
-    )
+  // Live audio: branded slim bar (real asset, or a seeded placeholder serve_url —
+  // e.g. the demo audio block). Respects d.dock ('inline' | 'bottom').
+  if (kind === 'audio' && (d.asset_id || d.serve_url)) {
+    const src = d.serve_url || `/api/media/serve/${d.asset_id}`
+    return <AudioBar src={src} caption={d.caption} dock={d.dock || 'inline'} />
   }
 
   // Live cover video: a real uploaded asset that fills its content area. Plays

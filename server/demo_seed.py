@@ -99,9 +99,23 @@ def _video(label='Course Video', caption='', fill=False):
         data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
-def _audio(label='Course Audio', caption=''):
+def _silent_wav_datauri(seconds=8, sr=8000):
+    """A small valid silent WAV data-URI so the demo Audio Block plays in the
+    branded bar (real duration + scrubbing) without bundling a media file."""
+    import struct
+    n = sr * seconds
+    body = bytes([128]) * n   # 8-bit unsigned silence (midpoint)
+    hdr = (b'RIFF' + struct.pack('<I', 36 + n) + b'WAVE' + b'fmt '
+           + struct.pack('<IHHIIHH', 16, 1, 1, sr, sr, 1, 8)
+           + b'data' + struct.pack('<I', n))
+    return 'data:audio/wav;base64,' + base64.b64encode(hdr + body).decode()
+
+def _audio(label='Course Audio', caption='', dock='inline'):
+    # dock: 'inline' (renders in flow) | 'bottom' (pinned to the content area).
+    # serve_url carries a silent WAV so the branded bar is interactive in the demo.
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
         'kind': 'audio', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
+        'dock': dock, 'serve_url': _silent_wav_datauri(),
         'original_name': label.lower().replace(' ', '_') + '.mp3'}}
 
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
@@ -245,16 +259,24 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                caption='Live example: muted, looped, and compressed for fast load'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in an accessible '
-                   'HTML5 player. This live example — <em>“Beneath the Still Water,”</em> an instrumental '
-                   'cinematic cue — is normalized to the DoD broadcast standard (−16 LUFS, EBU R128) and '
-                   'served as MP3. Process source WAV/AIFF through ForgePack Audio to normalize loudness and '
-                   'output MP3, OGG, and M4A — auto-paired in CourseForge.</p>',
-              narration='The Audio block plays processed narration or ambient audio. This cue is normalized to '
-                        'negative sixteen LUFS. Use ForgePack Audio to normalize your source and generate MP3, '
-                        'OGG, and M4A before uploading.'),
+        _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in a branded, '
+                   'on-brand slim player — navy bar, amber controls, mono time readout, and the same playback '
+                   'speeds as the video player. Authors choose its placement per block: <strong>inline</strong> '
+                   '(in the content flow) or <strong>docked</strong> (pinned to the bottom of the content area, '
+                   'so narration stays reachable while the learner reads). This live example is normalized to the '
+                   'DoD broadcast standard (−16 LUFS, EBU R128). Process source WAV/AIFF through ForgePack Audio '
+                   'to normalize loudness and output MP3, OGG, and M4A — auto-paired in CourseForge.</p>',
+              narration='The Audio block plays processed narration or ambient audio in a branded slim player. '
+                        'Authors place it inline or docked to the bottom of the content area. This cue is '
+                        'normalized to negative sixteen LUFS.'),
+        # Inline example — flows with the content.
         _audio(label='Beneath the Still Water',
-               caption='Instrumental cinematic cue · normalized to −16 LUFS (EBU R128)'),
+               caption='Inline placement · instrumental cue · −16 LUFS (EBU R128)',
+               dock='inline'),
+        # Docked example — pinned full-width to the bottom of the content area.
+        _audio(label='Narration — Lesson Intro',
+               caption='Docked placement (this caption is hidden on the docked bar)',
+               dock='bottom'),
     ]},
 
     # ── Assessment Blocks ──
