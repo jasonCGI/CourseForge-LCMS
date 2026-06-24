@@ -105,10 +105,14 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           <PreviewBlock block={b} />
         </BoundsBox>
       ))}
-      {/* Docked audio bars — pinned to the bottom of the frame container. */}
+      {/* Docked audio bars — pinned to the bottom of the frame container. Derived
+          purely from the CURRENT block state above, and keyed by id+dock so a
+          dock toggle ('bottom'→'inline') unmounts this bar entirely (its <audio>
+          stops + cleans up) instead of leaving a duplicate playing alongside the
+          new inline bar. */}
       {dockedAudio.map(b => {
         const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
-        return src ? <AudioBar key={b.id} src={src} caption={b.data.caption} dock="bottom" /> : null
+        return src ? <AudioBar key={`${b.id}-bottom`} src={src} caption={b.data.caption} dock="bottom" /> : null
       })}
     </div>
   )
@@ -523,6 +527,15 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
   const [rateIdx, setRateIdx] = useState(CF_AUDIO_RATES.indexOf(1))
   const docked = dock === 'bottom'
 
+  // Stop + release the underlying <audio> when this bar unmounts (e.g. an
+  // inline⇄docked toggle swaps which bar renders). Without this, a playing
+  // docked bar would keep its audio going after React swaps it out, producing a
+  // phantom "duplicate" that plays alongside the new bar.
+  useEffect(() => () => {
+    const a = audioRef.current
+    if (a) { try { a.pause() } catch (e) { /* noop */ } a.removeAttribute('src'); a.load() }
+  }, [])
+
   const toggle = () => {
     const a = audioRef.current; if (!a) return
     if (a.paused) a.play(); else a.pause()
@@ -651,6 +664,34 @@ function PreviewMedia({ block }) {
           {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
             <track kind="captions" src={`/api/media/serve/${cf.vtt_asset_id}`} srcLang="en" label="English" default />}
         </video>
+        {d.caption && (
+          <div style={{
+            position: 'absolute', left: 0, right: 0, top: 0,
+            padding: '12px 16px 28px', color: '#fff', fontSize: 13, lineHeight: 1.45,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0.45) 50%, transparent)', textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+          }}>{d.caption}</div>
+        )}
+      </div>
+    )
+  }
+
+  // Placeholder/seeded video (serve_url only, no uploaded asset — e.g. the demo
+  // Video Block). A <video> can't render an SVG as its source, so the SVG rides
+  // as the poster and the player shows it: a visible <video controls poster=...>
+  // that fills the content area. Mirrors the cover image+caption scrim treatment.
+  if (kind === 'video' && d.serve_url) {
+    const b = d.bounds
+    const poster = d.poster_url || d.serve_url
+    const coverWrap = b
+      ? { width: '100%', aspectRatio: `${b.width || 16} / ${b.height || 9}`, maxHeight: '70vh' }
+      : null
+    return (
+      <div style={{ position: 'relative', overflow: 'hidden',
+        ...(coverWrap || { width: '100%', display: 'block', lineHeight: 0 }) }}>
+        <video controls muted loop playsInline poster={poster} src={d.serve_url}
+          style={b ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
+                   : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
+          aria-label={d.original_name || 'Video'} />
         {d.caption && (
           <div style={{
             position: 'absolute', left: 0, right: 0, top: 0,

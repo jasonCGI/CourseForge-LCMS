@@ -101,15 +101,18 @@ export default function App() {
   const sidebarInner = (
     <div style={{ height: '100%', background: 'var(--cf-sidebar-bg)', borderRight: '1px solid var(--cf-border-primary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {projects.length > 0 && (
-        <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)' }}>
+        // Project selector + Import JSON share one row: the dropdown is narrowed
+        // 25% (75% width) and Import sits to its right, sized to its content.
+        <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <select onChange={e => fetchProject(e.target.value)} defaultValue="" aria-label="Select a project"
-            style={{ width: '100%', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)', border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--cf-font)' }}>
+            style={{ width: '75%', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)', border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--cf-font)' }}>
             <option value="" disabled>Select a project…</option>
             {projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
           </select>
+          <ImportButton inline />
         </div>
       )}
-      <ImportButton />
+      {projects.length === 0 && <ImportButton />}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}><ContentTree /></div>
     </div>
   )

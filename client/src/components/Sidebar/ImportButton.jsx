@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import useProjectStore from '../../store/projectStore'
 
-export default function ImportButton() {
+export default function ImportButton({ inline = false }) {
   const fileRef = useRef()
   const importProject = useProjectStore(s => s.importProject)
   const loading = useProjectStore(s => s.loading)
@@ -15,22 +15,43 @@ export default function ImportButton() {
     e.target.value = ''  // reset input
   }
 
+  // inline: sit to the right of the project selector, sized to content width with
+  // 20px of horizontal padding each side (so the button is only as wide as it
+  // needs to be). Standalone (no project yet): full-width block as before.
+  const wrapStyle = inline
+    ? { flex: '0 0 auto' }
+    : { padding: '12px 8px', borderBottom: '1px solid #333' }
+  const buttonStyle = inline
+    ? {
+        width: 'auto',
+        whiteSpace: 'nowrap',
+        padding: '8px 20px',
+        background: '#1565C0',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 4,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        fontSize: 13,
+        fontWeight: 600,
+      }
+    : {
+        width: '100%',
+        padding: '8px 0',
+        background: '#1565C0',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 4,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        fontSize: 13,
+        fontWeight: 600,
+      }
+
   return (
-    <div style={{ padding: '12px 8px', borderBottom: '1px solid #333' }}>
+    <div style={wrapStyle}>
       <button
         onClick={() => fileRef.current.click()}
         disabled={loading}
-        style={{
-          width: '100%',
-          padding: '8px 0',
-          background: '#1565C0',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 4,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-        }}
+        style={buttonStyle}
       >
         {loading ? 'Importing...' : '⬆ Import JSON'}
       </button>

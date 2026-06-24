@@ -191,17 +191,49 @@ def _frame_position(project, frame):
     """
     if not project:
         return 0, 1, 1, 1
+    # `or 0` on every order_index — it can be NULL (raw inserts / PATCH bodies);
+    # None < int crashes sorted() and would abort the whole walk (mirrors the
+    # course-preview walk below).
     all_frames = []
-    for course in sorted(project.courses, key=lambda c: c.order_index):
-        for mod in sorted(course.modules, key=lambda m: m.order_index):
-            for lesson in sorted(mod.lessons, key=lambda l: l.order_index):
-                for fr in sorted(lesson.frames, key=lambda f: f.order_index):
+    for course in sorted(project.courses, key=lambda c: c.order_index or 0):
+        for mod in sorted(course.modules, key=lambda m: m.order_index or 0):
+            for lesson in sorted(mod.lessons, key=lambda l: l.order_index or 0):
+                for fr in sorted(lesson.frames, key=lambda f: f.order_index or 0):
                     all_frames.append(fr)
     total = len(all_frames) or 1
-    try:
-        frame_idx = next(i for i, fr in enumerate(all_frames) if fr.id == frame.id)
-    except StopIteration:
-        return 0, total, 1, total
+
+    # Match by STRING id, not object identity or typed ==: the previewed `frame`
+    # is often a freshly re-queried instance (get_or_404) while the walk reads the
+    # project tree's own instances, so identity differs; and a NULL/typed-id edge
+    # could make a bare `==` miss. str() both sides so the match is robust.
+    fid = str(getattr(frame, "id", ""))
+    frame_idx = None
+    for i, fr in enumerate(all_frames):
+        if str(getattr(fr, "id", "")) == fid:
+            frame_idx = i
+            break
+
+    # Not found in the down-walk — locate the frame by its OWN lesson chain and
+    # order rather than collapsing to "1 / total" on every frame.
+    if frame_idx is None:
+        lesson = getattr(frame, "lesson", None)
+        if lesson is not None:
+            siblings = sorted(getattr(lesson, "frames", []) or [],
+                              key=lambda f: f.order_index or 0)
+            pos = next((j for j, fr in enumerate(siblings)
+                        if str(getattr(fr, "id", "")) == fid), 0)
+            # count frames in lessons ordered before this one, then add local pos
+            before = 0
+            for fr in all_frames:
+                fr_les = getattr(fr, "lesson", None)
+                if fr_les is not None and getattr(fr_les, "id", None) == getattr(lesson, "id", None):
+                    break
+                before += 1
+            frame_idx = before + pos if before < total else pos
+        else:
+            frame_idx = 0
+        frame_idx = max(0, min(frame_idx, total - 1))
+
     req_total = sum(1 for fr in all_frames if not getattr(fr, "optional", False)) or total
     run = 0
     disp_index = 1

@@ -84,17 +84,23 @@ def _video(label='Course Video', caption='', fill=False):
     the frame. The placeholder graphic stays text-free; any caption passed in
     rides through to data so it renders as a bottom overlay on the cover video,
     mirroring the Image Block's cover+caption treatment."""
+    # A <video> can't render an SVG as its source (an <img> can — that's why the
+    # image demo works), so the SVG rides as the *poster* and the player shows it.
+    svg = _svg(label, '#1A7A5E', '🎬', sub='process with ForgePack first')
     data = {
         'kind': 'video', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
-        'serve_url': _svg(label, '#1A7A5E', '🎬', sub='process with ForgePack first'),
+        'serve_url': svg, 'poster_url': svg,
         'original_name': label.lower().replace(' ', '_') + '.mp4', 'use_videojs': True,
         'asset_meta': {'has_captions': False, 'has_webm': False, 'has_poster': False}}
     if fill:
         # Video-only media: a text-free 16:9 placeholder poster that covers the
         # entire content area edge to edge, shown as-sent (no rounding/letterbox).
         # The caption (if any) renders as a scrim overlay pinned to the bottom of
-        # the video — identical to the cover Image Block.
-        data['serve_url'] = _svg(label, '#1A7A5E', '🎬', w=1920, h=1080, plain=True)
+        # the video — identical to the cover Image Block. The poster is the visible
+        # frame so the <video controls poster=...> shows a real player, not a blank.
+        plain = _svg(label, '#1A7A5E', '🎬', w=1920, h=1080, plain=True)
+        data['serve_url'] = plain
+        data['poster_url'] = plain
         data['fit'] = 'cover'
         data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
