@@ -505,7 +505,7 @@ function PreviewQuiz({ block }) {
                 color,
                 fontSize: 14,
                 textAlign: 'left',
-                cursor: submitted ? 'default' : 'pointer',
+                cursor: 'default',
                 fontFamily: 'inherit',
                 transition: 'all 0.15s',
               }}
@@ -527,7 +527,7 @@ function PreviewQuiz({ block }) {
             borderRadius: 4,
             fontSize: 13,
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: 'default',
             fontFamily: 'inherit',
           }}
         >
@@ -600,7 +600,7 @@ function PreviewHotspot({ block }) {
               border: `2px solid ${st.border}`,
               background: active === r.id ? rgba(st.stroke, 0.3) : st.fill,
               borderRadius: shapeRadius(r.shape),
-              cursor: 'pointer',
+              cursor: 'default',
               boxSizing: 'border-box',
               transition: 'all 0.15s',
             }}
@@ -647,7 +647,7 @@ function PreviewBranch({ block }) {
             color: chosen === 'true' ? '#fff' : '#3B8A4A',
             border: '2px solid #3B8A4A',
             borderRadius: 6, fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit',
+            cursor: 'default', fontFamily: 'inherit',
           }}
         >
           ✓ {block.data.true_label || 'Yes'}
@@ -660,7 +660,7 @@ function PreviewBranch({ block }) {
             color: chosen === 'false' ? '#fff' : '#C0392B',
             border: '2px solid #C0392B',
             borderRadius: 6, fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit',
+            cursor: 'default', fontFamily: 'inherit',
           }}
         >
           ✕ {block.data.false_label || 'No'}
@@ -753,7 +753,7 @@ function PreviewWCN({ block }) {
             <button onClick={() => setAcknowledged(true)}
               style={{ marginTop:8, padding:'5px 14px', borderRadius:4,
                        border:`1px solid ${cfg.border}`, background:cfg.bg,
-                       color:cfg.titleColor, cursor:'pointer', fontSize:11,
+                       color:cfg.titleColor, cursor:'default', fontSize:11,
                        fontWeight:600, fontFamily:'inherit' }}>
               ✓ {ackLabel}
             </button>
@@ -771,7 +771,7 @@ function PreviewWCN({ block }) {
       <button ref={triggerRef} onClick={openModal}
         aria-haspopup="dialog" aria-expanded={modalOpen}
         style={{ padding:'8px 16px', borderRadius:4, border:`1px solid ${cfg.border}`,
-                 background:cfg.bg, color:cfg.titleColor, cursor:'pointer',
+                 background:cfg.bg, color:cfg.titleColor, cursor:'default',
                  fontSize:13, fontWeight:600, fontFamily:'inherit',
                  display:'flex', alignItems:'center', gap:8 }}>
         <span aria-hidden="true">{type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}</span>
@@ -805,7 +805,7 @@ function PreviewWCN({ block }) {
               </div>
               <button onClick={closeModal} aria-label="Close"
                 style={{ marginLeft:'auto', background:'none', border:'none',
-                         color:cfg.tagBg, fontSize:20, cursor:'pointer', padding:4, lineHeight:1 }}>✕</button>
+                         color:cfg.tagBg, fontSize:20, cursor:'default', padding:4, lineHeight:1 }}>✕</button>
             </div>
             <div style={{ padding:'16px 18px', fontSize:13, lineHeight:1.65, color:'#1a1a1a' }}>
               {block.data.text}
@@ -815,7 +815,7 @@ function PreviewWCN({ block }) {
               <button onClick={acknowledge} aria-label={`${ackLabel} — closes dialog`}
                 style={{ padding:'8px 20px', background:cfg.tagBg, color:'#fff',
                          border:'none', borderRadius:4, fontSize:13, fontWeight:600,
-                         cursor:'pointer', fontFamily:'inherit' }}>
+                         cursor:'default', fontFamily:'inherit' }}>
                 ✓ {ackLabel}
               </button>
             </div>
