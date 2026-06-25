@@ -613,17 +613,30 @@ def seed_demo(app=None):
         lessons[name] = lesson
 
     counters = {name: 0 for name in LESSON_ORDER}
+    frame_ids = {}
     for fd in DEMO_FRAMES:
         lesson = lessons.get(fd['lesson'])
         if not lesson:
             continue
         order = counters[fd['lesson']]; counters[fd['lesson']] += 1
+        fid = str(uuid.uuid4())
+        frame_ids[fd['name']] = fid
         content = {'blocks': fd['blocks']}
         if fd.get('layout'):
             content['layout'] = fd['layout']
-        db.session.add(Frame(id=str(uuid.uuid4()), lesson_id=lesson.id, name=fd['name'],
+        db.session.add(Frame(id=fid, lesson_id=lesson.id, name=fd['name'],
                              frame_type=fd.get('frame_type', 'content'), order_index=order,
                              content=content))
+
+    # Wire the demo Branch block's targets to real frames so it's clickable out of
+    # the box: Yes -> Video Block, No -> Welcome (review). The branch dict is the
+    # same object referenced by its frame's content, so patching it before commit
+    # persists into the stored JSON.
+    for fd in DEMO_FRAMES:
+        for blk in fd.get('blocks', []):
+            if blk.get('type') == 'branch':
+                blk['data']['true_frame_id']  = frame_ids.get('Video Block', '')
+                blk['data']['false_frame_id'] = frame_ids.get('Welcome to CourseForge', '')
 
     # ── Menu Frame demo ──
     # A navigation frame near the very start (Welcome, order_index -1 so it sorts
