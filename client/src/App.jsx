@@ -8,6 +8,8 @@ import PersistentPreviewPane, { flatFrameOrder } from './components/Preview/Pers
 import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import EcosystemTray from './components/UI/EcosystemTray'
+import ContrastChecker from './components/UI/ContrastChecker'
+import { ColorFilter } from './components/icons'
 import useProjectStore from './store/projectStore'
 import useEditorStore from './store/editorStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -44,6 +46,7 @@ export default function App() {
   const [showShell, setShowShell] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [showContrast, setShowContrast] = useState(false)
 
   useKeyboardShortcuts({
     onSave:    () => useEditorStore.getState().flushSave(),
@@ -286,6 +289,21 @@ export default function App() {
               color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
               opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>⟳<span className="cf-hide-mobile"> History</span></button>
 
+          {/* Contrast checker (WCAG / 508) — floating, draggable a11y tool */}
+          <button
+            onClick={() => setShowContrast(c => !c)}
+            aria-label="Contrast checker (WCAG / 508)"
+            aria-pressed={showContrast}
+            title="Contrast checker (WCAG / 508)"
+            style={{
+              marginLeft: 10, padding: '5px 9px', display: 'inline-flex', alignItems: 'center',
+              background: 'transparent',
+              border: `1px solid ${showContrast ? 'var(--forge-amber)' : 'rgba(255,255,255,0.15)'}`,
+              borderRadius: 4, color: showContrast ? 'var(--forge-amber)' : 'var(--cf-text-secondary)',
+              cursor: 'pointer', fontFamily: 'var(--forge-font)',
+            }}
+          ><ColorFilter width={15} height={15} /></button>
+
           {/* Course shell (per-project GUI skin) */}
           <button
             onClick={() => setShowShell(true)}
@@ -384,6 +402,8 @@ export default function App() {
             />
           )}
         </Suspense>
+
+        <ContrastChecker open={showContrast} onClose={() => setShowContrast(false)} />
       </div>
     </ThemeProvider>
   )
