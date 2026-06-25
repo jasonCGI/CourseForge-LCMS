@@ -16,7 +16,6 @@ from datetime import datetime
 from functools import lru_cache
 from flask import current_app, render_template
 
-import urllib.request
 from ..models.project import Project, Frame, project_full_query
 
 
@@ -325,6 +324,22 @@ _OAM_PLAYER_TPL = """
 })();
 </script>
 """
+
+
+def _bundle_videojs_assets(zf):
+    """Copy the vendored Video.js player (assets/video-js/) into a package so the
+    PUBLISHED SCORM bundle is self-contained — no CDN fetch at publish time and no
+    runtime network dependency (security review H4). Output archive paths match the
+    SCO templates (sco_shell*.html → assets/video-js/...). Best-effort: a missing
+    vendored file is simply omitted, exactly like the three.js bundling pattern."""
+    base = Path(__file__).resolve().parent.parent / 'assets' / 'video-js'
+    for rel in ('video.min.js', 'video-js.min.css'):
+        try:
+            src = base / rel
+            if src.exists():
+                zf.write(str(src), 'assets/video-js/' + rel)
+        except Exception:
+            pass
 
 
 def _bundle_three_assets(zf):
@@ -1700,22 +1715,8 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             )
             zf.writestr(fname, comment + html)
 
-        # ── Bundle Video.js (cached) ───────────────────────────────
-        try:
-            cache_dir = Path(current_app.config['UPLOAD_FOLDER']) / 'cache' / 'videojs'
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            videojs_cdn = {
-                'assets/video-js/video.min.js':     'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video.min.js',
-                'assets/video-js/video-js.min.css': 'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video-js.min.css',
-            }
-            for arc_path, url in videojs_cdn.items():
-                cached = cache_dir / arc_path.split('/')[-1]
-                if not cached.exists():
-                    urllib.request.urlretrieve(url, str(cached))
-                zf.write(str(cached), arc_path)
-        except Exception:
-            # Network egress unavailable — omit player JS; publish still succeeds.
-            pass
+        # ── Bundle Video.js (vendored, offline — security review H4) ──
+        _bundle_videojs_assets(zf)
 
         # ── Bundle three.js + loaders + Draco (only if a 3D block exists) ──
         _model_frames = [f for (f, _l, _c) in all_frames]

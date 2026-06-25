@@ -5,7 +5,7 @@ Full demo course covering all block types with real example content.
 Idempotent — checks for existing demo before creating.
 Called automatically on first launch if the DB is empty.
 
-Manual reset:  GET /api/demo/reset
+Manual reset:  POST /api/demo/reset
 """
 
 import uuid
@@ -275,11 +275,8 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
               narration='The Audio block plays processed narration or ambient audio in a branded slim player. '
                         'Authors place it inline or docked to the bottom of the content area. This cue is '
                         'normalized to negative sixteen LUFS.'),
-        # Inline example — flows with the content.
-        _audio(label='Beneath the Still Water',
-               caption='Inline placement · instrumental cue · −16 LUFS (EBU R128)',
-               dock='inline'),
-        # Docked example — pinned full-width to the bottom of the content area.
+        # Single docked example — pinned full-width to the bottom of the content
+        # area (the demo uses only the docked player to avoid two media elements).
         _audio(label='Narration — Lesson Intro',
                caption='Docked placement (this caption is hidden on the docked bar)',
                dock='bottom'),
@@ -633,7 +630,7 @@ def seed_demo(app=None):
 
 
 def reset_demo():
-    """Delete and re-create the demo project (GET /api/demo/reset)."""
+    """Delete and re-create the demo project (POST /api/demo/reset)."""
     from .models.project import Project
     existing = Project.query.filter_by(name='CourseForge Demo').first()
     if existing:

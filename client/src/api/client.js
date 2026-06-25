@@ -5,6 +5,18 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Attach the edit token (security review C2) on every request when the owner has
+// set it in localStorage. Harmless on ungated read routes; required by the server
+// for destructive/upload/publish calls when CF_EDIT_TOKEN is set on the deploy.
+api.interceptors.request.use((config) => {
+  const token = (typeof localStorage !== 'undefined') && localStorage.getItem('cf_edit_token')
+  if (token) {
+    config.headers = config.headers || {}
+    config.headers['X-CF-Token'] = token
+  }
+  return config
+})
+
 // ── Projects ────────────────────────────────────────────────────────────────
 export const getProjects    = ()           => api.get('/projects')
 export const getProject     = (id)         => api.get(`/projects/${id}`)

@@ -12,7 +12,6 @@ import os
 import json
 import uuid
 import zipfile
-import urllib.request
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -22,30 +21,9 @@ from ..models.project import Project, project_full_query
 from ..models.media import MediaAsset, OamAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.scorm12 import (_render_blocks, _has_oam_with_scorm, _project_hotspot_cfg,
-                                _bundle_three_assets, _frames_have_model3d)
+                                _bundle_three_assets, _bundle_videojs_assets,
+                                _frames_have_model3d)
 from ..version import VERSION
-
-# Video.js CDN — same files as SCORM 1.2, cached locally
-VIDEOJS_CDN = {
-    'assets/video-js/video.min.js':
-        'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video.min.js',
-    'assets/video-js/video-js.min.css':
-        'https://cdnjs.cloudflare.com/ajax/libs/video.js/8.6.1/video-js.min.css',
-}
-
-
-def _get_videojs_cache(upload_root: Path) -> Path:
-    cache = upload_root / 'cache' / 'videojs'
-    cache.mkdir(parents=True, exist_ok=True)
-    return cache
-
-
-def _ensure_videojs_cached(cache_dir: Path) -> None:
-    for arc_path, url in VIDEOJS_CDN.items():
-        filename = arc_path.split('/')[-1]
-        cached   = cache_dir / filename
-        if not cached.exists():
-            urllib.request.urlretrieve(url, str(cached))
 
 
 def build_frame_html_2004(frame, lesson, frame_index,
@@ -88,7 +66,6 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
     tokens      = resolve_theme(project)
     css         = tokens_to_css(tokens)
     hotspot_cfg = _project_hotspot_cfg(project)
-    upload_root = Path(current_app.config['UPLOAD_FOLDER'])
 
     # ── Collect frames in order ──────────────────────────────
     all_frames = []
@@ -140,13 +117,6 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
         project_description=project.description or '',
     )
 
-    # ── Ensure Video.js cached ────────────────────────────────
-    videojs_cache = _get_videojs_cache(upload_root)
-    try:
-        _ensure_videojs_cached(videojs_cache)
-    except Exception:
-        pass  # Proceed without Video.js if network unavailable
-
     # ── Build ZIP ─────────────────────────────────────────────
     buf = BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -192,12 +162,8 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
             html = comment_prefix + html
             zf.writestr(fname, html)
 
-        # Video.js assets
-        for arc_path in VIDEOJS_CDN:
-            filename = arc_path.split('/')[-1]
-            cached   = videojs_cache / filename
-            if cached.exists():
-                zf.write(str(cached), arc_path)
+        # Video.js assets (vendored, offline — security review H4)
+        _bundle_videojs_assets(zf)
 
         # three.js + loaders + Draco (only if a 3D block exists) → fully offline
         if _frames_have_model3d(f for (f, _l, _c) in all_frames):

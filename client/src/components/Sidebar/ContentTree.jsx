@@ -290,7 +290,12 @@ export default function ContentTree() {
   const resetDemo = async () => {
     if (!confirm('Reset the demo course to defaults? Any edits to the demo project will be lost.')) return
     try {
-      const res = await fetch('/api/demo/reset')
+      // POST (security review C3) + edit token (C2) when the owner has set it.
+      const cfToken = (typeof localStorage !== 'undefined') && localStorage.getItem('cf_edit_token')
+      const res = await fetch('/api/demo/reset', {
+        method: 'POST',
+        headers: cfToken ? { 'X-CF-Token': cfToken } : {},
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body.status !== 'ok') {
         throw new Error(body.message || `HTTP ${res.status}`)

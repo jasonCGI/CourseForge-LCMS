@@ -5,7 +5,7 @@ from .extensions import db, migrate, cors
 
 def create_app(config_name=None):
     if config_name is None:
-        config_name = os.environ.get('FLASK_ENV', 'development')
+        config_name = os.environ.get('FLASK_ENV', 'production')
 
     app = Flask(__name__, static_folder='../client/dist', static_url_path='')
     app.config.from_object(config.get(config_name, config['default']))
@@ -44,6 +44,12 @@ def create_app(config_name=None):
     app.register_blueprint(search_bp)
     app.register_blueprint(forgejs_bp)
 
+    # Edit-token gate (security review C2): protects destructive/upload/publish
+    # routes behind CF_EDIT_TOKEN when set. Registered before the auto-seed hook
+    # so a 401 short-circuits cleanly. See server/auth.py for the full contract.
+    from .auth import register_edit_gate
+    register_edit_gate(app)
+
     # Health check
     @app.route('/api/health')
     def health():
@@ -59,7 +65,9 @@ def create_app(config_name=None):
         return jsonify(info)
 
     # ── Demo reset — delete and re-create the built-in demo course ──
-    @app.route('/api/demo/reset', methods=['GET'])
+    # POST-only (security review C3): a GET could be triggered by any link/prefetch
+    # and wipe demo edits. Also covered by the edit-token gate.
+    @app.route('/api/demo/reset', methods=['POST'])
     def demo_reset():
         try:
             from .demo_seed import reset_demo

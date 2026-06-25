@@ -23,6 +23,8 @@ def resolve_database_uri():
 
 
 class Config:
+    # Default secret is for development only. ProductionConfig overrides this and
+    # warns loudly if SECRET_KEY is unset (security review H2).
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = resolve_database_uri()
@@ -48,9 +50,26 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    # Production must use a real SECRET_KEY. Don't hard-crash (that would break
+    # the deploy) — warn loudly so it surfaces in logs (security review H2).
+    SECRET_KEY = os.environ.get('SECRET_KEY')
 
+    def __init__(self):
+        if not self.SECRET_KEY:
+            import logging
+            logging.getLogger(__name__).warning(
+                '[config] SECRET_KEY is unset in production — using an insecure '
+                'fallback. Set SECRET_KEY on the deploy NOW; sessions/signing are '
+                'not safe without it.'
+            )
+            # Fall back so the app still boots; insecure but non-fatal.
+            self.SECRET_KEY = 'dev-secret-change-me'
+
+# Production is the default: an unset or unknown FLASK_ENV resolves to production
+# (security review H1). DevelopmentConfig applies only when FLASK_ENV ==
+# 'development' explicitly.
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
-    'default': DevelopmentConfig,
+    'default': ProductionConfig,
 }
