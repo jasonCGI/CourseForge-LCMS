@@ -101,6 +101,7 @@ function setEntryLevel(THREE, entry, level) {
 
 export default function Model3DViewer({
   modelUrl, caption, attribution = '', bgColor = '#0d1017', height = 400,
+  fill = false,
   annotations = [], pinMode = false, onPinPlaced = null, onLoad = null,
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
@@ -286,15 +287,19 @@ export default function Model3DViewer({
     const THREE = window.THREE
     const canvas = canvasRef.current
     const w = canvas.clientWidth || 800
+    // fill mode: the canvas is height:100% of its (zone-sized) wrapper, so its real
+    // height is canvas.clientHeight — fill the layout zone, no fixed px. Fall back
+    // to the `height` prop before layout settles (clientHeight 0).
+    const h = fill ? (canvas.clientHeight || height) : height
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-    renderer.setSize(w, height); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping
     rendererRef.current = renderer
 
     const scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor)
     sceneRef.current = scene
-    const camera = new THREE.PerspectiveCamera(45, w / height, 0.01, 1000)
+    const camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 1000)
     cameraRef.current = camera
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.6))
@@ -361,7 +366,8 @@ export default function Model3DViewer({
 
     const ro = new ResizeObserver(() => {
       const w2 = canvas.clientWidth || w
-      renderer.setSize(w2, height); camera.aspect = w2 / height; camera.updateProjectionMatrix()
+      const h2 = fill ? (canvas.clientHeight || h) : height
+      renderer.setSize(w2, h2); camera.aspect = w2 / h2; camera.updateProjectionMatrix()
     })
     ro.observe(canvas)
 
@@ -424,13 +430,15 @@ export default function Model3DViewer({
     applyEnvIntensity(modelRef.current, on ? envIntensity : 1)
   }, [threeReady, environment, envIntensity, modelUrl])
 
-  // Apply height/resize in place (no scene rebuild, no GLB re-fetch).
+  // Apply height/resize in place (no scene rebuild, no GLB re-fetch). In fill mode
+  // the real height comes from the (zone-sized) canvas, not the height prop.
   useEffect(() => {
     const renderer = rendererRef.current, camera = cameraRef.current, canvas = canvasRef.current
     if (!renderer || !camera || !canvas) return
     const w = canvas.clientWidth || 800
-    renderer.setSize(w, height); camera.aspect = w / height; camera.updateProjectionMatrix()
-  }, [height])
+    const h = fill ? (canvas.clientHeight || height) : height
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix()
+  }, [height, fill])
 
   const handleCanvasClick = useCallback((e) => {
     // Part select (highlighting on, OR authoring/label mode), not while placing a pin.
@@ -530,12 +538,14 @@ export default function Model3DViewer({
   }, [])
 
   return (
-    <div style={{ width: '100%', marginBottom: 12, userSelect: 'none' }}>
+    <div style={{ width: '100%', marginBottom: fill ? 0 : 12, userSelect: 'none',
+                  height: fill ? '100%' : undefined }}>
       {/* Stage wraps the canvas + absolute overlays so the bottom hint pill
-          anchors to the canvas, not the caption that flows below it. */}
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
+          anchors to the canvas, not the caption that flows below it. In fill mode
+          the stage fills its zone and the canvas is height:100% of it. */}
+      <div style={{ position: 'relative', overflow: 'hidden', height: fill ? '100%' : undefined }}>
       <canvas ref={canvasRef} width={800} height={height}
-        style={{ width: '100%', height, display: 'block',
+        style={{ width: '100%', height: fill ? '100%' : height, display: 'block',
                  cursor: pinMode ? 'crosshair' : 'grab', outline: 'none', touchAction: 'none' }}
         tabIndex={decorative ? -1 : 0} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined}
         aria-label={decorative ? undefined : (caption || '3D model viewer — arrow keys orbit, +/- zoom, R reset, Tab to navigate annotations')}

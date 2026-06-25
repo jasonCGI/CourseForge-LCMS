@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import FramePreview, { renderBlockToHTML } from './FramePreview'
+import FramePreview, { buildShelledLayoutHTML } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
@@ -69,8 +69,8 @@ export default function PersistentPreviewPane() {
     [activeFrame?.content?.blocks],
   )
   const frameHtml = useMemo(
-    () => (needsOverlay ? '' : (activeFrame?.content?.blocks || []).map(renderBlockToHTML).join('')),
-    [needsOverlay, activeFrame?.content?.blocks],
+    () => (needsOverlay ? '' : buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout)),
+    [needsOverlay, activeFrame?.content?.blocks, activeFrame?.content?.layout],
   )
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).

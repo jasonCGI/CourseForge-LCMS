@@ -55,7 +55,8 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           borderBottom: '2px solid var(--forge-amber)',
         }}>{frame.name}</h1>
         <PreviewGUI guiBlock={guiBlock} contentBlocks={contentBlocks} frameName={frame.name}
-          framePrompt={frame.content?.prompt} frameId={frame.id} />
+          framePrompt={frame.content?.prompt} frameId={frame.id}
+          frameLayout={frame.content?.layout} />
       </div>
     )
   }
@@ -75,18 +76,29 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // text 40px padding), 'text-left'/'text-right' = 50/50 split. Mirrors
   // scorm12._render_blocks so the live preview and the SCO reflow identically.
   const layout = frame?.content?.layout || 'text-left'
-  const renderBlock = (block) => (
-    <SelectableBlock key={block.id} block={block}
+  // fill = render this block to fill its zone (full height, no flow gap) — used in
+  // overlay mode so media/3D/image/video fill their layout zone.
+  const renderBlock = (block, fill = false) => (
+    <SelectableBlock key={block.id} block={block} fill={fill}
       active={block.id === activeBlockId} onSelect={onBlockSelect} />
   )
 
+  // Overlay mode = rendered as a scaled React overlay over the shell's content
+  // area (PersistentPreviewPane passes contentArea). The zones must then FILL the
+  // content-area height so the media/3D zone gets full height (no dead space) — the
+  // in-canvas mirror of scorm12._render_blocks' absolute % zones. fullFill = a
+  // 'full' frame with a single element (only text OR only media) fills 100%.
+  const overlayFill = !!contentArea
+  const hasText = textBlocks.length > 0, hasMedia = otherBlocks.length > 0
+  const fullSingle = layout === 'full' && !(hasText && hasMedia)
   return (
     <div style={{
       background: FRAME_BG,
       color: '#1a1a1a',
       fontFamily: 'Inter, system-ui, sans-serif',
       minHeight: '100%',
-      padding: dockedAudio.length ? '28px 0 88px' : '28px 0 40px',
+      height: overlayFill ? '100%' : undefined,
+      padding: overlayFill ? 0 : (dockedAudio.length ? '28px 0 88px' : '28px 0 40px'),
       boxSizing: 'border-box',
       position: 'relative',   // anchor for docked audio bars
     }}>
@@ -110,26 +122,36 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
 
       {/* Layout preset (frame.content.layout). 'full' = single column with
           full-bleed media and 40px-padded text; 'text-left'/'text-right' = two
-          50% zones (text + media), 40px padding each, ordered by the preset. */}
+          50% zones (text + media), 40px padding each, ordered by the preset. In
+          overlay mode each zone fills the content-area height (media/3D fill). */}
       {flow.length > 0 && layout === 'full' && (
-        <div>
+        <div style={overlayFill && fullSingle ? { height: '100%' } : undefined}>
           {flow.map(b => (
-            <div key={b.id} style={{ padding: b.type === 'text' ? 40 : 0 }}>
-              {renderBlock(b)}
+            <div key={b.id} style={{
+              padding: b.type === 'text' ? 40 : 0,
+              height: overlayFill && fullSingle ? '100%' : undefined,
+              boxSizing: 'border-box',
+            }}>
+              {renderBlock(b, overlayFill && fullSingle && b.type !== 'text')}
             </div>
           ))}
         </div>
       )}
       {flow.length > 0 && layout !== 'full' && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap',
+          alignItems: overlayFill ? 'stretch' : 'flex-start',
+          height: overlayFill ? '100%' : undefined }}>
           {(() => {
-            const zone = (blocks2) => (
-              <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 40 }}>
-                {blocks2.map(renderBlock)}
+            const zone = (blocks2, isMedia) => (
+              <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box',
+                padding: isMedia && overlayFill ? 0 : 40,
+                height: overlayFill ? '100%' : undefined,
+                overflow: overlayFill ? 'hidden' : undefined }}>
+                {blocks2.map(b => renderBlock(b, isMedia && overlayFill))}
               </div>
             )
-            const textZone = zone(textBlocks)
-            const mediaZone = zone(otherBlocks)
+            const textZone = zone(textBlocks, false)
+            const mediaZone = zone(otherBlocks, true)
             return layout === 'text-right'
               ? <>{mediaZone}{textZone}</>
               : <>{textZone}{mediaZone}</>
@@ -161,20 +183,21 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
 // (preview → tab), and so the active block outlines + scrolls into view when
 // selected from the inspector (tab → preview). No-ops to a plain block when no
 // onSelect handler is provided (e.g. read-only previews).
-function SelectableBlock({ block, active, onSelect }) {
+function SelectableBlock({ block, active, onSelect, fill = false }) {
   const ref = useRef(null)
   useEffect(() => {
     if (active && ref.current) ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [active])
-  if (!onSelect) return <PreviewBlock block={block} />
+  if (!onSelect) return <PreviewBlock block={block} fill={fill} />
   return (
     <div ref={ref} onClick={() => onSelect(block.id)}
       style={{
         position: 'relative', cursor: 'pointer', borderRadius: 6,
+        height: fill ? '100%' : undefined,
         outline: active ? '2px solid var(--forge-amber)' : '2px solid transparent',
         outlineOffset: 3, transition: 'outline-color 0.15s',
       }}>
-      <PreviewBlock block={block} />
+      <PreviewBlock block={block} fill={fill} />
     </div>
   )
 }
@@ -234,7 +257,7 @@ function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children
   )
 }
 
-function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId }) {
+function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, frameLayout }) {
   const [action, setAction] = useState(null)
 
   // Resolve this frame's real 1-based position / total within the project's
@@ -264,18 +287,12 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId }
     )
   }
 
-  // Mirror scorm12._render_blocks (shelled path): the FIRST text block sits 40px
-  // from the top of the content area, media stays full-bleed. #fgui-content carries
-  // 12px padding inside the shell, so +28px on the first text block nets 40px.
-  let _shellTextSeen = false
-  const frameHtml = (contentBlocks || []).map((b) => {
-    const h = renderBlockToHTML(b)
-    if (b.type === 'text' && !_shellTextSeen) {
-      _shellTextSeen = true
-      return `<div class="cf-shelled-text-top" style="padding-top:28px">${h}</div>`
-    }
-    return h
-  }).join('')
+  // Mirror scorm12._render_blocks (shelled path): position the text + media boxes
+  // by the frame's layout (content.layout) so each element owns its own space (no
+  // overlap, no floating). frameLayout() builds the same .cf-layout-zones structure
+  // the server emits, with inline styles (the live shell iframe runs the stored
+  // shell's CSS, not the server's _patch_shell rules).
+  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout)
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -411,7 +428,11 @@ function audioBarScriptHTML() {
 // Block-to-HTML renderer for injecting into the GUI shell preview. Renders the
 // real media/quiz/WCN/hotspot so demo content actually appears in the shell
 // content area (instead of "[type block]" stubs that read as "covered up").
-export function renderBlockToHTML(block) {
+// fill=true → this block is rendered inside a layout-derived zone (a .cf-zone-media
+// half/full box). Media/3D/image/video then fill their box (width/height 100%),
+// exactly as an explicit `bounds` would, mirroring scorm12._render_blocks' shelled
+// zone path. Without it (normal injected flow) media keeps its height:auto sizing.
+export function renderBlockToHTML(block, { fill = false } = {}) {
   const d = block.data || {}
   switch (block.type) {
     case 'text':
@@ -425,7 +446,7 @@ export function renderBlockToHTML(block) {
       // image inside.) The image fills its content box (cover) and comes in
       // as-is: no engine-imposed rounding or crop.
       const src = d.serve_url || (d.asset_id ? `/api/media/serve/${d.asset_id}` : null)
-      const b = d.bounds
+      const b = d.bounds || fill
       const isCover = d.fit !== 'contain'
       if (k === 'image' && src) {
         // Cover image WITH a caption: overlay the caption on the image over a
@@ -515,17 +536,62 @@ export function renderBlockToHTML(block) {
   }
 }
 
-function PreviewBlock({ block }) {
+// Build the shelled content HTML for the GUI-shell preview, positioning the text
+// and media blocks into layout-derived zones — the in-preview mirror of
+// scorm12._render_blocks' shelled path. Uses INLINE styles (the live shell iframe
+// runs the stored shell's CSS, not the server's _patch_shell rules), and a
+// .cf-layout-zones layer that cancels #fgui-content's 12px padding (inset:-12px) so
+// % zones address the full content area edge-to-edge. Each element owns its own,
+// non-overlapping space; media/3D/image/video fill their zone.
+export function buildShelledLayoutHTML(contentBlocks, layout) {
+  const blocks = (contentBlocks || []).filter(b => b.type !== 'gui')
+  if (blocks.length === 0) return ''
+  const lay = ['full', 'text-left', 'text-right'].includes(layout) ? layout : 'text-left'
+  const textBlocks  = blocks.filter(b => b.type === 'text')
+  const otherBlocks = blocks.filter(b => b.type !== 'text')
+  const hasText = textBlocks.length > 0, hasMedia = otherBlocks.length > 0
+
+  // full WITH both a text AND a media block = two elements → stack them (text
+  // 40px-padded at top, media full-bleed beneath), no overlap. Mirrors the server.
+  if (lay === 'full' && hasText && hasMedia) {
+    return `<div class="cf-layout-full">` + blocks.map(b =>
+      `<div style="padding:${b.type === 'text' ? '40px' : '0'}">${renderBlockToHTML(b)}</div>`
+    ).join('\n') + `</div>`
+  }
+
+  // Zone geometry as % of the content area (y=0, height=100%).
+  let tLeft, tW, mLeft, mW
+  if (lay === 'text-left')       { tLeft = '0';   tW = '50%';  mLeft = '50%'; mW = '50%' }
+  else if (lay === 'text-right') { tLeft = '50%'; tW = '50%';  mLeft = '0';   mW = '50%' }
+  else                           { tLeft = '0';   tW = '100%'; mLeft = '0';   mW = '100%' }  // full single
+
+  const zones = []
+  if (hasText) {
+    const inner = textBlocks.map(b => renderBlockToHTML(b)).join('\n')
+    zones.push(`<div class="cf-zone-text" style="position:absolute;top:0;left:${tLeft};`
+      + `width:${tW};height:100%;box-sizing:border-box;padding:40px;overflow:auto">${inner}</div>`)
+  }
+  if (hasMedia) {
+    // fill=true so each media/3D/image/video block fills its zone (full height).
+    const inner = otherBlocks.map(b => renderBlockToHTML(b, { fill: true })).join('\n')
+    zones.push(`<div class="cf-zone-media" style="position:absolute;top:0;left:${mLeft};`
+      + `width:${mW};height:100%;box-sizing:border-box;overflow:hidden">${inner}</div>`)
+  }
+  return `<div class="cf-layout-zones" style="position:absolute;top:-12px;left:-12px;`
+    + `right:-12px;bottom:-12px;overflow:hidden">${zones.join('\n')}</div>`
+}
+
+function PreviewBlock({ block, fill = false }) {
   switch (block.type) {
     case 'text':    return <PreviewText    block={block} />
-    case 'media':   return <PreviewMedia   block={block} />
+    case 'media':   return <PreviewMedia   block={block} fill={fill} />
     case 'quiz':    return <PreviewQuiz    block={block} />
     case 'hotspot': return <PreviewHotspot block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
-    case 'ivideo':  return <PreviewIVideo  block={block} />
-    case 'model3d': return <PreviewModel3D block={block} />
-    case 'oam':     return <PreviewOAM     block={block} />
+    case 'ivideo':  return <PreviewIVideo  block={block} fill={fill} />
+    case 'model3d': return <PreviewModel3D block={block} fill={fill} />
+    case 'oam':     return <PreviewOAM     block={block} fill={fill} />
     default:        return (
       <div style={previewBlockWrap}>
         <p style={{ color: '#888', fontSize: 13 }}>
@@ -668,17 +734,20 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
   )
 }
 
-function PreviewMedia({ block }) {
+function PreviewMedia({ block, fill = false }) {
   const icons = { image: '🖼', video: '🎬', audio: '🎙', oam: '⚙' }
   const kind = block.data.kind
   const d = block.data
+  // In a layout zone (overlay fill) media fills its box exactly like explicit
+  // bounds do — coalesce the two so every `b` branch below picks up fill.
+  const _fillBounds = d.bounds || (fill ? { width: 16, height: 9 } : null)
 
   // Live video: a real uploaded asset can't render in an <img> — use <video>.
   if (kind === 'video' && d.asset_id) {
     const cf = d.asset_meta?.companion_files
     const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
       ? `/api/media/serve/${cf.poster_asset_id}` : undefined
-    const b = d.bounds
+    const b = _fillBounds
     return (
       <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
@@ -707,7 +776,7 @@ function PreviewMedia({ block }) {
     const cf = d.asset_meta?.companion_files
     const poster = d.asset_meta?.has_poster && cf?.poster_asset_id
       ? `/api/media/serve/${cf.poster_asset_id}` : undefined
-    const b = d.bounds
+    const b = _fillBounds
     // dock='bottom' fills the content box so the native playbar snaps flush to
     // the content-area bottom (no gap underneath); 'inline' (default) flows with
     // height:auto as before. Mirrors the audio block's dock toggle. Only the
@@ -745,7 +814,7 @@ function PreviewMedia({ block }) {
   // as the poster and the player shows it: a visible <video controls poster=...>
   // that fills the content area. Mirrors the cover image+caption scrim treatment.
   if (kind === 'video' && d.serve_url) {
-    const b = d.bounds
+    const b = _fillBounds
     const poster = d.poster_url || d.serve_url
     // dock='bottom' fills the content box so the native playbar snaps flush to the
     // content-area bottom (no gap underneath); 'inline' (default) flows as before.
@@ -777,7 +846,7 @@ function PreviewMedia({ block }) {
   // If a placeholder/asset image is available (demo blocks seed an SVG data-URI
   // in serve_url), render it so the preview shows the intended media slot.
   if (block.data.serve_url && (kind === 'image' || kind === 'video')) {
-    const b = d.bounds
+    const b = _fillBounds
     const isCover = d.fit === 'cover'
     const caption = block.data.caption
     // A bounded cover image sized purely with height:100% collapses to nothing
@@ -1203,7 +1272,7 @@ function PreviewWCN({ block }) {
   )
 }
 
-function PreviewIVideo({ block }) {
+function PreviewIVideo({ block, fill = false }) {
   const [clipData, setClipData] = React.useState(null)
   const videoId = block.data.video_asset_id
   const clipId  = block.data.clip_asset_id
@@ -1230,7 +1299,7 @@ function PreviewIVideo({ block }) {
   }
 
   // Full layout: the interactive video fills the content area — no caption text.
-  const b = block.data.bounds
+  const b = block.data.bounds || fill
   return (
     <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
       <IVideoRuntime
@@ -1242,7 +1311,7 @@ function PreviewIVideo({ block }) {
   )
 }
 
-function PreviewModel3D({ block }) {
+function PreviewModel3D({ block, fill = false }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
   const [selPart, setSelPart] = useState(null)
   // Label parts inline, right in the live preview — persists to block.data.parts.
@@ -1262,10 +1331,12 @@ function PreviewModel3D({ block }) {
       </div>
     )
   }
-  const bounded = !!block.data.bounds
+  // bounded OR fill (layout zone) → the viewer fills its box (full zone height).
+  const bounded = !!block.data.bounds || fill
   return (
     <div style={bounded ? { width: '100%', height: '100%' } : previewBlockWrap}>
       <Model3DViewer
+        fill={bounded}
         modelUrl={block.data.model_serve_url}
         caption={block.data.caption}
         attribution={block.data.attribution}
@@ -1286,7 +1357,7 @@ function PreviewModel3D({ block }) {
   )
 }
 
-function PreviewOAM({ block }) {
+function PreviewOAM({ block, fill = false }) {
   const d = block.data
   if (!d.oam_asset_id) {
     return (
@@ -1304,7 +1375,7 @@ function PreviewOAM({ block }) {
   // text, no media bar. Mirrors the cover image/video "fill" treatment as closely
   // as an iframe allows (100% of the zone, square corners, object-fit-style fill).
   const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
-  const b = d.bounds
+  const b = d.bounds || fill
   return (
     <div style={b
       ? { width: '100%', height: '100%' }

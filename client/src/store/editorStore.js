@@ -112,6 +112,11 @@ const useEditorStore = create((set, get) => ({
     const { activeFrame } = get()
     if (!activeFrame) return
 
+    // One text block per frame (locked spec) — the layout reflow assumes a single
+    // text zone. The toolbar disables the Text button, but guard here too so no
+    // other code path (or stale UI) can add a second one.
+    if (type === 'text' && (activeFrame.content?.blocks || []).some(b => b.type === 'text')) return
+
     const newBlock = _makeBlock(type)
     const updatedFrame = {
       ...activeFrame,

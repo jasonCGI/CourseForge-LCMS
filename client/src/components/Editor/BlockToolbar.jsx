@@ -23,6 +23,11 @@ export default function BlockToolbar() {
 
   if (!activeFrame) return null
 
+  // One text block per frame (locked spec): once a text block exists, the Text
+  // option is disabled. Layout reflow assumes a single text zone, and text overlays
+  // on media are a future, separate block type — not a second text block here.
+  const hasText = (activeFrame.content?.blocks || []).some(b => b.type === 'text')
+
   return (
     <div style={{
       padding: '10px 20px',
@@ -43,8 +48,12 @@ export default function BlockToolbar() {
         Add block
       </span>
       {BLOCK_TYPES.map(({ type, label, Icon, color, available }) => {
-        const enabled = available
-        const title = available ? `Add ${label} block` : `${label} — available in Sprint 4`
+        // Text is single-per-frame: disable once one exists.
+        const textBlocked = type === 'text' && hasText
+        const enabled = available && !textBlocked
+        const title = textBlocked
+          ? 'Only one text block per frame'
+          : available ? `Add ${label} block` : `${label} — available in Sprint 4`
         return (
           <button
             key={type}

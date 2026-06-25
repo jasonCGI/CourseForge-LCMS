@@ -1155,10 +1155,17 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # Optional attribution overlay (e.g. CC-BY credit) — empty = hidden.
                 _attr_safe = attribution.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                 attr_html = (f'''<div style="position:absolute;bottom:6px;left:8px;max-width:70%;background:rgba(0,0,0,0.45);color:#9FB4CC;font-family:'IBM Plex Mono',monospace;font-size:8.5px;padding:2px 7px;border-radius:4px;letter-spacing:0.03em;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none">{_attr_safe}</div>''' if attribution else '')
+                # The wrapper carries the height (px in normal flow). When this
+                # viewer lands inside a layout zone (.cf-zone-media / .cf-bounds in
+                # the shelled path), a CSS rule forces the wrapper to height:100% so
+                # the canvas — height:100% of the wrapper — fills the zone. The JS
+                # resize observer derives the render height from canvas.clientHeight,
+                # so the WebGL buffer + camera aspect track the real box, not a fixed
+                # px value. cap_html sits below as a 0-height-safe caption.
                 parts.append(f'''
-<div id="viewer3d-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
+<div id="viewer3d-{block_id}" class="cf-3d-viewer" style="position:relative;width:100%;height:{height}px;margin-bottom:20px">
   <canvas id="canvas3d-{block_id}" {canvas_a11y}
-    style="width:100%;height:{height}px;display:block;cursor:grab;outline:none;touch-action:none"></canvas>
+    style="width:100%;height:100%;display:block;cursor:grab;outline:none;touch-action:none"></canvas>
   <div id="annoverlay-{block_id}" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
   <div id="loading3d-{block_id}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:{bg_color}">
     <div style="text-align:center">
@@ -1171,8 +1178,8 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
   </div>
   {rotate_btn_html}
   {attr_html}
-  {cap_html}
 </div>
+{cap_html}
 <style>
   @keyframes spin3d {{ to {{ transform: rotate(360deg); }} }}
   @keyframes annFadeIn {{ from {{ opacity:0; transform:translateY(-3px); }} to {{ opacity:1; transform:translateY(0); }} }}
@@ -1226,11 +1233,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     var activePopover = null;
     if (!canvas || !THREE) return;
     var w = canvas.clientWidth || 800;
+    // The canvas is height:100% of its wrapper, so its real rendered height is
+    // canvas.clientHeight — which fills its layout zone (full content-area height)
+    // when the viewer lands in a .cf-zone-media / .cf-bounds box. Fall back to the
+    // server-passed `height` only before layout (clientHeight 0 on a detached node).
+    var h = canvas.clientHeight || height;
     var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
-    renderer.setSize(w, height); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     var scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor);
-    var camera = new THREE.PerspectiveCamera(45, w / height, 0.01, 1000);
+    var camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 1000);
     // Image-based lighting for reflective/metallic surfaces. 'day'/'night' load a
     // bundled equirectangular .hdr; 'studio' builds a procedural light box (no
     // file). scene.environment makes standard materials reflect it.
@@ -1416,7 +1428,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
       rotBtn.addEventListener('click', function() {{ rotating = !rotating; paintRot(); }});
       paintRot();
     }}
-    var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w; renderer.setSize(w2, height); camera.aspect = w2/height; camera.updateProjectionMatrix(); }});
+    var ro = new ResizeObserver(function() {{ var w2 = canvas.clientWidth || w, h2 = canvas.clientHeight || h; renderer.setSize(w2, h2); camera.aspect = w2/h2; camera.updateProjectionMatrix(); }});
     ro.observe(canvas);
     canvas.addEventListener('pointerdown', function(e) {{ if (e.button !== 0) return; orbit.dragging = true; orbit.lastX = e.clientX; orbit.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); }});
     canvas.addEventListener('pointermove', function(e) {{ if (!orbit.dragging) return; orbit.theta -= (e.clientX-orbit.lastX)*0.01; orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - (e.clientY-orbit.lastY)*0.01)); orbit.lastX = e.clientX; orbit.lastY = e.clientY; updateCamera(); }});
@@ -1478,27 +1490,65 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     #   text-left   50/50 split — text left, media right (both 40px padding).
     #   text-right  50/50 split — media left, text right (both 40px padding).
     if shelled and block_tags and not _shelled_has_bounds:
-        # Shelled injection has no layout zones: blocks flow straight into
-        # #fgui-content (which carries 12px padding, set in _patch_shell). Per spec,
-        # the TEXT block must sit 40px from the top of the content area, while media
-        # stays full-bleed (no top padding). #fgui-content's 12px top padding already
-        # accounts for 12 of those px, so a text block needs +28px to net 40px from
-        # the content-area top. Wrap each text segment; leave media/other untouched.
+        # Shelled injection, NO explicit per-block bounds: derive each block's box
+        # from frame.content.layout and position it ABSOLUTELY inside the content
+        # area so text and media each own their own, non-overlapping space (no
+        # flow gap, no floating). Mechanism = CSS % (resolution-independent), so we
+        # never need the content-area's pixel size.
+        #
+        # #fgui-content is position:relative with 12px padding (set in _patch_shell);
+        # absolute children would normally anchor INSIDE that padding. A single
+        # `.cf-layout-zones` layer cancels the padding on all four sides
+        # (inset:-12px) so its % zones address the FULL content area edge-to-edge.
+        # Text zones carry 40px CSS padding; media/3D/image/video zones fill their
+        # half/full with no padding (the 3D viewer's wrapper is forced to height:100%
+        # by the .cf-zone-media rule in _patch_shell, so its canvas fills the box).
+        lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
         segs = []  # (kind, html) per block, in flow order
         for i, (kind, s) in enumerate(block_tags):
             e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
             segs.append((kind, '\n'.join(parts[s:e])))
-        wrapped = []
-        text_seen = False
-        for kind, seg in segs:
-            if kind == 'text' and not text_seen:
-                # Only the FIRST text block gets the 40px-from-top offset; later
-                # text blocks flow naturally beneath preceding content.
-                text_seen = True
-                wrapped.append(f'<div class="cf-shelled-text-top" style="padding-top:28px">{seg}</div>')
-            else:
-                wrapped.append(seg)
-        out = '\n'.join(wrapped)
+        text_html  = '\n'.join(seg for kind, seg in segs if kind == 'text')
+        other_html = '\n'.join(seg for kind, seg in segs if kind != 'text')
+        has_text, has_media = bool(text_html.strip()), bool(other_html.strip())
+
+        # FULL with BOTH a text AND a media block isn't a single fill — there are two
+        # elements, so stack them (no overlap): text 40px-padded at the top, media
+        # full-bleed beneath. Mirrors the non-shelled `cf-layout-full`. The
+        # absolute-zone path below is reserved for the genuine split layouts and for
+        # full-with-a-single-block (which truly fills 100%).
+        if lay == 'full' and has_text and has_media:
+            stacked = []
+            for kind, seg in segs:
+                pad = '40px' if kind == 'text' else '0'
+                stacked.append(f'<div style="padding:{pad}">{seg}</div>')
+            out = f'<div class="cf-layout-full">{chr(10).join(stacked)}</div>'
+        else:
+            # Zone geometry as % of the content area: (left, width) per the layout.
+            # y is always 0 and height always 100% (full content-area height).
+            if lay == 'text-left':
+                t_left, t_w, m_left, m_w = '0', '50%', '50%', '50%'
+            elif lay == 'text-right':
+                t_left, t_w, m_left, m_w = '50%', '50%', '0', '50%'
+            else:  # full — a single block fills the whole area
+                t_left, t_w, m_left, m_w = '0', '100%', '0', '100%'
+            zones = []
+            # Text zone: 40px CSS padding INSIDE the box; scroll if it overflows.
+            if has_text:
+                zones.append(
+                    f'<div class="cf-zone-text" style="position:absolute;top:0;left:{t_left};'
+                    f'width:{t_w};height:100%;box-sizing:border-box;padding:40px;overflow:auto">'
+                    f'{text_html}</div>')
+            # Media/3D/image/video zone: fills its half/full edge-to-edge (no padding).
+            if has_media:
+                zones.append(
+                    f'<div class="cf-zone-media" style="position:absolute;top:0;left:{m_left};'
+                    f'width:{m_w};height:100%;box-sizing:border-box;overflow:hidden">'
+                    f'{other_html}</div>')
+            out = (
+                f'<div class="cf-layout-zones" style="position:absolute;top:-12px;left:-12px;'
+                f'right:-12px;bottom:-12px;overflow:hidden">' + '\n'.join(zones) + '</div>'
+            )
     elif not shelled and block_tags:
         lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
         segs = []  # (kind, html) per block, in flow order
@@ -1567,7 +1617,8 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         html_path = candidates[0]
 
     injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
-                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True)
+                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
+                                   layout=(frame.content or {}).get('layout'))
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1589,7 +1640,8 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
             return None, None
         html_path = cands[0]
     injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
-                                   hotspot_cfg=hotspot_cfg, shelled=True, preview=preview)
+                                   hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
+                                   layout=(frame.content or {}).get('layout'))
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1743,7 +1795,12 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
     '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto}}' +
     '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}' +
-    '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}';
+    '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}' +
+    '.cf-zone-text{{font-size:14px}}' +
+    '.cf-zone-media>*{{margin:0!important}}' +
+    '.cf-zone-media img,.cf-zone-media video{{width:100%;height:100%;object-fit:contain;display:block;max-width:none}}' +
+    '.cf-zone-media .cf-3d-viewer{{height:100%!important;margin:0!important}}' +
+    '.cf-zone-media iframe{{width:100%;height:100%;border:0;display:block}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);
