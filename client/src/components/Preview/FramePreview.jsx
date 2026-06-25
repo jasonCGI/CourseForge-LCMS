@@ -637,13 +637,21 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
   }
 }
 
+// List CSS for shell-injected rich text. The stored shell's `#fgui-content ul`
+// rule (margin-left, no padding) outranks a plain class, so target
+// `#fgui-content .cf-injected-text` to win specificity and give bullets/numbers a
+// clean hanging indent (padding-left, markers in the padding) in the in-canvas preview.
+const CF_INJ_LIST_CSS =
+  '<style>#fgui-content .cf-injected-text ul,#fgui-content .cf-injected-text ol' +
+  '{margin:10px 0 12px;padding-left:1.5em;list-style-position:outside}' +
+  '#fgui-content .cf-injected-text li{margin:5px 0}</style>'
+
 // Build the shelled content HTML for the GUI-shell preview, positioning the text
 // and media blocks into layout-derived zones — the in-preview mirror of
 // scorm12._render_blocks' shelled path. Uses INLINE styles (the live shell iframe
-// runs the stored shell's CSS, not the server's _patch_shell rules), and a
-// .cf-layout-zones layer that cancels #fgui-content's 12px padding (inset:-12px) so
-// % zones address the full content area edge-to-edge. Each element owns its own,
-// non-overlapping space; media/3D/image/video fill their zone.
+// runs the stored shell's CSS, not the server's _patch_shell rules); the
+// .cf-layout-zones layer fills #fgui-content edge-to-edge (0/0/100%/100%). Each
+// element owns its own, non-overlapping space; media/3D/image/video fill their zone.
 export function buildShelledLayoutHTML(contentBlocks, layout) {
   const blocks = (contentBlocks || []).filter(b => b.type !== 'gui')
   if (blocks.length === 0) return ''
@@ -655,7 +663,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
   // full WITH both a text AND a media block = two elements → stack them (text
   // 40px-padded at top, media full-bleed beneath), no overlap. Mirrors the server.
   if (lay === 'full' && hasText && hasMedia) {
-    return `<div class="cf-layout-full">` + blocks.map(b =>
+    return CF_INJ_LIST_CSS + `<div class="cf-layout-full">` + blocks.map(b =>
       `<div style="padding:${b.type === 'text' ? '40px' : '0'}">${renderBlockToHTML(b)}</div>`
     ).join('\n') + `</div>`
   }
@@ -678,7 +686,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
     zones.push(`<div class="cf-zone-media" style="position:absolute;top:0;left:${mLeft};`
       + `width:${mW};height:100%;box-sizing:border-box;overflow:hidden">${inner}</div>`)
   }
-  return `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
+  return CF_INJ_LIST_CSS + `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
     + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>`
 }
 
