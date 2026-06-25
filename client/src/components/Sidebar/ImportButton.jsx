@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import useProjectStore from '../../store/projectStore'
+import { Upload } from '../icons'
 
 export default function ImportButton({ inline = false }) {
   const fileRef = useRef()
@@ -51,9 +52,9 @@ export default function ImportButton({ inline = false }) {
       <button
         onClick={() => fileRef.current.click()}
         disabled={loading}
-        style={buttonStyle}
+        style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
-        {loading ? 'Importing...' : '⬆ Import JSON'}
+        {loading ? 'Importing…' : (<><Upload width={14} height={14} strokeWidth={2} aria-hidden="true" /> Import JSON</>)}
       </button>
       <input
         ref={fileRef}

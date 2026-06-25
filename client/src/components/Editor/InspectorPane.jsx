@@ -39,10 +39,14 @@ export default function InspectorPane() {
             <SegBtn active={mode === 'tabs'} onClick={() => choose('tabs')} title="One tab per block (prototype)">⊞ Tabs</SegBtn>
           </div>
           <div role="group" aria-label="Inspector dock position" style={{ display: 'flex', gap: 2 }}>
-            <SegBtn active={dock === 'bottom'} onClick={() => setInspectorDock('bottom')}
-              title="Dock inspector below the preview (stacked)">▭ Bottom</SegBtn>
+            <SegBtn active={dock === 'left'} onClick={() => setInspectorDock('left')}
+              title="Dock the block editor to the left of the preview">▯ Left</SegBtn>
             <SegBtn active={dock === 'right'} onClick={() => setInspectorDock('right')}
-              title="Dock inspector to the right of the preview (side by side)">▯ Right</SegBtn>
+              title="Dock the block editor to the right of the preview">▯ Right</SegBtn>
+            <SegBtn active={dock === 'top'} onClick={() => setInspectorDock('top')}
+              title="Dock the block editor above the preview">▭ Top</SegBtn>
+            <SegBtn active={dock === 'bottom'} onClick={() => setInspectorDock('bottom')}
+              title="Dock the block editor below the preview">▭ Bottom</SegBtn>
           </div>
         </div>
       } />

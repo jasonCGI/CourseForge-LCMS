@@ -121,35 +121,36 @@ export default function App() {
   const rightPanelInner = selectedNode?.type === 'project' ? (
     <CourseConfigPanel />
   ) : (!isMobile && activeFrame) ? (
-    // Resizable split: live preview + block editor. Orientation is user-toggled
-    // per frame (carrying a global default) — 'bottom' = vertical (preview top),
-    // 'right' = horizontal (preview left). A distinct autoSaveId per direction
-    // keeps react-resizable-panels from choking when restoring saved sizes.
-    dock === 'right' ? (
-      <PanelGroup key="hsplit" direction="horizontal" autoSaveId="cf-frame-hsplit" style={{ height: '100%' }}>
-        <Panel defaultSize={58} minSize={25} style={{ overflow: 'hidden' }}>
+    // Resizable split: live preview + block editor. The block editor can dock on
+    // any of four sides, user-toggled per frame (carrying a global default):
+    // 'left'/'right' = horizontal split, 'top'/'bottom' = vertical. 'left'/'top'
+    // put the inspector FIRST (before the preview). A distinct key + autoSaveId per
+    // dock keeps react-resizable-panels from choking when restoring saved sizes.
+    (() => {
+      const horizontal = dock === 'left' || dock === 'right'
+      const inspectorFirst = dock === 'left' || dock === 'top'
+      const previewPanel = (
+        <Panel defaultSize={horizontal ? 58 : 60} minSize={20} style={{ overflow: 'hidden' }}>
           <PersistentPreviewPane />
         </Panel>
-        <PanelResizeHandle className="cf-hsplit-handle" />
-        <Panel minSize={28} style={{ overflow: 'hidden' }}>
-          <div className="cf-block-config-pane" style={{ height: '100%' }}>
-            <InspectorPane />
-          </div>
-        </Panel>
-      </PanelGroup>
-    ) : (
-      <PanelGroup key="vsplit" direction="vertical" autoSaveId="cf-frame-vsplit" style={{ height: '100%' }}>
-        <Panel defaultSize={60} minSize={20} style={{ overflow: 'hidden' }}>
-          <PersistentPreviewPane />
-        </Panel>
-        <PanelResizeHandle className="cf-vsplit-handle" />
+      )
+      const inspectorPanel = (
         <Panel minSize={25} style={{ overflow: 'hidden' }}>
           <div className="cf-block-config-pane" style={{ height: '100%' }}>
             <InspectorPane />
           </div>
         </Panel>
-      </PanelGroup>
-    )
+      )
+      const handle = <PanelResizeHandle className={horizontal ? 'cf-hsplit-handle' : 'cf-vsplit-handle'} />
+      return (
+        <PanelGroup key={`split-${dock}`} direction={horizontal ? 'horizontal' : 'vertical'}
+          autoSaveId={`cf-frame-split-${dock}`} style={{ height: '100%' }}>
+          {inspectorFirst
+            ? <>{inspectorPanel}{handle}{previewPanel}</>
+            : <>{previewPanel}{handle}{inspectorPanel}</>}
+        </PanelGroup>
+      )
+    })()
   ) : (
     <div className="cf-block-config-pane" style={{ height: '100%' }}>
       <InspectorPane />
@@ -240,6 +241,13 @@ export default function App() {
           {/* Spacer */}
           <div style={{ flex: 1 }}/>
 
+          {/* Ecosystem tools — centered in the bar (flanked by equal spacers) so
+              the companion-app launchers sit front-and-center, not off in a corner. */}
+          <EcosystemTray />
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }}/>
+
           {/* Status indicator */}
           {loading && (
             <span style={{
@@ -250,9 +258,6 @@ export default function App() {
               marginRight: 12,
             }}>loading…</span>
           )}
-
-          {/* Ecosystem tools */}
-          <EcosystemTray />
 
           {/* Mode toggle */}
           <ModeToggle />

@@ -10,10 +10,12 @@ const AUTOSAVE_DELAY = 1200
 // split (preview top / inspector below); 'right' = horizontal (preview left /
 // inspector right). Per-frame overrides live in-memory in the store.
 const DOCK_KEY = 'cf-inspector-dock'
+// Four dock positions: 'left'/'right' = horizontal split, 'top'/'bottom' = vertical.
+const _DOCKS = ['left', 'right', 'top', 'bottom']
 function _readDockDefault() {
   try {
     const v = localStorage.getItem(DOCK_KEY)
-    return v === 'right' ? 'right' : 'bottom'
+    return _DOCKS.includes(v) ? v : 'bottom'
   } catch { return 'bottom' }
 }
 
@@ -47,7 +49,7 @@ const useEditorStore = create((set, get) => ({
   // choice carries over to subsequent un-overridden frames. Frames with an
   // explicit override keep it even when the global later changes.
   setInspectorDock: (orientation) => {
-    const o = orientation === 'right' ? 'right' : 'bottom'
+    const o = _DOCKS.includes(orientation) ? orientation : 'bottom'
     const id = get().activeFrame?.id
     set(s => ({
       inspectorDockDefault: o,

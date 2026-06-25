@@ -17,10 +17,14 @@ import {
   Sparks,
   PlaySolid,
   Box3dPoint,
+  Upload,
 } from 'iconoir-react'
 
 // Audio player controls (React AudioBar). Mirrors PLAY_SVG / PAUSE_SVG server-side.
 export { Play, Pause }
+
+// Toolbar glyphs.
+export { Upload }
 
 // blockType -> Iconoir component, used by the add-block palette and block tabs.
 // Confirmed against the installed iconoir-react package export names.
