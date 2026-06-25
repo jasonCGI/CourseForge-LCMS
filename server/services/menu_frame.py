@@ -26,7 +26,28 @@ owns the markup + target-kind semantics.
 Sub-menus are just nested menu frames (a menu whose items point at sub-topic
 frames) — there is no separate sub-menu type. One mechanism.
 """
+import json
+
 from .scorm12 import esc
+
+
+def _record_menu_onclick(title) -> str:
+    """Build the inline onclick that records the SOURCE menu before a nav-button
+    navigates, so the destination frame can show a "← {title}" back-pill.
+
+    Stores {href: <this menu page's own URL>, title: <menu title>} in
+    sessionStorage under 'cf_return_menu'. The menu page's URL is captured as
+    window.location.href at click time (the learner is ON the menu), so no
+    filename map is needed. Wrapped in try/catch so a sessionStorage failure
+    (e.g. privacy mode) can never block the navigation itself.
+
+    Returns an HTML attribute string: onclick="...". The title is JSON-encoded
+    for the JS string literal, then HTML-escaped for the attribute value.
+    """
+    payload = "{href:location.href,title:" + json.dumps(title or "") + "}"
+    js = ("try{sessionStorage.setItem('cf_return_menu',JSON.stringify("
+          + payload + "))}catch(e){}")
+    return f' onclick="{esc(js)}"'
 
 
 def is_menu_frame(frame) -> bool:
@@ -112,6 +133,10 @@ def render_menu_html(menu, resolve, *, shelled=False) -> str:
     items = menu.get("items") or []
     title = menu.get("title") or ""
 
+    # Each nav button records the source menu (this page's own URL + the menu
+    # title) before navigating, so the destination frame can render a back-pill.
+    record = _record_menu_onclick(title)
+
     btns = []
     for it in items:
         if not isinstance(it, dict):
@@ -120,7 +145,7 @@ def render_menu_html(menu, resolve, *, shelled=False) -> str:
         href = resolve(it) or ""
         if href:
             btns.append(
-                f'<a class="cf-menu-btn" href="{esc(href)}">'
+                f'<a class="cf-menu-btn" href="{esc(href)}"{record}>'
                 f'<span class="cf-menu-btn-label">{label}</span>'
                 f'<span class="cf-menu-btn-arrow" aria-hidden="true">&#8250;</span>'
                 f'</a>'

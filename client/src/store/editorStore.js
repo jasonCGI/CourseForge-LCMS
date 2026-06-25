@@ -93,6 +93,16 @@ const useEditorStore = create((set, get) => ({
   saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
   selectedNode: null,         // {type:'project'|'frame', id} — drives the context-sensitive right panel
 
+  // Menu back-pill (in-canvas React parity with the SCO sessionStorage runtime):
+  // when a learner clicks a menu item in the in-canvas preview, record the SOURCE
+  // menu (its OWN frame id + title) here. A frame preview shows a "← {title}" pill
+  // when lastMenuFrame is set and isn't the current frame; clicking calls
+  // loadFrame(lastMenuFrame.frameId). Set null again when a menu frame is shown
+  // (the menu itself gets no pill). {frameId, title} | null.
+  lastMenuFrame: null,
+  setLastMenuFrame: (frameId, title) =>
+    set({ lastMenuFrame: frameId ? { frameId, title: title || '' } : null }),
+
   // ── Inspector dock orientation ──────────────────────────────────────────
   inspectorDockDefault: _readDockDefault(),  // global carry-over default
   inspectorDockByFrame: {},                  // per-frame overrides, keyed by frame id

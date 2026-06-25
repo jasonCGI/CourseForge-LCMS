@@ -21,6 +21,7 @@ export default function PersistentPreviewPane() {
   const activeBlockId = useEditorStore(s => s.activeBlockId)
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
   const loadFrame    = useEditorStore(s => s.loadFrame)
+  const setLastMenuFrame = useEditorStore(s => s.setLastMenuFrame)
   const activeProject = useProjectStore(s => s.activeProject)
 
   // A menu frame stores its nav items in content.menu (no content.blocks), so the
@@ -94,11 +95,17 @@ export default function PersistentPreviewPane() {
   useEffect(() => {
     const handler = (e) => {
       if (!e.data || e.data.type !== 'fgui_nav' || !e.data.frameId) return
+      // Shell-injected menu click: record the SOURCE menu (the frame we're ON now,
+      // which IS the menu) before navigating, so the destination shows a back-pill.
+      // React parity with MenuFramePreview.goTo and the SCO sessionStorage runtime.
+      if (activeFrame?.frame_type === 'menu') {
+        setLastMenuFrame(activeFrame.id, activeFrame?.content?.menu?.title || '')
+      }
       loadFrame(e.data.frameId)
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [loadFrame])
+  }, [loadFrame, setLastMenuFrame, activeFrame])
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
   const ctx = useMemo(() => frameContext(activeProject, activeFrame?.id), [activeProject, activeFrame?.id])

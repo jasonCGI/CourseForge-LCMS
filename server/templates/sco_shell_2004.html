@@ -377,6 +377,64 @@
   </script>
 
   <script>
+  // ── Menu back-pill — "← {menu title}" return affordance ──────────────────
+  // Mirror of sco_shell.html. When a learner enters a frame via a menu item, the
+  // menu render recorded the SOURCE menu (its own page URL + title) in
+  // sessionStorage under 'cf_return_menu'. On each frame load we read it and, if
+  // present AND it does not point at THIS page, inject a small branded
+  // "← {title}" pill at the top-left of the content area; clicking returns to the
+  // menu. EVERYTHING is guarded so a failed read / bad JSON / missing host
+  // silently no-ops to "no pill" and never aborts the rest of the page runtime.
+  (function(){
+    try {
+      var raw = null;
+      try { raw = sessionStorage.getItem('cf_return_menu'); } catch (e) { return; }
+      if (!raw) return;
+      var info = null;
+      try { info = JSON.parse(raw); } catch (e) { return; }
+      if (!info || !info.href || typeof info.href !== 'string') return;
+      var here = '';
+      try { here = window.location.href; } catch (e) { here = ''; }
+      if (info.href === here) return;
+      var host = document.querySelector('.cf-content')
+              || document.querySelector('.cf-preview-main')
+              || document.getElementById('fgui-content')
+              || document.body;
+      if (!host) return;
+      if (host.querySelector && host.querySelector('.cf-menu-backpill')) return;
+      var title = (info.title == null ? '' : String(info.title)) || 'Menu';
+      var pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'cf-menu-backpill';
+      pill.setAttribute('aria-label', 'Back to ' + title);
+      pill.style.cssText = 'display:inline-flex;align-items:center;gap:6px;'
+        + 'position:absolute;top:12px;left:12px;z-index:30;'
+        + 'max-width:240px;padding:5px 12px;border-radius:14px;'
+        + 'background:#042C53;color:#fff;border:1px solid #F59E0B;cursor:pointer;'
+        + "font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;"
+        + 'font-weight:600;line-height:1.2;box-shadow:0 1px 4px rgba(0,0,0,0.25)';
+      var arrow = document.createElement('span');
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.style.cssText = 'color:#F59E0B;flex:none';
+      arrow.textContent = '←';
+      var label = document.createElement('span');
+      label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      label.textContent = title;
+      pill.appendChild(arrow);
+      pill.appendChild(label);
+      pill.addEventListener('click', function(){
+        try { window.location.href = info.href; } catch (e) {}
+      });
+      try {
+        var pos = window.getComputedStyle ? window.getComputedStyle(host).position : '';
+        if (pos === 'static' || !pos) host.style.position = 'relative';
+      } catch (e) {}
+      host.insertBefore(pill, host.firstChild);
+    } catch (e) { /* never let the back-pill abort the page runtime */ }
+  })();
+  </script>
+
+  <script>
   // ── IVideo runtime — timecode-triggered interactions (vanilla, self-contained) ──
   // An interaction is a *pause point* when reaching it should hold playback so the
   // learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with

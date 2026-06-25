@@ -106,8 +106,11 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       height: overlayFill ? '100%' : undefined,
       padding: overlayFill ? 0 : (dockedAudio.length ? '28px 0 88px' : '28px 0 40px'),
       boxSizing: 'border-box',
-      position: 'relative',   // anchor for docked audio bars
+      position: 'relative',   // anchor for docked audio bars + the menu back-pill
     }}>
+      {/* Menu back-pill: shown when this frame was reached via a menu (React
+          parity with the SCO sessionStorage runtime). Top-left of the content area. */}
+      <MenuBackPill currentFrameId={frame.id} />
       {/* Frame title (hidden when the shell already shows it in its chrome) */}
       {!hideTitle && (
         <h1 style={{
@@ -229,13 +232,26 @@ export function resolveMenuTargetFrameId(item, project) {
 // (reuses the store's loadFrame, matching how the live preview swaps frames). A
 // topic target (lesson/module) resolves client-side to that section's first frame.
 function MenuFramePreview({ frame, hideTitle = false }) {
-  const loadFrame     = useEditorStore(s => s.loadFrame)
-  const activeProject = useProjectStore(s => s.activeProject)
+  const loadFrame        = useEditorStore(s => s.loadFrame)
+  const setLastMenuFrame = useEditorStore(s => s.setLastMenuFrame)
+  const activeProject    = useProjectStore(s => s.activeProject)
 
   const menu  = frame.content?.menu || {}
   const items = Array.isArray(menu.items) ? menu.items : []
 
+  // We are ON a menu frame → it gets no pill. Clear any stale source so the menu
+  // itself never shows a back-pill (parity with the SCO `href === here` check).
+  useEffect(() => { setLastMenuFrame(null) }, [frame.id, setLastMenuFrame])
+
   const resolveTargetFrameId = (item) => resolveMenuTargetFrameId(item, activeProject)
+
+  // Record THIS menu (its own frame id + title) as the source before navigating,
+  // so the destination frame's preview can show a "← {title}" back-pill.
+  const goTo = (targetId) => {
+    if (!targetId) return
+    setLastMenuFrame(frame.id, menu.title || '')
+    loadFrame(targetId)
+  }
 
   return (
     <div style={{
@@ -258,7 +274,7 @@ function MenuFramePreview({ frame, hideTitle = false }) {
           return (
             <button
               key={it.id}
-              onClick={() => targetId && loadFrame(targetId)}
+              onClick={() => goTo(targetId)}
               disabled={disabled}
               title={disabled ? 'No target set' : 'Go to target'}
               style={{
@@ -277,6 +293,40 @@ function MenuFramePreview({ frame, hideTitle = false }) {
         })}
       </div>
     </div>
+  )
+}
+
+// Menu back-pill — the React mirror of the SCO/preview sessionStorage runtime.
+// Shows a small branded "← {menu title}" pill at the top-left of the content area
+// when the learner reached THIS frame via a menu (lastMenuFrame is set and points
+// at a DIFFERENT frame). Clicking returns to that menu via loadFrame. Renders
+// nothing when no source menu is recorded, or when the recorded menu IS this frame
+// (a menu frame shows no pill). Doubles as a lightweight breadcrumb.
+function MenuBackPill({ currentFrameId }) {
+  const lastMenuFrame = useEditorStore(s => s.lastMenuFrame)
+  const loadFrame     = useEditorStore(s => s.loadFrame)
+  if (!lastMenuFrame || !lastMenuFrame.frameId) return null
+  if (lastMenuFrame.frameId === currentFrameId) return null   // on the menu itself → no pill
+  const title = lastMenuFrame.title || 'Menu'
+  return (
+    <button
+      type="button"
+      onClick={() => loadFrame(lastMenuFrame.frameId)}
+      aria-label={`Back to ${title}`}
+      title={`Back to ${title}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        position: 'absolute', top: 12, left: 12, zIndex: 30,
+        maxWidth: 240, padding: '5px 12px', borderRadius: 14,
+        background: '#042C53', color: '#fff', border: '1px solid #F59E0B',
+        cursor: 'pointer', fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+        fontSize: 12, fontWeight: 600, lineHeight: 1.2,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+      }}
+    >
+      <span aria-hidden="true" style={{ color: '#F59E0B', flex: 'none' }}>←</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+    </button>
   )
 }
 
