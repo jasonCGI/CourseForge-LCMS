@@ -1,16 +1,8 @@
 /* ============================================================
    COURSE FORGE — Component Classes
+   Depends on forge-motion.css (loaded first) for @keyframes
+   forge-blink and the prefers-reduced-motion overrides.
    ============================================================ */
-
-/* ── Cursor blink ────────────────────────────────────────── */
-@keyframes forge-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .forge-path__cursor { animation: none !important; opacity: 1; }
-}
 
 /* ── Path wrapper ────────────────────────────────────────── */
 .forge-path {
@@ -48,8 +40,8 @@
    bar across all modes; the tool segment + cursor stay amber. Use ONLY on the
    nav bars — the full recessive hierarchy is for display marks + the demo. */
 .forge-path--bar .forge-path__root,
-.forge-path--bar .forge-path__mid   { color: #9CA3AF; }
-.forge-path--bar .forge-path__slash { color: #4B5563; }
+.forge-path--bar .forge-path__mid   { color: var(--forge-path-bar-prefix); }
+.forge-path--bar .forge-path__slash { color: var(--forge-path-bar-slash); }
 
 /* ── Sub-label beneath path ──────────────────────────────── */
 .forge-path__label {

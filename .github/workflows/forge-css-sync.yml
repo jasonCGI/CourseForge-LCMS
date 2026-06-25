@@ -1,0 +1,33 @@
+name: Forge CSS Sync
+
+# Guards against drift between the canonical Forge CSS core in static/css/
+# and its hand-mirrored copies. If a mirror diverges, run:
+#   python tools/sync-forge-css.py
+on:
+  push:
+    paths:
+      - "static/css/**"
+      - "**/forge-tokens.css"
+      - "**/forge-motion.css"
+      - "**/forge-components.css"
+      - "tools/sync-forge-css.py"
+      - ".github/workflows/forge-css-sync.yml"
+  pull_request:
+    paths:
+      - "static/css/**"
+      - "**/forge-tokens.css"
+      - "**/forge-motion.css"
+      - "**/forge-components.css"
+      - "tools/sync-forge-css.py"
+      - ".github/workflows/forge-css-sync.yml"
+
+jobs:
+  check-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Verify Forge CSS mirrors match canonical
+        run: python tools/sync-forge-css.py --check

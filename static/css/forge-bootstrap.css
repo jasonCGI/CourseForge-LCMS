@@ -1,11 +1,19 @@
 /* ============================================================
-   COURSE FORGE — Bootstrap 5 Variable Overrides
-   Import order: bootstrap.css → forge-bootstrap.css → forge-components.css
+   COURSE FORGE — Bootstrap 5 Bridge (OPTIONAL)
+   Remaps Bootstrap's --bs-* variables onto Forge tokens. Load this
+   ONLY on surfaces that ship vendor Bootstrap (currently just the
+   demo): bootstrap.css → forge-bootstrap.css.
+
+   This file is NOT part of the canonical runtime cascade. The core
+   that every tool and the React client load is the 3-file chain:
+       forge-tokens.css → forge-motion.css → forge-components.css
+   Bootstrap is absent from those surfaces, so this bridge is unused
+   there and intentionally lives only in static/css/ (not mirrored).
    ============================================================ */
 
 :root {
   /* Remap Bootstrap primary to forge amber */
-  --bs-primary:             #D4820A;
+  --bs-primary:             var(--forge-amber);
   --bs-primary-rgb:         212, 130, 10;
 
   /* Body */
@@ -16,7 +24,7 @@
 
   /* Links */
   --bs-link-color:          var(--forge-amber);
-  --bs-link-hover-color:    #B86D08;
+  --bs-link-hover-color:    var(--forge-amber-hover);
 
   /* Borders */
   --bs-border-color:        var(--forge-border);
@@ -87,7 +95,7 @@
   --bs-primary:             #F59E0B;
   --bs-primary-rgb:         245, 158, 11;
   --bs-link-color:          #F59E0B;
-  --bs-link-hover-color:    #D4820A;
+  --bs-link-hover-color:    var(--forge-amber);
   --bs-body-bg:             var(--forge-surface);
   --bs-body-color:          var(--forge-text-primary);
   --bs-border-color:        var(--forge-border);

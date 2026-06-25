@@ -7,12 +7,11 @@
 
   /* ── Typography ─────────────────────────────────────── */
   --forge-font:            'IBM Plex Mono', 'Courier New', monospace;
-  --forge-weight-light:    300;
-  --forge-weight-regular:  400;
   --forge-weight-semibold: 600;
 
   /* ── Brand amber — light mode ───────────────────────── */
   --forge-amber:           #D4820A;
+  --forge-amber-hover:     #B86D08;   /* darker amber for hover/active */
   --forge-amber-bg:        rgba(212, 130, 10, 0.10);
   --forge-amber-border:    rgba(212, 130, 10, 0.30);
 
@@ -22,6 +21,10 @@
   --forge-path-tool:       #D4820A;   /* Tool   — destination, amber */
   --forge-path-slash:      #D1D5DB;   /* /      — near invisible */
   --forge-path-cursor:     #D4820A;   /* _      — matches tool */
+
+  /* ── Nav-bar path grays (legible on the always-dark nav bar) ── */
+  --forge-path-bar-prefix: #9CA3AF;   /* Course/Forge prefix on dark bar */
+  --forge-path-bar-slash:  #4B5563;   /* slash on dark bar */
 
   /* ── Surface & border ───────────────────────────────── */
   --forge-surface:         #F9FAFB;
@@ -51,11 +54,19 @@
   --forge-blink-duration:  1.1s;
 }
 
-/* ── Dark mode overrides (Bootstrap convention) ──────────── */
-[data-bs-theme="dark"] {
+/* ── Dark mode overrides ──────────────────────────────────────
+   UNIFIED: all three dark hooks — Bootstrap's [data-bs-theme],
+   CourseForge's [data-cf-mode], and the [data-mode] tools — share a
+   single Forge near-black palette (#06080f surface family / #C8D8E8
+   text family). Previously data-cf-mode used a lighter #0D1117/#F0F0F0
+   palette; it now matches the rest. ────────────────────────────── */
+[data-bs-theme="dark"],
+[data-cf-mode="dark"],
+[data-mode="dark"] {
 
   /* Brand amber — lifted for dark backgrounds */
   --forge-amber:           #F59E0B;
+  --forge-amber-hover:     #E08A0A;   /* darker amber for hover/active */
   --forge-amber-bg:        rgba(245, 158, 11, 0.10);
   --forge-amber-border:    rgba(245, 158, 11, 0.25);
 
@@ -66,89 +77,31 @@
   --forge-path-slash:      #1E1E1E;   /* /      — ghost */
   --forge-path-cursor:     #F59E0B;
 
-  /* Surface & border */
-  --forge-surface:         #0D1117;
-  --forge-surface-raised:  #161B22;
-  --forge-border:          rgba(255, 255, 255, 0.07);
-  --forge-border-subtle:   rgba(255, 255, 255, 0.04);
+  /* Nav-bar path grays — unchanged across modes */
+  --forge-path-bar-prefix: #9CA3AF;
+  --forge-path-bar-slash:  #4B5563;
 
-  /* Text */
-  --forge-text-primary:    #F0F0F0;
-  --forge-text-secondary:  #9CA3AF;
-  --forge-text-tertiary:   #4B5563;
-  --forge-text-muted:      #2A2A2A;
-}
-
-/* ── Bridge: CourseForge uses data-cf-mode ─────────────── */
-[data-cf-mode="dark"] {
-  --forge-amber:           #F59E0B;
-  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
-  --forge-amber-border:    rgba(245, 158, 11, 0.25);
-  --forge-path-root:       #2A2A2A;
-  --forge-path-mid:        #4B5563;
-  --forge-path-tool:       #F59E0B;
-  --forge-path-slash:      #1E1E1E;
-  --forge-path-cursor:     #F59E0B;
-  --forge-surface:         #0D1117;
-  --forge-surface-raised:  #161B22;
-  --forge-border:          rgba(255, 255, 255, 0.07);
-  --forge-border-subtle:   rgba(255, 255, 255, 0.04);
-  --forge-text-primary:    #F0F0F0;
-  --forge-text-secondary:  #9CA3AF;
-  --forge-text-tertiary:   #4B5563;
-  --forge-text-muted:      #2A2A2A;
-}
-
-[data-cf-mode="light"] {
-  /* Same as :root defaults — no overrides needed */
-}
-
-[data-cf-mode="hc"] {
-  --forge-amber:           #F59E0B;
-  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
-  --forge-amber-border:    rgba(245, 158, 11, 0.50);
-  --forge-path-root:       #FFFFFF;
-  --forge-path-mid:        #FFFFFF;
-  --forge-path-tool:       #F59E0B;
-  --forge-path-slash:      #666666;
-  --forge-path-cursor:     #F59E0B;
-  --forge-surface:         #000000;
-  --forge-surface-raised:  #000000;
-  --forge-border:          #FFFFFF;
-  --forge-border-subtle:   #444444;
-  --forge-text-primary:    #FFFFFF;
-  --forge-text-secondary:  #DDDDDD;
-  --forge-text-tertiary:   #AAAAAA;
-  --forge-text-muted:      #666666;
-}
-
-/* ── Bridge: ForgePack / ForgeBlueprint / ForgeClip use data-mode ── */
-[data-mode="dark"] {
-  --forge-amber:           #F59E0B;
-  --forge-amber-bg:        rgba(245, 158, 11, 0.10);
-  --forge-amber-border:    rgba(245, 158, 11, 0.25);
-  --forge-path-root:       #2A2A2A;
-  --forge-path-mid:        #4B5563;
-  --forge-path-tool:       #F59E0B;
-  --forge-path-slash:      #1E1E1E;
-  --forge-path-cursor:     #F59E0B;
+  /* Surface & border — Forge near-black */
   --forge-surface:         #06080f;
   --forge-surface-raised:  #0d1017;
   --forge-border:          rgba(255, 255, 255, 0.07);
   --forge-border-subtle:   rgba(255, 255, 255, 0.04);
+
+  /* Text */
   --forge-text-primary:    #C8D8E8;
   --forge-text-secondary:  #7A90A8;
   --forge-text-tertiary:   #3A5A7A;
   --forge-text-muted:      #1c2a3a;
 }
 
-[data-mode="light"] {
-  /* Same as :root defaults */
-}
+/* Light hooks resolve to :root defaults — no overrides needed:
+   [data-cf-mode="light"], [data-mode="light"]. */
 
+/* ── High-contrast mode (merged: data-cf-mode + data-mode) ─────── */
+[data-cf-mode="hc"],
 [data-mode="hc"] {
-  /* Same as [data-cf-mode="hc"] */
   --forge-amber:           #F59E0B;
+  --forge-amber-hover:     #F59E0B;
   --forge-amber-bg:        rgba(245, 158, 11, 0.10);
   --forge-amber-border:    rgba(245, 158, 11, 0.50);
   --forge-path-root:       #FFFFFF;
@@ -156,6 +109,8 @@
   --forge-path-tool:       #F59E0B;
   --forge-path-slash:      #666666;
   --forge-path-cursor:     #F59E0B;
+  --forge-path-bar-prefix: #FFFFFF;
+  --forge-path-bar-slash:  #666666;
   --forge-surface:         #000000;
   --forge-surface-raised:  #000000;
   --forge-border:          #FFFFFF;
