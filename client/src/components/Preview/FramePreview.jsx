@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
+import OamMediaBar from './OamMediaBar'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
 import useEditorStore from '../../store/editorStore'
@@ -1391,6 +1392,8 @@ function PreviewIVideo({ block, fill = false }) {
   }
 
   // Full layout: the interactive video fills the content area — no caption text.
+  // In the fill case the runtime fills its box and overlays the controller on the
+  // media bottom (no scrollbar); inline it docks the controller below in flow.
   const b = block.data.bounds || fill
   return (
     <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
@@ -1398,6 +1401,7 @@ function PreviewIVideo({ block, fill = false }) {
         videoSrc={block.data.video_serve_url || `/api/media/serve/${videoId}`}
         clipData={clipData}
         onComplete={() => {}}
+        fill={!!b}
       />
     </div>
   )
@@ -1463,18 +1467,19 @@ function PreviewOAM({ block, fill = false }) {
       </div>
     )
   }
-  // Full layout: the OAM embed fills the entire content area — no caption/label
-  // text, no media bar. Mirrors the cover image/video "fill" treatment as closely
-  // as an iframe allows (100% of the zone, square corners, object-fit-style fill).
+  // Full layout: the OAM embed fills the content area AND carries the forge-oam
+  // media bar (play/pause/scrub/next-stop), in parity with the server-rendered
+  // _OAM_PLAYER_TPL. The bar is part of the OamMediaBar component, which scales the
+  // animation to fit and reserves the bar below it.
   const src = `/api/media/oam/${d.oam_asset_id}/files/${d.entry_point || 'index.html'}`
-  const b = d.bounds || fill
   return (
-    <div style={b
-      ? { width: '100%', height: '100%' }
-      : { width: '100%', aspectRatio: `${d.width || 16} / ${d.height || 9}`, maxHeight: '70vh' }}>
-      <iframe src={src} title="Adobe Animate animation" scrolling="no"
-        sandbox="allow-scripts allow-same-origin"
-        style={{ width: '100%', height: '100%', border: 0, display: 'block', background: '#0d1017' }} />
+    <div style={{ width: '100%' }}>
+      <OamMediaBar
+        src={src}
+        width={d.width || 800}
+        height={d.height || 600}
+        hotspotConfig={d.hotspot}
+      />
     </div>
   )
 }

@@ -378,6 +378,12 @@
 
   <script>
   // ── IVideo runtime — timecode-triggered interactions (vanilla, self-contained) ──
+  // An interaction is a *pause point* when reaching it should hold playback so the
+  // learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with
+  // pause_on_reach:false); passive annotations only pause if explicitly opted in.
+  function iVideoShouldPause(i) {
+    return i.type === 'annotation' ? !!i.pause_on_reach : i.pause_on_reach !== false;
+  }
   function iVideoInit(containerId, interactions, options) {
     var container = document.getElementById(containerId);
     if (!container) return;
@@ -393,7 +399,8 @@
         overlay.innerHTML = '';
         interactions.forEach(function(i) {
           var inRange = t >= i.timecode && (!i.end_timecode || t <= i.end_timecode);
-          if (!inRange || !i.data) return;
+          // A consumed (answered) hotspot is gone — don't redraw its resting overlay.
+          if (!inRange || !i.data || (i.type === 'hotspot' && answered[i.id])) return;
           if (i.type === 'annotation' && i.data.x != null) {
             var a = document.createElement('div');
             a.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;pointer-events:none;z-index:10';
@@ -415,8 +422,10 @@
       if (state.blocking) return;
       for (var k = 0; k < interactions.length; k++) {
         var it = interactions[k];
-        if (answered[it.id] || !it.pause_on_reach) continue;
-        if (t >= it.timecode) {
+        if (answered[it.id] || !iVideoShouldPause(it)) continue;
+        // Pause once the playhead reaches the marker (within its active window if one
+        // is set) so a seek past it doesn't strand an unaddressed interaction.
+        if (t >= it.timecode && (!it.end_timecode || t <= it.end_timecode)) {
           state.blocking = true; video.pause();
           iVideoShowBlocking(container, video, it, answered, state);
           break;

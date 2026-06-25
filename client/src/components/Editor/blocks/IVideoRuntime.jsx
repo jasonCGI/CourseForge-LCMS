@@ -2,11 +2,19 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import MediaBar from '../../Preview/MediaBar'
 import { hotspotStyle, shapeRadius, rgba } from '../../../utils/hotspotStyle'
 
+// An interaction is a *pause point* when reaching it should hold playback so the
+// learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with
+// pause_on_reach:false); passive annotations only pause if explicitly opted in.
+function shouldPause(i) {
+  return i.type === 'annotation' ? !!i.pause_on_reach : i.pause_on_reach !== false
+}
+
 export default function IVideoRuntime({
   videoSrc, webmSrc, vttSrc, posterSrc,
   clipData,       // parsed .clip.json object (may be null while loading)
   onComplete,
   scorm,
+  fill = false,   // full-bleed: media fills the box and the controller overlays its bottom
 }) {
   const videoRef = useRef(null)
   const wrapRef  = useRef(null)
@@ -20,6 +28,7 @@ export default function IVideoRuntime({
   const [captionsOn,   setCaptionsOn]   = useState(!!vttSrc)  // <track default> shows them initially
   const [answered,     setAnswered]     = useState({})
   const [quizSelected, setQuizSelected] = useState({})
+  const [hasAudio,     setHasAudio]     = useState(true)   // assume audio until detection says otherwise
 
   const interactions = clipData?.interactions || []
 
@@ -34,36 +43,64 @@ export default function IVideoRuntime({
     )
     setActiveInts(inRange)
 
-    const blocker = inRange.find(i => i.pause_on_reach && !answered[i.id])
+    // Pause at each pause-point marker (within its active window) once reached.
+    const blocker = inRange.find(i => shouldPause(i) && !answered[i.id])
     if (blocker && !blocking) {
       v.pause()
       setBlocking(blocker)
     }
   }, [interactions, answered, blocking])
 
+  // Detect whether the video actually carries an audio track, so a soundless clip
+  // hides the volume/mute control instead of implying sound that isn't there.
+  // mozHasAudio / webkitAudioDecodedByteCount / audioTracks.length cover the major
+  // engines; where none is available we leave the control as-is (assume audio).
+  const detectAudio = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (typeof v.mozHasAudio === 'boolean') { setHasAudio(v.mozHasAudio); return }
+    if (v.audioTracks && typeof v.audioTracks.length === 'number') { setHasAudio(v.audioTracks.length > 0); return }
+    if (typeof v.webkitAudioDecodedByteCount === 'number') {
+      // Bytes are decoded only once playback flows, so this is conclusive only
+      // after the playhead has advanced: bytes>0 => audio; advanced with 0 bytes
+      // => no audio. Before then, keep the control (assume audio).
+      if (v.webkitAudioDecodedByteCount > 0) setHasAudio(true)
+      else if (v.currentTime > 0.1) setHasAudio(false)
+      return
+    }
+    // No detection support -> degrade gracefully (leave hasAudio = true).
+  }, [])
+
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    const meta = () => setDuration(v.duration || 0)
+    const meta = () => { setDuration(v.duration || 0); detectAudio() }
     const ended = () => { setPlaying(false); onComplete?.() }
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)
     const onVol = () => { setVolume(v.volume); setMuted(v.muted) }
+    const onProgress = () => detectAudio()
     v.addEventListener('timeupdate', onTimeUpdate)
     v.addEventListener('loadedmetadata', meta)
+    v.addEventListener('loadeddata', meta)
+    v.addEventListener('playing', onProgress)
+    v.addEventListener('timeupdate', onProgress)
     v.addEventListener('ended', ended)
     v.addEventListener('play', onPlay)
     v.addEventListener('pause', onPause)
     v.addEventListener('volumechange', onVol)
     return () => {
       v.removeEventListener('timeupdate', onTimeUpdate)
+      v.removeEventListener('loadeddata', meta)
+      v.removeEventListener('playing', onProgress)
+      v.removeEventListener('timeupdate', onProgress)
       v.removeEventListener('loadedmetadata', meta)
       v.removeEventListener('ended', ended)
       v.removeEventListener('play', onPlay)
       v.removeEventListener('pause', onPause)
       v.removeEventListener('volumechange', onVol)
     }
-  }, [onTimeUpdate, onComplete])
+  }, [onTimeUpdate, onComplete, detectAudio])
 
   const submitQuiz = (i) => {
     const selected = quizSelected[i.id]
@@ -84,7 +121,8 @@ export default function IVideoRuntime({
   const acknowledge = (i) => {
     setAnswered(prev => ({ ...prev, [i.id]: true }))
     setBlocking(null)
-    if (i.pause_on_reach) videoRef.current?.play()
+    // Resume whenever this interaction actually held playback (it was a pause point).
+    if (shouldPause(i)) videoRef.current?.play()
   }
 
   // Interaction timecodes become stop markers on the shared media bar, mirroring
@@ -124,10 +162,48 @@ export default function IVideoRuntime({
     wrapRef.current?.requestFullscreen?.()
   }
 
+  // Non-blocking overlays exclude any consumed hotspot — once selected it is gone,
+  // it must NOT reappear as a resting overlay (B.2). Other answered interactions
+  // (annotations etc.) may still show in their window.
+  const overlayInts = activeInts.filter(i =>
+    (i.type === 'hotspot' && answered[i.id]) ? false : (!shouldPause(i) || answered[i.id])
+  )
+
+  // Shared transport bar. In fill (full-bleed) mode it OVERLAYS the bottom of the
+  // media — absolutely positioned inside the media container — so the content fills
+  // the area with the controls on top and the frame never grows a scrollbar. In
+  // inline mode it docks below the media in normal flow (unchanged).
+  const bar = (
+    <MediaBar
+      playing={playing}
+      t={currentTime}
+      duration={duration}
+      stops={stops}
+      onPlayPause={togglePlay}
+      onSeek={seek}
+      onNextStop={nextStop}
+      disabled={!!blocking}
+      volume={volume}
+      muted={muted}
+      onVolume={hasAudio ? changeVolume : undefined}
+      onToggleMute={hasAudio ? toggleMute : undefined}
+      captions={captionsOn}
+      onToggleCaptions={vttSrc ? toggleCaptions : undefined}
+      onFullscreen={toggleFullscreen}
+    />
+  )
+
   return (
-    <div ref={wrapRef} style={{ width: '100%', background: '#000' }}>
-      <div style={{ position: 'relative', width: '100%', background: '#000', overflow: 'hidden' }}>
-        <video ref={videoRef} controls={false} style={{ width: '100%', display: 'block' }}
+    <div ref={wrapRef} style={fill
+      ? { position: 'relative', width: '100%', height: '100%', background: '#000', overflow: 'hidden' }
+      : { width: '100%', background: '#000' }}>
+      <div style={fill
+        ? { position: 'absolute', inset: 0, background: '#000', overflow: 'hidden' }
+        : { position: 'relative', width: '100%', background: '#000', overflow: 'hidden' }}>
+        <video ref={videoRef} controls={false}
+          style={fill
+            ? { width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+            : { width: '100%', display: 'block' }}
           poster={posterSrc} aria-label="Interactive video">
           {webmSrc && <source src={webmSrc} type="video/webm" />}
           {videoSrc && <source src={videoSrc} type="video/mp4" />}
@@ -136,7 +212,7 @@ export default function IVideoRuntime({
         </video>
 
         {/* Non-blocking overlays */}
-        {activeInts.filter(i => !i.pause_on_reach || answered[i.id]).map(i => (
+        {overlayInts.map(i => (
           <Overlay key={i.id} i={i} />
         ))}
 
@@ -152,26 +228,15 @@ export default function IVideoRuntime({
             onAck={acknowledge}
           />
         )}
+
+        {/* Controller overlaying the bottom of the media (full-bleed) */}
+        {fill && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 40 }}>{bar}</div>
+        )}
       </div>
 
-      {/* Shared transport bar — gated while a blocking interaction holds the video */}
-      <MediaBar
-        playing={playing}
-        t={currentTime}
-        duration={duration}
-        stops={stops}
-        onPlayPause={togglePlay}
-        onSeek={seek}
-        onNextStop={nextStop}
-        disabled={!!blocking}
-        volume={volume}
-        muted={muted}
-        onVolume={changeVolume}
-        onToggleMute={toggleMute}
-        captions={captionsOn}
-        onToggleCaptions={vttSrc ? toggleCaptions : undefined}
-        onFullscreen={toggleFullscreen}
-      />
+      {/* Controller docked below the media (inline flow) */}
+      {!fill && bar}
     </div>
   )
 }
