@@ -107,6 +107,7 @@ body{
 }
 .cf-preview-main{
   max-width:880px;margin:0 auto;padding:88px 32px 64px;background:#ffffff;color:#1a1a1a;min-height:100vh;
+  position:relative;   /* anchor for the absolutely-pinned WCN recall bar */
 }
 .cf-preview-main img{max-width:100%;height:auto}
 .cf-preview-main iframe{max-width:100%;border:0}

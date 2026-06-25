@@ -552,6 +552,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # block_tags start offsets used by the shelled text-top reflow below, so we
     # skip that reflow when absolute positioning is already in play.
     _shelled_has_bounds = False
+    # WCN recall affordance: every WCN block on a frame contributes a persistent
+    # color-coded icon button, collected here and emitted as a horizontal bar
+    # pinned to the content area's lower-left. Each entry is (wcn_type, modal_id,
+    # trigger_id, title) so the recall button can re-open the SAME modal (modal
+    # mode) / the re-show modal (inline mode) that the block already built.
+    wcn_recall = []
     for block in blocks:
         btype = block.get('type')
         data  = block.get('data', {})
@@ -951,10 +957,28 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 'note':    {'tag':'#185FA5','border':'#185FA5','bg':'rgba(24,95,165,0.07)', 'title':'#7EB8F0','text':'#8AAAC0','header':'#06080f'},
             }
 
+            # Recall-icon glyphs: small, crisp, per-type SHAPE + COLOR per the
+            # WCN-recall spec (distinct from the WCN body icons above). Warning ->
+            # red triangle, caution -> yellow diamond, note -> blue circle-i.
+            recall_icons = {
+                'warning': '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12,2 23,22 1,22" fill="#D0342C"/></svg>',
+                'caution': '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12,1 23,12 12,23 1,12" fill="#eed202"/></svg>',
+                'note':    '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#2E62D8"/><text x="12" y="17" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#fff">i</text></svg>',
+            }
+            recall_colors = {'warning': '#D0342C', 'caution': '#eed202', 'note': '#2E62D8'}
+
             c     = colors.get(wcn_type, colors['note'])
             icon  = icons.get(wcn_type, icons['note'])
             sicon = small_icons.get(wcn_type, small_icons['note'])
             tag   = wcn_type.upper()
+
+            # Register a recall affordance for every WCN block (both modes). The
+            # recall button re-opens this block's modal: in modal mode the existing
+            # one; in inline mode the hidden re-show modal emitted below.
+            wcn_recall.append((wcn_type, modal_id, trigger_id,
+                               recall_icons.get(wcn_type, recall_icons['note']),
+                               recall_colors.get(wcn_type, recall_colors['note']),
+                               title))
 
             if modal:
                 parts.append(f'''
@@ -1039,6 +1063,48 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
              color:{c["title"]};cursor:pointer;font-size:11px;
              font-weight:600;font-family:inherit"
     >✓ {ack_label}</button>
+  </div>
+</div>
+<div
+  id="{modal_id}"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="{title_id}"
+  aria-hidden="true"
+  style="display:none;position:fixed;inset:0;
+         background:rgba(4,44,83,0.75);z-index:999;
+         align-items:center;justify-content:center;padding:24px"
+>
+  <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;
+              overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+    <div style="background:{c["header"]};padding:14px 18px;display:flex;
+                align-items:center;gap:12px;border-bottom:3px solid {c["border"]}">
+      {icon}
+      <div style="flex:1">
+        <div style="font-family:'IBM Plex Mono','Courier New',monospace;font-size:9px;font-weight:700;
+                    color:{c["tag"]};letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
+        <div id="{title_id}" style="font-size:15px;font-weight:700;color:{c["tag"]}">{title or tag}</div>
+      </div>
+      <button
+        onclick="wcnCloseModal('{modal_id}')"
+        aria-label="Close dialog"
+        style="background:none;border:none;color:{c["tag"]};
+               font-size:22px;cursor:pointer;padding:4px;line-height:1;
+               margin-left:auto;flex-shrink:0"
+      >✕</button>
+    </div>
+    <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">
+      {text}
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid #eee;
+                display:flex;justify-content:flex-end;background:#f8f8f8">
+      <button
+        onclick="wcnCloseModal('{modal_id}')"
+        style="padding:8px 20px;background:{c["tag"]};color:#fff;border:none;
+               border-radius:4px;font-size:13px;font-weight:600;
+               cursor:pointer;font-family:inherit"
+      >Close</button>
+    </div>
   </div>
 </div>''')
 
@@ -1635,11 +1701,52 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             out = out + chr(10) + aux_html
     else:
         out = '\n'.join(parts)
+    # WCN recall bar: a persistent row of color-coded icon buttons pinned to the
+    # content area's lower-left, one per WCN block on the frame (in block order).
+    # Clicking re-opens that block's modal via the existing wcnOpenModal path. The
+    # bar is appended OUTSIDE the layout-zone wrappers (which carry overflow:hidden)
+    # so it's never clipped; it self-anchors to the nearest positioned ancestor
+    # (.cf-content / #fgui-content / .cf-preview-main, all position:relative). It's
+    # offset up 64px so it clears any bottom-docked audio / iVideo control bar.
+    if wcn_recall:
+        out = out + '\n' + _wcn_recall_bar(wcn_recall)
     # Wire every branded audio bar with one self-contained controller (emitted
     # once per rendered block list).
     if 'data-cf-audio' in out:
         out += '\n' + _cf_audio_script()
     return out
+
+
+def _wcn_recall_bar(entries):
+    """Build the WCN recall bar: a horizontal row of small bordered icon buttons
+    (styled like the editor's Add-Block palette glyphs), one per WCN block, pinned
+    to the content area's lower-left. Each re-opens its WCN modal via wcnOpenModal.
+
+    entries: list of (wcn_type, modal_id, trigger_id, recall_icon_svg, color, title).
+    """
+    btns = []
+    for i, (wtype, modal_id, _trig, ricon, color, title) in enumerate(entries):
+        btn_id = f'{modal_id}-recall'
+        tag = wtype.upper()
+        label = esc(f'Re-open {tag}{": " + title if title else ""}')
+        btns.append(
+            f'<button id="{btn_id}" type="button" data-type="{tag}" '
+            f'onclick="wcnOpenModal(\'{modal_id}\', \'{btn_id}\')" '
+            f'aria-haspopup="dialog" title="{label}" aria-label="{label}" '
+            f'style="display:inline-flex;align-items:center;justify-content:center;gap:5px;'
+            f'padding:4px 9px;border-radius:5px;border:1px solid {color};'
+            f'background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;'
+            f'font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:1;'
+            f'box-shadow:0 1px 3px rgba(0,0,0,0.18)">'
+            f'{ricon}<span>{tag}</span></button>'
+        )
+    return (
+        '<div class="cf-wcn-recall" role="group" aria-label="Re-open warnings, cautions and notes" '
+        'style="position:absolute;left:16px;bottom:64px;z-index:40;'
+        'display:flex;flex-wrap:wrap;gap:8px;pointer-events:auto">'
+        + ''.join(btns) +
+        '</div>'
+    )
 
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,

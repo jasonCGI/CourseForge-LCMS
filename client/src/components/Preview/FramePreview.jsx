@@ -184,6 +184,8 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
         return src ? <AudioBar key={`${b.id}-bottom`} src={src} caption={b.data.caption} dock="bottom" /> : null
       })}
+      {/* WCN recall bar — persistent re-open icons, lower-left of the content area. */}
+      <WCNRecallBar wcnBlocks={blocks.filter(b => b.type === 'wcn')} />
     </div>
   )
 }
@@ -1267,9 +1269,62 @@ function PreviewWCN({ block }) {
   const closeModal = () => { setModalOpen(false); triggerRef.current?.focus() }
   const acknowledge = () => { setAcknowledged(true); closeModal() }
 
+  // The frame-level WCN recall bar re-opens a block's modal by dispatching a
+  // 'cf-wcn-recall' CustomEvent keyed by block id. Listen for ours and re-open
+  // the SAME modal (modal mode) / re-show modal (inline mode) — no second modal.
+  React.useEffect(() => {
+    const onRecall = (e) => { if (e.detail === block.id) setModalOpen(true) }
+    window.addEventListener('cf-wcn-recall', onRecall)
+    return () => window.removeEventListener('cf-wcn-recall', onRecall)
+  }, [block.id])
+
+  // Shared modal markup so both modal mode and inline-recall re-show the same UI.
+  const modalMarkup = modalOpen && (
+    <div role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
+      style={{ position:'fixed', inset:0, background:'rgba(4,44,83,0.75)',
+               zIndex:2000, display:'flex', alignItems:'center',
+               justifyContent:'center', padding:24 }}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
+        style={{ background:'#fff', borderRadius:8, maxWidth:480, width:'100%',
+                 overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.4)' }}>
+        <div style={{ background:cfg.headerBg, padding:'14px 18px', display:'flex',
+                      alignItems:'center', gap:12, borderBottom:`3px solid ${cfg.border}` }}>
+          <span style={{ fontSize:28 }} aria-hidden="true">
+            {type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}
+          </span>
+          <div>
+            <div style={{ fontFamily:'monospace', fontSize:9, fontWeight:700,
+                           color:cfg.tagBg, letterSpacing:'0.12em', marginBottom:3 }}>{cfg.tag}</div>
+            <div id={modalId} style={{ fontSize:15, fontWeight:700, color:cfg.tagBg }}>
+              {block.data.title || cfg.tag}
+            </div>
+          </div>
+          <button onClick={closeModal} aria-label="Close"
+            style={{ marginLeft:'auto', background:'none', border:'none',
+                     color:cfg.tagBg, fontSize:20, cursor:'default', padding:4, lineHeight:1 }}>✕</button>
+        </div>
+        <div style={{ padding:'16px 18px', fontSize:13, lineHeight:1.65, color:'#1a1a1a' }}>
+          {block.data.text}
+        </div>
+        <div style={{ padding:'12px 18px', borderTop:'1px solid #eee',
+                      display:'flex', justifyContent:'flex-end', background:'#f8f8f8' }}>
+          <button onClick={block.data.modal ? acknowledge : closeModal}
+            aria-label={block.data.modal ? `${ackLabel} — closes dialog` : 'Close dialog'}
+            style={{ padding:'8px 20px', background:cfg.tagBg, color:'#fff',
+                     border:'none', borderRadius:4, fontSize:13, fontWeight:600,
+                     cursor:'default', fontFamily:'inherit' }}>
+            {block.data.modal ? `✓ ${ackLabel}` : 'Close'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   // ── Inline mode ──────────────────────────────────────────────
   if (!block.data.modal) {
     return (
+      <>
       <div role="note"
         aria-label={`${cfg.tag}${block.data.title ? ': ' + block.data.title : ''}`}
         style={{ display:'flex', border:`1px solid ${cfg.border}`, borderLeft:`4px solid ${cfg.border}`,
@@ -1301,6 +1356,8 @@ function PreviewWCN({ block }) {
           )}
         </div>
       </div>
+      {modalMarkup}
+      </>
     )
   }
 
@@ -1321,46 +1378,45 @@ function PreviewWCN({ block }) {
         <span style={{ fontSize:11, color:'#4CAF50', marginLeft:10 }}>✓ Acknowledged</span>
       )}
 
-      {modalOpen && (
-        <div role="presentation"
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
-          style={{ position:'fixed', inset:0, background:'rgba(4,44,83,0.75)',
-                   zIndex:2000, display:'flex', alignItems:'center',
-                   justifyContent:'center', padding:24 }}>
-          <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
-            style={{ background:'#fff', borderRadius:8, maxWidth:480, width:'100%',
-                     overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.4)' }}>
-            <div style={{ background:cfg.headerBg, padding:'14px 18px', display:'flex',
-                          alignItems:'center', gap:12, borderBottom:`3px solid ${cfg.border}` }}>
-              <span style={{ fontSize:28 }} aria-hidden="true">
-                {type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}
-              </span>
-              <div>
-                <div style={{ fontFamily:'monospace', fontSize:9, fontWeight:700,
-                               color:cfg.tagBg, letterSpacing:'0.12em', marginBottom:3 }}>{cfg.tag}</div>
-                <div id={modalId} style={{ fontSize:15, fontWeight:700, color:cfg.tagBg }}>
-                  {block.data.title || cfg.tag}
-                </div>
-              </div>
-              <button onClick={closeModal} aria-label="Close"
-                style={{ marginLeft:'auto', background:'none', border:'none',
-                         color:cfg.tagBg, fontSize:20, cursor:'default', padding:4, lineHeight:1 }}>✕</button>
-            </div>
-            <div style={{ padding:'16px 18px', fontSize:13, lineHeight:1.65, color:'#1a1a1a' }}>
-              {block.data.text}
-            </div>
-            <div style={{ padding:'12px 18px', borderTop:'1px solid #eee',
-                          display:'flex', justifyContent:'flex-end', background:'#f8f8f8' }}>
-              <button onClick={acknowledge} aria-label={`${ackLabel} — closes dialog`}
-                style={{ padding:'8px 20px', background:cfg.tagBg, color:'#fff',
-                         border:'none', borderRadius:4, fontSize:13, fontWeight:600,
-                         cursor:'default', fontFamily:'inherit' }}>
-                ✓ {ackLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {modalMarkup}
+    </div>
+  )
+}
+
+// WCN recall bar — the in-canvas mirror of scorm12._wcn_recall_bar. One small
+// color-coded icon button per WCN block on the frame (in block order), pinned to
+// the content area's lower-left. Clicking dispatches 'cf-wcn-recall' with the
+// block id; the matching PreviewWCN re-opens its modal (no second modal).
+const WCN_RECALL = {
+  warning: { color:'#D0342C', shape:<polygon points="12,2 23,22 1,22" fill="#D0342C" /> },
+  caution: { color:'#eed202', shape:<polygon points="12,1 23,12 12,23 1,12" fill="#eed202" /> },
+  note:    { color:'#2E62D8', shape:<><circle cx="12" cy="12" r="11" fill="#2E62D8" /><text x="12" y="17" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="14" fill="#fff">i</text></> },
+}
+function WCNRecallBar({ wcnBlocks }) {
+  if (!wcnBlocks.length) return null
+  return (
+    <div role="group" aria-label="Re-open warnings, cautions and notes"
+      style={{ position:'absolute', left:16, bottom:64, zIndex:40,
+               display:'flex', flexWrap:'wrap', gap:8 }}>
+      {wcnBlocks.map(b => {
+        const t = b.data.wcn_type === 'warning' || b.data.wcn_type === 'caution' ? b.data.wcn_type : 'note'
+        const cfg = WCN_RECALL[t]
+        const tag = t.toUpperCase()
+        const label = `Re-open ${tag}${b.data.title ? ': ' + b.data.title : ''}`
+        return (
+          <button key={b.id} type="button" title={label} aria-label={label}
+            aria-haspopup="dialog"
+            onClick={() => window.dispatchEvent(new CustomEvent('cf-wcn-recall', { detail: b.id }))}
+            style={{ display:'inline-flex', alignItems:'center', justifyContent:'center',
+                     gap:5, padding:'4px 9px', borderRadius:5, border:`1px solid ${cfg.color}`,
+                     background:'#fff', color:'#1a1a1a', cursor:'pointer', fontFamily:'inherit',
+                     fontSize:10, fontWeight:700, letterSpacing:'0.04em', lineHeight:1,
+                     boxShadow:'0 1px 3px rgba(0,0,0,0.18)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">{cfg.shape}</svg>
+            <span>{tag}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
