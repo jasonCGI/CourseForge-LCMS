@@ -7,6 +7,7 @@ Produces a ZIP file containing:
 """
 
 import os
+import re
 import uuid
 import zipfile
 import json
@@ -15,6 +16,74 @@ from pathlib import Path
 from datetime import datetime
 from functools import lru_cache
 from flask import current_app, render_template
+from markupsafe import escape as _mk_escape
+
+# ── Stored-XSS hardening (security review C4) ────────────────────────────────
+# User-authored block fields are interpolated into generated SCO/preview HTML and
+# into inline on*= handlers. Everything below escapes those values at the point of
+# interpolation. Plain-text fields go through esc(); the one RICH-HTML field (text
+# block body) is run through a bleach allowlist so intended formatting survives
+# while scripts / event handlers / javascript: URLs are stripped.
+try:
+    import bleach
+    _HAVE_BLEACH = True
+except ImportError:                       # pragma: no cover - bleach is a hard dep
+    _HAVE_BLEACH = False
+
+# Allowlist for author rich text. Mirrors the editor's formatting toolbar:
+# block/inline text, lists, links, headings, quotes, code. No script/style, no
+# event-handler attributes, and href is URL-scheme filtered (no javascript:).
+_RICH_TAGS = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'a',
+              'h1', 'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'span']
+_RICH_ATTRS = {'a': ['href', 'title', 'target', 'rel']}
+_RICH_PROTOCOLS = ['http', 'https', 'mailto', 'tel']
+
+# Conservative fallback if bleach is unavailable: strip <script>/<style> blocks
+# and any on*= handlers, neutralize javascript: URLs, then keep the rest.
+_FALLBACK_SCRIPT_RE = re.compile(r'(?is)<\s*(script|style)\b.*?<\s*/\s*\1\s*>')
+_FALLBACK_ON_RE = re.compile(r'(?is)\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)')
+_FALLBACK_JSURL_RE = re.compile(r'(?i)(href|src)\s*=\s*(["\']?)\s*javascript:[^"\'>\s]*\2')
+
+
+def esc(value):
+    """HTML-escape an arbitrary user value for safe interpolation into markup or
+    an attribute / on*= string. Coerces to str first so None/ints don't blow up."""
+    return str(_mk_escape('' if value is None else value))
+
+
+def _sanitize_rich_html(html):
+    """Allowlist-sanitize author rich text (the text block body) so intended
+    formatting survives but scripts / event handlers / javascript: URLs cannot."""
+    s = '' if html is None else str(html)
+    if _HAVE_BLEACH:
+        return bleach.clean(s, tags=_RICH_TAGS, attributes=_RICH_ATTRS,
+                            protocols=_RICH_PROTOCOLS, strip=True)
+    # Hand-rolled fallback (bleach missing): drop script/style, on*= handlers and
+    # javascript: URLs. Less robust than bleach but blocks the obvious vectors.
+    s = _FALLBACK_SCRIPT_RE.sub('', s)
+    s = _FALLBACK_ON_RE.sub('', s)
+    s = _FALLBACK_JSURL_RE.sub(r'\1=\2#\2', s)
+    return s
+
+
+def _safe_id(value):
+    """Validate a frame id / filename token used in navigation. Returns the value
+    only if it matches the expected [\\w-]+ shape, else '' (so a malformed/hostile
+    value can't break out of the onclick string)."""
+    s = '' if value is None else str(value)
+    return s if re.fullmatch(r'[\w-]+', s) else ''
+
+
+def _f(value, default=0.0):
+    """Coerce a user dimension to float (so a string can't break out of a style
+    attribute). Non-numeric / NaN / inf -> default."""
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if n != n or n in (float('inf'), float('-inf')):
+        return float(default)
+    return n
 
 from ..models.project import Project, Frame, project_full_query
 
@@ -48,7 +117,7 @@ def _cf_audio_bar(src, caption='', dock='inline', bid=None):
                       container (position:absolute; the container is relative).
     """
     bid = bid or uuid.uuid4().hex[:8]
-    cap = (f'<div style="font-size:12px;color:#888;margin-top:6px">{caption}</div>'
+    cap = (f'<div style="font-size:12px;color:#888;margin-top:6px">{esc(caption)}</div>'
            if caption and dock != 'bottom' else '')
     docked = dock == 'bottom'
     # Outer wrapper: inline flows; bottom pins to the bottom of the nearest
@@ -67,7 +136,7 @@ def _cf_audio_bar(src, caption='', dock='inline', bid=None):
         f'padding:0 12px;box-sizing:border-box;'
         f'background:{CF_AUDIO_NAVY};color:#E8EEF6;'
         f"font-family:'IBM Plex Mono',ui-monospace,monospace;\">"
-        f'<audio data-cf-src preload="metadata" src="{src}"></audio>'
+        f'<audio data-cf-src preload="metadata" src="{esc(src)}"></audio>'
         f'<button type="button" data-cf-play aria-label="Play" '
         f'style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;'
         f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
@@ -493,22 +562,24 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             continue
 
         if btype == 'text':
-            html = f'<div class="cf-text">{data.get("body","")}</div>'
+            # body is author RICH HTML -> allowlist-sanitize (keep formatting,
+            # strip script/handlers); narrator_script is plain text -> escape.
+            html = f'<div class="cf-text">{_sanitize_rich_html(data.get("body",""))}</div>'
             if data.get('narrator_script'):
-                html += f'<div class="cf-narration">🎙 {data["narrator_script"]}</div>'
+                html += f'<div class="cf-narration">🎙 {esc(data["narrator_script"])}</div>'
             parts.append(html)
 
         elif (preview and btype == 'media' and data.get('kind') == 'video'
               and (data.get('serve_url') or data.get('video_serve_url') or data.get('asset_id'))):
             # Live preview: resolve via serve_url like the React renderer so a
             # video carrying only serve_url (no asset_id) still plays.
-            src      = (data.get('serve_url') or data.get('video_serve_url')
+            src      = esc(data.get('serve_url') or data.get('video_serve_url')
                         or f"/api/media/serve/{data['asset_id']}")
-            title    = data.get('original_name', 'Video')
-            caption  = data.get('caption', '')
+            title    = esc(data.get('original_name', 'Video'))
+            caption  = esc(data.get('caption', ''))
             is_cover = data.get('fit') == 'cover'
             poster   = data.get('poster_url')
-            poster_attr = f'poster="{poster}"' if poster else ''
+            poster_attr = f'poster="{esc(poster)}"' if poster else ''
             if is_cover:
                 # Cover video: fills its content box (object-fit:cover, no
                 # rounding/letterbox), plays seamlessly (muted/loop/autoplay/
@@ -546,6 +617,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
               and (data.get('serve_url') or data.get('asset_id'))):
             src   = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
             dock  = data.get('dock', 'inline')
+            # caption is escaped inside _cf_audio_bar; src is escaped there too.
             wrap  = '' if dock == 'bottom' else 'margin-bottom:20px'
             parts.append(
                 f'<div style="{wrap}">'
@@ -559,14 +631,17 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             webm_id    = companions.get('webm_asset_id')
             vtt_id     = companions.get('vtt_asset_id')
             poster_id  = companions.get('poster_asset_id')
-            title      = data.get('original_name', 'Video')
-            caption    = data.get('caption', '')
+            title      = esc(data.get('original_name', 'Video'))
+            caption    = esc(data.get('caption', ''))
             is_cover   = data.get('fit') == 'cover'
 
+            # asset ids become part of <source>/<track>/poster src attributes and
+            # the player element id -> validate to id tokens so they can't break out.
+            asset_id   = _safe_id(asset_id)
             mp4_src    = f'media/video/{asset_id}.mp4'
-            webm_src   = f'media/video/{webm_id}.webm'   if webm_id   else None
-            vtt_src    = f'media/captions/{vtt_id}.vtt'   if vtt_id    else None
-            poster_src = f'media/images/{poster_id}.jpg'  if poster_id else None
+            webm_src   = f'media/video/{_safe_id(webm_id)}.webm'   if webm_id   else None
+            vtt_src    = f'media/captions/{_safe_id(vtt_id)}.vtt'   if vtt_id    else None
+            poster_src = f'media/images/{_safe_id(poster_id)}.jpg'  if poster_id else None
 
             sources = ''
             if webm_src:
@@ -624,10 +699,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             # whose serve_url is set but asset_id isn't (fresh upload / demo
             # placeholder) still shows instead of dropping to a placeholder card.
             # Image comes in as-is: square, no rounding (matches the publish look).
-            src      = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
+            src      = esc(data.get('serve_url') or f"/api/media/serve/{data['asset_id']}")
             name     = data.get('original_name') or ''
-            alt      = data.get('alt_text') or data.get('placeholder_label') or name or 'Image'
-            caption  = data.get('caption', '')
+            alt      = esc(data.get('alt_text') or data.get('placeholder_label') or name or 'Image')
+            caption  = esc(data.get('caption', ''))
             is_cover = data.get('fit') == 'cover'
             if caption and is_cover:
                 # Cover image WITH a caption: the caption is an overlay pinned to
@@ -657,10 +732,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             asset_id = data['asset_id']
             name     = data.get('original_name') or ''
             ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'jpg'
-            alt      = data.get('placeholder_label') or name or 'Image'
-            caption  = data.get('caption', '')
+            if not re.fullmatch(r'[a-z0-9]+', ext):
+                ext = 'jpg'
+            alt      = esc(data.get('placeholder_label') or name or 'Image')
+            caption  = esc(data.get('caption', ''))
             is_cover = data.get('fit') == 'cover'
-            img_src  = f'media/images/{asset_id}.{ext}'
+            img_src  = f'media/images/{_safe_id(asset_id)}.{ext}'
             if caption and is_cover:
                 # Cover image WITH a caption: overlay the caption on the image over
                 # a bottom-up gradient scrim (white text, WCAG AA) instead of a
@@ -691,8 +768,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 asset_id = data['asset_id']
                 name     = data.get('original_name') or ''
                 ext      = name.rsplit('.', 1)[-1].lower() if '.' in name else 'mp3'
-                src      = f'media/audio/{asset_id}.{ext}'
+                if not re.fullmatch(r'[a-z0-9]+', ext):
+                    ext = 'mp3'
+                src      = f'media/audio/{_safe_id(asset_id)}.{ext}'
             else:
+                # serve_url is escaped at the <audio src> point inside _cf_audio_bar.
                 src = data['serve_url']
             dock = data.get('dock', 'inline')
             wrap = '' if dock == 'bottom' else 'margin-bottom:20px'
@@ -702,11 +782,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             )
 
         elif btype == 'media':
-            kind  = data.get('kind', 'image')
-            label = data.get('placeholder_label', '')
-            cap   = data.get('caption', '')
+            kind  = esc(data.get('kind', 'image'))
+            label = esc(data.get('placeholder_label', ''))
+            cap   = esc(data.get('caption', ''))
             icons = {'image':'🖼','video':'🎬','audio':'🎙','oam':'⚙'}
-            icon  = icons.get(kind, '📎')
+            icon  = icons.get(data.get('kind', 'image'), '📎')
             parts.append(
                 f'<div class="cf-media">'
                 f'{icon} [{kind}: {label}]'
@@ -715,24 +795,29 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             )
 
         elif btype == 'quiz':
+            safe_bid = esc(bid)
             choices_html = ''
             for i, choice in enumerate(data.get('choices', [])):
                 choices_html += (
                     f'<button class="cf-choice" data-index="{i}" '
-                    f'onclick="cfSelectChoice(\'{bid}\', this)">'
-                    f'{choice}</button>'
+                    f'onclick="cfSelectChoice(\'{safe_bid}\', this)">'
+                    f'{esc(choice)}</button>'
                 )
-            fb_correct   = data.get('feedback_correct',   'Correct!')
-            fb_incorrect = data.get('feedback_incorrect', 'Incorrect — please review.')
-            correct_idx  = data.get('correct_index', 0)
+            fb_correct   = esc(data.get('feedback_correct',   'Correct!'))
+            fb_incorrect = esc(data.get('feedback_incorrect', 'Incorrect — please review.'))
+            # correct_index/correct_idx -> int so it can't inject JS into onclick.
+            try:
+                correct_idx = int(data.get('correct_index', data.get('correct_idx', 0)) or 0)
+            except (TypeError, ValueError):
+                correct_idx = 0
             parts.append(
-                f'<div class="cf-quiz" id="quiz-{bid}">'
-                f'<p class="cf-quiz-question">{data.get("question","")}</p>'
+                f'<div class="cf-quiz" id="quiz-{safe_bid}">'
+                f'<p class="cf-quiz-question">{esc(data.get("question",""))}</p>'
                 f'{choices_html}'
                 f'<button class="cf-submit" '
-                f'onclick="cfSubmitQuiz(\'{bid}\', {correct_idx})">Submit</button>'
-                f'<div class="cf-feedback correct" id="feedback-{bid}">{fb_correct}</div>'
-                f'<div class="cf-feedback incorrect" id="feedback-{bid}-wrong">{fb_incorrect}</div>'
+                f'onclick="cfSubmitQuiz(\'{safe_bid}\', {correct_idx})">Submit</button>'
+                f'<div class="cf-feedback correct" id="feedback-{safe_bid}">{fb_correct}</div>'
+                f'<div class="cf-feedback incorrect" id="feedback-{safe_bid}-wrong">{fb_incorrect}</div>'
                 f'</div>'
             )
 
@@ -741,12 +826,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             for r in data.get('regions', []):
                 radius = _hotspot_radius(r.get('shape'))
                 stroke, fill = _hotspot_colors(r.get('color'))
+                # x/y/w/h -> float so a string can't break out of the style attr;
+                # label escaped; color values escaped (CSS-context defense).
+                rx = _f(r.get('x')); ry = _f(r.get('y'))
+                rw = _f(r.get('w', r.get('width'))); rh = _f(r.get('h', r.get('height')))
                 regions_html += (
                     f'<div class="cf-hotspot-region" '
-                    f'style="left:{r["x"]}%;top:{r["y"]}%;'
-                    f'width:{r["w"]}%;height:{r["h"]}%;border-radius:{radius};'
-                    f'border:2px solid {stroke};background:{fill}">'
-                    f'<span class="cf-hotspot-label">{r.get("label","")}</span>'
+                    f'style="left:{rx}%;top:{ry}%;'
+                    f'width:{rw}%;height:{rh}%;border-radius:{radius};'
+                    f'border:2px solid {esc(stroke)};background:{esc(fill)}">'
+                    f'<span class="cf-hotspot-label">{esc(r.get("label",""))}</span>'
                     f'</div>'
                 )
             parts.append(
@@ -754,13 +843,17 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             )
 
         elif btype == 'branch':
-            true_label  = data.get('true_label',  'Yes')
-            false_label = data.get('false_label', 'No')
-            true_frame  = data.get('true_frame_id',  '')
-            false_frame = data.get('false_frame_id', '')
+            true_label  = esc(data.get('true_label',  'Yes'))
+            false_label = esc(data.get('false_label', 'No'))
+            # Frame targets become a filename in window.location.href — validate
+            # they're plain id tokens ([\w-]+) and blank anything else, so a hostile
+            # value can't break out of the onclick string. (true_frame / false_frame
+            # are the legacy keys; *_frame_id the current ones.)
+            true_frame  = _safe_id(data.get('true_frame_id',  data.get('true_frame',  '')))
+            false_frame = _safe_id(data.get('false_frame_id', data.get('false_frame', '')))
             parts.append(
                 f'<div class="cf-branch">'
-                f'<p class="cf-branch-condition">{data.get("condition","")}</p>'
+                f'<p class="cf-branch-condition">{esc(data.get("condition",""))}</p>'
                 f'<div class="cf-branch-btns">'
                 f'<button class="cf-branch-btn true" '
                 f'onclick="window.location.href=\'{true_frame}.html\'">'
@@ -772,12 +865,17 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             )
 
         elif btype == 'wcn':
+            # wcn_type keys the color/icon maps and becomes the visible tag; clamp
+            # it to the known set so it can't carry markup. title/text/ack_label are
+            # plain user text -> escape everywhere they enter markup, attrs, onclick.
             wcn_type  = data.get('wcn_type', 'note')
-            title     = data.get('title', '')
-            text      = data.get('text', '')
+            if wcn_type not in ('warning', 'caution', 'note'):
+                wcn_type = 'note'
+            title     = esc(data.get('title', ''))
+            text      = esc(data.get('text', ''))
             modal     = data.get('modal', False)
-            ack_label = data.get('ack_label', 'I understand — proceed')
-            block_id  = block.get('id', str(uuid.uuid4()))[:8]
+            ack_label = esc(data.get('ack_label', 'I understand — proceed'))
+            block_id  = _safe_id(block.get('id', str(uuid.uuid4()))[:8]) or uuid.uuid4().hex[:8]
             modal_id   = f'wcn-modal-{block_id}'
             trigger_id = f'wcn-trigger-{block_id}'
             ack_btn_id = f'wcn-ack-{block_id}'
@@ -902,8 +1000,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 parts.append('<div class="cf-media">&#9881; [OAM — no animation linked]</div>')
             else:
                 # OAM files are bundled at oam/{asset_id}/{entry}; the media bar
-                # drives the animation via the oam:* postMessage protocol.
-                src = f"oam/{asset_id}/{entry}"
+                # drives the animation via the oam:* postMessage protocol. asset_id
+                # is validated to an id token and entry is restricted to a relative
+                # path of id-ish segments (no quotes/spaces) so neither can break out
+                # of the iframe src="" attribute it's spliced into.
+                safe_entry = entry if re.fullmatch(r'[\w./-]+', str(entry)) else 'index.html'
+                src = esc(f"oam/{_safe_id(asset_id)}/{safe_entry}")
                 # Ordered prompt list (by stop index) + final-frame fallback. The
                 # OAM carries no text — CourseForge owns it. '</' escaped so a
                 # prompt can't close the player's <script>.
@@ -922,7 +1024,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             video_id = data.get('video_asset_id', '')
             clip_id  = data.get('clip_asset_id', '')
             caption  = data.get('caption', '')
-            block_id = bid[:8]
+            block_id = _safe_id(bid[:8]) or uuid.uuid4().hex[:8]
 
             if not video_id:
                 parts.append('<div class="cf-media">▶⊕ [Interactive Video — no video linked]</div>')
@@ -931,7 +1033,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 v_asset = _get_asset(video_id, asset_map)
                 if v_asset and v_asset.original_name and '.' in v_asset.original_name:
                     vext = v_asset.original_name.rsplit('.', 1)[-1].lower()
-                video_src = f'media/video/{video_id}.{vext}'
+                if not re.fullmatch(r'[a-z0-9]+', vext):
+                    vext = 'mp4'
+                # video_id / vext become part of a <source src> and a video/<ext>
+                # type -> validate so neither can break out of the attribute.
+                video_src = f'media/video/{_safe_id(video_id)}.{vext}'
 
                 # Inline the clip interactions — robust across LMS that block fetch()
                 clip_json = '{"interactions":[]}'
@@ -960,11 +1066,17 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif btype == 'model3d':
             model_id = data.get('model_asset_id', '')
-            caption  = data.get('caption', '')
+            caption  = esc(data.get('caption', ''))
             attribution = data.get('attribution', '')
-            height   = (data.get('bounds') or {}).get('height') or data.get('viewer_height', 400)
+            # height feeds both CSS (height:{height}px) and JS (a bare number arg)
+            # -> coerce to int so a string can't break out of either context.
+            height   = _int_dim((data.get('bounds') or {}).get('height') or data.get('viewer_height', 400), 400)
+            # bg_color feeds CSS and a JS string literal -> validate it's a hex/
+            # rgb()/named color shape; anything else falls back to the dark default.
             bg_color = data.get('bg_color') or '#0d1017'   # null (unseeded inherit) -> classic dark
-            block_id = bid[:8]
+            if not re.fullmatch(r'#[0-9a-fA-F]{3,8}|rgba?\([\d.,\s%]+\)|[a-zA-Z]+', str(bg_color)):
+                bg_color = '#0d1017'
+            block_id = _safe_id(bid[:8]) or uuid.uuid4().hex[:8]
             annotations = data.get('annotations', [])
             decorative = bool(data.get('decorative'))
             ann_json = json.dumps(annotations).replace('</', '<\\/')
@@ -996,7 +1108,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 m_asset = _get_asset(model_id, asset_map)
                 if m_asset and m_asset.stored_path:
                     m_ext = Path(m_asset.stored_path).suffix.lower()
-                model_src = f'media/models/{model_id}{m_ext}'
+                # model_id becomes part of a JS string literal ('{model_src}')
+                # -> validate it's an id token so it can't break out of the string.
+                model_src = f'media/models/{_safe_id(model_id)}{m_ext}'
                 cap_html = f'<p style="font-size:12px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
                 aria = caption or '3D model viewer — use arrow keys to rotate, plus/minus to zoom, R to reset'
                 # Decorative models are hidden from assistive tech (508/WCAG 1.1.1 —
