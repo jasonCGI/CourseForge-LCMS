@@ -65,6 +65,22 @@ def _menu_resolver_for(project):
     return resolve
 
 
+def _branch_resolver_for(project):
+    """A branch-block target resolver for the live preview: frame id -> that
+    frame's /api/frames/<id>/preview-html URL (mirrors the menu resolver, but the
+    branch target is already a frame id). Unknown id -> None (disabled button)."""
+    if not project:
+        return lambda _fid: None
+    index = build_frame_index(project)
+    frames = index.get("frames", {})
+
+    def resolve(target_frame_id):
+        return (f"/api/frames/{target_frame_id}/preview-html"
+                if target_frame_id and target_frame_id in frames else None)
+
+    return resolve
+
+
 def _project_for_frame(frame):
     """Walk Frame -> Lesson -> Module -> Course -> Project (any link may be missing)."""
     lesson = getattr(frame, "lesson", None)
@@ -287,6 +303,7 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         hotspot_cfg=_project_hotspot_cfg(project),
         preview=True,
         menu_resolve=_menu_resolver_for(project),
+        branch_resolve=_branch_resolver_for(project),
     )
     if not html:
         return None
@@ -348,7 +365,8 @@ def build_frame_preview_html(frame) -> str:
         layout = (frame.content or {}).get("layout") if isinstance(frame.content, dict) else None
         blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False,
                                                           hotspot_cfg=_project_hotspot_cfg(project),
-                                                          preview=True, layout=layout))
+                                                          preview=True, layout=layout,
+                                                          branch_resolve=_branch_resolver_for(project)))
 
     try:
         theme_css = tokens_to_css(resolve_theme(project)) if project else ""

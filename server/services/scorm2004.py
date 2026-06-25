@@ -29,13 +29,16 @@ from ..version import VERSION
 def build_frame_html_2004(frame, lesson, frame_index,
                            total_frames, frame_map,
                            theme_css, scorm_bridge=False,
-                           disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None):
+                           disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None,
+                           branch_resolve=None):
     """Render a single SCO HTML page using SCORM 2004 API.
 
     Visible counter + progress use disp_index/disp_total (required frames only,
     excluding optional); navigation uses the real frame_index/total_frames.
+    branch_resolve: frame id -> '<frame>.html' for branch-block navigation.
     """
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg,
+                                 branch_resolve=branch_resolve)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -80,7 +83,8 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
     org_id      = f"org_{manifest_id}"
 
     # ── Build frame map ───────────────────────────────────────
-    frame_map  = {}
+    frame_map         = {}
+    frame_id_to_fname = {}
     items      = []
     resources  = []
 
@@ -88,6 +92,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
         fname  = f"frame_{idx:04d}_{frame.id[:8]}.html"
         res_id = f"res_{idx:04d}"
         frame_map[idx] = fname
+        frame_id_to_fname[frame.id] = fname
         items.append({
             'item_id': f"item_{idx:04d}",
             'res_id':  res_id,
@@ -144,6 +149,10 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
         project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
         asset_by_id = {a.id: a for a in project_assets}
 
+        # Branch-block target resolver: frame id -> published '<frame>.html'.
+        def branch_resolve(target_frame_id):
+            return frame_id_to_fname.get(target_frame_id) if target_frame_id else None
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
             html  = build_frame_html_2004(
@@ -158,6 +167,7 @@ def build_scorm2004_package(project_id: str) -> tuple[BytesIO, str]:
                 disp_total=req_total,
                 asset_map=asset_by_id,
                 hotspot_cfg=hotspot_cfg,
+                branch_resolve=branch_resolve,
             )
             html = comment_prefix + html
             zf.writestr(fname, html)

@@ -1170,8 +1170,40 @@ function PreviewHotspot({ block }) {
   )
 }
 
+// In-canvas branch preview. Clicking a choice navigates to the target frame via
+// the store's loadFrame — the same mechanism MenuFramePreview uses — so branch
+// nav behaves in-canvas exactly as it does in the published SCO / live preview.
+// A target id that isn't an actual frame in the project renders disabled (no
+// dead navigation), matching the menu's unresolved-target handling.
 function PreviewBranch({ block }) {
-  const [chosen, setChosen] = useState(null)
+  const loadFrame     = useEditorStore(s => s.loadFrame)
+  const activeProject = useProjectStore(s => s.activeProject)
+
+  // Accept current (*_frame_id) and legacy (*_frame) keys, mirroring the packager.
+  const trueId  = block.data.true_frame_id  || block.data.true_frame  || ''
+  const falseId = block.data.false_frame_id || block.data.false_frame || ''
+
+  const frameExists = (id) => {
+    if (!id) return false
+    for (const course of activeProject?.courses || [])
+      for (const mod of course.modules || [])
+        for (const lesson of mod.lessons || [])
+          for (const fr of lesson.frames || [])
+            if (fr.id === id) return true
+    return false
+  }
+  const trueOk  = frameExists(trueId)
+  const falseOk = frameExists(falseId)
+
+  const btnStyle = (ok, color) => ({
+    flex: 1, padding: '12px 16px',
+    background: '#fff', color,
+    border: `2px solid ${color}`,
+    borderRadius: 6, fontSize: 14, fontWeight: 600,
+    cursor: ok ? 'pointer' : 'not-allowed',
+    opacity: ok ? 1 : 0.5, fontFamily: 'inherit',
+  })
+
   return (
     <div style={{ ...previewBlockWrap, background: '#F8F8FF', border: '1px solid #CECBF6', borderRadius: 8, padding: 20 }}>
       {block.data.condition && (
@@ -1181,42 +1213,22 @@ function PreviewBranch({ block }) {
       )}
       <div style={{ display: 'flex', gap: 12 }}>
         <button
-          onClick={() => setChosen('true')}
-          style={{
-            flex: 1, padding: '12px 16px',
-            background: chosen === 'true' ? '#3B8A4A' : '#fff',
-            color: chosen === 'true' ? '#fff' : '#3B8A4A',
-            border: '2px solid #3B8A4A',
-            borderRadius: 6, fontSize: 14, fontWeight: 600,
-            cursor: 'default', fontFamily: 'inherit',
-          }}
+          onClick={() => trueOk && loadFrame(trueId)}
+          disabled={!trueOk}
+          title={trueOk ? 'Go to target frame' : 'No target frame set'}
+          style={btnStyle(trueOk, '#3B8A4A')}
         >
           ✓ {block.data.true_label || 'Yes'}
         </button>
         <button
-          onClick={() => setChosen('false')}
-          style={{
-            flex: 1, padding: '12px 16px',
-            background: chosen === 'false' ? '#C0392B' : '#fff',
-            color: chosen === 'false' ? '#fff' : '#C0392B',
-            border: '2px solid #C0392B',
-            borderRadius: 6, fontSize: 14, fontWeight: 600,
-            cursor: 'default', fontFamily: 'inherit',
-          }}
+          onClick={() => falseOk && loadFrame(falseId)}
+          disabled={!falseOk}
+          title={falseOk ? 'Go to target frame' : 'No target frame set'}
+          style={btnStyle(falseOk, '#C0392B')}
         >
           ✕ {block.data.false_label || 'No'}
         </button>
       </div>
-      {chosen && (
-        <p style={{ marginTop: 12, fontSize: 12, color: '#666' }}>
-          → Would navigate to:{' '}
-          <strong>
-            {chosen === 'true'
-              ? (block.data.true_frame_id  || 'no frame set')
-              : (block.data.false_frame_id || 'no frame set')}
-          </strong>
-        </p>
-      )}
     </div>
   )
 }

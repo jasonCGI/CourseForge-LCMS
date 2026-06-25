@@ -205,7 +205,7 @@ def _cf_audio_script():
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
                      disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None,
-                     menu_resolve=None):
+                     menu_resolve=None, branch_resolve=None):
     """Render a single SCO HTML page for one frame.
 
     The visible counter + progress bar use disp_index/disp_total (required
@@ -214,6 +214,8 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
 
     menu_resolve: for a menu frame (frame_type == 'menu'), a callable
     item -> '<frame>.html' used to render the nav buttons instead of blocks.
+    branch_resolve: for a branch block, a callable frame_id -> '<frame>.html'
+    used to wire its true/false navigation to the real published filename.
     """
 
     from .menu_frame import is_menu_frame, get_menu, render_menu_html
@@ -221,7 +223,7 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
         blocks_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None))
     else:
         blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg,
-                                     layout=frame.content.get('layout'))
+                                     layout=frame.content.get('layout'), branch_resolve=branch_resolve)
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -515,8 +517,13 @@ def _hotspot_radius(shape):
 
 
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
-                   preview=False, layout=None):
+                   preview=False, layout=None, branch_resolve=None):
     """Convert block list to HTML string.
+
+    branch_resolve: for a branch block, a callable frame_id -> href (the real
+    published '<frame>.html' in the SCO, or '/api/frames/<id>/preview-html' in
+    the live preview), mirroring the menu's resolver. Returns None for an
+    unresolvable target, which renders that button disabled (no broken link).
 
     shelled: True when injecting into a GUI shell's #fgui-content (positioned
     content area). Blocks with custom `bounds` are then wrapped as absolute boxes
@@ -904,22 +911,41 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         elif btype == 'branch':
             true_label  = esc(data.get('true_label',  'Yes'))
             false_label = esc(data.get('false_label', 'No'))
-            # Frame targets become a filename in window.location.href — validate
-            # they're plain id tokens ([\w-]+) and blank anything else, so a hostile
-            # value can't break out of the onclick string. (true_frame / false_frame
-            # are the legacy keys; *_frame_id the current ones.)
+            # Frame targets are stored as frame ids — validate they're plain id
+            # tokens ([\w-]+) and blank anything else, so a hostile value can't
+            # break out of the onclick string. (true_frame / false_frame are the
+            # legacy keys; *_frame_id the current ones.)
             true_frame  = _safe_id(data.get('true_frame_id',  data.get('true_frame',  '')))
             false_frame = _safe_id(data.get('false_frame_id', data.get('false_frame', '')))
+
+            # Resolve each target id -> the real published filename (SCO) or the
+            # /api/frames/<id>/preview-html URL (preview), exactly like the menu.
+            # No resolver (or an unresolvable target) -> disabled button rather
+            # than a broken '<id>.html' link.
+            resolve = branch_resolve or (lambda _fid: None)
+
+            def _branch_btn(cls, frame_id, icon, label):
+                href = resolve(frame_id) if frame_id else None
+                if href:
+                    # href is a server-built filename / API path (never raw user
+                    # text); esc() keeps the JS string literal intact.
+                    return (
+                        f'<button class="cf-branch-btn {cls}" '
+                        f'onclick="window.location.href=\'{esc(href)}\'">'
+                        f'{icon} {label}</button>'
+                    )
+                return (
+                    f'<button class="cf-branch-btn {cls}" disabled '
+                    f'aria-disabled="true" title="No target set">'
+                    f'{icon} {label}</button>'
+                )
+
             parts.append(
                 f'<div class="cf-branch">'
                 f'<p class="cf-branch-condition">{esc(data.get("condition",""))}</p>'
                 f'<div class="cf-branch-btns">'
-                f'<button class="cf-branch-btn true" '
-                f'onclick="window.location.href=\'{true_frame}.html\'">'
-                f'✓ {true_label}</button>'
-                f'<button class="cf-branch-btn false" '
-                f'onclick="window.location.href=\'{false_frame}.html\'">'
-                f'✕ {false_label}</button>'
+                f'{_branch_btn("true", true_frame, "✓", true_label)}'
+                f'{_branch_btn("false", false_frame, "✕", false_label)}'
                 f'</div></div>'
             )
 
@@ -1751,7 +1777,7 @@ def _wcn_recall_bar(entries):
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
                      frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None,
-                     hotspot_cfg=None, menu_resolve=None):
+                     hotspot_cfg=None, menu_resolve=None, branch_resolve=None):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -1790,7 +1816,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     else:
         injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
                                         if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
-                                       layout=(frame.content or {}).get('layout'))
+                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1799,7 +1825,8 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
                                section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                               asset_map=None, hotspot_cfg=None, preview=False, menu_resolve=None):
+                               asset_map=None, hotspot_cfg=None, preview=False, menu_resolve=None,
+                               branch_resolve=None):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected).
 
     preview: forwarded to _render_blocks so the live shell preview resolves media
@@ -1817,7 +1844,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
     else:
         injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
                                        hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
-                                       layout=(frame.content or {}).get('layout'))
+                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -2131,6 +2158,12 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             tfid = resolve_target_frame_id(item, _menu_index)
             return frame_id_to_fname.get(tfid) if tfid else None
 
+        # Branch-block target resolver: frame id -> published '<frame>.html'.
+        # Targets are already frame ids, so this is a direct map lookup (no
+        # topic-target indirection like the menu). Unknown id -> None (disabled).
+        def branch_resolve(target_frame_id):
+            return frame_id_to_fname.get(target_frame_id) if target_frame_id else None
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
 
@@ -2139,7 +2172,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
-                    menu_resolve=menu_resolve,
+                    menu_resolve=menu_resolve, branch_resolve=branch_resolve,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
@@ -2153,7 +2186,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 ph, sid = _build_project_shell_frame(
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
-                    menu_resolve=menu_resolve,
+                    menu_resolve=menu_resolve, branch_resolve=branch_resolve,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)
@@ -2173,6 +2206,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 asset_map=asset_by_id,
                 hotspot_cfg=hotspot_cfg,
                 menu_resolve=menu_resolve,
+                branch_resolve=branch_resolve,
             )
             zf.writestr(fname, comment + html)
 
