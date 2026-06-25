@@ -1,5 +1,5 @@
 import React from 'react'
-import useEditorStore from '../../store/editorStore'
+import useEditorStore, { PRIMARY_TYPES, MEDIA_TYPES, resolveExclusivity } from '../../store/editorStore'
 import { BLOCK_ICONS } from '../icons'
 
 // `Icon` is the Iconoir (iconoir-react) component for each block type; see
@@ -23,10 +23,14 @@ export default function BlockToolbar() {
 
   if (!activeFrame) return null
 
-  // One text block per frame (locked spec): once a text block exists, the Text
-  // option is disabled. Layout reflow assumes a single text zone, and text overlays
-  // on media are a future, separate block type — not a second text block here.
-  const hasText = (activeFrame.content?.blocks || []).some(b => b.type === 'text')
+  // Layout-aware content-type exclusivity. The frame's content.layout caps how
+  // many zone-fillers fit: 'full' = ONE total (any zone-filler blocks both groups),
+  // split layouts = one PRIMARY (text/quiz) + one MEDIA (media/model3d/oam/ivideo).
+  // Auxiliary types (wcn/hotspot/branch/audio) stay always-addable. Mirrors the
+  // store guard in addBlock (resolveExclusivity / isBlockTypeBlocked).
+  const ex = resolveExclusivity(activeFrame)
+  const primaryReason = ex.reason || ex.primaryReason
+  const mediaReason   = ex.reason || ex.mediaReason
 
   return (
     <div style={{
@@ -48,11 +52,16 @@ export default function BlockToolbar() {
         Add block
       </span>
       {BLOCK_TYPES.map(({ type, label, Icon, color, available }) => {
-        // Text is single-per-frame: disable once one exists.
-        const textBlocked = type === 'text' && hasText
-        const enabled = available && !textBlocked
-        const title = textBlocked
-          ? 'Only one text block per frame'
+        // Disable the PRIMARY group (text/quiz) or MEDIA group (media/model3d/oam/
+        // ivideo) per the layout-resolved exclusivity. Auxiliary types are never
+        // blocked here.
+        const isPrimary = PRIMARY_TYPES.includes(type)
+        const isMedia   = MEDIA_TYPES.includes(type)
+        const exclusivityBlocked =
+          (isPrimary && ex.primaryBlocked) || (isMedia && ex.mediaBlocked)
+        const enabled = available && !exclusivityBlocked
+        const title = exclusivityBlocked
+          ? (isPrimary ? primaryReason : mediaReason)
           : available ? `Add ${label} block` : `${label} — available in Sprint 4`
         return (
           <button

@@ -19,6 +19,66 @@ function _readDockDefault() {
   } catch { return 'bottom' }
 }
 
+// ── Layout-aware content-type exclusivity ────────────────────────────────
+// A frame's content.layout decides how many zone-fillers fit:
+//   'full'                  → ONE zone-filler total (text/quiz OR media share it)
+//   'text-left'/'text-right'→ one PRIMARY (text/quiz) + one MEDIA, side by side
+// PRIMARY  = text-zone fillers, mutually exclusive: text, quiz
+// MEDIA    = media-zone fillers, mutually exclusive: media(image/video), model3d, oam, ivideo
+// AUXILIARY (never blocked): wcn, hotspot, branch, audio (media w/ kind==='audio'),
+//   gui, and anything else.
+// Audio is a `media` block with data.kind==='audio' that docks as a bar (not a
+// zone filler), so an existing audio media must NOT count as a MEDIA zone-filler.
+export const PRIMARY_TYPES = ['text', 'quiz']
+export const MEDIA_TYPES   = ['media', 'model3d', 'oam', 'ivideo']
+
+// Is THIS existing block a zone-filling media? (audio-kind media docks as a bar,
+// so it doesn't occupy the media zone and is treated as auxiliary.)
+export function isZoneMedia(block) {
+  if (!block) return false
+  if (block.type === 'media') return (block.data?.kind || 'image') !== 'audio'
+  return MEDIA_TYPES.includes(block.type)
+}
+
+// Resolve which add-block category, if any, a frame can no longer accept. Returns
+// { primaryBlocked, mediaBlocked, reason } given the frame's blocks + layout. The
+// palette uses this to disable buttons (with `reason` as the tooltip) and the store
+// mirrors it as a defense-in-depth guard.
+export function resolveExclusivity(frame) {
+  const blocks = frame?.content?.blocks || []
+  // Default 'text-left' matches the renderer default (FramePreview/scorm12).
+  const layout = frame?.content?.layout || 'text-left'
+  const hasPrimary = blocks.some(b => PRIMARY_TYPES.includes(b.type))
+  const hasMedia   = blocks.some(b => isZoneMedia(b))
+
+  if (layout === 'full') {
+    // One zone-filler total: any existing zone-filler blocks BOTH groups.
+    const taken = hasPrimary || hasMedia
+    return {
+      primaryBlocked: taken,
+      mediaBlocked: taken,
+      reason: 'One content element per Full-layout frame',
+    }
+  }
+  // Split layouts: one PRIMARY + one MEDIA, each half independent.
+  return {
+    primaryBlocked: hasPrimary,
+    mediaBlocked: hasMedia,
+    primaryReason: 'Only one text/quiz block per frame',
+    mediaReason: 'One media block per frame',
+  }
+}
+
+// Would adding `type` violate the active frame's exclusivity? Used as the store-
+// level guard. AUXILIARY types are always allowed. A new `media` add from the
+// palette is always a zone-filler (defaults to kind:'image'), so it's MEDIA here.
+export function isBlockTypeBlocked(frame, type) {
+  const ex = resolveExclusivity(frame)
+  if (PRIMARY_TYPES.includes(type)) return ex.primaryBlocked
+  if (MEDIA_TYPES.includes(type))   return ex.mediaBlocked
+  return false
+}
+
 const useEditorStore = create((set, get) => ({
   // State
   activeFrame: null,
@@ -112,10 +172,12 @@ const useEditorStore = create((set, get) => ({
     const { activeFrame } = get()
     if (!activeFrame) return
 
-    // One text block per frame (locked spec) — the layout reflow assumes a single
-    // text zone. The toolbar disables the Text button, but guard here too so no
-    // other code path (or stale UI) can add a second one.
-    if (type === 'text' && (activeFrame.content?.blocks || []).some(b => b.type === 'text')) return
+    // Layout-aware content-type exclusivity (generalizes the old single-text rule):
+    // PRIMARY (text/quiz) and MEDIA (media/model3d/oam/ivideo) zone-fillers are
+    // capped by the frame's content.layout. The toolbar disables the relevant
+    // buttons, but guard here too so no other code path (or stale UI) can exceed it.
+    // Auxiliary types (wcn/hotspot/branch/audio/gui) are never blocked.
+    if (isBlockTypeBlocked(activeFrame, type)) return
 
     const newBlock = _makeBlock(type)
     const updatedFrame = {
