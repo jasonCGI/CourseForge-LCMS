@@ -678,8 +678,8 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
     zones.push(`<div class="cf-zone-media" style="position:absolute;top:0;left:${mLeft};`
       + `width:${mW};height:100%;box-sizing:border-box;overflow:hidden">${inner}</div>`)
   }
-  return `<div class="cf-layout-zones" style="position:absolute;top:-12px;left:-12px;`
-    + `right:-12px;bottom:-12px;overflow:hidden">${zones.join('\n')}</div>`
+  return `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
+    + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>`
 }
 
 // Build the menu-frame nav HTML for injection into the GUI shell iframe — the
