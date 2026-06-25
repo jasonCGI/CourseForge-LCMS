@@ -668,6 +668,21 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
     ).join('\n') + `</div>`
   }
 
+  // Text-only content (no media zone-filler): a split layout is meaningless with
+  // nothing in the other half, so collapse to ONE full-width box that fills the
+  // content area top:0/height:100% and applies the 40px-all-sides padding rule.
+  // The in-canvas iframe runs the STORED shell CSS (no .cf-shelled-text-top rule),
+  // so carry the absolute/full-area geometry as INLINE styles — this also makes
+  // the box immune to a stored shell that flex-centers #fgui-content (the
+  // position:absolute box escapes that centering and stays TOP-aligned). Mirrors
+  // the server's .cf-shelled-text-top text-only path for parity.
+  if (hasText && !hasMedia) {
+    const inner = textBlocks.map(b => renderBlockToHTML(b)).join('\n')
+    return CF_INJ_LIST_CSS + `<div class="cf-shelled-text-top" style="position:absolute;`
+      + `top:0;left:0;width:100%;height:100%;box-sizing:border-box;padding:40px;`
+      + `overflow:auto">${inner}</div>`
+  }
+
   // Zone geometry as % of the content area (y=0, height=100%).
   let tLeft, tW, mLeft, mW
   if (lay === 'text-left')       { tLeft = '0';   tW = '50%';  mLeft = '50%'; mW = '50%' }

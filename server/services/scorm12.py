@@ -320,7 +320,18 @@ _OAM_PLAYER_TPL = """
     }
     if(!(s>0)||!isFinite(s)) s=1;
     f.style.transform='scale('+s+')';
-    f.style.left=Math.max(0,(cw-SW*s)/2)+'px';
+    // Shrink the (dark) stage to the SCALED media box and center it in the zone.
+    // Without this the stage stays full zone-width while a height-constrained
+    // scale makes the iframe narrower, leaving a one-sided dark strip on the far
+    // edge (the right edge against the shell). Sizing the stage to SW*s + auto
+    // margins makes the media fill its stage edge-to-edge: any aspect letterbox
+    // is then symmetric shell background, never a stray dark strip or scrollbar.
+    var sw=SW*s;
+    stage.style.width=sw+'px';
+    stage.style.maxWidth='100%';
+    stage.style.marginLeft='auto';
+    stage.style.marginRight='auto';
+    f.style.left='0px';
     stage.style.height=(SH*s)+'px';
   }
   fit();

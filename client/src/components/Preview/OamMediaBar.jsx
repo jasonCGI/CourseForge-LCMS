@@ -35,7 +35,15 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption, h
       let s = Math.min(cw / SW, 1)
       if (!(s > 0) || !isFinite(s)) s = 1
       ifr.style.transform = `scale(${s})`
-      ifr.style.left = `${Math.max(0, (cw - SW * s) / 2)}px`
+      // Shrink the (dark) stage to the SCALED media box and center it, so a
+      // width-constrained scale leaves no one-sided dark strip on the far edge —
+      // the media fills its stage edge-to-edge and any leftover space is
+      // symmetric (parity with the server OAM fit()).
+      ifr.style.left = '0px'
+      stage.style.width = `${SW * s}px`
+      stage.style.maxWidth = '100%'
+      stage.style.marginLeft = 'auto'
+      stage.style.marginRight = 'auto'
       setStageH(SH * s)
     }
     fit()
