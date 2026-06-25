@@ -323,7 +323,7 @@ _OAM_PLAYER_TPL = """
   <div id="oamstage-__BID__" class="cf-oam-stage" style="position:relative;width:100%;overflow:hidden;background:#0d1117">
     <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
       title="Interactive animation" sandbox="allow-scripts allow-same-origin"
-      style="position:absolute;top:0;left:0;border:0;transform-origin:top left;display:block;background:#0d1117"></iframe>
+      style="position:absolute;top:0;left:0;border:0;transform-origin:top left;display:block;background:#0d1117;width:__W__px;height:__H__px"></iframe>
   </div>
   <div id="oambar-__BID__" class="cf-oam-bar" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none">
     <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
@@ -348,9 +348,15 @@ _OAM_PLAYER_TPL = """
   var lastKey='';
   function fit(){
     if(!stage||!SW||!SH) return;
-    var cw=stage.clientWidth||SW;
     var sc=document.getElementById('fgui-content');
     var inShell=sc && sc.contains(wrap);
+    // Container width can read 0 before the shell's scaleStage transform + layout
+    // settle (the /preview-html load path). A 0/near-0 cw made s collapse and the
+    // stage shrink to a tiny box; cache that under lastKey and it never recovered.
+    // Fall back to the parent zone width, then native SW, and bail (without caching)
+    // until a real width arrives so a later resize/RO tick re-fits at full size.
+    var cw=stage.clientWidth || (wrap&&wrap.clientWidth) || (inShell&&sc.clientWidth) || 0;
+    if(!(cw>0)){ lastKey=''; return; }
     var barH=bar?bar.offsetHeight:36;
     var ch=inShell?sc.clientHeight:0;
     // Key on every input to the scale (width, content height, bar height) so a
@@ -384,9 +390,17 @@ _OAM_PLAYER_TPL = """
     f.style.left='0px';
     stage.style.height=(SH*s)+'px';
   }
+  function refit(){ lastKey=''; fit(); }
   fit();
-  if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(stage); }catch(e){} }
-  window.addEventListener('resize', function(){ lastKey=''; fit(); });
+  // Re-fit after layout settles — in the /preview-html path the shell's scaleStage
+  // transform and content sizing land after our script runs, so the first fit() can
+  // see a 0-width container. These ticks (rAF, timers, iframe load, window load)
+  // re-fit once a real width exists, matching the in-canvas full-size render.
+  if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(stage); if(wrap) new ResizeObserver(fit).observe(wrap); }catch(e){} }
+  window.addEventListener('resize', refit);
+  window.addEventListener('load', refit);
+  f.addEventListener('load', refit);
+  requestAnimationFrame(refit); setTimeout(refit,60); setTimeout(refit,250); setTimeout(refit,600);
   // -- media bar protocol + prompt cue wiring --
   var dur=0, supported=false;
   var PROMPTS=__PROMPTS__, END_PROMPT=__ENDPROMPT__, lastWasDefined=false, lastStopFrame=-1;

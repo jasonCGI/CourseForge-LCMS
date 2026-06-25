@@ -31,16 +31,20 @@ from .menu_frame import (
 from .theme_resolver import resolve_theme, tokens_to_css
 
 # media/<kind>/<uuid>.<ext>  ->  /api/media/serve/<uuid>   (serve route is kind-agnostic)
+# The trailing class excludes a backslash so we never swallow the JS-string escaping
+# backslash of a following \" (the shell-preview path runs this over JSON-encoded
+# FRAME_HTML where every attribute quote is \"; eating that \ leaves a bare " that
+# terminates the JS string early -> "Unexpected identifier" and a dead runtime).
 _MEDIA_RE = re.compile(
     r"media/(?:images|video|audio|captions|models|clips)/"
     r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-    r"[^\"'\s)]*"
+    r"[^\"'\s)\\]*"
 )
 # oam/<uuid>/<entry...>  ->  /api/media/oam/<uuid>/files/<entry...>
 _OAM_RE = re.compile(
     r"(?<![\w/])oam/"
     r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/"
-    r"([^\"'\s)]+)"
+    r"([^\"'\s)\\]+)"
 )
 
 
