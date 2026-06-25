@@ -7,6 +7,7 @@ import { BLOCK_ICONS } from '../icons'
 export const BLOCK_TYPES = [
   { type: 'text',    label: 'Text',    Icon: BLOCK_ICONS.text,    color: '#185FA5', available: true  },
   { type: 'media',   label: 'Media',   Icon: BLOCK_ICONS.media,   color: '#3B6D11', available: true  },
+  { type: 'audio',   label: 'Audio',   Icon: BLOCK_ICONS.audio,   color: '#1A7A5E', available: true  },
   { type: 'quiz',    label: 'Quiz',    Icon: BLOCK_ICONS.quiz,    color: '#854F0B', available: true  },
   { type: 'hotspot', label: 'Hotspot', Icon: BLOCK_ICONS.hotspot, color: '#533AB7', available: true  },
   { type: 'branch',  label: 'Branch',  Icon: BLOCK_ICONS.branch,  color: '#3C3489', available: true  },

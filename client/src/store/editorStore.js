@@ -373,6 +373,12 @@ const useEditorStore = create((set, get) => ({
 // Block factory
 function _makeBlock(type) {
   const id = crypto.randomUUID()
+  // The Audio palette button adds a media block pre-set to the docked audio bar
+  // (kind 'audio'). Audio is auxiliary (it docks, not a zone filler), so it's exempt
+  // from media exclusivity — see isZoneMedia / MEDIA_TYPES.
+  if (type === 'audio') {
+    return { id, type: 'media', data: { kind: 'audio', placeholder_label: '', asset_id: null, caption: '', dock: 'inline', bounds: null } }
+  }
   const defaults = {
     text:  { body: '', narrator_script: '' },
     media: { kind: 'image', placeholder_label: '', asset_id: null, caption: '', bounds: null },

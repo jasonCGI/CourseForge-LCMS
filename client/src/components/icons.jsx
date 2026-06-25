@@ -19,6 +19,7 @@ import {
   Box3dPoint,
   Upload,
   ColorFilter,
+  SoundHigh,
 } from 'iconoir-react'
 
 // Audio player controls (React AudioBar). Mirrors PLAY_SVG / PAUSE_SVG server-side.
@@ -32,6 +33,7 @@ export { Upload, ColorFilter }
 export const BLOCK_ICONS = {
   text:    Text,             // paragraph / text block
   media:   MediaImage,       // image/media block
+  audio:   SoundHigh,        // audio bar (auxiliary, docks)
   quiz:    HelpCircle,       // question / quiz block
   hotspot: FrameSelect,      // selectable region / hotspot
   branch:  GitFork,          // branching scenario
