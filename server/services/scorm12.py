@@ -35,7 +35,27 @@ except ImportError:                       # pragma: no cover - bleach is a hard 
 # event-handler attributes, and href is URL-scheme filtered (no javascript:).
 _RICH_TAGS = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'a',
               'h1', 'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'span']
-_RICH_ATTRS = {'a': ['href', 'title', 'target', 'rel']}
+# Inline frame-link convention: an <a> may carry data-cf-frame="<frameId>" so the
+# author can branch to another frame from inside body text. The render pass
+# (_render_blocks text case) rewrites those anchors into real navigation (the
+# published '<frame>.html' / the preview-html URL), exactly like the branch block.
+_RICH_LINK_ATTRS = {'href', 'title', 'target', 'rel'}
+
+
+def _rich_a_attr(tag, name, value):
+    """bleach attribute filter for <a>: keep the standard link attrs, and keep
+    data-cf-frame ONLY when its value is a valid id token ([\\w-]+) — a malformed
+    / hostile value drops the attribute (so it degrades to a plain link, never a
+    broken navigation target). Everything else (on*= handlers, style, …) is
+    stripped, unchanged from before."""
+    if name in _RICH_LINK_ATTRS:
+        return True
+    if name == 'data-cf-frame':
+        return bool(_safe_id(value))
+    return False
+
+
+_RICH_ATTRS = {'a': _rich_a_attr}
 _RICH_PROTOCOLS = ['http', 'https', 'mailto', 'tel']
 
 # Conservative fallback if bleach is unavailable: strip <script>/<style> blocks
@@ -72,6 +92,78 @@ def _safe_id(value):
     value can't break out of the onclick string)."""
     s = '' if value is None else str(value)
     return s if re.fullmatch(r'[\w-]+', s) else ''
+
+
+# Match a sanitized inline frame-link anchor: <a ... data-cf-frame="<id>" ...>.
+# Runs over bleach output (so the markup is well-formed and the value is already
+# a valid id token), capturing the whole opening <a ...> tag and the target id.
+_CF_FRAME_LINK_RE = re.compile(
+    r'(?is)<a\b([^>]*?)\sdata-cf-frame="([\w-]+)"([^>]*)>'
+)
+
+
+def _resolve_frame_links(html, frame_resolve):
+    """Post-process sanitized text-block HTML: rewrite every inline frame-link
+    `<a data-cf-frame="<id>">` into real in-course navigation, mirroring how the
+    branch block / Menu Frame resolve a target frame id.
+
+    frame_resolve(frame_id) -> href:
+      * SCO publish  -> the target frame's published '<frame>.html'
+      * live preview -> '/api/frames/<id>/preview-html'
+      * None for an unresolvable / unset target.
+
+    Resolvable  -> a real <a class="cf-frame-link" href="..."> (amber-underlined
+                   in-course link), data-cf-frame kept so the React in-canvas
+                   handler can also intercept it.
+    Unresolvable -> an href-less <a class="cf-frame-link cf-frame-link--dead">
+                   (an anchor with no href does NOT navigate — never a broken
+                   '<id>.html'). Kept as an <a> so the </a> stays balanced.
+                   Fully guarded: any resolver error degrades to the dead anchor
+                   rather than throwing.
+    """
+    if not html or 'data-cf-frame' not in html:
+        return html
+
+    def _sub(m):
+        pre, fid, post = m.group(1), m.group(2), m.group(3)
+        # Strip any href bleach kept on the anchor (an author may have typed both a
+        # URL and a frame target); the frame target wins and we set our own href.
+        attrs = (pre or '') + (post or '')
+        attrs = re.sub(r'(?is)\shref="[^"]*"', '', attrs)
+        attrs = re.sub(r"(?is)\shref='[^']*'", '', attrs)
+        # Drop any author-set class so our cf-frame-link class is authoritative.
+        attrs = re.sub(r'(?is)\sclass="[^"]*"', '', attrs)
+        attrs = re.sub(r"(?is)\sclass='[^']*'", '', attrs)
+        href = None
+        try:
+            if callable(frame_resolve):
+                href = frame_resolve(fid)
+        except Exception:
+            href = None
+        if href:
+            # href is a server-built filename / API path (never raw user text).
+            return (f'<a class="cf-frame-link" data-cf-frame="{esc(fid)}" '
+                    f'href="{esc(href)}"{attrs}>')
+        # Unresolvable -> inert anchor (no href = no navigation), tag stays balanced.
+        return ('<a class="cf-frame-link cf-frame-link--dead" '
+                f'data-cf-frame="{esc(fid)}" title="Link target not found"{attrs}>')
+
+    return _CF_FRAME_LINK_RE.sub(_sub, html)
+
+
+# CSS for inline frame-links — amber underline so they read as in-course
+# navigation (distinct from a normal external link). Injected once per rendered
+# page wherever text blocks are emitted. The dead variant is muted + not-allowed.
+_CF_FRAME_LINK_CSS = (
+    '<style>'
+    '.cf-frame-link{color:#B45309;text-decoration:underline;'
+    'text-decoration-color:#F59E0B;text-decoration-thickness:2px;'
+    'text-underline-offset:2px;cursor:pointer;font-weight:600}'
+    '.cf-frame-link:hover{color:#92400E;text-decoration-color:#B45309}'
+    '.cf-frame-link--dead{color:#9aa4b2;text-decoration-style:dotted;'
+    'cursor:not-allowed;font-weight:400}'
+    '</style>'
+)
 
 
 def _f(value, default=0.0):
@@ -678,7 +770,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         if btype == 'text':
             # body is author RICH HTML -> allowlist-sanitize (keep formatting,
             # strip script/handlers); narrator_script is plain text -> escape.
-            html = f'<div class="cf-text">{_sanitize_rich_html(data.get("body",""))}</div>'
+            # After sanitizing, rewrite any inline frame-link <a data-cf-frame>
+            # into real in-course navigation, reusing the SAME frame-id->href
+            # resolver the branch block / Menu Frame use (SCO '<frame>.html' /
+            # preview-html URL). Unresolvable -> inert link (never broken .html).
+            body = _resolve_frame_links(
+                _sanitize_rich_html(data.get("body", "")), branch_resolve)
+            html = f'<div class="cf-text">{body}</div>'
             if data.get('narrator_script'):
                 html += f'<div class="cf-narration">🎙 {esc(data["narrator_script"])}</div>'
             parts.append(html)
@@ -1823,6 +1921,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # once per rendered block list).
     if 'data-cf-audio' in out:
         out += '\n' + _cf_audio_script()
+    # Inline frame-link styling (amber underline = in-course navigation), emitted
+    # once per rendered block list when any text block carried a frame-link.
+    if 'cf-frame-link' in out:
+        out = _CF_FRAME_LINK_CSS + out
     return out
 
 

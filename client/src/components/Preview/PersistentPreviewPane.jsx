@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId } from './FramePreview'
+import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId, frameExistsInProject } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
@@ -95,6 +95,9 @@ export default function PersistentPreviewPane() {
   useEffect(() => {
     const handler = (e) => {
       if (!e.data || e.data.type !== 'fgui_nav' || !e.data.frameId) return
+      // Ignore an unknown target (a stale inline frame-link / deleted frame) so a
+      // bad id never drives a dead navigation — mirrors the server resolver guard.
+      if (!frameExistsInProject(activeProject, e.data.frameId)) return
       // Shell-injected menu click: record the SOURCE menu (the frame we're ON now,
       // which IS the menu) before navigating, so the destination shows a back-pill.
       // React parity with MenuFramePreview.goTo and the SCO sessionStorage runtime.
@@ -105,7 +108,7 @@ export default function PersistentPreviewPane() {
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [loadFrame, setLastMenuFrame, activeFrame])
+  }, [loadFrame, setLastMenuFrame, activeFrame, activeProject])
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
   const ctx = useMemo(() => frameContext(activeProject, activeFrame?.id), [activeProject, activeFrame?.id])

@@ -829,6 +829,23 @@ export function wireMenuNav(win) {
       }
     })
   })
+  // Inline text frame-links inside the shell (<a data-cf-frame="<id>">) — same
+  // mechanism: intercept the click and post fgui_nav so the host loads the target
+  // (no raw <a href> nav in the editor preview). The host validates the id against
+  // the project tree, so an unknown id is simply ignored. Skip the inert/dead
+  // variant. Guarded so a bad anchor never throws.
+  win.document.querySelectorAll('a[data-cf-frame]').forEach((a) => {
+    if (a.__cfFrameLinkWired) return
+    a.__cfFrameLinkWired = true
+    a.addEventListener('click', (ev) => {
+      try {
+        if (a.classList && a.classList.contains('cf-frame-link--dead')) { ev.preventDefault(); return }
+        const target = a.getAttribute('data-cf-frame')
+        ev.preventDefault()
+        if (target) (win.parent || window).postMessage({ type: 'fgui_nav', frameId: target }, '*')
+      } catch (e) { /* iframe torn down */ }
+    })
+  })
 }
 
 function PreviewBlock({ block, fill = false }) {
@@ -852,12 +869,64 @@ function PreviewBlock({ block, fill = false }) {
   }
 }
 
+// True if `id` is a real frame in the active project tree. Shared by PreviewText
+// (inline frame-links) and PreviewBranch — the client mirror of the server
+// resolvers' "unknown id -> no navigation" guard.
+export function frameExistsInProject(project, id) {
+  if (!id) return false
+  for (const course of project?.courses || [])
+    for (const mod of course.modules || [])
+      for (const lesson of mod.lessons || [])
+        for (const fr of lesson.frames || [])
+          if (fr.id === id) return true
+  return false
+}
+
+// Amber-underline styling for inline frame-links inside text bodies (mirrors the
+// server's _CF_FRAME_LINK_CSS). Injected once so the in-canvas render matches the
+// published SCO / live-preview look. The dead variant is muted + not-allowed.
+const CF_FRAME_LINK_STYLE_ID = 'cf-frame-link-style'
+function ensureFrameLinkStyle() {
+  if (typeof document === 'undefined') return
+  if (document.getElementById(CF_FRAME_LINK_STYLE_ID)) return
+  const el = document.createElement('style')
+  el.id = CF_FRAME_LINK_STYLE_ID
+  el.textContent =
+    '.cf-frame-link{color:#B45309;text-decoration:underline;text-decoration-color:#F59E0B;' +
+    'text-decoration-thickness:2px;text-underline-offset:2px;cursor:pointer;font-weight:600}' +
+    '.cf-frame-link:hover{color:#92400E;text-decoration-color:#B45309}' +
+    '.cf-frame-link--dead{color:#9aa4b2;text-decoration-style:dotted;cursor:not-allowed;font-weight:400}'
+  document.head.appendChild(el)
+}
+
 function PreviewText({ block }) {
+  const loadFrame     = useEditorStore(s => s.loadFrame)
+  const activeProject = useProjectStore(s => s.activeProject)
+
+  useEffect(() => { ensureFrameLinkStyle() }, [])
+
+  // Intercept clicks on inline frame-links (<a data-cf-frame="<id>">). Like the
+  // branch/menu in-canvas behavior, navigation is done via the store's loadFrame
+  // (no raw <a href> nav in the editor preview). An id that isn't a real frame in
+  // the project is ignored (no dead navigation). Fully guarded so a bad/missing id
+  // never throws.
+  const onBodyClick = (e) => {
+    try {
+      const a = e.target && e.target.closest && e.target.closest('a[data-cf-frame]')
+      if (!a) return
+      e.preventDefault()
+      e.stopPropagation()
+      const id = a.getAttribute('data-cf-frame')
+      if (frameExistsInProject(activeProject, id)) loadFrame(id)
+    } catch { /* never let a stray click handler abort the render */ }
+  }
+
   return (
     <div style={previewBlockWrap}>
       {block.data.body && (
         <div
           className="cf-preview-richtext"
+          onClick={onBodyClick}
           style={{ fontSize: 'var(--cf-preview-body, 18px)', lineHeight: 1.7, color: '#1a1a1a', marginBottom: 12 }}
           dangerouslySetInnerHTML={{ __html: block.data.body }}
         />
@@ -1339,17 +1408,8 @@ function PreviewBranch({ block }) {
   const trueId  = block.data.true_frame_id  || block.data.true_frame  || ''
   const falseId = block.data.false_frame_id || block.data.false_frame || ''
 
-  const frameExists = (id) => {
-    if (!id) return false
-    for (const course of activeProject?.courses || [])
-      for (const mod of course.modules || [])
-        for (const lesson of mod.lessons || [])
-          for (const fr of lesson.frames || [])
-            if (fr.id === id) return true
-    return false
-  }
-  const trueOk  = frameExists(trueId)
-  const falseOk = frameExists(falseId)
+  const trueOk  = frameExistsInProject(activeProject, trueId)
+  const falseOk = frameExistsInProject(activeProject, falseId)
 
   const btnStyle = (ok, color) => ({
     flex: 1, padding: '12px 16px',
