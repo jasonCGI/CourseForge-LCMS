@@ -29,6 +29,11 @@ export default function GUIShellRenderer({
     try {
       win.fgui.injectContent(frameHtml || '')
       win.fgui.setFrameData(frameData || {})
+      // Shells built before the setFrameData key-map fix read state.currentFrame,
+      // which their old setFrameData ignored (it merged the 'frameIndex' key
+      // verbatim) — leaving the counter stuck at "1 / total". Also drive the
+      // postMessage bridge those shells map correctly. Idempotent on fixed shells.
+      win.postMessage({ type: 'fgui_frame_data', ...(frameData || {}) }, '*')
       // injectContent uses innerHTML, so the bar's inline <script> never runs —
       // wire the branded audio bars directly in the iframe document instead.
       wireAudioBars(win.document)

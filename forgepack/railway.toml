@@ -1,5 +1,7 @@
 [build]
 builder = "nixpacks"
+# Only rebuild this service when its own subdir changes (repo-root-relative).
+watchPatterns = ["forgepack/**"]
 
 [deploy]
 # Single worker: the job store is an in-memory dict (services/video_processor.py),

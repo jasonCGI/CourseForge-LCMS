@@ -574,6 +574,13 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
     // Update state directly (for non-postMessage integration)
     setFrameData: function(data) {{
       Object.assign(state, data);
+      // CourseForge sends {{frameIndex, totalFrames, isFirst, isLast}} but the
+      // zones read state.currentFrame / isFirstFrame / isLastFrame. Map the keys
+      // (mirror the fgui_frame_data postMessage handler) so the frame counter
+      // isn't stuck at "1 / total" on every frame.
+      if (data.frameIndex != null) state.currentFrame = data.frameIndex;
+      if (data.isFirst    != null) state.isFirstFrame = data.isFirst;
+      if (data.isLast     != null) state.isLastFrame  = data.isLast;
       updateZones();
       updateButtons();
     }},

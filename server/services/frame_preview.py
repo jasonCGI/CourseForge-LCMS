@@ -274,14 +274,36 @@ def _build_shell_preview(shell, frame, project) -> str | None:
 
     # Graft preview chrome into the shell's own document.
     chrome_scripts = "<script>" + _STUB_JS + "</script>" + _shell_runtime_js()
+
+    # The shell's own scaleStage() centers #fgui-stage against the FULL viewport
+    # height, so the fixed LIVE-PREVIEW banner overlaps the stage's top row (where
+    # the title/pager usually sit) — the GUI looks "cut off". Re-fit the stage into
+    # the viewport MINUS the banner, and re-assert after the shell's own scaler runs
+    # (it registers a resize listener first; ours is added later so it wins). Uses
+    # the real stage dims from the shell record, so it's independent of shell internals.
+    sw = int(getattr(shell, "stage_width", None) or 1024)
+    sh = int(getattr(shell, "stage_height", None) or 768)
+    fit_js = (
+        "<script>(function(){"
+        f"var SW={sw},SH={sh},BH=42;"
+        "function fit(){var s=document.getElementById('fgui-stage');if(!s)return;"
+        "var aH=Math.max(1,window.innerHeight-BH);"
+        "var sc=Math.min(window.innerWidth/SW,aH/SH);"
+        "var ox=(window.innerWidth-SW*sc)/2,oy=BH+(aH-SH*sc)/2;"
+        "s.style.transform='translate('+ox+'px,'+oy+'px) scale('+sc+')';}"
+        "fit();window.addEventListener('resize',fit);"
+        "requestAnimationFrame(fit);setTimeout(fit,60);setTimeout(fit,250);"
+        "})();</script>"
+    )
+
     if "</head>" in html:
         html = html.replace("</head>", _HEAD_ASSETS + "</head>", 1)
     else:
         html = _HEAD_ASSETS + html
     if "</body>" in html:
-        html = html.replace("</body>", _BANNER + chrome_scripts + "</body>", 1)
+        html = html.replace("</body>", _BANNER + chrome_scripts + fit_js + "</body>", 1)
     else:
-        html = html + _BANNER + chrome_scripts
+        html = html + _BANNER + chrome_scripts + fit_js
     return html
 
 

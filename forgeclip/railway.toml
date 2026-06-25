@@ -1,5 +1,7 @@
 [build]
 builder = "nixpacks"
+# Only rebuild this service when its own subdir changes (repo-root-relative).
+watchPatterns = ["forgeclip/**"]
 
 [deploy]
 # Single worker: the clip store is an in-memory dict (routes/clip.py), so all

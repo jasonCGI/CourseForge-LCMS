@@ -1484,6 +1484,12 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     window.fgui.injectContent(FRAME_HTML);
     runInjectedScripts();
     window.fgui.setFrameData(FRAME_DATA);
+    // Shells built before the setFrameData key-map fix read state.currentFrame,
+    // which their old setFrameData never set (it merged 'frameIndex' verbatim) —
+    // so the counter stuck at "1 / total". Route the same payload through the
+    // postMessage bridge those shells DO map correctly, so the pager is right
+    // regardless of when the shell was authored. Idempotent on fixed shells.
+    try {{ window.postMessage(Object.assign({{ type: 'fgui_frame_data' }}, FRAME_DATA), '*'); }} catch(e) {{}}
     window.fgui.onAction = function(action) {{
       // Bubble to a host that drives navigation itself (the course-preview
       // wrapper). Harmless in a published SCO — the LMS ignores it and the

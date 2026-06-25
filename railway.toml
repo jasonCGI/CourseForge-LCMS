@@ -1,5 +1,16 @@
 [build]
 builder = "nixpacks"
+# Only rebuild the main app when ITS sources change — not when a sibling service
+# (forgeclip / forgegui / isd-tool / forgepack) is touched. Without this, every push
+# rebuilds all six services and the main app queues behind them on the hobby plan's
+# limited build slots. Repo-root-relative, gitignore-style with `!` negation.
+watchPatterns = [
+    "**",
+    "!forgeclip/**",
+    "!forgegui/**",
+    "!isd-tool/**",
+    "!forgepack/**",
+]
 
 [deploy]
 # Apply any pending DB migrations before the new release starts taking traffic.
