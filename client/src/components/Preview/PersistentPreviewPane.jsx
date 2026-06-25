@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import FramePreview, { buildShelledLayoutHTML } from './FramePreview'
+import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
@@ -20,7 +20,14 @@ export default function PersistentPreviewPane() {
   const activeFrame  = useEditorStore(s => s.activeFrame)
   const activeBlockId = useEditorStore(s => s.activeBlockId)
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
+  const loadFrame    = useEditorStore(s => s.loadFrame)
   const activeProject = useProjectStore(s => s.activeProject)
+
+  // A menu frame stores its nav items in content.menu (no content.blocks), so the
+  // shell-injection path can't use buildShelledLayoutHTML (which renders blocks and
+  // would leave the content area blank). Detected here so the shell branch injects
+  // the menu nav buttons instead.
+  const isMenuFrame = activeFrame?.frame_type === 'menu'
 
   const shellId = activeProject?.gui_shell_id || null
   // Live-preview GUI toggle: ON = render inside the shell (learner view),
@@ -69,9 +76,29 @@ export default function PersistentPreviewPane() {
     [activeFrame?.content?.blocks],
   )
   const frameHtml = useMemo(
-    () => (needsOverlay ? '' : buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout)),
-    [needsOverlay, activeFrame?.content?.blocks, activeFrame?.content?.layout],
+    () => {
+      if (needsOverlay) return ''
+      // Menu frame: inject the branded nav buttons (resolving each target the same
+      // way MenuFramePreview does) instead of the empty block layout.
+      if (isMenuFrame) {
+        return buildMenuHTML(activeFrame?.content?.menu, (it) => resolveMenuTargetFrameId(it, activeProject))
+      }
+      return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout)
+    },
+    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject],
   )
+
+  // Shell-injected menu buttons (no React in the iframe) post an fgui_nav message
+  // on click; turn it into a real frame load in the editor preview — the shell-path
+  // equivalent of MenuFramePreview's onClick={loadFrame(targetId)}.
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.data || e.data.type !== 'fgui_nav' || !e.data.frameId) return
+      loadFrame(e.data.frameId)
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [loadFrame])
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
   const ctx = useMemo(() => frameContext(activeProject, activeFrame?.id), [activeProject, activeFrame?.id])

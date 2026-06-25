@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { wireAudioBars } from './FramePreview'
+import { wireAudioBars, wireMenuNav } from './FramePreview'
 
 /**
  * GUIShellRenderer
@@ -57,6 +57,9 @@ export default function GUIShellRenderer({
       // injectContent uses innerHTML, so the bar's inline <script> never runs —
       // wire the branded audio bars directly in the iframe document instead.
       wireAudioBars(win.document)
+      // Same for menu-frame nav buttons: wire each [data-cf-nav-target] to post an
+      // fgui_nav message the host turns into loadFrame(targetId).
+      wireMenuNav(win)
     } catch (e) {
       console.warn('[GUIShellRenderer] inject error:', e)
     }

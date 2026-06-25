@@ -190,6 +190,40 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   )
 }
 
+// Resolve a menu item to the id of the frame it should navigate to, from the
+// live project tree. The client mirror of server menu_frame.resolve_target_frame_id:
+// a topic target (lesson/module) resolves to that section's first frame (lowest
+// order_index); a 'frame' target resolves to itself if present. Returns null when
+// the target can't be resolved. Shared by MenuFramePreview (React click-nav) and
+// the shell-injection path (buildMenuHTML / PersistentPreviewPane postMessage nav).
+export function resolveMenuTargetFrameId(item, project) {
+  if (!item?.target_id) return null
+  const kind = item.target_kind || 'frame'
+  const firstFrameOfLesson = (lesson) => {
+    const fs = [...(lesson?.frames || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    return fs[0] || null
+  }
+  for (const course of project?.courses || []) {
+    for (const mod of course.modules || []) {
+      if (kind === 'module' && mod.id === item.target_id) {
+        for (const l of [...(mod.lessons || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))) {
+          const f = firstFrameOfLesson(l); if (f) return f.id
+        }
+        return null
+      }
+      for (const lesson of mod.lessons || []) {
+        if (kind === 'lesson' && lesson.id === item.target_id) {
+          const f = firstFrameOfLesson(lesson); return f ? f.id : null
+        }
+        for (const fr of lesson.frames || []) {
+          if (kind === 'frame' && fr.id === item.target_id) return fr.id
+        }
+      }
+    }
+  }
+  return null
+}
+
 // Menu frame in-canvas preview — the React mirror of server render_menu_html.
 // Buttons navigate by loading the resolved target frame in the editor preview
 // (reuses the store's loadFrame, matching how the live preview swaps frames). A
@@ -201,34 +235,7 @@ function MenuFramePreview({ frame, hideTitle = false }) {
   const menu  = frame.content?.menu || {}
   const items = Array.isArray(menu.items) ? menu.items : []
 
-  // Build id->object lookups + first-frame helpers from the project tree.
-  const resolveTargetFrameId = (item) => {
-    if (!item?.target_id) return null
-    const kind = item.target_kind || 'frame'
-    const firstFrameOfLesson = (lesson) => {
-      const fs = [...(lesson?.frames || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-      return fs[0] || null
-    }
-    for (const course of activeProject?.courses || []) {
-      for (const mod of course.modules || []) {
-        if (kind === 'module' && mod.id === item.target_id) {
-          for (const l of [...(mod.lessons || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))) {
-            const f = firstFrameOfLesson(l); if (f) return f.id
-          }
-          return null
-        }
-        for (const lesson of mod.lessons || []) {
-          if (kind === 'lesson' && lesson.id === item.target_id) {
-            const f = firstFrameOfLesson(lesson); return f ? f.id : null
-          }
-          for (const fr of lesson.frames || []) {
-            if (kind === 'frame' && fr.id === item.target_id) return fr.id
-          }
-        }
-      }
-    }
-    return null
-  }
+  const resolveTargetFrameId = (item) => resolveMenuTargetFrameId(item, activeProject)
 
   return (
     <div style={{
@@ -673,6 +680,82 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
   }
   return `<div class="cf-layout-zones" style="position:absolute;top:-12px;left:-12px;`
     + `right:-12px;bottom:-12px;overflow:hidden">${zones.join('\n')}</div>`
+}
+
+// Build the menu-frame nav HTML for injection into the GUI shell iframe — the
+// HTML-string mirror of <MenuFramePreview> and the server's render_menu_html. A
+// menu frame has no content.blocks (its data is content.menu), so the shell path
+// can't use buildShelledLayoutHTML; this renders one branded button per item.
+//
+// `resolve(item) -> targetFrameId | null` resolves each item's target the same way
+// MenuFramePreview does (topic → first frame). Resolvable buttons carry
+// data-cf-nav-target="<frameId>"; unresolvable ones render disabled (no target).
+// Clicks are wired by wireMenuNav() in the host (the iframe has no React), which
+// reads the attribute and posts an fgui_nav message the host turns into loadFrame.
+// Uses INLINE styles (the live shell iframe runs the stored shell's CSS, not the
+// server's _MENU_CSS) so it matches MenuFramePreview without depending on shell CSS.
+export function buildMenuHTML(menu, resolve) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  const m = menu || {}
+  const items = Array.isArray(m.items) ? m.items : []
+  const title = m.title || ''
+
+  const titleHTML = title
+    ? `<h2 style="font-size:22px;font-weight:700;color:#042C53;margin:0 0 20px;`
+      + `padding-bottom:10px;border-bottom:2px solid #F59E0B;max-width:640px;`
+      + `margin-left:auto;margin-right:auto;font-family:Inter,system-ui,sans-serif">${esc(title)}</h2>`
+    : ''
+
+  const btnBase = 'display:flex;align-items:center;justify-content:space-between;'
+    + 'padding:16px 20px;border-radius:8px;font-size:16px;font-weight:600;'
+    + 'font-family:Inter,system-ui,sans-serif;text-align:left;color:#fff;width:100%;'
+    + 'box-sizing:border-box;text-decoration:none'
+  const arrow = '<span style="color:#F59E0B;font-size:22px;margin-left:16px;flex:none" aria-hidden="true">&#8250;</span>'
+
+  let btns
+  if (items.length === 0) {
+    btns = '<p style="color:#6a7686;font-style:italic">No menu items yet.</p>'
+  } else {
+    btns = items.map((it) => {
+      const label = esc((it && it.label) || 'Untitled')
+      const targetId = resolve ? resolve(it) : null
+      if (targetId) {
+        return `<button type="button" data-cf-nav-target="${esc(targetId)}" title="Go to target" `
+          + `style="${btnBase};background:#042C53;border:1px solid #042C53;cursor:pointer">`
+          + `<span>${label}</span>${arrow}</button>`
+      }
+      return `<span role="link" aria-disabled="true" title="No target set" `
+        + `style="${btnBase};background:#9aa7b6;border:1px solid #9aa7b6;cursor:not-allowed;opacity:.7">`
+        + `<span>${label}</span>${arrow}</span>`
+    }).join('')
+  }
+
+  return `<div style="background:#fff;color:#1a1a1a;font-family:Inter,system-ui,sans-serif;`
+    + `min-height:100%;padding:32px 24px;box-sizing:border-box">`
+    + titleHTML
+    + `<div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px">`
+    + btns
+    + `</div></div>`
+}
+
+// Wire every [data-cf-nav-target] menu button in a given iframe document so a click
+// posts an fgui_nav message (with the resolved target frame id) up to the host,
+// which calls loadFrame(targetId). The iframe has no React, mirroring how the audio
+// bars are wired by hand. Idempotent per button. `win` is the iframe contentWindow.
+export function wireMenuNav(win) {
+  if (!win || !win.document) return
+  win.document.querySelectorAll('[data-cf-nav-target]').forEach((btn) => {
+    if (btn.__cfNavWired) return
+    btn.__cfNavWired = true
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-cf-nav-target')
+      if (target) {
+        try { (win.parent || window).postMessage({ type: 'fgui_nav', frameId: target }, '*') }
+        catch (e) { /* iframe torn down */ }
+      }
+    })
+  })
 }
 
 function PreviewBlock({ block, fill = false }) {
