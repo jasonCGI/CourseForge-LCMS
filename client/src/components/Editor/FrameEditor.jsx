@@ -25,6 +25,7 @@ import WCNBlock from './blocks/WCNBlock'
 import IVideoBlock from './blocks/IVideoBlock'
 import Model3DBlock from './blocks/Model3DBlock'
 import GUIBlock from './blocks/GUIBlock'
+import MenuEditor from './MenuEditor'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -155,6 +156,11 @@ export default function FrameEditor() {
         <p style={{ fontSize: 12, margin: 0, opacity: 0.6 }}>Or import a JSON project to get started</p>
       </div>
     )
+  }
+
+  // Menu frame: show the Menu editor (items + targets) instead of the block palette.
+  if (activeFrame.frame_type === 'menu') {
+    return <MenuEditor />
   }
 
   const blocks = activeFrame.content?.blocks || []

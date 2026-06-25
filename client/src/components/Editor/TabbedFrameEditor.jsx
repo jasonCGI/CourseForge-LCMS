@@ -10,6 +10,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import { BLOCK_TYPES } from './BlockToolbar'
+import MenuEditor from './MenuEditor'
 import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
 import FrameLayout from './FrameLayout'
@@ -98,6 +99,11 @@ export default function TabbedFrameEditor() {
     }
     prevRef.current = { frameId, count: blocks.length }
   }, [activeFrame?.id, blocks.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Menu frame has no blocks/tabs — show the Menu editor in both inspector modes.
+  if (activeFrame && activeFrame.frame_type === 'menu') {
+    return <MenuEditor />
+  }
 
   if (!activeFrame) {
     return (

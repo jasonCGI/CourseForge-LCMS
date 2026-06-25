@@ -34,6 +34,11 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   const updateBlock = useEditorStore(s => s.updateBlock)   // for drag/resize of bounded blocks
   if (!frame) return null
 
+  // Menu frame: render the nav-button list (mirrors server render_menu_html).
+  if (frame.frame_type === 'menu') {
+    return <MenuFramePreview frame={frame} hideTitle={hideTitle} />
+  }
+
   const allBlocks = frame.content?.blocks || []
   const blocks = ignoreGui ? allBlocks.filter(b => b.type !== 'gui') : allBlocks
 
@@ -178,6 +183,89 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
         return src ? <AudioBar key={`${b.id}-bottom`} src={src} caption={b.data.caption} dock="bottom" /> : null
       })}
+    </div>
+  )
+}
+
+// Menu frame in-canvas preview — the React mirror of server render_menu_html.
+// Buttons navigate by loading the resolved target frame in the editor preview
+// (reuses the store's loadFrame, matching how the live preview swaps frames). A
+// topic target (lesson/module) resolves client-side to that section's first frame.
+function MenuFramePreview({ frame, hideTitle = false }) {
+  const loadFrame     = useEditorStore(s => s.loadFrame)
+  const activeProject = useProjectStore(s => s.activeProject)
+
+  const menu  = frame.content?.menu || {}
+  const items = Array.isArray(menu.items) ? menu.items : []
+
+  // Build id->object lookups + first-frame helpers from the project tree.
+  const resolveTargetFrameId = (item) => {
+    if (!item?.target_id) return null
+    const kind = item.target_kind || 'frame'
+    const firstFrameOfLesson = (lesson) => {
+      const fs = [...(lesson?.frames || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+      return fs[0] || null
+    }
+    for (const course of activeProject?.courses || []) {
+      for (const mod of course.modules || []) {
+        if (kind === 'module' && mod.id === item.target_id) {
+          for (const l of [...(mod.lessons || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))) {
+            const f = firstFrameOfLesson(l); if (f) return f.id
+          }
+          return null
+        }
+        for (const lesson of mod.lessons || []) {
+          if (kind === 'lesson' && lesson.id === item.target_id) {
+            const f = firstFrameOfLesson(lesson); return f ? f.id : null
+          }
+          for (const fr of lesson.frames || []) {
+            if (kind === 'frame' && fr.id === item.target_id) return fr.id
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  return (
+    <div style={{
+      background: FRAME_BG, color: '#1a1a1a', fontFamily: 'Inter, system-ui, sans-serif',
+      minHeight: '100%', padding: '32px 24px', boxSizing: 'border-box',
+    }}>
+      {!hideTitle && (menu.title ? (
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#042C53', margin: '0 0 20px',
+          paddingBottom: 10, borderBottom: '2px solid #F59E0B', maxWidth: 640, marginInline: 'auto' }}>
+          {menu.title}
+        </h2>
+      ) : null)}
+      <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {items.length === 0 && (
+          <p style={{ color: '#6a7686', fontStyle: 'italic' }}>No menu items yet.</p>
+        )}
+        {items.map(it => {
+          const targetId = resolveTargetFrameId(it)
+          const disabled = !targetId
+          return (
+            <button
+              key={it.id}
+              onClick={() => targetId && loadFrame(targetId)}
+              disabled={disabled}
+              title={disabled ? 'No target set' : 'Go to target'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
+                fontFamily: 'inherit', textAlign: 'left',
+                background: disabled ? '#9aa7b6' : '#042C53',
+                color: '#fff', border: `1px solid ${disabled ? '#9aa7b6' : '#042C53'}`,
+                cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.7 : 1,
+              }}
+            >
+              <span>{it.label || 'Untitled'}</span>
+              <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

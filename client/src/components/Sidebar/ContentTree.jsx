@@ -356,6 +356,11 @@ export default function ContentTree() {
   const assignNewBlockIds = (content) => {
     const c = JSON.parse(JSON.stringify(content || { blocks: [] }))
     for (const b of (c.blocks || [])) b.id = crypto.randomUUID()
+    // Preserve non-block content (e.g. a menu frame's content.menu) and give its
+    // items fresh ids so duplicates don't collide.
+    if (c.menu && Array.isArray(c.menu.items)) {
+      c.menu.items = c.menu.items.map(it => ({ ...it, id: crypto.randomUUID() }))
+    }
     return c
   }
 

@@ -24,6 +24,10 @@ from pathlib import Path
 from flask import current_app
 
 from .scorm12 import _render_blocks, _build_project_shell_frame, _project_hotspot_cfg
+from .menu_frame import (
+    is_menu_frame, get_menu, render_menu_html,
+    build_frame_index, resolve_target_frame_id,
+)
 from .theme_resolver import resolve_theme, tokens_to_css
 
 # media/<kind>/<uuid>.<ext>  ->  /api/media/serve/<uuid>   (serve route is kind-agnostic)
@@ -45,6 +49,20 @@ def _rewrite_asset_paths(html: str) -> str:
     html = _MEDIA_RE.sub(lambda m: f"/api/media/serve/{m.group(1)}", html)
     html = _OAM_RE.sub(lambda m: f"/api/media/oam/{m.group(1)}/files/{m.group(2)}", html)
     return html
+
+
+def _menu_resolver_for(project):
+    """A menu target resolver for the live preview: item -> the target frame's
+    /api/frames/<id>/preview-html URL (topic targets -> section's first frame)."""
+    if not project:
+        return lambda _item: None
+    index = build_frame_index(project)
+
+    def resolve(item):
+        tfid = resolve_target_frame_id(item, index)
+        return f"/api/frames/{tfid}/preview-html" if tfid else None
+
+    return resolve
 
 
 def _project_for_frame(frame):
@@ -267,6 +285,7 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         {0: ""}, VERSION, disp_index, disp_total,
         hotspot_cfg=_project_hotspot_cfg(project),
         preview=True,
+        menu_resolve=_menu_resolver_for(project),
     )
     if not html:
         return None
@@ -321,11 +340,14 @@ def build_frame_preview_html(frame) -> str:
         if shell_html:
             return shell_html
 
-    blocks = (frame.content or {}).get("blocks", []) if isinstance(frame.content, dict) else []
-    layout = (frame.content or {}).get("layout") if isinstance(frame.content, dict) else None
-    blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False,
-                                                      hotspot_cfg=_project_hotspot_cfg(project),
-                                                      preview=True, layout=layout))
+    if is_menu_frame(frame):
+        blocks_html = render_menu_html(get_menu(frame), _menu_resolver_for(project))
+    else:
+        blocks = (frame.content or {}).get("blocks", []) if isinstance(frame.content, dict) else []
+        layout = (frame.content or {}).get("layout") if isinstance(frame.content, dict) else None
+        blocks_html = _rewrite_asset_paths(_render_blocks(blocks, scorm_bridge=False,
+                                                          hotspot_cfg=_project_hotspot_cfg(project),
+                                                          preview=True, layout=layout))
 
     try:
         theme_css = tokens_to_css(resolve_theme(project)) if project else ""

@@ -625,6 +625,31 @@ def seed_demo(app=None):
                              frame_type=fd.get('frame_type', 'content'), order_index=order,
                              content=content))
 
+    # ── Menu Frame demo ──
+    # A navigation frame near the very start (Welcome, order_index -1 so it sorts
+    # first). Each item targets a LESSON (topic) — at render time a topic resolves
+    # to that lesson's first frame. Built here, after lessons exist, so the items
+    # carry real lesson ids.
+    welcome = lessons.get('Welcome')
+    if welcome:
+        def _topic(label, lesson_name):
+            les = lessons.get(lesson_name)
+            return {'id': str(uuid.uuid4()), 'label': label,
+                    'target_kind': 'lesson', 'target_id': les.id if les else ''}
+        menu_content = {'menu': {
+            'title': 'Course Menu',
+            'items': [
+                _topic('Content Blocks', 'Content Blocks'),
+                _topic('Assessment Blocks', 'Assessment Blocks'),
+                _topic('Safety Blocks', 'Safety Blocks'),
+                _topic('Advanced Blocks', 'Advanced Blocks'),
+                _topic('Course Summary', 'Course Summary'),
+            ],
+        }}
+        db.session.add(Frame(id=str(uuid.uuid4()), lesson_id=welcome.id,
+                             name='Course Menu', frame_type='menu', order_index=-1,
+                             content=menu_content))
+
     db.session.commit()
     total = sum(counters.values())
     print(f'[demo_seed] Created {total} frames across {len(LESSON_ORDER)} lessons')

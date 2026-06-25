@@ -336,6 +336,48 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
+  // ── Menu Frame (frame_type 'menu') ────────────────────────────────────
+  // Items live in content.menu = { title, items: [{id,label,target_kind,target_id}] }
+  // and ride the existing content autosave (no schema change). _setMenu is the
+  // single writer; the helpers below produce the next menu object.
+  _setMenu: (nextMenu) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    set({ activeFrame: { ...activeFrame, content: { ...activeFrame.content, menu: nextMenu } }, isDirty: true })
+    get()._scheduleAutosave()
+  },
+  _menu: () => {
+    const m = get().activeFrame?.content?.menu
+    return { title: m?.title || '', items: Array.isArray(m?.items) ? m.items : [] }
+  },
+  setMenuTitle: (title) => {
+    const m = get()._menu()
+    get()._setMenu({ ...m, title })
+  },
+  addMenuItem: () => {
+    const m = get()._menu()
+    const item = { id: crypto.randomUUID(), label: 'New item', target_kind: 'frame', target_id: '' }
+    get()._setMenu({ ...m, items: [...m.items, item] })
+  },
+  updateMenuItem: (itemId, patch) => {
+    const m = get()._menu()
+    get()._setMenu({ ...m, items: m.items.map(it => it.id === itemId ? { ...it, ...patch } : it) })
+  },
+  removeMenuItem: (itemId) => {
+    const m = get()._menu()
+    get()._setMenu({ ...m, items: m.items.filter(it => it.id !== itemId) })
+  },
+  moveMenuItem: (itemId, dir) => {
+    const m = get()._menu()
+    const items = [...m.items]
+    const i = items.findIndex(it => it.id === itemId)
+    if (i < 0) return
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= items.length) return
+    ;[items[i], items[j]] = [items[j], items[i]]
+    get()._setMenu({ ...m, items })
+  },
+
   // Manual save
   save: async () => {
     if (autosaveTimer) clearTimeout(autosaveTimer)

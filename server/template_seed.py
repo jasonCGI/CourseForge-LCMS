@@ -59,6 +59,9 @@ BUILTIN_TEMPLATES = [
          {'type': 'text', 'data': {'body': '<h2>3D Model</h2><p>Orbit and zoom to explore the model. Click annotation pins to learn about each component.</p>', 'narrator_script': 'Use the mouse or arrow keys to orbit and zoom the model.'}},
          {'type': 'model3d', 'data': {'model_asset_id': None, 'viewer_height': 400, 'bg_color': '#060810', 'caption': '', 'annotations': []}},
      ]}},
+    {'name': 'Menu Frame', 'description': 'Navigation frame — a list of buttons that jump to frames or topics',
+     'frame_type': 'menu', 'icon': '☰', 'tags': ['content', 'navigation'],
+     'content': {'menu': {'title': 'Menu', 'items': []}}},
     {'name': 'Blank Frame', 'description': 'Empty frame — start from scratch',
      'frame_type': 'content', 'icon': '○', 'tags': ['blank'],
      'content': {'blocks': []}},
@@ -73,7 +76,10 @@ def seed_builtin_templates(app=None):
         if FrameTemplate.query.filter_by(is_builtin=True).count() > 0:
             return
         for t in BUILTIN_TEMPLATES:
-            content = {'blocks': []}
+            # Preserve non-block content keys (e.g. a menu frame's `menu`), then
+            # rebuild blocks with fresh ids below.
+            content = {k: v for k, v in t['content'].items() if k != 'blocks'}
+            content['blocks'] = []
             for blk in t['content'].get('blocks', []):
                 nb = dict(blk)
                 nb['id'] = str(_uuid.uuid4())

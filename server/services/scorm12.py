@@ -204,16 +204,24 @@ def _cf_audio_script():
 
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
-                     disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None):
+                     disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None,
+                     menu_resolve=None):
     """Render a single SCO HTML page for one frame.
 
     The visible counter + progress bar use disp_index/disp_total (required
     frames only, excluding optional); navigation still uses the real
     frame_index/total_frames positions.
+
+    menu_resolve: for a menu frame (frame_type == 'menu'), a callable
+    item -> '<frame>.html' used to render the nav buttons instead of blocks.
     """
 
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg,
-                                 layout=frame.content.get('layout'))
+    from .menu_frame import is_menu_frame, get_menu, render_menu_html
+    if is_menu_frame(frame):
+        blocks_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None))
+    else:
+        blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg,
+                                     layout=frame.content.get('layout'))
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -1636,7 +1644,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
                      frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None,
-                     hotspot_cfg=None):
+                     hotspot_cfg=None, menu_resolve=None):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -1669,9 +1677,13 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
             return None, None
         html_path = candidates[0]
 
-    injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
-                                    if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
-                                   layout=(frame.content or {}).get('layout'))
+    from .menu_frame import is_menu_frame, get_menu, render_menu_html
+    if is_menu_frame(frame):
+        injected_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None), shelled=True)
+    else:
+        injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
+                                        if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
+                                       layout=(frame.content or {}).get('layout'))
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1680,7 +1692,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
                                section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                               asset_map=None, hotspot_cfg=None, preview=False):
+                               asset_map=None, hotspot_cfg=None, preview=False, menu_resolve=None):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected).
 
     preview: forwarded to _render_blocks so the live shell preview resolves media
@@ -1692,9 +1704,13 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         if not cands:
             return None, None
         html_path = cands[0]
-    injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
-                                   hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
-                                   layout=(frame.content or {}).get('layout'))
+    from .menu_frame import is_menu_frame, get_menu, render_menu_html
+    if is_menu_frame(frame):
+        injected_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None), shelled=True)
+    else:
+        injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
+                                       hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
+                                       layout=(frame.content or {}).get('layout'))
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total)
@@ -1910,9 +1926,14 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
     items      = []
     resources  = []
 
+    # Menu-frame nav: frame_id -> published filename, so a menu item's target
+    # frame (or a topic's first frame) resolves to the real SCO '<frame>.html'.
+    frame_id_to_fname = {}
+
     for idx, (frame, lesson, course) in enumerate(all_frames):
         fname = f"frame_{idx:04d}_{frame.id[:8]}.html"
         frame_map[idx] = fname
+        frame_id_to_fname[frame.id] = fname
         res_id = f"res_{idx:04d}"
         items.append({
             'item_id': f"item_{idx:04d}",
@@ -1983,6 +2004,15 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
         project_assets = MediaAsset.query.filter_by(project_id=project_id).all()
         asset_by_id = {a.id: a for a in project_assets}
 
+        # Menu-frame target resolver: item -> published '<frame>.html'. Topic
+        # (lesson/module) targets resolve to that section's first frame.
+        from .menu_frame import build_frame_index, resolve_target_frame_id
+        _menu_index = build_frame_index(project)
+
+        def menu_resolve(item):
+            tfid = resolve_target_frame_id(item, _menu_index)
+            return frame_id_to_fname.get(tfid) if tfid else None
+
         for idx, (frame, lesson, course) in enumerate(all_frames):
             fname = frame_map[idx]
 
@@ -1991,6 +2021,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 gui_html, gui_aid = _build_gui_frame(
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
+                    menu_resolve=menu_resolve,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
@@ -2004,6 +2035,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 ph, sid = _build_project_shell_frame(
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
+                    menu_resolve=menu_resolve,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)
@@ -2022,6 +2054,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                 disp_total=req_total,
                 asset_map=asset_by_id,
                 hotspot_cfg=hotspot_cfg,
+                menu_resolve=menu_resolve,
             )
             zf.writestr(fname, comment + html)
 
