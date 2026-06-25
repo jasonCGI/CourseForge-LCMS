@@ -304,7 +304,7 @@ export default function Model3DViewer({
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.6))
     const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(5, 8, 5); scene.add(key)
-    const fill = new THREE.DirectionalLight(0x8AAAC8, 0.4); fill.position.set(-5, 2, -5); scene.add(fill)
+    const fillLight = new THREE.DirectionalLight(0x8AAAC8, 0.4); fillLight.position.set(-5, 2, -5); scene.add(fillLight)
     const rim = new THREE.DirectionalLight(0xF59E0B, 0.2); rim.position.set(0, -3, -8); scene.add(rim)
 
     setLoading(true); setError(null)
