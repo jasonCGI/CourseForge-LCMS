@@ -899,25 +899,90 @@ function ensureFrameLinkStyle() {
   document.head.appendChild(el)
 }
 
+// Amber dotted-underline styling for inline image-swap triggers (mirrors the
+// server's _CF_SWAP_LINK_CSS). Injected once so the in-canvas render matches the
+// published SCO / live-preview look. The active variant (set on click) is a solid
+// amber underline; the dead variant is muted + not-allowed.
+const CF_SWAP_LINK_STYLE_ID = 'cf-swap-link-style'
+function ensureSwapLinkStyle() {
+  if (typeof document === 'undefined') return
+  if (document.getElementById(CF_SWAP_LINK_STYLE_ID)) return
+  const el = document.createElement('style')
+  el.id = CF_SWAP_LINK_STYLE_ID
+  // Target both .cf-swap-link (server-resolved markup) and a[data-cf-swap] (the
+  // raw author HTML the in-canvas React render shows before any server pass), so
+  // the trigger reads as interactive in every context.
+  el.textContent =
+    '.cf-swap-link,.cf-preview-richtext a[data-cf-swap]{color:#B45309;text-decoration:underline;' +
+    'text-decoration-style:dotted;text-decoration-color:#F59E0B;text-decoration-thickness:2px;' +
+    'text-underline-offset:2px;cursor:pointer;font-weight:600}' +
+    '.cf-swap-link:hover,.cf-preview-richtext a[data-cf-swap]:hover{color:#92400E;text-decoration-color:#B45309}' +
+    '.cf-swap-active{text-decoration-style:solid !important;background:rgba(245,158,11,.16);border-radius:3px}' +
+    '.cf-swap-link--dead{color:#9aa4b2;text-decoration-style:dotted;cursor:not-allowed;font-weight:400}'
+  document.head.appendChild(el)
+}
+
 function PreviewText({ block }) {
   const loadFrame     = useEditorStore(s => s.loadFrame)
   const activeProject = useProjectStore(s => s.activeProject)
 
-  useEffect(() => { ensureFrameLinkStyle() }, [])
+  useEffect(() => { ensureFrameLinkStyle(); ensureSwapLinkStyle() }, [])
 
-  // Intercept clicks on inline frame-links (<a data-cf-frame="<id>">). Like the
-  // branch/menu in-canvas behavior, navigation is done via the store's loadFrame
-  // (no raw <a href> nav in the editor preview). An id that isn't a real frame in
-  // the project is ignored (no dead navigation). Fully guarded so a bad/missing id
-  // never throws.
+  // Image-swap: change the frame's media image (the first img.cf-swap-target) to
+  // the trigger's asset. Mirrors the SCO runtime (sco_shell*): resolve the asset id
+  // to '/api/media/serve/<id>', capture the image's default src once, and toggle a
+  // .cf-swap-active highlight on the live trigger; clicking the active trigger
+  // reverts to default. The swap target lives in a SIBLING image block, so we walk
+  // up from the anchor to the nearest ancestor that contains an img.cf-swap-target.
+  // Fully guarded — no target / bad id / thrown DOM op silently no-ops.
+  const swapImage = (a) => {
+    try {
+      const id = a.getAttribute('data-cf-swap')
+      if (!id || !/^[\w-]+$/.test(id)) return            // inert / hostile id -> no-op
+      // Find the swap-target img within the current frame (walk up a bounded number
+      // of ancestors, then fall back to document — one frame renders at a time).
+      let img = null, node = a
+      for (let i = 0; i < 8 && node; i++) {
+        if (node.querySelector) { const found = node.querySelector('img.cf-swap-target'); if (found) { img = found; break } }
+        node = node.parentElement
+      }
+      if (!img && typeof document !== 'undefined') img = document.querySelector('img.cf-swap-target')
+      if (!img) return                                   // no surface -> no-op
+      const src = `/api/media/serve/${id}`
+      if (img.dataset.cfDefaultSrc == null) img.dataset.cfDefaultSrc = img.getAttribute('src') || ''
+      const wasActive = a.classList.contains('cf-swap-active')
+      // Clear active on every swap trigger in the frame (find them from the anchor's
+      // root the same way we found the image), then set the new state.
+      const root = node || document
+      try { (root.querySelectorAll ? root : document).querySelectorAll('a.cf-swap-link, a[data-cf-swap]').forEach(t => t.classList.remove('cf-swap-active')) } catch { /* noop */ }
+      if (wasActive) {
+        if (img.dataset.cfDefaultSrc) img.setAttribute('src', img.dataset.cfDefaultSrc)
+        return                                           // toggle-off -> revert to default
+      }
+      img.setAttribute('src', src)
+      try { a.classList.add('cf-swap-active') } catch { /* noop */ }
+    } catch { /* never let a swap click abort the render */ }
+  }
+
+  // Intercept clicks on inline frame-links (<a data-cf-frame="<id>">) AND inline
+  // image-swap triggers (<a data-cf-swap="<assetId>">). Frame-links navigate via
+  // the store's loadFrame (no raw <a href> nav in the editor preview); swap
+  // triggers change the frame's media image in place. Both fully guarded so a
+  // bad/missing id never throws (and never aborts the render).
   const onBodyClick = (e) => {
     try {
-      const a = e.target && e.target.closest && e.target.closest('a[data-cf-frame]')
-      if (!a) return
-      e.preventDefault()
-      e.stopPropagation()
-      const id = a.getAttribute('data-cf-frame')
-      if (frameExistsInProject(activeProject, id)) loadFrame(id)
+      // Frame-link first (a term can't be both — data-cf-frame wins if somehow both).
+      const fa = e.target && e.target.closest && e.target.closest('a[data-cf-frame]')
+      if (fa) {
+        e.preventDefault(); e.stopPropagation()
+        const id = fa.getAttribute('data-cf-frame')
+        if (frameExistsInProject(activeProject, id)) loadFrame(id)
+        return
+      }
+      const sa = e.target && e.target.closest && e.target.closest('a[data-cf-swap]')
+      if (!sa) return
+      e.preventDefault(); e.stopPropagation()
+      swapImage(sa)
     } catch { /* never let a stray click handler abort the render */ }
   }
 
@@ -1188,6 +1253,7 @@ function PreviewMedia({ block, fill = false }) {
         <div style={{ position: 'relative', overflow: 'hidden',
           ...(coverWrap || { width: '100%', display: 'inline-block', lineHeight: 0 }) }}>
           <img
+            className={kind === 'image' ? 'cf-swap-target' : undefined}
             src={block.data.serve_url}
             alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
             style={b ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
@@ -1203,6 +1269,7 @@ function PreviewMedia({ block, fill = false }) {
     return (
       <div style={coverWrap ? { ...coverWrap, overflow: 'hidden' } : { ...previewBlockWrap, textAlign: 'center' }}>
         <img
+          className={kind === 'image' ? 'cf-swap-target' : undefined}
           src={block.data.serve_url}
           alt={block.data.alt_text || block.data.placeholder_label || `${kind} placeholder`}
           // Image comes in as-is — no engine-imposed rounding/border/crop. When

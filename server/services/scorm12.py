@@ -39,18 +39,24 @@ _RICH_TAGS = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'a',
 # author can branch to another frame from inside body text. The render pass
 # (_render_blocks text case) rewrites those anchors into real navigation (the
 # published '<frame>.html' / the preview-html URL), exactly like the branch block.
+#
+# Inline image-swap convention (parallel): an <a> may carry data-cf-swap="<assetId>"
+# so clicking the term swaps the frame's media image (the .cf-swap-target <img>) to
+# that asset. The render pass resolves the asset id to a concrete src on the same
+# anchor (data-cf-swap-src) — preview '/api/media/serve/<id>', published
+# 'media/images/<id>.<ext>' — and a guarded runtime (sco_shell*) wires the click.
 _RICH_LINK_ATTRS = {'href', 'title', 'target', 'rel'}
 
 
 def _rich_a_attr(tag, name, value):
     """bleach attribute filter for <a>: keep the standard link attrs, and keep
-    data-cf-frame ONLY when its value is a valid id token ([\\w-]+) — a malformed
-    / hostile value drops the attribute (so it degrades to a plain link, never a
-    broken navigation target). Everything else (on*= handlers, style, …) is
-    stripped, unchanged from before."""
+    data-cf-frame / data-cf-swap ONLY when the value is a valid id token ([\\w-]+) —
+    a malformed / hostile value drops the attribute (so it degrades to a plain link,
+    never a broken navigation/swap target). Everything else (on*= handlers, style,
+    …) is stripped, unchanged from before."""
     if name in _RICH_LINK_ATTRS:
         return True
-    if name == 'data-cf-frame':
+    if name in ('data-cf-frame', 'data-cf-swap'):
         return bool(_safe_id(value))
     return False
 
@@ -161,6 +167,94 @@ _CF_FRAME_LINK_CSS = (
     'text-underline-offset:2px;cursor:pointer;font-weight:600}'
     '.cf-frame-link:hover{color:#92400E;text-decoration-color:#B45309}'
     '.cf-frame-link--dead{color:#9aa4b2;text-decoration-style:dotted;'
+    'cursor:not-allowed;font-weight:400}'
+    '</style>'
+)
+
+
+# Match a sanitized inline image-swap anchor: <a ... data-cf-swap="<id>" ...>.
+# Runs over bleach output (markup well-formed, value already a valid id token),
+# capturing the whole opening <a ...> tag and the swap-target asset id.
+_CF_SWAP_LINK_RE = re.compile(
+    r'(?is)<a\b([^>]*?)\sdata-cf-swap="([\w-]+)"([^>]*)>'
+)
+
+
+def _swap_img_src(asset_id, asset_map, preview):
+    """Resolve a swap-trigger's image asset id to a concrete src, the SAME way the
+    image media block resolves its <img> src:
+      * live preview -> '/api/media/serve/<id>'
+      * published SCO -> 'media/images/<id>.<ext>' (the bundled image path; the
+        publisher already bundles EVERY project image asset, so the swap image is
+        in the ZIP without any extra collection step).
+    Returns '' when the asset can't be resolved (preview always resolves to the
+    serve route; publish needs a real image asset to know the extension)."""
+    aid = _safe_id(asset_id)
+    if not aid:
+        return ''
+    if preview:
+        return f'/api/media/serve/{aid}'
+    asset = _get_asset(aid, asset_map)
+    if asset is None or getattr(asset, 'kind', None) != 'image':
+        return ''
+    name = getattr(asset, 'original_name', '') or ''
+    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else 'jpg'
+    if not re.fullmatch(r'[a-z0-9]+', ext):
+        ext = 'jpg'
+    return f'media/images/{aid}.{ext}'
+
+
+def _resolve_swap_links(html, asset_map, preview):
+    """Post-process sanitized text-block HTML: for every inline image-swap anchor
+    `<a data-cf-swap="<assetId>">`, resolve the asset to a concrete image src and
+    stamp it on the anchor as data-cf-swap-src (so the guarded runtime can swap the
+    .cf-swap-target <img> on click without knowing the file extension). Also tag the
+    anchor with the cf-swap-link class for the amber active-state styling.
+
+    Resolvable   -> <a class="cf-swap-link" data-cf-swap="<id>"
+                       data-cf-swap-src="<src>" ...> (active runtime swap).
+    Unresolvable -> <a class="cf-swap-link cf-swap-link--dead" data-cf-swap="<id>" ...>
+                    with NO data-cf-swap-src, so the runtime treats it as inert (the
+                    click is a no-op — never a broken image). Tag stays balanced.
+    Fully guarded: any resolver error degrades to the dead anchor rather than
+    throwing (a recent bug let one block abort the whole page runtime)."""
+    if not html or 'data-cf-swap' not in html:
+        return html
+
+    def _sub(m):
+        pre, aid, post = m.group(1), m.group(2), m.group(3)
+        attrs = (pre or '') + (post or '')
+        # Drop any author-set class so our cf-swap-link class is authoritative.
+        attrs = re.sub(r'(?is)\sclass="[^"]*"', '', attrs)
+        attrs = re.sub(r"(?is)\sclass='[^']*'", '', attrs)
+        src = ''
+        try:
+            src = _swap_img_src(aid, asset_map, preview)
+        except Exception:
+            src = ''
+        if src:
+            return (f'<a class="cf-swap-link" data-cf-swap="{esc(aid)}" '
+                    f'data-cf-swap-src="{esc(src)}"{attrs}>')
+        return ('<a class="cf-swap-link cf-swap-link--dead" '
+                f'data-cf-swap="{esc(aid)}" title="Swap image not found"{attrs}>')
+
+    return _CF_SWAP_LINK_RE.sub(_sub, html)
+
+
+# CSS for inline image-swap triggers — amber dotted underline (distinct from the
+# solid frame-link underline) so they read as "click to change the image". The
+# .cf-swap-active class (set by the runtime on the live trigger) becomes a solid
+# amber underline; the dead variant is muted + not-allowed. Injected once per page.
+_CF_SWAP_LINK_CSS = (
+    '<style>'
+    '.cf-swap-link{color:#B45309;text-decoration:underline;'
+    'text-decoration-style:dotted;text-decoration-color:#F59E0B;'
+    'text-decoration-thickness:2px;text-underline-offset:2px;'
+    'cursor:pointer;font-weight:600}'
+    '.cf-swap-link:hover{color:#92400E;text-decoration-color:#B45309}'
+    '.cf-swap-link.cf-swap-active{text-decoration-style:solid;'
+    'background:rgba(245,158,11,.16);border-radius:3px}'
+    '.cf-swap-link--dead{color:#9aa4b2;text-decoration-style:dotted;'
     'cursor:not-allowed;font-weight:400}'
     '</style>'
 )
@@ -732,6 +826,20 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # trigger_id, title) so the recall button can re-open the SAME modal (modal
     # mode) / the re-show modal (inline mode) that the block already built.
     wcn_recall = []
+    # Image-swap target: the FIRST rendered image's <img> is tagged cf-swap-target
+    # so an inline <a data-cf-swap> trigger knows which image to swap. One flag,
+    # flipped once, so multiple images on a frame don't all become swap targets
+    # (the convention is: the first image is the swap surface).
+    _swap_target_used = [False]
+
+    def _swap_target_cls():
+        """Return ' cf-swap-target' for the FIRST image only (then ''). Appended to
+        an image's class so the swap runtime can find the one img it swaps."""
+        if _swap_target_used[0]:
+            return ''
+        _swap_target_used[0] = True
+        return ' cf-swap-target'
+
     for block in blocks:
         btype = block.get('type')
         data  = block.get('data', {})
@@ -776,6 +884,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             # preview-html URL). Unresolvable -> inert link (never broken .html).
             body = _resolve_frame_links(
                 _sanitize_rich_html(data.get("body", "")), branch_resolve)
+            # Then resolve any inline image-swap <a data-cf-swap="<assetId>"> into a
+            # concrete image src on the anchor (data-cf-swap-src), the SAME way the
+            # image media block resolves its src (preview serve route / published
+            # bundled media path). Unresolvable -> inert (no swap-src), never throws.
+            body = _resolve_swap_links(body, asset_map, preview)
             html = f'<div class="cf-text">{body}</div>'
             if data.get('narrator_script'):
                 html += f'<div class="cf-narration">🎙 {esc(data["narrator_script"])}</div>'
@@ -943,6 +1056,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             alt      = esc(data.get('alt_text') or data.get('placeholder_label') or name or 'Image')
             caption  = esc(data.get('caption', ''))
             is_cover = data.get('fit') == 'cover'
+            swap_cls = _swap_target_cls()   # tag the first image as the swap surface
             if caption and is_cover:
                 # Cover image WITH a caption: the caption is an overlay pinned to
                 # the bottom of the image over a bottom-up gradient scrim, so it
@@ -950,7 +1064,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # below the fold. Image stays as-sent (object-fit:cover, no crop).
                 parts.append(
                     f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
-                    f'<img src="{src}" alt="{alt}" '
+                    f'<img class="cf-img{swap_cls}" src="{src}" alt="{alt}" '
                     f'style="display:block;width:100%;height:auto;object-fit:cover">'
                     f'<div style="position:absolute;left:0;right:0;bottom:0;'
                     f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
@@ -962,7 +1076,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                             if caption else '')
                 parts.append(
                     f'<div style="margin-bottom:20px">'
-                    f'<img src="{src}" alt="{alt}" '
+                    f'<img class="cf-img{swap_cls}" src="{src}" alt="{alt}" '
                     f'style="max-width:100%;height:auto">'
                     f'{cap_html}</div>'
                 )
@@ -977,13 +1091,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             caption  = esc(data.get('caption', ''))
             is_cover = data.get('fit') == 'cover'
             img_src  = f'media/images/{_safe_id(asset_id)}.{ext}'
+            swap_cls = _swap_target_cls()   # tag the first image as the swap surface
             if caption and is_cover:
                 # Cover image WITH a caption: overlay the caption on the image over
                 # a bottom-up gradient scrim (white text, WCAG AA) instead of a
                 # below-image <p>, so it never pushes content below the fold.
                 parts.append(
                     f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
-                    f'<img src="{img_src}" alt="{alt}" '
+                    f'<img class="cf-img{swap_cls}" src="{img_src}" alt="{alt}" '
                     f'style="display:block;width:100%;height:auto;object-fit:cover">'
                     f'<div style="position:absolute;left:0;right:0;bottom:0;'
                     f'padding:28px 16px 12px;color:#fff;font-size:13px;line-height:1.45;'
@@ -995,7 +1110,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                             if caption else '')
                 parts.append(
                     f'<div style="margin-bottom:20px">'
-                    f'<img src="{img_src}" alt="{alt}" '
+                    f'<img class="cf-img{swap_cls}" src="{img_src}" alt="{alt}" '
                     f'style="max-width:100%;height:auto">'
                     f'{cap_html}</div>'
                 )
@@ -1925,6 +2040,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # once per rendered block list when any text block carried a frame-link.
     if 'cf-frame-link' in out:
         out = _CF_FRAME_LINK_CSS + out
+    # Inline image-swap trigger styling (amber dotted underline), emitted once per
+    # rendered block list when any text block carried an image-swap trigger. The
+    # swap CLICK wiring lives in the page runtime (sco_shell* / preview shell);
+    # this only styles the trigger so it reads as interactive even before the
+    # runtime mounts (and degrades gracefully if the runtime is absent).
+    if 'cf-swap-link' in out:
+        out = _CF_SWAP_LINK_CSS + out
     return out
 
 

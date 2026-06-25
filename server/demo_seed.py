@@ -259,6 +259,28 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True,
                caption='Live example: cropped to a 16:9 content fit, optimized and EXIF-stripped'),
     ]},
+    {'name': 'Image Swap (click to change)', 'frame_type': 'content', 'lesson': 'Content Blocks',
+     'layout': 'text-left', 'blocks': [
+        # Half-layout (text left, image right). The text carries inline image-swap
+        # triggers: <a data-cf-swap="<assetId>">term</a>. Clicking a term swaps the
+        # image on the right (the first cf-swap-target <img>) to that asset; clicking
+        # the active term again reverts to the default. The data-cf-swap ids below are
+        # PLACEHOLDERS (__SWAP_A/B/C__) that _wire_demo_assets() rewrites to the real
+        # demo image asset ids once they're registered — so the demo works after a
+        # reset with zero manual uploads.
+        _text(body=(
+            '<h2>Image swap — click a term</h2>'
+            '<p>This frame shows the inline image-swap interaction. The image on the '
+            'right starts on its default view. Click '
+            '<a data-cf-swap="__SWAP_A__">view&nbsp;one</a>, '
+            '<a data-cf-swap="__SWAP_B__">view&nbsp;two</a>, or '
+            '<a data-cf-swap="__SWAP_C__">view&nbsp;three</a> '
+            'to change it in place. Click the active term again to return to the '
+            'default. The same markup drives the live preview and the published SCO.</p>'
+        )),
+        _image(label='Default view', color='#185FA5', icon='🖼',
+               caption='Click a term on the left to swap this image'),
+    ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Video fills the entire content area (cover fit), shown as-sent-in (no
         # engine rounding or letterbox) and played seamlessly (muted/looped/
@@ -534,6 +556,19 @@ def _wire_demo_assets(project):
             if fr.name == 'Image Block' and t == 'media' and d.get('kind') == 'image':
                 d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
                          original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
+            elif fr.name.startswith('Image Swap') and t == 'media' and d.get('kind') == 'image':
+                # Default image shown before any swap (the cf-swap-target surface).
+                d.update(asset_id=hb.id, serve_url=f'/api/media/serve/{hb.id}',
+                         original_name='hotspot_bg.jpg', asset_meta=_serialize_media(hb)); changed = True
+            elif fr.name.startswith('Image Swap') and t == 'text':
+                # Rewrite the placeholder swap ids to three real, already-bundled demo
+                # image assets so the swap works in preview AND the published SCO.
+                body = d.get('body', '') or ''
+                body = (body.replace('__SWAP_A__', img.id)
+                            .replace('__SWAP_B__', poster.id)
+                            .replace('__SWAP_C__', hb.id))
+                if body != d.get('body'):
+                    d['body'] = body; changed = True
             elif fr.name == 'Video Block' and t == 'media' and d.get('kind') == 'video':
                 # dock='bottom' keeps the playbar snapped to the content-area
                 # bottom once the real cover clip replaces the placeholder.

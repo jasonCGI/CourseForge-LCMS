@@ -6,11 +6,15 @@ import Link from '@tiptap/extension-link'
 import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { countWords, formatTime } from '../../../utils/wordCount'
+import { uploadMedia, listProjectMedia } from '../../../api/client'
+import MediaUploader from './MediaUploader'
 
-// Inline frame-link: a Link mark that ALSO carries data-cf-frame="<frameId>" so an
-// author can branch to another frame from inside body text. The publisher rewrites
-// these anchors into real in-course navigation (the branch block's frame_id→href
-// resolver); here we just need the attribute to round-trip through the editor HTML.
+// Inline frame-link / image-swap: ONE Link mark carrying BOTH data-cf-frame
+// (branch to another frame) AND data-cf-swap (swap the frame's media image to an
+// asset). The publisher rewrites these anchors into real navigation / a resolved
+// swap-src; here we just round-trip the attributes through the editor HTML. (A
+// single mark named 'link' — TipTap allows only one mark of a given name, so both
+// data attrs live on the same extension rather than two competing Link marks.)
 const FrameLink = Link.extend({
   name: 'link',
   addAttributes() {
@@ -21,6 +25,12 @@ const FrameLink = Link.extend({
         parseHTML: el => el.getAttribute('data-cf-frame'),
         renderHTML: attrs => (attrs['data-cf-frame']
           ? { 'data-cf-frame': attrs['data-cf-frame'] } : {}),
+      },
+      'data-cf-swap': {
+        default: null,
+        parseHTML: el => el.getAttribute('data-cf-swap'),
+        renderHTML: attrs => (attrs['data-cf-swap']
+          ? { 'data-cf-swap': attrs['data-cf-swap'] } : {}),
       },
     }
   },
@@ -46,7 +56,9 @@ export default function TextBlock({ block }) {
   const removeBlock = useEditorStore(s => s.removeBlock)
   const moveBlock   = useEditorStore(s => s.moveBlock)
   const frames      = useProjectFrames()
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerOpen, setPickerOpen]   = useState(false)
+  const [swapOpen, setSwapOpen]       = useState(false)
+  const activeProject = useProjectStore(s => s.activeProject)
 
   const editor = useEditor({
     extensions: [
@@ -82,6 +94,27 @@ export default function TextBlock({ block }) {
     setPickerOpen(false)
   }, [editor])
 
+  // Insert / wrap an image-swap trigger. With a text selection → wrap it; with no
+  // selection → insert the chosen image's label as the link text. data-cf-swap
+  // carries the image ASSET id (the author never types it — they pick/upload an
+  // image); href is a harmless placeholder (the publisher sets the real swap-src).
+  const insertSwapLink = useCallback((assetId, fallbackLabel) => {
+    if (!editor || !assetId) return
+    const { from, to } = editor.state.selection
+    const chain = editor.chain().focus()
+    if (from === to) {
+      const label = fallbackLabel || 'Show image'
+      chain.insertContent({
+        type: 'text',
+        text: label,
+        marks: [{ type: 'link', attrs: { href: '#', 'data-cf-swap': assetId } }],
+      }).run()
+    } else {
+      chain.setLink({ href: '#', 'data-cf-swap': assetId }).run()
+    }
+    setSwapOpen(false)
+  }, [editor])
+
   const hasSelection = editor && editor.state.selection.from !== editor.state.selection.to
 
   return (
@@ -111,17 +144,26 @@ export default function TextBlock({ block }) {
       }}>
         <button
           type="button"
-          onClick={() => setPickerOpen(o => !o)}
+          onClick={() => { setPickerOpen(o => !o); setSwapOpen(false) }}
           title="Insert a link that navigates to another frame"
           style={toolbarBtn}
         >
           🔗 Frame link
         </button>
-        {editor && editor.isActive('link', {}) && editor.getAttributes('link')['data-cf-frame'] && (
+        <button
+          type="button"
+          onClick={() => { setSwapOpen(o => !o); setPickerOpen(false) }}
+          title="Mark a term that swaps the frame's image to a chosen image when clicked"
+          style={toolbarBtn}
+        >
+          🖼 Swap image
+        </button>
+        {editor && editor.isActive('link', {}) &&
+         (editor.getAttributes('link')['data-cf-frame'] || editor.getAttributes('link')['data-cf-swap']) && (
           <button
             type="button"
             onClick={() => editor.chain().focus().unsetLink().run()}
-            title="Remove the frame link on the current selection"
+            title="Remove the frame link / image-swap on the current selection"
             style={{ ...toolbarBtn, color: '#E24B4A' }}
           >
             ✕ Unlink
@@ -146,6 +188,18 @@ export default function TextBlock({ block }) {
           ) : (
             <FramePickerSelect frames={frames} onPick={insertFrameLink} />
           )}
+        </div>
+      )}
+
+      {/* Image-swap picker — choose an existing project image OR upload a new one;
+          the chosen image's asset id becomes data-cf-swap (authors never type it). */}
+      {swapOpen && (
+        <div style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--color-border-tertiary)',
+          background: 'var(--color-background-secondary)',
+        }}>
+          <SwapImagePicker projectId={activeProject?.id} onPick={insertSwapLink} />
         </div>
       )}
 
@@ -190,6 +244,81 @@ function FramePickerSelect({ frames, onPick }) {
           <option key={f.id} value={f.id}>{f.label}</option>
         ))}
       </select>
+    </div>
+  )
+}
+
+// Image-swap picker: pick an EXISTING project image (the swap image is then
+// already bundled into any published SCO — the packager bundles every project
+// image asset) or upload a NEW one. Either way the chosen image's asset id is
+// handed to onPick as data-cf-swap; the author never sees or types the id.
+function SwapImagePicker({ projectId, onPick }) {
+  const [images, setImages]     = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]       = useState(null)
+
+  React.useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    setLoading(true)
+    listProjectMedia(projectId)
+      .then(({ data }) => { if (!cancelled) setImages((data || []).filter(a => a.kind === 'image')) })
+      .catch(() => { if (!cancelled) setError('Could not load project images.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [projectId])
+
+  const handleUpload = async (file) => {
+    if (!projectId) { setError('No project selected.'); return }
+    setUploading(true); setError(null)
+    try {
+      const { data } = await uploadMedia(file, projectId, 'image')
+      setImages(imgs => [data, ...imgs])
+      onPick(data.id, (data.original_name || 'image').replace(/\.[^.]+$/, ''))
+    } catch (e) {
+      setError(e.response?.data?.error || 'Upload failed.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {loading ? (
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>Loading images…</p>
+      ) : images.length > 0 ? (
+        <select
+          defaultValue=""
+          onChange={e => {
+            const a = images.find(im => im.id === e.target.value)
+            if (a) onPick(a.id, (a.original_name || 'image').replace(/\.[^.]+$/, ''))
+          }}
+          style={{
+            fontSize: 12, padding: '6px 8px',
+            border: '1px solid var(--color-border-tertiary)', borderRadius: 5,
+            background: 'var(--color-background-primary)', color: 'var(--color-text-primary)',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          <option value="" disabled>— pick a project image to show on click —</option>
+          {images.map(a => (
+            <option key={a.id} value={a.id}>{a.original_name || a.id}</option>
+          ))}
+        </select>
+      ) : (
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
+          No project images yet — upload one below.
+        </p>
+      )}
+      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary, #7a7a90)' }}>or upload a new image:</div>
+      <MediaUploader
+        accept={{ 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] }}
+        label="Drop an image to use as the swap target"
+        onUpload={handleUpload}
+        uploading={uploading}
+        error={error}
+      />
     </div>
   )
 }

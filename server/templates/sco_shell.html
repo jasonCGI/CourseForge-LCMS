@@ -488,6 +488,69 @@
   </script>
 
   <script>
+  // ── Image-swap runtime — click a marked term to swap the frame's media image ──
+  // Convention (set by the publisher / preview renderer):
+  //   trigger : <a data-cf-swap="<assetId>" data-cf-swap-src="<resolvedUrl>">term</a>
+  //             inside a text block. data-cf-swap-src is the SAME url the image
+  //             block would use (preview '/api/media/serve/<id>', published
+  //             'media/images/<id>.<ext>'). A trigger WITHOUT data-cf-swap-src
+  //             (asset unresolvable) is inert — its click is a no-op.
+  //   surface : the first image's <img class="cf-swap-target"> on the frame.
+  // Behavior: clicking a trigger sets the target img src to that trigger's image
+  // and marks the trigger .cf-swap-active (amber). Clicking another swaps again.
+  // Clicking the ALREADY-active trigger reverts the image to its default and clears
+  // the active state (a simple toggle-off). Everything is guarded so a missing
+  // target / inert trigger / thrown handler silently no-ops and NEVER aborts the
+  // rest of the page runtime (a recent bug let one block kill the whole preview).
+  (function(){
+    try {
+      var host = document.querySelector('.cf-content')
+              || document.querySelector('.cf-preview-main')
+              || document.getElementById('fgui-content')
+              || document.body;
+      if (!host || !host.querySelectorAll) return;
+      var triggers = host.querySelectorAll('a[data-cf-swap]');
+      if (!triggers.length) return;
+      // The image this frame swaps (first cf-swap-target). May be absent — then
+      // every trigger is a harmless no-op (degrade gracefully, never throw).
+      function target(){ try { return host.querySelector('img.cf-swap-target'); } catch(e){ return null; } }
+      var defaultSrc = null;   // captured lazily on the first successful swap
+      var active = null;       // the currently-active trigger element (or null)
+      function clearActive(){
+        try {
+          for (var i=0;i<triggers.length;i++) triggers[i].classList.remove('cf-swap-active');
+        } catch(e){}
+        active = null;
+      }
+      for (var i=0;i<triggers.length;i++){
+        (function(a){
+          if (a.__cfSwapWired) return; a.__cfSwapWired = true;
+          a.addEventListener('click', function(ev){
+            try {
+              if (ev && ev.preventDefault) ev.preventDefault();
+              var img = target();
+              if (!img) return;                          // no surface -> no-op
+              var src = a.getAttribute('data-cf-swap-src');
+              if (!src) return;                          // inert (unresolved) trigger
+              if (defaultSrc === null) defaultSrc = img.getAttribute('src') || '';
+              if (active === a){                         // toggle-off -> revert
+                if (defaultSrc) img.setAttribute('src', defaultSrc);
+                clearActive();
+                return;
+              }
+              clearActive();
+              img.setAttribute('src', src);
+              try { a.classList.add('cf-swap-active'); } catch(e){}
+              active = a;
+            } catch(e){ /* a single bad click never breaks the page */ }
+          });
+        })(triggers[i]);
+      }
+    } catch (e) { /* never let image-swap wiring abort the page runtime */ }
+  })();
+  </script>
+
+  <script>
   // ── IVideo runtime — timecode-triggered interactions (vanilla, self-contained) ──
   // An interaction is a *pause point* when reaching it should hold playback so the
   // learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with

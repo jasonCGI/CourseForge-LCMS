@@ -435,6 +435,51 @@
   </script>
 
   <script>
+  // ── Image-swap runtime — click a marked term to swap the frame's media image ──
+  // Mirror of sco_shell.html. Trigger <a data-cf-swap data-cf-swap-src> swaps the
+  // first <img class="cf-swap-target"> to the resolved image; clicking the active
+  // trigger reverts to the default. Fully guarded so a missing target / inert
+  // trigger / thrown handler silently no-ops and never aborts the page runtime.
+  (function(){
+    try {
+      var host = document.querySelector('.cf-content')
+              || document.querySelector('.cf-preview-main')
+              || document.getElementById('fgui-content')
+              || document.body;
+      if (!host || !host.querySelectorAll) return;
+      var triggers = host.querySelectorAll('a[data-cf-swap]');
+      if (!triggers.length) return;
+      function target(){ try { return host.querySelector('img.cf-swap-target'); } catch(e){ return null; } }
+      var defaultSrc = null, active = null;
+      function clearActive(){
+        try { for (var i=0;i<triggers.length;i++) triggers[i].classList.remove('cf-swap-active'); } catch(e){}
+        active = null;
+      }
+      for (var i=0;i<triggers.length;i++){
+        (function(a){
+          if (a.__cfSwapWired) return; a.__cfSwapWired = true;
+          a.addEventListener('click', function(ev){
+            try {
+              if (ev && ev.preventDefault) ev.preventDefault();
+              var img = target();
+              if (!img) return;
+              var src = a.getAttribute('data-cf-swap-src');
+              if (!src) return;
+              if (defaultSrc === null) defaultSrc = img.getAttribute('src') || '';
+              if (active === a){ if (defaultSrc) img.setAttribute('src', defaultSrc); clearActive(); return; }
+              clearActive();
+              img.setAttribute('src', src);
+              try { a.classList.add('cf-swap-active'); } catch(e){}
+              active = a;
+            } catch(e){}
+          });
+        })(triggers[i]);
+      }
+    } catch (e) { /* never let image-swap wiring abort the page runtime */ }
+  })();
+  </script>
+
+  <script>
   // ── IVideo runtime — timecode-triggered interactions (vanilla, self-contained) ──
   // An interaction is a *pause point* when reaching it should hold playback so the
   // learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with
