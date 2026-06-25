@@ -264,7 +264,18 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId }
     )
   }
 
-  const frameHtml = (contentBlocks || []).map(renderBlockToHTML).join('')
+  // Mirror scorm12._render_blocks (shelled path): the FIRST text block sits 40px
+  // from the top of the content area, media stays full-bleed. #fgui-content carries
+  // 12px padding inside the shell, so +28px on the first text block nets 40px.
+  let _shellTextSeen = false
+  const frameHtml = (contentBlocks || []).map((b) => {
+    const h = renderBlockToHTML(b)
+    if (b.type === 'text' && !_shellTextSeen) {
+      _shellTextSeen = true
+      return `<div class="cf-shelled-text-top" style="padding-top:28px">${h}</div>`
+    }
+    return h
+  }).join('')
 
   return (
     <div style={{ marginBottom: 16 }}>

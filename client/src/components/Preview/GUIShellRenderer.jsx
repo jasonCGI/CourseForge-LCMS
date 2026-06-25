@@ -34,6 +34,26 @@ export default function GUIShellRenderer({
       // verbatim) — leaving the counter stuck at "1 / total". Also drive the
       // postMessage bridge those shells map correctly. Idempotent on fixed shells.
       win.postMessage({ type: 'fgui_frame_data', ...(frameData || {}) }, '*')
+      // Version-INDEPENDENT counter (mirrors scorm12._patch_shell.paintCounter):
+      // the two calls above both depend on the stored shell's baked runtime (its
+      // setFrameData key-map and/or its async fgui_frame_data handler). When the
+      // shell was baked by an older shell_builder, the counter stuck at "1 / 1" or
+      // showed an empty total. Every shell_builder version tags the counter zone
+      // with data-zone-type="frame_counter", so write its text ourselves. Re-assert
+      // on a tick to win against the async postMessage handler's updateZones().
+      const fd = frameData || {}
+      const paintCounter = () => {
+        try {
+          const nodes = win.document.querySelectorAll('[data-zone-type="frame_counter"]')
+          for (let i = 0; i < nodes.length; i++) {
+            nodes[i].textContent = `${fd.frameIndex} / ${fd.totalFrames}`
+          }
+        } catch (e) { /* iframe torn down */ }
+      }
+      paintCounter()
+      win.requestAnimationFrame ? win.requestAnimationFrame(paintCounter) : setTimeout(paintCounter, 0)
+      setTimeout(paintCounter, 50)
+      setTimeout(paintCounter, 200)
       // injectContent uses innerHTML, so the bar's inline <script> never runs —
       // wire the branded audio bars directly in the iframe document instead.
       wireAudioBars(win.document)

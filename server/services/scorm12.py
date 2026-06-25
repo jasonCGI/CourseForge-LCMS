@@ -539,6 +539,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # ('text'|'other', start_index) marking where that block's HTML begins in
     # `parts`; populated only for the non-shelled flow path (see two-zone below).
     block_tags = []
+    # Set True if any block is bounds-wrapped into an absolute box (shelled path).
+    # Bounds-wrapping mutates `parts` (del/append), which invalidates the
+    # block_tags start offsets used by the shelled text-top reflow below, so we
+    # skip that reflow when absolute positioning is already in play.
+    _shelled_has_bounds = False
     for block in blocks:
         btype = block.get('type')
         data  = block.get('data', {})
@@ -1427,6 +1432,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         # in content-area pixels inside #fgui-content.
         b = data.get('bounds')
         if shelled and isinstance(b, dict) and len(parts) > start:
+            _shelled_has_bounds = True
             x = max(0, int(b.get('x') or 0)); y = max(0, int(b.get('y') or 0))
             w = max(1, int(b.get('width') or 0)); h = max(1, int(b.get('height') or 0))
             seg = '\n'.join(parts[start:]); del parts[start:]
@@ -1444,7 +1450,29 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     #   full        single column; media full-bleed, text 40px padding.
     #   text-left   50/50 split — text left, media right (both 40px padding).
     #   text-right  50/50 split — media left, text right (both 40px padding).
-    if not shelled and block_tags:
+    if shelled and block_tags and not _shelled_has_bounds:
+        # Shelled injection has no layout zones: blocks flow straight into
+        # #fgui-content (which carries 12px padding, set in _patch_shell). Per spec,
+        # the TEXT block must sit 40px from the top of the content area, while media
+        # stays full-bleed (no top padding). #fgui-content's 12px top padding already
+        # accounts for 12 of those px, so a text block needs +28px to net 40px from
+        # the content-area top. Wrap each text segment; leave media/other untouched.
+        segs = []  # (kind, html) per block, in flow order
+        for i, (kind, s) in enumerate(block_tags):
+            e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
+            segs.append((kind, '\n'.join(parts[s:e])))
+        wrapped = []
+        text_seen = False
+        for kind, seg in segs:
+            if kind == 'text' and not text_seen:
+                # Only the FIRST text block gets the 40px-from-top offset; later
+                # text blocks flow naturally beneath preceding content.
+                text_seen = True
+                wrapped.append(f'<div class="cf-shelled-text-top" style="padding-top:28px">{seg}</div>')
+            else:
+                wrapped.append(seg)
+        out = '\n'.join(wrapped)
+    elif not shelled and block_tags:
         lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
         segs = []  # (kind, html) per block, in flow order
         for i, (kind, s) in enumerate(block_tags):
@@ -1631,6 +1659,25 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     // postMessage bridge those shells DO map correctly, so the pager is right
     // regardless of when the shell was authored. Idempotent on fixed shells.
     try {{ window.postMessage(Object.assign({{ type: 'fgui_frame_data' }}, FRAME_DATA), '*'); }} catch(e) {{}}
+    // Version-INDEPENDENT counter: write the frame_counter zone text directly from
+    // FRAME_DATA, bypassing the shell's baked runtime entirely. The two paths above
+    // both depend on the stored shell's runtime (its setFrameData key-map and/or its
+    // async fgui_frame_data handler + updateZones); when the demo's shell was baked
+    // by an older shell_builder, OR when the postMessage race loses, the zone showed
+    // "1 / 1" or "13 / " (empty total). Every shell_builder version tags the counter
+    // zone div with data-zone-type="frame_counter", so we can populate it ourselves.
+    // Re-assert on a tick so we win against the async postMessage handler's
+    // updateZones() (which may run later with stale state on a buggy shell).
+    function paintCounter() {{
+      var nodes = document.querySelectorAll('[data-zone-type="frame_counter"]');
+      for (var i = 0; i < nodes.length; i++) {{
+        nodes[i].textContent = FRAME_DATA.frameIndex + ' / ' + FRAME_DATA.totalFrames;
+      }}
+    }}
+    paintCounter();
+    requestAnimationFrame(paintCounter);
+    setTimeout(paintCounter, 50);
+    setTimeout(paintCounter, 200);
     window.fgui.onAction = function(action) {{
       // Bubble to a host that drives navigation itself (the course-preview
       // wrapper). Harmless in a published SCO — the LMS ignores it and the
