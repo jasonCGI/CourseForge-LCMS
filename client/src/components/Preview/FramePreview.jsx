@@ -151,6 +151,9 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
               </div>
             )
             const textZone = zone(textBlocks, false)
+            // No media to fill the other half (e.g. only an auxiliary docked audio
+            // bar) — render the text full-width instead of a half-empty split.
+            if (otherBlocks.length === 0) return textZone
             const mediaZone = zone(otherBlocks, true)
             return layout === 'text-right'
               ? <>{mediaZone}{textZone}</>
@@ -607,6 +610,7 @@ function PreviewText({ block }) {
     <div style={previewBlockWrap}>
       {block.data.body && (
         <div
+          className="cf-preview-richtext"
           style={{ fontSize: 'var(--cf-preview-body, 18px)', lineHeight: 1.7, color: '#1a1a1a', marginBottom: 12 }}
           dangerouslySetInnerHTML={{ __html: block.data.body }}
         />

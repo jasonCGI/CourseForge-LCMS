@@ -550,7 +550,20 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         bid   = block.get('id', str(uuid.uuid4()))
         start = len(parts)   # where this block's HTML begins (for bounds-wrapping)
         if btype != 'gui':
-            block_tags.append(('text' if btype == 'text' else 'other', start))
+            # A docked audio bar is an AUXILIARY element pinned to the content-area
+            # bottom (position:absolute) — it is NOT a layout zone-filler. Tag it
+            # 'aux' so the layout reflow below ignores it when deciding text vs.
+            # media zones (parity with FramePreview.jsx's isDockedAudio). Without
+            # this, an audio block makes a text+audio 'full' frame look like
+            # text+media and skips the proper full-width 40px-padded text box.
+            if (btype == 'media' and data.get('kind') == 'audio'
+                    and data.get('dock') == 'bottom'):
+                kind_tag = 'aux'
+            elif btype == 'text':
+                kind_tag = 'text'
+            else:
+                kind_tag = 'other'
+            block_tags.append((kind_tag, start))
 
         if btype == 'gui':
             # GUI shell blocks only render as the SCO page in SCORM 1.2 (handled
@@ -1496,11 +1509,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         # flow gap, no floating). Mechanism = CSS % (resolution-independent), so we
         # never need the content-area's pixel size.
         #
-        # #fgui-content is position:relative with 12px padding (set in _patch_shell);
-        # absolute children would normally anchor INSIDE that padding. A single
-        # `.cf-layout-zones` layer cancels the padding on all four sides
-        # (inset:-12px) so its % zones address the FULL content area edge-to-edge.
-        # Text zones carry 40px CSS padding; media/3D/image/video zones fill their
+        # #fgui-content is position:relative with 12px padding (set in _patch_shell).
+        # Absolute children anchor to its PADDING box, which (border-box, no border)
+        # IS the element's edge — so a single `.cf-layout-zones` layer at
+        # top:0/left:0 sized 100%/100% already addresses the FULL content area edge
+        # to edge (the 12px padding only insets normal-flow children, never the
+        # zones). Text zones carry 40px CSS padding; media/3D/image/video zones fill their
         # half/full with no padding (the 3D viewer's wrapper is forced to height:100%
         # by the .cf-zone-media rule in _patch_shell, so its canvas fills the box).
         lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
@@ -1509,7 +1523,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
             segs.append((kind, '\n'.join(parts[s:e])))
         text_html  = '\n'.join(seg for kind, seg in segs if kind == 'text')
-        other_html = '\n'.join(seg for kind, seg in segs if kind != 'text')
+        other_html = '\n'.join(seg for kind, seg in segs if kind == 'other')
+        # Auxiliary blocks (docked audio) render as-is, OUTSIDE the zone layout —
+        # they self-position (position:absolute) against #fgui-content. Kept out
+        # of has_text/has_media so they never force a stacked split.
+        aux_html   = '\n'.join(seg for kind, seg in segs if kind == 'aux')
         has_text, has_media = bool(text_html.strip()), bool(other_html.strip())
 
         # FULL with BOTH a text AND a media block isn't a single fill — there are two
@@ -1520,9 +1538,23 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         if lay == 'full' and has_text and has_media:
             stacked = []
             for kind, seg in segs:
+                if kind == 'aux':
+                    continue
                 pad = '40px' if kind == 'text' else '0'
                 stacked.append(f'<div style="padding:{pad}">{seg}</div>')
             out = f'<div class="cf-layout-full">{chr(10).join(stacked)}</div>'
+        elif has_text and not has_media:
+            # Text-only content (no media zone-filler — e.g. a text block with only
+            # an auxiliary docked audio bar). A split layout (text-left/right) is
+            # meaningless with nothing to put in the other half, so collapse to ONE
+            # full-width box that applies the 40px-all-sides padding rule (top AND
+            # right AND bottom AND left) and scrolls itself. The .cf-shelled-text-top
+            # rule positions it top:0/left:0 at 100%/100% so it owns the whole content
+            # area edge to edge (anchored to #fgui-content's padding box = its edge).
+            # When a docked audio bar is present, reserve extra bottom room (~88px)
+            # so the bar never overlaps the last line of copy.
+            dock_pad = ' style="padding-bottom:88px"' if aux_html else ''
+            out = f'<div class="cf-shelled-text-top"{dock_pad}>{text_html}</div>'
         else:
             # Zone geometry as % of the content area: (left, width) per the layout.
             # y is always 0 and height always 100% (full content-area height).
@@ -1545,33 +1577,54 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                     f'<div class="cf-zone-media" style="position:absolute;top:0;left:{m_left};'
                     f'width:{m_w};height:100%;box-sizing:border-box;overflow:hidden">'
                     f'{other_html}</div>')
+            # Absolutely-positioned children of #fgui-content anchor to its PADDING
+            # box, which for a border-box element with no border is the full element
+            # edge — so top:0/left:0 + 100%/100% already fills the content area edge
+            # to edge (the 12px padding only insets normal-flow children). A negative
+            # inset would instead push the zone 12px PAST every edge and trip the
+            # content area's scrollbar; top:0 + 100% fits exactly (no overflow).
             out = (
-                f'<div class="cf-layout-zones" style="position:absolute;top:-12px;left:-12px;'
-                f'right:-12px;bottom:-12px;overflow:hidden">' + '\n'.join(zones) + '</div>'
+                f'<div class="cf-layout-zones" style="position:absolute;top:0;left:0;'
+                f'width:100%;height:100%;overflow:hidden">' + '\n'.join(zones) + '</div>'
             )
+        # Auxiliary docked audio (kept out of the zone layout) renders alongside it;
+        # it self-anchors to #fgui-content's bottom via position:absolute.
+        if aux_html:
+            out = out + '\n' + aux_html
     elif not shelled and block_tags:
         lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
         segs = []  # (kind, html) per block, in flow order
         for i, (kind, s) in enumerate(block_tags):
             e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
             segs.append((kind, '\n'.join(parts[s:e])))
+        # Docked audio is auxiliary (renders in flow but isn't a layout zone-filler).
+        aux_segs   = [seg for kind, seg in segs if kind == 'aux']
+        aux_html   = chr(10).join(aux_segs)
         if lay == 'full':
             wrapped = [
                 f'<div style="padding:{"40px" if kind == "text" else "0"}">{seg}</div>'
-                for kind, seg in segs
+                for kind, seg in segs if kind != 'aux'
             ]
             out = f'<div class="cf-layout-full">{chr(10).join(wrapped)}</div>'
         else:
             text_html  = [seg for kind, seg in segs if kind == 'text']
-            other_html = [seg for kind, seg in segs if kind != 'text']
+            other_html = [seg for kind, seg in segs if kind == 'other']
             col = 'flex:1 1 0;min-width:0;box-sizing:border-box;padding:40px'
-            text_zone  = f'<div class="cf-zone-text" style="{col}">{chr(10).join(text_html)}</div>'
-            media_zone = f'<div class="cf-zone-media" style="{col}">{chr(10).join(other_html)}</div>'
-            zones = (media_zone + text_zone) if lay == 'text-right' else (text_zone + media_zone)
-            out = (
-                f'<div class="cf-two-zone" style="display:flex;flex-wrap:wrap;align-items:flex-start">'
-                f'{zones}</div>'
-            )
+            if other_html:
+                text_zone  = f'<div class="cf-zone-text" style="{col}">{chr(10).join(text_html)}</div>'
+                media_zone = f'<div class="cf-zone-media" style="{col}">{chr(10).join(other_html)}</div>'
+                zones = (media_zone + text_zone) if lay == 'text-right' else (text_zone + media_zone)
+                out = (
+                    f'<div class="cf-two-zone" style="display:flex;flex-wrap:wrap;align-items:flex-start">'
+                    f'{zones}</div>'
+                )
+            else:
+                # Text-only (no media to fill the other half) — one full-width
+                # 40px-padded column instead of a half-empty split.
+                out = (f'<div class="cf-zone-text" style="box-sizing:border-box;'
+                       f'padding:40px">{chr(10).join(text_html)}</div>')
+        if aux_html:
+            out = out + chr(10) + aux_html
     else:
         out = '\n'.join(parts)
     # Wire every branded audio bar with one self-contained controller (emitted
@@ -1790,12 +1843,24 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
   style.textContent =
     '#fgui-content{{font-family:\\'IBM Plex Mono\\',\\'Inter\\',system-ui,sans-serif;' +
     'font-size:14px;color:#C8D8E8;line-height:1.6;padding:12px;box-sizing:border-box;' +
-    'overflow-y:auto;height:100%}}' +
+    // Full-size media/zones fill the content area edge to edge (top:0/100%); the
+    // content box must NEVER scroll (any sub-pixel overhang would otherwise add a
+    // scrollbar). Clip instead — full items fill, overflowing text scrolls its
+    // OWN zone (.cf-zone-text / .cf-shelled-text-top carry overflow:auto).
+    'overflow:hidden;height:100%}}' +
     '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
-    '#fgui-content p{{margin-bottom:10px}}#fgui-content ul{{margin:8px 0 10px 20px}}' +
+    '#fgui-content p{{margin-bottom:10px}}' +
+    // List indent: the global *{{padding:0}} reset zeroes padding-left, so an
+    // outside marker would hug the text edge. Restore a real padding-left so
+    // bullets/numbers sit clearly indented from the body text.
+    '#fgui-content ul,#fgui-content ol{{margin:8px 0 10px 0;padding-left:1.6em}}' +
     '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto}}' +
     '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}' +
     '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}' +
+    // A text-only shelled frame fills the whole content area; this box applies
+    // the 40px-on-all-sides padding rule (top AND right AND bottom AND left) and
+    // scrolls itself if the copy is long, so the content area never scrolls.
+    '.cf-shelled-text-top{{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto}}' +
     '.cf-zone-text{{font-size:14px}}' +
     '.cf-zone-media>*{{margin:0!important}}' +
     '.cf-zone-media img,.cf-zone-media video{{width:100%;height:100%;object-fit:contain;display:block;max-width:none}}' +

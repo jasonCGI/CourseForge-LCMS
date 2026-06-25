@@ -169,6 +169,9 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
       border-bottom: 3px solid var(--cf-accent, #D4820A);
     }}
     .cf-text {{ margin-bottom: 20px; line-height: 1.7; }}
+    /* Global reset zeroes padding-left — restore a real list indent. */
+    .cf-text ul, .cf-text ol {{ margin: 8px 0 12px 0; padding-left: 1.6em; }}
+    .cf-text li {{ margin-bottom: 4px; }}
     .cf-media {{
       padding: 32px; border: 2px dashed var(--cf-primary, #185FA5);
       border-radius: var(--cf-radius, 6px); text-align: center;

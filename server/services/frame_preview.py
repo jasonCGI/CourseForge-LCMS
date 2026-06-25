@@ -92,6 +92,9 @@ body{
 }
 .cf-preview-main img{max-width:100%;height:auto}
 .cf-preview-main iframe{max-width:100%;border:0}
+/* Restore list indent so bullets/numbers sit clearly inside the body text. */
+.cf-preview-main ul,.cf-preview-main ol{margin:8px 0 12px 0;padding-left:1.6em}
+.cf-preview-main li{margin-bottom:4px}
 .cf-media{
   border:1px dashed #c9ced6;border-radius:8px;padding:24px;text-align:center;
   color:#6a7686;font-size:14px;margin-bottom:20px;background:#f6f8fb;

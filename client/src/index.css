@@ -38,6 +38,15 @@ body { margin: 0; font-family: var(--font-sans); }
   margin: 0.4em 0;
 }
 
+/* Rendered (non-editor) rich text in the live preview — the body HTML is
+   injected raw, so without an explicit indent its list markers would hug the
+   text edge. Mirrors the shell/SCO/web-export ul/ol padding-left rule. */
+.cf-preview-richtext ul, .cf-preview-richtext ol {
+  padding-left: 1.6em;
+  margin: 8px 0 12px;
+}
+.cf-preview-richtext li { margin-bottom: 4px; }
+
 .tiptap h1 { font-size: 1.4em; font-weight: 600; margin: 0.4em 0; }
 .tiptap h2 { font-size: 1.2em; font-weight: 600; margin: 0.4em 0; }
 .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.4em 0; }
