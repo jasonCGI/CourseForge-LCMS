@@ -12,6 +12,7 @@ import useEditorStore from '../../store/editorStore'
 import { BLOCK_TYPES } from './BlockToolbar'
 import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
+import FrameLayout from './FrameLayout'
 import BlockToolbar from './BlockToolbar'
 import TextBlock from './blocks/TextBlock'
 import MediaBlock from './blocks/MediaBlock'
@@ -150,9 +151,9 @@ export default function TabbedFrameEditor() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {tab === FRAME_TAB ? (
           <>
+            <FrameLayout frame={activeFrame} />
             <FramePrompt frame={activeFrame} />
             <FrameNotes frame={activeFrame} />
-            <LayoutPresetStub />
           </>
         ) : activeBlock ? (
           <div>
@@ -179,32 +180,6 @@ export default function TabbedFrameEditor() {
 
       <BlockToolbar />
       {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)} />}
-    </div>
-  )
-}
-
-// Placeholder for the frame-level layout-preset picker (the "layout bible").
-// Wires to the CSS layout presets next; shown so the Frame tab's role is clear.
-function LayoutPresetStub() {
-  return (
-    <div style={{ marginTop: 18, padding: '12px 14px', border: '1px dashed var(--cf-border-tertiary)',
-      borderRadius: 6, background: 'var(--cf-input-bg, #060810)' }}>
-      <div style={{ fontSize: 10, fontFamily: 'var(--forge-font)', letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--cf-text-tertiary)', marginBottom: 8 }}>
-        Layout (prototype)
-      </div>
-      <select disabled defaultValue="stack"
-        style={{ width: '100%', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)',
-          border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px',
-          fontSize: 13, opacity: 0.6 }}>
-        <option value="stack">Default — stacked</option>
-        <option value="text-left">Text Left / Media Right</option>
-        <option value="media-top">Media Top / Text Bottom</option>
-        <option value="full-bleed">Full Bleed</option>
-      </select>
-      <div style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', marginTop: 6 }}>
-        Wires to the layout-preset bible — picking a layout re-flows the live preview.
-      </div>
     </div>
   )
 }

@@ -71,6 +71,10 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   const flow    = (contentArea ? blocks.filter(b => !b.data?.bounds) : blocks).filter(b => !isDockedAudio(b))
   const textBlocks  = flow.filter(b => b.type === 'text')
   const otherBlocks = flow.filter(b => b.type !== 'text')
+  // Frame layout preset (content.layout): 'full' = single column (media full-bleed,
+  // text 40px padding), 'text-left'/'text-right' = 50/50 split. Mirrors
+  // scorm12._render_blocks so the live preview and the SCO reflow identically.
+  const layout = frame?.content?.layout || 'text-left'
   const renderBlock = (block) => (
     <SelectableBlock key={block.id} block={block}
       active={block.id === activeBlockId} onSelect={onBlockSelect} />
@@ -104,17 +108,32 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         <p style={{ color: '#888', fontStyle: 'italic', padding: '0 25px' }}>No content blocks in this frame.</p>
       )}
 
-      {/* Basic two-zone layout: text on the left half, media/image/3D on the right
-          half — each 50%, 25px padding. A layout-preset dropdown (text-left/
-          image-right, image-left/text-right, …) will replace this default later. */}
-      {flow.length > 0 && (
+      {/* Layout preset (frame.content.layout). 'full' = single column with
+          full-bleed media and 40px-padded text; 'text-left'/'text-right' = two
+          50% zones (text + media), 40px padding each, ordered by the preset. */}
+      {flow.length > 0 && layout === 'full' && (
+        <div>
+          {flow.map(b => (
+            <div key={b.id} style={{ padding: b.type === 'text' ? 40 : 0 }}>
+              {renderBlock(b)}
+            </div>
+          ))}
+        </div>
+      )}
+      {flow.length > 0 && layout !== 'full' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 25 }}>
-            {textBlocks.map(renderBlock)}
-          </div>
-          <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 25 }}>
-            {otherBlocks.map(renderBlock)}
-          </div>
+          {(() => {
+            const zone = (blocks2) => (
+              <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', padding: 40 }}>
+                {blocks2.map(renderBlock)}
+              </div>
+            )
+            const textZone = zone(textBlocks)
+            const mediaZone = zone(otherBlocks)
+            return layout === 'text-right'
+              ? <>{mediaZone}{textZone}</>
+              : <>{textZone}{mediaZone}</>
+          })()}
         </div>
       )}
       {/* Custom-bounds blocks: absolute boxes in content-area pixels (anchor to the

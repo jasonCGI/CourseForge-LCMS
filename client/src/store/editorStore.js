@@ -259,6 +259,16 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
+  // Per-frame layout preset — 'full' | 'text-left' | 'text-right'. Drives how the
+  // live preview / SCO reflows flow blocks (see FramePreview + scorm12._render_blocks).
+  // Stored inside content so it rides the existing content autosave (no schema change).
+  setFrameLayout: (val) => {
+    const { activeFrame } = get()
+    if (!activeFrame) return
+    set({ activeFrame: { ...activeFrame, content: { ...activeFrame.content, layout: val } }, isDirty: true })
+    get()._scheduleAutosave()
+  },
+
   // Manual save
   save: async () => {
     if (autosaveTimer) clearTimeout(autosaveTimer)

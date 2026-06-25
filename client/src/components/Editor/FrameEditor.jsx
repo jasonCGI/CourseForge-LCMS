@@ -13,6 +13,7 @@ import useClipboardStore from '../../store/clipboardStore'
 import { countWords, formatTime } from '../../utils/wordCount'
 import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
+import FrameLayout from './FrameLayout'
 import BlockToolbar from './BlockToolbar'
 import TextBlock from './blocks/TextBlock'
 import MediaBlock from './blocks/MediaBlock'
@@ -169,6 +170,7 @@ export default function FrameEditor() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        <FrameLayout frame={activeFrame} />
         <FramePrompt frame={activeFrame} />
         <FrameNotes frame={activeFrame} />
         {copiedBlock && (

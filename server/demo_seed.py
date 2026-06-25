@@ -247,7 +247,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
             narration='The Text block supports rich HTML formatting for on-screen display, plus a '
                       'separate narrator script for audio narration. Keep on-screen text concise.'),
     ]},
-    {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
+    {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Image fills the entire content area (cover fit), shown as-sent-in (no
         # engine rounding or crop). The caption rides over the bottom of the image
         # as a scrim overlay (white text, readable over any image) — it never
@@ -255,7 +255,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True,
                caption='Live example: cropped to a 16:9 content fit, optimized and EXIF-stripped'),
     ]},
-    {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
+    {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Video fills the entire content area (cover fit), shown as-sent-in (no
         # engine rounding or letterbox) and played seamlessly (muted/looped/
         # autoplay). The caption rides over the bottom of the video as a scrim
@@ -373,7 +373,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
     ]},
 
     # ── Advanced Blocks ──
-    {'name': '3D Model Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
+    {'name': '3D Model Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'text-left', 'blocks': [
         _text(body='<h2>3D Model Block</h2><p>The 3D Model block renders interactive GLB files using Three.js. '
                    'Learners orbit and zoom to examine the model from any angle. Authors place annotation pins '
                    'on the model surface directly in the editor with the <strong>✦ Place pin</strong> button.</p>'
@@ -384,7 +384,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         _model3d(caption='Upload a .glb file to activate this block. Export from 3ds Max: '
                          'File → Export → glTF 2.0 · embed textures · Reset XForm first'),
     ]},
-    {'name': 'Interactive Video Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
+    {'name': 'Interactive Video Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
         _text(body='<h2>Interactive Video Block</h2><p>The Interactive Video block (ivideo) combines video '
                    'playback with timecode-triggered interactions authored in <strong>ForgeClip</strong> — '
                    'quiz checkpoints, hotspot overlays, branch points, WCN overlays, and annotations. The '
@@ -399,7 +399,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                         'frames, then upload the baked MP4 and clip JSON here.'),
         _ivideo(caption='Live example — annotation (2-8s) + pause-on-reach hotspot (4-9s), authored in ForgeClip'),
     ]},
-    {'name': 'OAM Block — Adobe Animate', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'blocks': [
+    {'name': 'OAM Block — Adobe Animate', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
         _text(body='<h2>OAM Block — Adobe Animate Canvas</h2><p>The OAM block embeds Adobe Animate Canvas '
                    '(HTML5) animations directly in a frame. Export your animation as an OAM package from '
                    'Adobe Animate CC and upload it here — CourseForge extracts all assets automatically.</p>'
@@ -614,9 +614,12 @@ def seed_demo(app=None):
         if not lesson:
             continue
         order = counters[fd['lesson']]; counters[fd['lesson']] += 1
+        content = {'blocks': fd['blocks']}
+        if fd.get('layout'):
+            content['layout'] = fd['layout']
         db.session.add(Frame(id=str(uuid.uuid4()), lesson_id=lesson.id, name=fd['name'],
                              frame_type=fd.get('frame_type', 'content'), order_index=order,
-                             content={'blocks': fd['blocks']}))
+                             content=content))
 
     db.session.commit()
     total = sum(counters.values())

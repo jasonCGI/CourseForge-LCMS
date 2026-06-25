@@ -144,7 +144,8 @@ def build_frame_html(frame, lesson, frame_index, total_frames,
     frame_index/total_frames positions.
     """
 
-    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg)
+    blocks_html = _render_blocks(frame.content.get('blocks', []), scorm_bridge, asset_map, hotspot_cfg,
+                                 layout=frame.content.get('layout'))
 
     counter_index = disp_index if disp_index is not None else (frame_index + 1)
     counter_total = disp_total if disp_total is not None else total_frames
@@ -422,7 +423,7 @@ def _hotspot_radius(shape):
 
 
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
-                   preview=False):
+                   preview=False, layout=None):
     """Convert block list to HTML string.
 
     shelled: True when injecting into a GUI shell's #fgui-content (positioned
@@ -1308,24 +1309,35 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
             )
 
-    # Two-zone layout (parity with FramePreview.jsx): in the normal flow render
-    # (NOT the GUI-shell injection, which positions blocks via bounds) split the
-    # flow blocks into a left 50% column of text blocks and a right 50% column of
-    # everything else, each with 25px padding. Soft flex rule that wraps on narrow
-    # widths. Feeds both /preview-html and the published SCO.
+    # Layout preset (parity with FramePreview.jsx). In the normal flow render (NOT
+    # the GUI-shell injection, which positions blocks via bounds), reflow the flow
+    # blocks per frame.content.layout. Feeds both /preview-html and the published SCO.
+    #   full        single column; media full-bleed, text 40px padding.
+    #   text-left   50/50 split — text left, media right (both 40px padding).
+    #   text-right  50/50 split — media left, text right (both 40px padding).
     if not shelled and block_tags:
-        text_html, other_html = [], []
+        lay = layout if layout in ('full', 'text-left', 'text-right') else 'text-left'
+        segs = []  # (kind, html) per block, in flow order
         for i, (kind, s) in enumerate(block_tags):
             e = block_tags[i + 1][1] if i + 1 < len(block_tags) else len(parts)
-            seg = '\n'.join(parts[s:e])
-            (text_html if kind == 'text' else other_html).append(seg)
-        col = ('flex:1 1 0;min-width:0;box-sizing:border-box;padding:25px')
-        out = (
-            f'<div class="cf-two-zone" style="display:flex;flex-wrap:wrap;align-items:flex-start">'
-            f'<div class="cf-zone-text" style="{col}">{chr(10).join(text_html)}</div>'
-            f'<div class="cf-zone-media" style="{col}">{chr(10).join(other_html)}</div>'
-            f'</div>'
-        )
+            segs.append((kind, '\n'.join(parts[s:e])))
+        if lay == 'full':
+            wrapped = [
+                f'<div style="padding:{"40px" if kind == "text" else "0"}">{seg}</div>'
+                for kind, seg in segs
+            ]
+            out = f'<div class="cf-layout-full">{chr(10).join(wrapped)}</div>'
+        else:
+            text_html  = [seg for kind, seg in segs if kind == 'text']
+            other_html = [seg for kind, seg in segs if kind != 'text']
+            col = 'flex:1 1 0;min-width:0;box-sizing:border-box;padding:40px'
+            text_zone  = f'<div class="cf-zone-text" style="{col}">{chr(10).join(text_html)}</div>'
+            media_zone = f'<div class="cf-zone-media" style="{col}">{chr(10).join(other_html)}</div>'
+            zones = (media_zone + text_zone) if lay == 'text-right' else (text_zone + media_zone)
+            out = (
+                f'<div class="cf-two-zone" style="display:flex;flex-wrap:wrap;align-items:flex-start">'
+                f'{zones}</div>'
+            )
     else:
         out = '\n'.join(parts)
     # Wire every branded audio bar with one self-contained controller (emitted
