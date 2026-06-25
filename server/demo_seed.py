@@ -386,29 +386,11 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                          'File → Export → glTF 2.0 · embed textures · Reset XForm first'),
     ]},
     {'name': 'Interactive Video Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
-        _text(body='<h2>Interactive Video Block</h2><p>The Interactive Video block (ivideo) combines video '
-                   'playback with timecode-triggered interactions authored in <strong>ForgeClip</strong> — '
-                   'quiz checkpoints, hotspot overlays, branch points, WCN overlays, and annotations. The '
-                   'example below is live: a timed annotation plus a pause-on-reach hotspot.</p>'
-                   '<p><strong>Workflow:</strong></p><ol>'
-                   '<li>Process source video in ForgePack (Interactive Video preset — CFR 30fps)</li>'
-                   '<li>Author interactions in ForgeClip — place markers at timecodes</li>'
-                   '<li>Click <strong>🔥 Bake &amp; Export</strong> — inserts 1s hold frames at each marker</li>'
-                   '<li>Upload the <code>_baked.mp4</code> and <code>_baked.clip.json</code> here</li></ol>',
-              narration='The Interactive Video block plays a processed video with timecode-triggered '
-                        'interactions authored in ForgeClip. After authoring, Bake and Export inserts hold '
-                        'frames, then upload the baked MP4 and clip JSON here.'),
+        # Media-only, full screen — this is how an iVideo is used in production.
         _ivideo(caption='Live example — annotation (2-8s) + pause-on-reach hotspot (4-9s), authored in ForgeClip'),
     ]},
     {'name': 'OAM Block — Adobe Animate', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
-        _text(body='<h2>OAM Block — Adobe Animate Canvas</h2><p>The OAM block embeds Adobe Animate Canvas '
-                   '(HTML5) animations directly in a frame. Export your animation as an OAM package from '
-                   'Adobe Animate CC and upload it here — CourseForge extracts all assets automatically.</p>'
-                   '<p>Enable the SCORM bridge toggle for animations that report completion or score to the '
-                   'LMS via the <code>window.API</code> object.</p>',
-              narration='The OAM block embeds Adobe Animate HTML5 animations. Export as an OAM package from '
-                        'Adobe Animate CC, upload it here, and CourseForge handles asset extraction. Enable '
-                        'the SCORM bridge if the animation reports completion to the LMS.'),
+        # Media-only, full screen — this is how an OAM is used in production.
         _oam(caption='Upload .oam exported from Adobe Animate CC to activate. '
                      'File → Publish Settings → OAM package in Animate'),
     ]},
