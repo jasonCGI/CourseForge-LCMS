@@ -202,6 +202,56 @@ def _cf_audio_script():
     )
 
 
+def _cf_ivideo_bar(bid):
+    """Emit the branded interactive-video transport bar (no <script>).
+
+    Mirrors the audio bar's navy/amber styling and IBM Plex Mono readout, but is
+    namespaced per iVideo block id (so multiple iVideos on a frame don't collide)
+    and pinned to the BOTTOM of the media container as an overlay — a full-bleed /
+    cover iVideo then fills its box with the bar on top and the frame never grows a
+    scrollbar. The controller (in iVideoInit) wires play/pause, scrub, time,
+    speed, and the conditional volume control to the block's <video>.
+
+    The volume cluster is rendered but starts hidden (display:none); the
+    controller reveals it only once an audio track is detected (degrade-gracefully:
+    where detection is unsupported the controller assumes audio and shows it).
+    """
+    rates = ','.join(str(r) for r in CF_AUDIO_RATES)
+    return (
+        f'<div class="cf-ivbar" data-cf-ivbar data-rates="{rates}" '
+        f'style="position:absolute;left:0;right:0;bottom:0;z-index:40;'
+        f'display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;'
+        f'box-sizing:border-box;background:rgba(4,44,83,0.92);color:#E8EEF6;'
+        f"font-family:'IBM Plex Mono',ui-monospace,monospace;"
+        f'box-shadow:0 -2px 12px rgba(0,0,0,0.25)">'
+        f'<button type="button" data-cf-iv-play aria-label="Play" '
+        f'style="flex:0 0 auto;width:30px;height:30px;border:none;border-radius:50%;'
+        f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
+        f'display:flex;align-items:center;justify-content:center;font-size:13px;'
+        f'line-height:1;padding:0">{PLAY_SVG}</button>'
+        f'<span data-cf-iv-cur style="flex:0 0 auto;font-size:11px;letter-spacing:.02em">0:00</span>'
+        f'<input data-cf-iv-seek type="range" min="0" max="1000" value="0" step="1" '
+        f'aria-label="Seek" '
+        f'style="flex:1 1 auto;height:4px;accent-color:{CF_AUDIO_AMBER};cursor:pointer;'
+        f'min-width:60px">'
+        f'<span data-cf-iv-dur style="flex:0 0 auto;font-size:11px;letter-spacing:.02em;'
+        f'color:#9FB4CC">0:00</span>'
+        f'<span data-cf-iv-vol style="display:none;flex:0 0 auto;align-items:center;gap:6px">'
+        f'<button type="button" data-cf-iv-mute aria-label="Mute" '
+        f'style="flex:0 0 auto;width:26px;height:26px;border:none;border-radius:4px;'
+        f'background:transparent;color:{CF_AUDIO_AMBER};cursor:pointer;font-size:14px;'
+        f'line-height:1;padding:0">&#128266;</button>'
+        f'<input data-cf-iv-volrange type="range" min="0" max="100" value="100" step="1" '
+        f'aria-label="Volume" '
+        f'style="width:56px;height:4px;accent-color:{CF_AUDIO_AMBER};cursor:pointer"></span>'
+        f'<button type="button" data-cf-iv-rate aria-label="Playback speed" '
+        f'style="flex:0 0 auto;min-width:42px;height:26px;border:1px solid rgba(245,158,11,.5);'
+        f'border-radius:6px;background:transparent;color:{CF_AUDIO_AMBER};cursor:pointer;'
+        f"font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px\">1x</button>"
+        f'</div>'
+    )
+
+
 def build_frame_html(frame, lesson, frame_index, total_frames,
                      frame_map, theme_css, scorm_bridge=False,
                      disp_index=None, disp_total=None, asset_map=None, hotspot_cfg=None,
@@ -1205,13 +1255,21 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
                 # Full layout: the interactive video fills the content area — no
                 # caption/label text, square corners (no corner mask).
+                # The native <video controls> is replaced by a branded transport
+                # bar (_cf_ivideo_bar) overlaid on the bottom of the media so a
+                # full-bleed iVideo fills its box with the bar on top and never
+                # grows a scrollbar. iVideoInit wires both the interaction layer
+                # (the .ivideo-overlay + blocking modals) AND the bar; the
+                # interaction overlays sit ABOVE the bar (z 50 vs 40).
+                iv_bar = _cf_ivideo_bar(block_id)
                 parts.append(f'''
-<div id="ivideo-{block_id}" style="position:relative;width:100%;margin-bottom:20px">
-  <video controls style="width:100%;display:block" aria-label="Interactive video">
+<div id="ivideo-{block_id}" style="position:relative;width:100%;margin-bottom:20px;overflow:hidden;line-height:0">
+  <video playsinline style="width:100%;height:100%;display:block" aria-label="Interactive video">
     <source src="{video_src}" type="video/{vext}">
     <p>Your browser does not support HTML5 video.</p>
   </video>
   <div class="ivideo-overlay" style="position:absolute;inset:0;pointer-events:none"></div>
+  {iv_bar}
 </div>
 <script>
 (function() {{

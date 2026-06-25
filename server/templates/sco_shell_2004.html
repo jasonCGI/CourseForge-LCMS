@@ -393,8 +393,13 @@
     var answered = {};
     var state = { blocking: false };
 
+    // Wire the branded transport bar (custom controls, replacing native ones) and
+    // keep a handle so the timeupdate loop below can refresh it.
+    var bar = iVideoWireBar(container, video, interactions, answered, state);
+
     video.addEventListener('timeupdate', function() {
       var t = video.currentTime;
+      if (bar) bar.refresh();
       if (overlay) {
         overlay.innerHTML = '';
         interactions.forEach(function(i) {
@@ -432,6 +437,116 @@
         }
       }
     });
+  }
+
+  // ── Branded transport bar — custom controls replacing native <video controls> ──
+  // Provides play/pause, scrub (gated), time readout, playback speed, and a volume
+  // cluster that appears ONLY when the clip carries an audio track. Coexists with
+  // the interaction runtime: the blocking modals own resume, so while state.blocking
+  // is set the bar's play/scrub are inert (the modal, not the bar, lets you continue),
+  // and the scrubber will not seek past the earliest unanswered required interaction.
+  var IV_PLAY_SVG  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.5" color="currentColor" aria-hidden="true" focusable="false"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var IV_PAUSE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.5" color="currentColor" aria-hidden="true" focusable="false"><path d="M6 18.4V5.6C6 5.26863 6.26863 5 6.6 5H9.4C9.73137 5 10 5.26863 10 5.6V18.4C10 18.7314 9.73137 19 9.4 19H6.6C6.26863 19 6 18.7314 6 18.4Z" fill="currentColor" stroke="currentColor"/><path d="M14 18.4V5.6C14 5.26863 14.2686 5 14.6 5H17.4C17.7314 5 18 5.26863 18 5.6V18.4C18 18.7314 17.7314 19 17.4 19H14.6C14.2686 19 14 18.7314 14 18.4Z" fill="currentColor" stroke="currentColor"/></svg>';
+  function iVideoFmt(s){ if(!isFinite(s)||s<0) s=0; var m=Math.floor(s/60), x=Math.floor(s%60); return m+':'+(x<10?'0':'')+x; }
+  function iVideoShouldGate(i){ return i && iVideoShouldPause(i); }
+  function iVideoWireBar(container, video, interactions, answered, state) {
+    var bar = container.querySelector('[data-cf-ivbar]');
+    if (!bar || bar.__cfWired) return null;
+    bar.__cfWired = true;
+    var play   = bar.querySelector('[data-cf-iv-play]'),
+        seek   = bar.querySelector('[data-cf-iv-seek]'),
+        cur    = bar.querySelector('[data-cf-iv-cur]'),
+        dur    = bar.querySelector('[data-cf-iv-dur]'),
+        rateB  = bar.querySelector('[data-cf-iv-rate]'),
+        volBox = bar.querySelector('[data-cf-iv-vol]'),
+        muteB  = bar.querySelector('[data-cf-iv-mute]'),
+        volR   = bar.querySelector('[data-cf-iv-volrange]');
+    var rates = (bar.getAttribute('data-rates')||'1').split(',').map(parseFloat), ri = rates.indexOf(1);
+    if (ri < 0) ri = 0;
+    var seeking = false, hasAudio = null;   // null = undetermined (assume audio for the gate-degrade)
+
+    function ico(p){ play.innerHTML = p ? IV_PAUSE_SVG : IV_PLAY_SVG; play.setAttribute('aria-label', p ? 'Pause' : 'Play'); }
+
+    // The furthest time the learner may seek to: just shy of the earliest unanswered
+    // required (pause-point) interaction. Mirrors the runtime's pause-at-marker gate
+    // so the bar can't be used to skip an interaction the runtime would otherwise hold.
+    function gateCap() {
+      var cap = Infinity;
+      for (var k = 0; k < interactions.length; k++) {
+        var it = interactions[k];
+        if (iVideoShouldGate(it) && !answered[it.id] && typeof it.timecode === 'number' && it.timecode < cap) cap = it.timecode;
+      }
+      return cap;
+    }
+
+    // Detect a real audio track the same way the React runtime does: mozHasAudio →
+    // audioTracks.length → webkitAudioDecodedByteCount (conclusive only once the
+    // playhead has advanced). No support → leave the control shown (assume audio).
+    function detectAudio() {
+      if (hasAudio === false) return;            // a definitive "no audio" is sticky
+      var has = null;
+      if (typeof video.mozHasAudio === 'boolean') has = video.mozHasAudio;
+      else if (video.audioTracks && typeof video.audioTracks.length === 'number') has = video.audioTracks.length > 0;
+      else if (typeof video.webkitAudioDecodedByteCount === 'number') {
+        if (video.webkitAudioDecodedByteCount > 0) has = true;
+        else if (video.currentTime > 0.1) has = false;
+      }
+      if (has === null) { if (hasAudio === null) { hasAudio = true; volBox.style.display = 'inline-flex'; } return; }
+      hasAudio = has;
+      volBox.style.display = has ? 'inline-flex' : 'none';
+    }
+
+    play.addEventListener('click', function(){
+      if (state.blocking) return;               // the blocking modal owns resume
+      if (video.paused) { try { video.play(); } catch(e){} } else video.pause();
+    });
+    video.addEventListener('play',  function(){ ico(true); });
+    video.addEventListener('pause', function(){ ico(false); });
+    var meta = function(){ dur.textContent = iVideoFmt(video.duration); detectAudio(); };
+    video.addEventListener('loadedmetadata', meta);
+    video.addEventListener('loadeddata', meta);
+    video.addEventListener('playing', detectAudio);
+    video.addEventListener('timeupdate', detectAudio);
+    video.addEventListener('ended', function(){ ico(false); });
+
+    seek.addEventListener('input', function(){
+      seeking = true;
+      if (video.duration) cur.textContent = iVideoFmt(seek.value/1000*video.duration);
+    });
+    seek.addEventListener('change', function(){
+      seeking = false;
+      if (!video.duration) return;
+      var target = seek.value/1000*video.duration;
+      var cap = gateCap();                       // don't let the scrubber jump a required interaction
+      if (target > cap) target = Math.max(0, cap - 0.01);
+      video.currentTime = target;
+    });
+    rateB.addEventListener('click', function(){
+      ri = (ri+1) % rates.length; video.playbackRate = rates[ri]; rateB.textContent = rates[ri] + 'x';
+    });
+
+    if (volR) volR.addEventListener('input', function(){
+      var v = volR.value/100; video.volume = v; video.muted = v === 0;
+    });
+    if (muteB) muteB.addEventListener('click', function(){ video.muted = !video.muted; });
+    video.addEventListener('volumechange', function(){
+      if (volR) volR.value = String(Math.round((video.muted ? 0 : video.volume) * 100));
+      if (muteB) muteB.innerHTML = (video.muted || video.volume === 0) ? '🔇' : '🔊';
+    });
+
+    detectAudio();
+    return {
+      refresh: function() {
+        // Reflect playback state, time, and progress; dim play/scrub while a
+        // blocking interaction holds the video so the bar can't fight the modal.
+        cur.textContent = iVideoFmt(video.currentTime);
+        if (!seeking && video.duration) seek.value = String(Math.round(video.currentTime/video.duration*1000));
+        var lock = !!state.blocking;
+        play.disabled = lock; seek.disabled = lock;
+        play.style.opacity = lock ? '0.5' : '1'; seek.style.opacity = lock ? '0.5' : '1';
+        detectAudio();
+      }
+    };
   }
 
   function iVideoResume(ov, video, state) {

@@ -68,6 +68,28 @@ WCN_SCRIPT = """
 """
 
 
+def _ivideo_runtime_js() -> str:
+    """Lift JUST the interactive-video runtime <script> (iVideoInit + the branded
+    transport bar controller iVideoWireBar) from sco_shell.html, so the standalone
+    web bundle gets the SAME custom control bar + interaction layer as the SCO —
+    no copy-paste drift. WCN modal JS is supplied separately (WCN_SCRIPT), so we
+    take only the iVideo block to avoid redefining it. Returns '' if unavailable."""
+    from flask import current_app
+    from pathlib import Path
+    try:
+        src = (Path(current_app.root_path) / "templates" / "sco_shell.html").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    marker = src.find("IVideo runtime")
+    if marker == -1:
+        return ""
+    start = src.rfind("<script>", 0, marker)
+    end = src.find("</script>", marker)
+    if start == -1 or end == -1:
+        return ""
+    return src[start:end + len("</script>")]
+
+
 def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
     """
     Build a standalone web ZIP containing index.html + assets.
@@ -102,6 +124,8 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
                                        hotspot_cfg=_project_hotspot_cfg(project)),
             'progress': round((idx / max(total - 1, 1)) * 100),
         })
+
+    IVIDEO_RUNTIME = _ivideo_runtime_js()
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -234,8 +258,18 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
     document.getElementById('progress-fill').style.width = f.progress + '%';
     document.getElementById('btn-prev').disabled = idx === 0;
     document.getElementById('btn-next').disabled = idx === frames.length - 1;
-    document.getElementById('main-content').innerHTML =
-      '<h1 class="cf-frame-title">' + f.name + '</h1>' + f.html;
+    var mc = document.getElementById('main-content');
+    mc.innerHTML = '<h1 class="cf-frame-title">' + f.name + '</h1>' + f.html;
+    // Frame HTML is injected via innerHTML, so its inline <script> tags (the
+    // iVideo / 3D / OAM block initializers) do NOT auto-run. Re-create them so
+    // those blocks come alive — including the interactive-video transport bar
+    // and its interaction runtime (iVideoInit), defined by the lifted shell JS.
+    var scripts = mc.querySelectorAll('script');
+    for (var s = 0; s < scripts.length; s++) {{
+      var old = scripts[s], ns = document.createElement('script');
+      if (old.src) ns.src = old.src; else ns.textContent = old.textContent;
+      old.parentNode.replaceChild(ns, old);
+    }}
     current = idx;
     window.scrollTo(0, 0);
   }}
@@ -270,6 +304,7 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
   render(0);
   </script>
 {WCN_SCRIPT}
+{IVIDEO_RUNTIME}
 </body>
 </html>"""
 
