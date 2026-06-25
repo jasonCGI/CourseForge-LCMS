@@ -160,6 +160,41 @@ export default function MediaBlock({ block }) {
           </div>
         )}
 
+        {/* Playbar (video only) — for a full-bleed (cover) video, choose where the
+            control bar / playbar sits: inline (flows with a gap underneath the
+            video) or docked (the video fills the content area so the playbar snaps
+            flush to the content-area bottom). Mirrors the audio Placement toggle.
+            Only meaningful when the video uses cover/fill (fit:'cover'). */}
+        {kind === 'video' && (
+          <div style={{ marginTop: 12 }}>
+            <label style={fieldLabel}>Playbar</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[['inline', 'Inline'], ['bottom', 'Snap to bottom']].map(([val, lbl]) => {
+                const active = (block.data.dock || 'inline') === val
+                return (
+                  <button
+                    key={val}
+                    onClick={() => update('dock', val)}
+                    aria-pressed={active}
+                    style={{
+                      padding: '6px 14px', borderRadius: 4,
+                      border: `1px solid ${active ? KIND_COLOR.video : 'var(--color-border-tertiary)'}`,
+                      background: active ? KIND_COLOR.video : 'transparent',
+                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                )
+              })}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
+              For a full-bleed (cover) video, “Snap to bottom” pins the playbar flush to the bottom of the content area instead of leaving it underneath the video.
+            </p>
+          </div>
+        )}
+
         {/* Alt text (508) — text alternative for screen readers. Images require it;
             video uses it as an accessible description. */}
         {(kind === 'image' || kind === 'video') && (

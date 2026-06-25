@@ -585,6 +585,15 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             is_cover = data.get('fit') == 'cover'
             poster   = data.get('poster_url')
             poster_attr = f'poster="{esc(poster)}"' if poster else ''
+            # dock: 'inline' (default — video flows with a 20px gap below it) |
+            # 'bottom' (full-bleed: video fills its content box and the native
+            # control bar / playbar snaps flush to the bottom of the content area
+            # instead of sitting underneath the video in the flow). Mirrors the
+            # audio block's dock toggle. Only meaningful for cover/full videos.
+            dock     = data.get('dock', 'inline')
+            docked   = is_cover and dock == 'bottom'
+            wrap_mb  = '' if docked else 'margin-bottom:20px;'
+            dock_attr = ' data-cf-video-dock="bottom"' if docked else ''
             if is_cover:
                 # Cover video: fills its content box (object-fit:cover, no
                 # rounding/letterbox), plays seamlessly (muted/loop/autoplay/
@@ -593,14 +602,19 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # caption rides on a TOP-down gradient scrim (white text, WCAG AA)
                 # so it never overlaps the controls. Mirrors the cover Image Block
                 # preview branch below.
+                #   dock='bottom': fill the full content-box height so the native
+                #   control bar lands flush at the content-area bottom (no gap
+                #   underneath); dock='inline': height:auto in the flow as before.
+                v_height = '100%' if docked else 'auto'
                 video_html = (
                     f'<video controls muted loop autoplay playsinline {poster_attr} '
-                    f'style="display:block;width:100%;height:auto;object-fit:cover" '
+                    f'style="display:block;width:100%;height:{v_height};object-fit:cover" '
                     f'aria-label="{title}"><source src="{src}">'
                     f'<p>Your browser does not support HTML5 video.</p></video>')
                 if caption:
                     parts.append(
-                        f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                        f'<div{dock_attr} style="{wrap_mb}position:relative;display:block;line-height:0'
+                        f'{";height:100%" if docked else ""}">'
                         f'{video_html}'
                         f'<div style="position:absolute;left:0;right:0;top:0;'
                         f'padding:12px 16px 28px;color:#fff;font-size:13px;line-height:1.45;'
@@ -608,7 +622,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         f'{caption}</div></div>'
                     )
                 else:
-                    parts.append(f'<div style="margin-bottom:20px;line-height:0">{video_html}</div>')
+                    parts.append(
+                        f'<div{dock_attr} style="{wrap_mb}line-height:0'
+                        f'{";height:100%" if docked else ""}">{video_html}</div>')
             else:
                 cap_html = f'<p style="font-size:13px;color:#888;margin-top:6px">{caption}</p>' if caption else ''
                 parts.append(
@@ -639,6 +655,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             title      = esc(data.get('original_name', 'Video'))
             caption    = esc(data.get('caption', ''))
             is_cover   = data.get('fit') == 'cover'
+            # dock: 'inline' (default) | 'bottom' — see the preview branch above.
+            # For cover/full videos, 'bottom' fills the content box so the native
+            # playbar snaps flush to the content-area bottom (no gap underneath).
+            dock       = data.get('dock', 'inline')
+            docked     = is_cover and dock == 'bottom'
+            wrap_mb    = '' if docked else 'margin-bottom:20px;'
+            dock_attr  = ' data-cf-video-dock="bottom"' if docked else ''
+            v_height   = '100%' if docked else 'auto'
 
             # asset ids become part of <source>/<track>/poster src attributes and
             # the player element id -> validate to id tokens so they can't break out.
@@ -666,12 +690,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # overlaps the controls. Mirrors the cover Image Block branch below.
                 video_html = (
                     f'<video controls muted loop autoplay playsinline {poster_attr} '
-                    f'style="display:block;width:100%;height:auto;object-fit:cover" '
+                    f'style="display:block;width:100%;height:{v_height};object-fit:cover" '
                     f'aria-label="{title}">{sources}{track}'
                     f'<p>Your browser does not support HTML5 video.</p></video>')
                 if caption:
                     parts.append(
-                        f'<div style="margin-bottom:20px;position:relative;display:block;line-height:0">'
+                        f'<div{dock_attr} style="{wrap_mb}position:relative;display:block;line-height:0'
+                        f'{";height:100%" if docked else ""}">'
                         f'{video_html}'
                         f'<div style="position:absolute;left:0;right:0;top:0;'
                         f'padding:12px 16px 28px;color:#fff;font-size:13px;line-height:1.45;'
@@ -679,7 +704,9 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                         f'{caption}</div></div>'
                     )
                 else:
-                    parts.append(f'<div style="margin-bottom:20px;line-height:0">{video_html}</div>')
+                    parts.append(
+                        f'<div{dock_attr} style="{wrap_mb}line-height:0'
+                        f'{";height:100%" if docked else ""}">{video_html}</div>')
             elif use_vjs:
                 parts.append(
                     f'<div style="margin-bottom:20px">'

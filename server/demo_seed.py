@@ -78,18 +78,22 @@ def _image(label='Course Image', caption='', color='#185FA5', icon='🖼', fill=
         data['bounds'] = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
-def _video(label='Course Video', caption='', fill=False):
+def _video(label='Course Video', caption='', fill=False, dock='inline'):
     """fill=True: the video covers its whole content area (objectFit 'cover',
     full-area bounds) — used for the demo Video Block frame where the clip fills
     the frame. The placeholder graphic stays text-free; any caption passed in
     rides through to data so it renders as a bottom overlay on the cover video,
-    mirroring the Image Block's cover+caption treatment."""
+    mirroring the Image Block's cover+caption treatment.
+
+    dock: 'inline' (default — playbar flows underneath the video) | 'bottom'
+    (full-bleed: the playbar snaps flush to the bottom of the content area).
+    Mirrors the audio block's dock toggle; only meaningful for cover/full videos."""
     # A <video> can't render an SVG as its source (an <img> can — that's why the
     # image demo works), so the SVG rides as the *poster* and the player shows it.
     svg = _svg(label, '#1A7A5E', '🎬', sub='process with ForgePack first')
     data = {
         'kind': 'video', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
-        'serve_url': svg, 'poster_url': svg,
+        'serve_url': svg, 'poster_url': svg, 'dock': dock,
         'original_name': label.lower().replace(' ', '_') + '.mp4', 'use_videojs': True,
         'asset_meta': {'has_captions': False, 'has_webm': False, 'has_poster': False}}
     if fill:
@@ -261,7 +265,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         # autoplay). The caption rides over the bottom of the video as a scrim
         # overlay (white text, readable over any frame) — it never pushes content
         # below the fold. Mirrors the cover Image Block above.
-        _video(label='Sample Clip', fill=True,
+        _video(label='Sample Clip', fill=True, dock='bottom',
                caption='Live example: muted, looped, and compressed for fast load'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
@@ -549,8 +553,11 @@ def _wire_demo_assets(project):
                 d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
                          original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
             elif fr.name == 'Video Block' and t == 'media' and d.get('kind') == 'video':
+                # dock='bottom' keeps the playbar snapped to the content-area
+                # bottom once the real cover clip replaces the placeholder.
                 d.update(asset_id=mp4.id, serve_url=f'/api/media/serve/{mp4.id}',
-                         original_name='sample_video.mp4', use_videojs=True, asset_meta=mp4_meta); changed = True
+                         original_name='sample_video.mp4', use_videojs=True,
+                         dock='bottom', asset_meta=mp4_meta); changed = True
             elif fr.name == 'Audio Block' and t == 'media' and d.get('kind') == 'audio':
                 d.update(asset_id=aud.id, serve_url=f'/api/media/serve/{aud.id}',
                          original_name='beneath-the-still-water.mp3', asset_meta=_serialize_media(aud)); changed = True
