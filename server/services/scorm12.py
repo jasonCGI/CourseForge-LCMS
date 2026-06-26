@@ -2289,6 +2289,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # (.cf-content / #fgui-content / .cf-preview-main, all position:relative). It's
     # offset up 64px so it clears any bottom-docked audio / iVideo control bar.
     if wcn_recall:
+        # Canonical recall-bar order regardless of authoring order: warning ->
+        # caution -> note (stable within a type). Mirrors the React WCNRecallBar.
+        _wcn_order = {'warning': 0, 'caution': 1, 'note': 2}
+        wcn_recall = sorted(wcn_recall, key=lambda e: _wcn_order.get(e[0], 99))
         out = out + '\n' + _wcn_recall_bar(wcn_recall)
     # Wire every branded audio bar with one self-contained controller (emitted
     # once per rendered block list).

@@ -2334,13 +2334,18 @@ const WCN_RECALL = {
   caution: { color:'#eed202', shape:<polygon points="12,1 23,12 12,23 1,12" fill="#eed202" /> },
   note:    { color:'#2E62D8', shape:<><circle cx="12" cy="12" r="11" fill="#2E62D8" /><text x="12" y="17" textAnchor="middle" fontFamily="sans-serif" fontWeight="700" fontSize="14" fill="#fff">i</text></> },
 }
+const WCN_RECALL_ORDER = { warning: 0, caution: 1, note: 2 }
 function WCNRecallBar({ wcnBlocks }) {
   if (!wcnBlocks.length) return null
+  // Canonical order regardless of authoring order: warning -> caution -> note
+  // (stable within a type). Mirrors scorm12._render_blocks' wcn_recall sort.
+  const ordered = wcnBlocks.slice().sort(
+    (a, b) => (WCN_RECALL_ORDER[a.data?.wcn_type] ?? 99) - (WCN_RECALL_ORDER[b.data?.wcn_type] ?? 99))
   return (
     <div role="group" aria-label="Re-open warnings, cautions and notes"
       style={{ position:'absolute', left:16, bottom:64, zIndex:40,
                display:'flex', flexWrap:'wrap', gap:8 }}>
-      {wcnBlocks.map(b => {
+      {ordered.map(b => {
         const t = b.data.wcn_type === 'warning' || b.data.wcn_type === 'caution' ? b.data.wcn_type : 'note'
         const cfg = WCN_RECALL[t]
         const tag = t.toUpperCase()
