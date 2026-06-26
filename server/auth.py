@@ -43,6 +43,7 @@ _GATED_POST_PATHS = frozenset({
     '/api/publish',
     '/api/validate',
     '/api/demo/reset',
+    '/api/forgeagent/generate-frame',  # expensive Claude call — owner-gated
 })
 
 

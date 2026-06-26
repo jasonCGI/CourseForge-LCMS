@@ -247,18 +247,21 @@ def generate_frame():
     errors = validate_frame(frame)
 
     # ── One repair round-trip if invalid ──────────────────────────────────────
+    # Use a FRESH single-turn request, NOT a continuation. Re-sending the prior
+    # assistant tool_use turn would require a matching tool_result block in the
+    # next user message (the Anthropic API enforces this and 400s otherwise);
+    # embedding the failed frame + the errors in a new user prompt sidesteps that.
     if errors:
-        repair_messages = [
-            {'role': 'user', 'content': req['messages'][0]['content']},
-            {'role': 'assistant', 'content': message.content},
-            {'role': 'user', 'content': (
-                "The frame you emitted failed validation against the schema. "
-                "Fix ALL of these problems and call `emit_frame` again with a "
-                "corrected frame:\n\n- " + "\n- ".join(errors)
-            )},
-        ]
+        repair_user = (
+            req['messages'][0]['content']
+            + "\n\nYour previous attempt was:\n"
+            + json.dumps(frame, ensure_ascii=False)
+            + "\n\nIt FAILED validation. Fix ALL of these problems and call "
+            "`emit_frame` again with a corrected frame:\n- "
+            + "\n- ".join(errors)
+        )
         repair_req = dict(req)
-        repair_req['messages'] = repair_messages
+        repair_req['messages'] = [{'role': 'user', 'content': repair_user}]
         try:
             message2 = client.messages.create(**repair_req)
         except Exception as e:  # noqa: BLE001
