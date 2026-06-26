@@ -6,7 +6,7 @@ import GUIShellRenderer from './GUIShellRenderer'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
-import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
+import { hotspotStyle, shapeRadius, rgba, HOTSPOT_AMBER } from '../../utils/hotspotStyle'
 import { buildCalloutOverlayHTML, CALLOUT_STYLE, resolveCalloutAnchor, calloutAnchorTransform, calloutLineBoxEnd } from '../../utils/calloutOverlay'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 import { Play, Pause } from '../icons'
@@ -93,7 +93,7 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // overlay mode so media/3D/image/video fill their layout zone.
   const renderBlock = (block, fill = false) => (
     <SelectableBlock key={block.id} block={block} fill={fill}
-      active={block.id === activeBlockId} onSelect={onBlockSelect} />
+      active={block.id === activeBlockId} onSelect={onBlockSelect} updateBlock={updateBlock} />
   )
 
   // Overlay mode = rendered as a scaled React overlay over the shell's content
@@ -351,7 +351,7 @@ function MenuBackPill({ currentFrameId }) {
 // (preview → tab), and so the active block outlines + scrolls into view when
 // selected from the inspector (tab → preview). No-ops to a plain block when no
 // onSelect handler is provided (e.g. read-only previews).
-function SelectableBlock({ block, active, onSelect, fill = false }) {
+function SelectableBlock({ block, active, onSelect, updateBlock = null, fill = false }) {
   const ref = useRef(null)
   useEffect(() => {
     if (active && ref.current) ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -365,7 +365,8 @@ function SelectableBlock({ block, active, onSelect, fill = false }) {
         outline: active ? '2px solid var(--forge-amber)' : '2px solid transparent',
         outlineOffset: 3, transition: 'outline-color 0.15s',
       }}>
-      <PreviewBlock block={block} fill={fill} />
+      <PreviewBlock block={block} fill={fill}
+        interactive active={active} onSelect={onSelect} updateBlock={updateBlock} />
     </div>
   )
 }
@@ -1030,12 +1031,13 @@ export function wireMenuNav(win) {
   })
 }
 
-function PreviewBlock({ block, fill = false }) {
+function PreviewBlock({ block, fill = false, interactive = false, active = false, onSelect = null, updateBlock = null }) {
   switch (block.type) {
     case 'text':    return <PreviewText    block={block} />
     case 'media':   return <PreviewMedia   block={block} fill={fill} />
     case 'quiz':    return <PreviewQuiz    block={block} />
-    case 'hotspot': return <PreviewHotspot block={block} />
+    case 'hotspot': return <PreviewHotspot block={block}
+                      interactive={interactive} active={active} onSelect={onSelect} updateBlock={updateBlock} />
     case 'callout': return <PreviewCallout block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
@@ -1822,7 +1824,202 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
   )
 }
 
-function PreviewHotspot({ block }) {
+// Hotspot preview. Two modes, gated like PreviewCallout:
+//   • interactive=false → the STATIC learner render (regions over the background,
+//     click a region to reveal its label). This is what read-only previews use and
+//     is byte-parity with renderBlockToHTML's `case 'hotspot'` string path and the
+//     server SCO (scorm12) — nothing here changes the published output.
+//   • interactive=true (editor preview, onBlockSelect present) → an EDITABLE overlay
+//     where regions are DRAGGABLE boxes with corner RESIZE handles, committing
+//     geometry via updateBlock. Editor-only affordance; never published.
+function PreviewHotspot({ block, interactive = false, active = false, onSelect = null, updateBlock = null }) {
+  if (interactive) {
+    return <InteractiveHotspot block={block} active={active} onSelect={onSelect} updateBlock={updateBlock} />
+  }
+  return <StaticHotspot block={block} />
+}
+
+// Editor-only interactive hotspot overlay (see PreviewHotspot). Mirrors
+// HotspotBlock's draw/move/resize math: regions are normalized 0-100 (% of the
+// image), clamped 0..100 and rounded on commit. relPos is taken relative to the
+// image/region container so drag + resize stay accurate at any preview scale.
+// Drag a region body to move; drag a corner handle to resize (opposite edge(s)
+// anchored). Drag empty image area to draw a new region.
+function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
+  const canvasRef = useRef(null)
+  const drag = useRef(null)                       // { mode, id, handle, ox, oy, base }
+  const [draft, setDraft] = useState(null)        // { x, y, w, h } while drawing
+  const [live, setLive]   = useState(null)        // { id, x, y, w, h } while moving/resizing
+  const [sel, setSel]     = useState(null)        // selected region id (shows handles)
+
+  const regions = block.data.regions || []
+  const hasImg  = !!(block.data.image_id || block.data.background_url)
+  const commit  = next => updateBlock && updateBlock(block.id, { regions: next })
+
+  const relPos = e => {
+    const r = canvasRef.current.getBoundingClientRect()
+    return {
+      x: _clampPc(((e.clientX - r.left) / r.width) * 100),
+      y: _clampPc(((e.clientY - r.top) / r.height) * 100),
+    }
+  }
+
+  const onCanvasDown = e => {
+    if (!hasImg || drag.current) return
+    if (onSelect) onSelect(block.id)
+    setSel(null)
+    const p = relPos(e)
+    drag.current = { mode: 'draw', ox: p.x, oy: p.y }
+    setDraft({ x: p.x, y: p.y, w: 0, h: 0 })
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+  const startMove = (e, r) => {
+    e.stopPropagation()
+    if (onSelect) onSelect(block.id)
+    setSel(r.id)
+    const p = relPos(e)
+    drag.current = { mode: 'move', id: r.id, ox: p.x, oy: p.y, base: { ...r } }
+    setLive({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+  const startResize = (e, r, handle) => {
+    e.stopPropagation()
+    if (onSelect) onSelect(block.id)
+    setSel(r.id)
+    const p = relPos(e)
+    drag.current = { mode: 'resize', id: r.id, handle, ox: p.x, oy: p.y, base: { ...r } }
+    setLive({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const onMove = e => {
+    const d = drag.current
+    if (!d) return
+    const p = relPos(e)
+    if (d.mode === 'draw') {
+      setDraft({ x: Math.min(d.ox, p.x), y: Math.min(d.oy, p.y), w: Math.abs(p.x - d.ox), h: Math.abs(p.y - d.oy) })
+      return
+    }
+    const b = d.base
+    if (d.mode === 'move') {
+      setLive({ id: d.id, w: b.w, h: b.h,
+        x: _clampPc2(b.x + (p.x - d.ox), 0, 100 - b.w),
+        y: _clampPc2(b.y + (p.y - d.oy), 0, 100 - b.h) })
+    } else { // resize — anchor the opposite edge(s)
+      let { x, y, w, h } = b
+      const right = b.x + b.w, bottom = b.y + b.h
+      if (d.handle.includes('e')) w = _clampPc2(p.x, b.x + 3, 100) - x
+      if (d.handle.includes('s')) h = _clampPc2(p.y, b.y + 3, 100) - y
+      if (d.handle.includes('w')) { x = _clampPc2(p.x, 0, right - 3); w = right - x }
+      if (d.handle.includes('n')) { y = _clampPc2(p.y, 0, bottom - 3); h = bottom - y }
+      setLive({ id: d.id, x, y, w, h })
+    }
+  }
+
+  const onUp = () => {
+    const d = drag.current
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    if (d?.mode === 'draw') {
+      setDraft(cur => {
+        if (cur && cur.w >= 2 && cur.h >= 2) {
+          const nr = { ...roundGeom(cur), shape: 'rect', label: `Region ${regions.length + 1}`, description: '', color: HOTSPOT_AMBER, id: crypto.randomUUID() }
+          commit([...regions, nr])
+          setSel(nr.id)
+        }
+        return null
+      })
+    } else if (d?.mode === 'move' || d?.mode === 'resize') {
+      setLive(cur => {
+        if (cur) commit(regions.map(r => (r.id === cur.id ? { ...r, ...roundGeom(cur) } : r)))
+        return null
+      })
+    }
+    drag.current = null
+  }
+
+  const geomOf = r => (live && live.id === r.id ? live : r)
+
+  return (
+    <div style={previewBlockWrap}>
+      <div
+        ref={canvasRef}
+        onMouseDown={onCanvasDown}
+        style={{
+          position: 'relative', width: '100%', paddingBottom: '56.25%',
+          background: '#E8F0F8', border: '1px solid #B5D4F4',
+          overflow: 'hidden', userSelect: 'none',
+          cursor: hasImg ? 'crosshair' : 'default',
+        }}>
+        {block.data.background_url && (
+          <img src={block.data.background_url} alt={block.data.alt_text || 'Hotspot background'}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+        )}
+
+        {!hasImg && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13 }}>
+            [Hotspot image — no asset linked]
+          </div>
+        )}
+
+        {regions.map(r => {
+          const g = geomOf(r)
+          const st = hotspotStyle(r.color)
+          const isSel = sel === r.id
+          return (
+            <div key={r.id}
+              onMouseDown={e => startMove(e, r)}
+              title="Drag to move · drag a corner to resize"
+              style={{
+                position: 'absolute', left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, height: `${g.h}%`,
+                border: `2px solid ${st.border}`,
+                background: isSel ? rgba(st.stroke, 0.3) : st.fill,
+                borderRadius: shapeRadius(r.shape),
+                boxSizing: 'border-box', cursor: 'move',
+                outline: isSel ? '2px dashed var(--forge-amber)' : 'none', outlineOffset: 2,
+              }}>
+              <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none' }}>{r.label}</span>
+              {isSel && Object.entries(HOTSPOT_HANDLES).map(([h, pos]) => (
+                <div key={h} onMouseDown={e => startResize(e, r, h)}
+                  style={{ position: 'absolute', width: 10, height: 10, background: 'var(--forge-amber)',
+                    border: '1px solid #042C53', borderRadius: 2, cursor: pos.cursor, ...pos }} />
+              ))}
+            </div>
+          )
+        })}
+
+        {draft && (
+          <div style={{
+            position: 'absolute', left: `${draft.x}%`, top: `${draft.y}%`, width: `${draft.w}%`, height: `${draft.h}%`,
+            border: '2px dashed var(--forge-amber)', background: 'color-mix(in srgb, var(--forge-amber) 10%, transparent)',
+            pointerEvents: 'none',
+          }} />
+        )}
+      </div>
+      {regions.length > 0 && (
+        <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+          Drag a region to move it; drag a corner handle to resize. Draw on empty image area to add a region.
+        </p>
+      )}
+    </div>
+  )
+}
+
+const _clampPc2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+const roundGeom = g => ({ x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h) })
+const HOTSPOT_HANDLES = {
+  nw: { left: -5, top: -5, cursor: 'nwse-resize' },
+  ne: { right: -5, top: -5, cursor: 'nesw-resize' },
+  sw: { left: -5, bottom: -5, cursor: 'nesw-resize' },
+  se: { right: -5, bottom: -5, cursor: 'nwse-resize' },
+}
+
+// Static learner render — regions over the background, click a region to reveal
+// its label. Byte-parity with the published SCO / renderBlockToHTML string path.
+function StaticHotspot({ block }) {
   const [active, setActive] = useState(null)
   const regions = block.data.regions || []
 
