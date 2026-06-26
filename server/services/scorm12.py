@@ -2317,7 +2317,7 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
     PreviewWCN modal and the shell runtime JS (wcnOpenModal/Close/Acknowledge)
     are kept in visual/behavioural sync with this markup by hand.
 
-    Design: dynamic-width card (width:fit-content, max-width:75% of the overlay,
+    Design: dynamic-width card (width:fit-content, max-width:60% of the overlay,
     min-width:320px floor), 8px radius, 3px theme border, soft shadow, overflow
     hidden. ~64px header is diagonal hazard stripes (repeating-linear-gradient
     of theme + black) with a centered white LABEL CHIP (2px black border) on
@@ -2337,7 +2337,7 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
     <div role="dialog" aria-modal="true" aria-labelledby="{title_id}"
          onclick="event.stopPropagation()"
          style="background:#fff;border:3px solid {theme};border-radius:8px;
-                width:fit-content;max-width:75%;min-width:320px;overflow:hidden;
+                width:fit-content;max-width:60%;min-width:320px;overflow:hidden;
                 box-shadow:0 10px 30px rgba(0,0,0,0.25)">
       <div style="position:relative;height:64px;display:flex;align-items:center;
                   justify-content:center;
@@ -2720,7 +2720,7 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     // show and breathe. Matches the in-canvas preview (GUIShellRenderer) override.
     '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],' +
     '[data-zone-type="section_title"],[data-zone-type="prompt"]' +
-    '{{overflow:visible!important;line-height:1.35!important}}';
+    '{{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);

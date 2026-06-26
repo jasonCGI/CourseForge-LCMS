@@ -39,7 +39,7 @@ export default function GUIShellRenderer({
           st.id = 'cf-zone-descender-fix'
           st.textContent = '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],'
             + '[data-zone-type="section_title"],[data-zone-type="prompt"]'
-            + '{overflow:visible!important;line-height:1.35!important}'
+            + '{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}'
           ;(doc.head || doc.documentElement).appendChild(st)
         }
       } catch (e) { /* cross-origin / torn down */ }
@@ -58,11 +58,12 @@ export default function GUIShellRenderer({
       // with data-zone-type="frame_counter", so write its text ourselves. Re-assert
       // on a tick to win against the async postMessage handler's updateZones().
       const fd = frameData || {}
+      const desiredCounter = `${fd.frameIndex} / ${fd.totalFrames}`
       const paintCounter = () => {
         try {
           const nodes = win.document.querySelectorAll('[data-zone-type="frame_counter"]')
           for (let i = 0; i < nodes.length; i++) {
-            nodes[i].textContent = `${fd.frameIndex} / ${fd.totalFrames}`
+            if (nodes[i].textContent !== desiredCounter) nodes[i].textContent = desiredCounter
           }
         } catch (e) { /* iframe torn down */ }
       }
@@ -70,6 +71,15 @@ export default function GUIShellRenderer({
       win.requestAnimationFrame ? win.requestAnimationFrame(paintCounter) : setTimeout(paintCounter, 0)
       setTimeout(paintCounter, 50)
       setTimeout(paintCounter, 200)
+      // The shell's own async updateZones() can rewrite the counter AFTER our
+      // timeouts, dropping the total ("18 / "). Observe the counter zones and
+      // re-assert whenever anything rewrites them, so our "idx / total" always wins.
+      // The !== guard makes the re-assert idempotent (no observer feedback loop).
+      try {
+        const obs = new win.MutationObserver(paintCounter)
+        win.document.querySelectorAll('[data-zone-type="frame_counter"]').forEach(n =>
+          obs.observe(n, { childList: true, characterData: true, subtree: true }))
+      } catch (e) { /* no MutationObserver in this context */ }
       // injectContent uses innerHTML, so the bar's inline <script> never runs —
       // wire the branded audio bars directly in the iframe document instead.
       wireAudioBars(win.document)

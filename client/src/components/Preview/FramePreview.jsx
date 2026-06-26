@@ -2018,7 +2018,7 @@ function PreviewWCN({ block }) {
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
         onClick={(e) => e.stopPropagation()}
         style={{ background:'#fff', border:`3px solid ${cfg.theme}`, borderRadius:8,
-                 width:'fit-content', maxWidth:'75%', minWidth:320, overflow:'hidden',
+                 width:'fit-content', maxWidth:'60%', minWidth:320, overflow:'hidden',
                  boxShadow:'0 10px 30px rgba(0,0,0,0.25)' }}>
         <div style={{ position:'relative', height:64, display:'flex',
                       alignItems:'center', justifyContent:'center',
