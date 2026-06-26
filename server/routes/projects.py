@@ -1,3 +1,4 @@
+import json
 import re
 from flask import Blueprint, request, jsonify
 from ..extensions import db
@@ -31,6 +32,24 @@ def get_project(project_id):
     # Eager-load the whole tree (one query per level) — the editor's main load.
     project = project_full_query().get_or_404(project_id)
     return jsonify(project_schema.dump(project))
+
+
+@projects_bp.get('/api/projects/<project_id>/export.json')
+def export_project_json(project_id):
+    """Download the whole course build as a JSON file (backup / inspect / move
+    between environments). The full project tree is included; media binaries are
+    NOT — asset_id references point at this environment's media library, so a
+    cross-environment import re-links media by id (or leaves it to be re-uploaded).
+    """
+    project = project_full_query().get_or_404(project_id)
+    payload = project_schema.dump(project)
+    body = json.dumps(payload, indent=2, ensure_ascii=False)
+    slug = (re.sub(r'[^a-z0-9]+', '-', (project.name or 'course').lower()).strip('-')
+            or 'course')
+    return body, 200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': f'attachment; filename="{slug}.courseforge.json"',
+    }
 
 
 @projects_bp.post('/api/projects')

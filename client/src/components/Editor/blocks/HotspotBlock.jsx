@@ -17,6 +17,10 @@ export default function HotspotBlock({ block }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
   const removeBlock = useEditorStore(s => s.removeBlock)
   const moveBlock   = useEditorStore(s => s.moveBlock)
+  // Shared hotspot-region selection (synced with the live-preview editor): the row
+  // / canvas region you're editing in the preview lights up here, and vice versa.
+  const activeRegionId  = useEditorStore(s => s.activeRegionId)
+  const setActiveRegion = useEditorStore(s => s.setActiveRegion)
 
   const canvasRef = useRef(null)
   const drag = useRef(null)                       // { mode, id, handle, ox, oy, base }
@@ -43,6 +47,7 @@ export default function HotspotBlock({ block }) {
   // Region body → move; corner handle → resize
   const startMove = (e, r) => {
     e.stopPropagation()
+    setActiveRegion(r.id)
     const p = relPos(e)
     drag.current = { mode: 'move', id: r.id, ox: p.x, oy: p.y, base: { ...r } }
     setLive({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })
@@ -174,6 +179,7 @@ export default function HotspotBlock({ block }) {
                   background: st.fill,
                   borderRadius: shapeRadius(r.shape),
                   boxSizing: 'border-box', cursor: 'move',
+                  boxShadow: r.id === activeRegionId ? '0 0 0 2px var(--forge-amber)' : 'none',
                 }}>
                 <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.label}</span>
                 {Object.entries(HANDLES).map(([h, pos]) => (
@@ -200,7 +206,12 @@ export default function HotspotBlock({ block }) {
           <div>
             <label style={fieldLabel}>Regions ({regions.length})</label>
             {regions.map(r => (
-              <div key={r.id} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <div key={r.id} onMouseDown={() => setActiveRegion(r.id)}
+                style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center',
+                  padding: '4px 6px', borderRadius: 6,
+                  background: r.id === activeRegionId ? 'color-mix(in srgb, var(--forge-amber) 14%, transparent)' : 'transparent',
+                  boxShadow: r.id === activeRegionId ? 'inset 0 0 0 1.5px var(--forge-amber)' : 'none',
+                  transition: 'background .12s, box-shadow .12s' }}>
                 <div style={{ width: 14, height: 14, flexShrink: 0, border: `2px solid ${hotspotStyle(r.color).border}`,
                   background: hotspotStyle(r.color).fill, borderRadius: shapeRadius(r.shape) }} />
                 <input value={r.label} onChange={e => setLabel(r.id, e.target.value)} style={{ ...inputStyle, flex: 1 }} />

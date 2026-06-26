@@ -334,6 +334,27 @@ export default function App() {
             }}
           >▶<span className="cf-hide-mobile"> Course</span></button>
 
+          {/* Export the whole course build as a JSON file (backup / inspect / move) */}
+          <button
+            onClick={() => {
+              if (!activeProject) return
+              const a = document.createElement('a')
+              a.href = `/api/projects/${activeProject.id}/export.json`
+              a.download = ''
+              document.body.appendChild(a); a.click(); a.remove()
+            }}
+            disabled={!activeProject}
+            aria-label="Export course as JSON"
+            title="Export the whole course build as a .json file (backup / inspect / move between environments)"
+            style={{
+              marginLeft: 10, padding: '5px 12px', background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
+              color: 'var(--cf-text-secondary)', fontSize: 12,
+              cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
+              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
+            }}
+          >⭳<span className="cf-hide-mobile"> JSON</span></button>
+
           {/* Publish */}
           <button
             onClick={() => setShowPublish(true)}

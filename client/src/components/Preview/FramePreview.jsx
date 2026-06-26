@@ -1907,6 +1907,11 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
   const commit  = next => updateBlock && updateBlock(block.id, { regions: next })
 
   useEffect(() => { _ensureCalloutAntsCSS() }, [])
+  // Mirror the selected region into the store so the inspector's region list can
+  // highlight the row you're editing here in the preview (cleared on unmount).
+  const setActiveRegion = useEditorStore(s => s.setActiveRegion)
+  useEffect(() => { setActiveRegion(sel) }, [sel, setActiveRegion])
+  useEffect(() => () => setActiveRegion(null), [setActiveRegion])
   const selRegion = regions.find(r => r.id === sel) || null
   // Scale the selected region uniformly about its center — a way to size it without
   // dragging each corner handle. Clamped into the canvas.

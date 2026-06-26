@@ -108,6 +108,8 @@ const useEditorStore = create((set, get) => ({
   lastSaved: null,
   saveError: null,
   activeBlockId: null,        // last-focused/clicked block (for keyboard shortcuts)
+  activeRegionId: null,       // selected hotspot region — syncs the live-preview
+                              // editor with the inspector region list (highlight)
   previewOpen: false,         // preview modal flag (so global shortcuts can open it)
   _undoStack: [],             // snapshots of blocks arrays (most recent first)
   saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
@@ -266,6 +268,7 @@ const useEditorStore = create((set, get) => ({
 
   // ── Sprint A: selection, undo, duplicate, reorder, flush ──────────────
   setActiveBlock: (id) => set({ activeBlockId: id }),
+  setActiveRegion: (id) => set({ activeRegionId: id }),
   setPreviewOpen: (v) => set({ previewOpen: v }),
 
   _pushUndo: () => {
