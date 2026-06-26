@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -63,6 +63,11 @@ export default function TextBlock({ block }) {
   const [pickerOpen, setPickerOpen]   = useState(false)
   const [swapOpen, setSwapOpen]       = useState(false)
   const activeProject = useProjectStore(s => s.activeProject)
+  // TipTap calls scrollIntoView on selection; with the rounded overflow:hidden
+  // block container that nudges the editor sideways and clips the leading glyph of
+  // a wrapped line ("image" -> "mage"). Pin horizontal scroll to 0 to kill the nudge.
+  const editorScrollRef = useRef(null)
+  const pinScroll = () => { const el = editorScrollRef.current; if (el && el.scrollLeft) el.scrollLeft = 0 }
 
   const editor = useEditor({
     extensions: [
@@ -207,8 +212,10 @@ export default function TextBlock({ block }) {
         </div>
       )}
 
-      {/* TipTap editor */}
-      <div style={{ padding: '12px 16px', minHeight: 80 }}>
+      {/* TipTap editor. overflowX:hidden + the onScroll pin keep a selection-driven
+          scrollIntoView from shifting the text under the rounded container edge. */}
+      <div ref={editorScrollRef} onScroll={pinScroll}
+        style={{ padding: '12px 16px', minHeight: 80, overflowX: 'hidden' }}>
         <EditorContent editor={editor} />
       </div>
 
