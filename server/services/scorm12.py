@@ -676,20 +676,24 @@ def _int_dim(v, default):
 
 
 _OAM_PLAYER_TPL = """
-<div id="oamwrap-__BID__" class="cf-oam" style="margin-bottom:20px;width:100%">
+<div id="oamwrap-__BID__" class="cf-oam" style="margin-bottom:20px;width:100%;position:relative">
   <div id="oamstage-__BID__" class="cf-oam-stage" style="position:relative;width:100%;overflow:hidden;background:#0d1117">
     <iframe id="oam-__BID__" src="__SRC__" width="__W__" height="__H__" scrolling="no" allowfullscreen
       title="Interactive animation" sandbox="allow-scripts allow-same-origin"
       style="position:absolute;top:0;left:0;border:0;transform-origin:top left;display:block;background:#0d1117;width:__W__px;height:__H__px"></iframe>
-  </div>
-  <div id="oambar-__BID__" class="cf-oam-bar" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;border:1px solid #1c2a3a;border-top:none">
-    <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
-    <div id="oamtrack-__BID__" style="flex:1;position:relative;height:8px;background:#1c2a3a;border-radius:4px;cursor:pointer">
-      <div id="oamfill-__BID__" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:#F59E0B;border-radius:4px"></div>
-      <div id="oammarks-__BID__"></div>
+    <!-- Media bar overlaid on the LOWER END of the Animate canvas (parity with the
+         video block's bottom-anchored controls): it sits ON the stage bottom, adds
+         NO extra height to the wrap, and so produces no overflow / phantom scrollbar.
+         A soft upward scrim (box-shadow) keeps the controls legible over the canvas. -->
+    <div id="oambar-__BID__" class="cf-oam-bar" style="position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d1117;box-shadow:0 -10px 20px rgba(13,17,23,0.55);border-top:1px solid #1c2a3a">
+      <button id="oamplay-__BID__" aria-label="Play" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#9658;</button>
+      <div id="oamtrack-__BID__" style="flex:1;position:relative;height:8px;background:#1c2a3a;border-radius:4px;cursor:pointer">
+        <div id="oamfill-__BID__" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:#F59E0B;border-radius:4px"></div>
+        <div id="oammarks-__BID__"></div>
+      </div>
+      <button id="oamnext-__BID__" aria-label="Next stop" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#10515; Next stop</button>
+      <span id="oamtime-__BID__" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7A90A8;min-width:60px;text-align:right"></span>
     </div>
-    <button id="oamnext-__BID__" aria-label="Next stop" style="background:#F59E0B;color:#042C53;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace">&#10515; Next stop</button>
-    <span id="oamtime-__BID__" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7A90A8;min-width:60px;text-align:right"></span>
   </div>
 </div>
 <script>
@@ -726,7 +730,10 @@ _OAM_PLAYER_TPL = """
     if(inShell){
       var cs=getComputedStyle(sc);
       var padV=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
-      var availH=ch-padV-barH;                   // content-box height minus padding + bar
+      // The media bar now OVERLAYS the stage bottom (absolute, no longer stacked
+      // below it), so the stage is the only height contributor — fit the full
+      // content box (no barH reservation) and the bar rides on the canvas bottom.
+      var availH=ch-padV;                        // content-box height minus padding
       if(availH>0) s=Math.min(s, availH/SH);     // letterbox inside the content box
     } else {
       s=Math.min(s,1);                           // flowing layout: don't upscale past native
@@ -2693,18 +2700,26 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '.cf-zone-media>*{{margin:0!important}}' +
     '.cf-zone-media img,.cf-zone-media video{{width:100%;height:100%;object-fit:contain;display:block;max-width:none}}' +
     '.cf-zone-media .cf-3d-viewer{{height:100%!important;margin:0!important}}' +
-    // OAM player in a full-bleed zone: the wrap fills the zone as a flex column so
-    // its media bar (play/pause/scrub) stays visible BELOW the stage instead of
-    // being pushed off the bottom of the clipped zone. The stage flexes to take the
-    // remaining height; the bar keeps its intrinsic height. The OAM iframe is
+    // OAM player in a full-bleed zone: the wrap fills the zone and centers the
+    // scaled stage. The media bar (play/pause/scrub) is absolutely positioned ON
+    // the stage bottom (overlay), so it no longer needs its own row in a flex
+    // column — centering the stage keeps the player + overlaid bar inside the
+    // clipped zone with no extra height (no phantom scrollbar). The OAM iframe is
     // transform-scaled by the player's own fit() (width/height come from the SW×SH
     // attributes), so it MUST be exempted from the blanket iframe{{height:100%}} rule
-    // below — that override would defeat the scale and re-hide the bar.
-    '.cf-zone-media .cf-oam{{height:100%!important;margin:0!important;display:flex!important;flex-direction:column;overflow:hidden}}' +
-    '.cf-zone-media .cf-oam .cf-oam-stage{{flex:1 1 auto;min-height:0}}' +
-    '.cf-zone-media .cf-oam .cf-oam-bar{{flex:0 0 auto}}' +
+    // below — that override would defeat the scale.
+    '.cf-zone-media .cf-oam{{height:100%!important;margin:0!important;display:flex!important;align-items:center;justify-content:center;overflow:hidden}}' +
+    '.cf-zone-media .cf-oam .cf-oam-stage{{max-height:100%}}' +
     '.cf-zone-media .cf-oam iframe{{width:auto;height:auto}}' +
-    '.cf-zone-media iframe{{width:100%;height:100%;border:0;display:block}}';
+    '.cf-zone-media iframe{{width:100%;height:100%;border:0;display:block}}' +
+    // Shell TITLE + PROMPT zones: authors size these boxes to the cap-height, so a
+    // fixed border-box height + overflow:hidden clips glyph descenders (g,y,p,j) off
+    // the bottom. Every shell_builder version tags zones with data-zone-type, so
+    // override just those text zones (built OR uploaded shells) to let descenders
+    // show and breathe. Matches the in-canvas preview (GUIShellRenderer) override.
+    '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],' +
+    '[data-zone-type="section_title"],[data-zone-type="prompt"]' +
+    '{{overflow:visible!important;line-height:1.35!important}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);

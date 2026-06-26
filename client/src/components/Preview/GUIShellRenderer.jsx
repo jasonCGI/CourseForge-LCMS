@@ -27,6 +27,22 @@ export default function GUIShellRenderer({
     const win = iframeRef.current.contentWindow
     if (!win || !win.fgui) return
     try {
+      // Shell TITLE + PROMPT zones: authors size these boxes to the cap-height, so a
+      // fixed border-box height + overflow:hidden clips glyph descenders (g,y,p,j).
+      // Inject a one-time override targeting the data-zone-type text zones so the
+      // in-canvas preview matches the published render (scorm12._patch_shell). Built
+      // OR uploaded shells both carry data-zone-type, so this reaches both.
+      try {
+        const doc = win.document
+        if (doc && !doc.getElementById('cf-zone-descender-fix')) {
+          const st = doc.createElement('style')
+          st.id = 'cf-zone-descender-fix'
+          st.textContent = '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],'
+            + '[data-zone-type="section_title"],[data-zone-type="prompt"]'
+            + '{overflow:visible!important;line-height:1.35!important}'
+          ;(doc.head || doc.documentElement).appendChild(st)
+        }
+      } catch (e) { /* cross-origin / torn down */ }
       win.fgui.injectContent(frameHtml || '')
       win.fgui.setFrameData(frameData || {})
       // Shells built before the setFrameData key-map fix read state.currentFrame,

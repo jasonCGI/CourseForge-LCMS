@@ -138,9 +138,18 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
   }}""")
 
     # -- CSS for zones ----------------------------------------------
+    # Text-bearing zones (the frame/lesson/section titles + the prompt) carry
+    # author copy whose glyphs have descenders (g, y, p, j). Authors routinely
+    # size these boxes to the visible cap-height, so a fixed border-box height +
+    # overflow:hidden + the browser-default tight line-height clips the descenders
+    # off the bottom line. Give every zone a comfortable line-height, and let the
+    # text zones' bottom descenders show (overflow:visible) unless the author
+    # explicitly set an overflow — counter/feedback chrome keeps its clip.
+    _TEXT_ZONE_TYPES = ('frame_title', 'lesson_title', 'section_title', 'prompt')
     zone_css = []
     for i, zone in enumerate(zones):
         zid = _safe_id(zone.get('id'), f'fgui-zone-{i}')
+        _overflow_default = 'visible' if str(zone.get('type', 'prompt')) in _TEXT_ZONE_TYPES else 'hidden'
         zone_css.append(f"""
   #{zid} {{
     position: absolute;
@@ -151,11 +160,12 @@ def build_shell_html(gui: dict, upload_folder: str) -> str:
     font-family: {_css_val(zone.get('font_family','IBM Plex Mono,monospace'))};
     font-size:   {_css_val(zone.get('font_size',13))}px;
     font-weight: {_css_val(zone.get('font_weight',400))};
+    line-height: {_css_val(zone.get('line_height',1.3))};
     color:       {_css_val(zone.get('color','#C8D8E8'))};
     background:  {_css_val(zone.get('bg_color','transparent'))};
     text-align:  {_css_val(zone.get('align','left'))};
     padding:     {_css_val(zone.get('padding','4px 8px'))};
-    overflow:    {_css_val(zone.get('overflow','hidden'))};
+    overflow:    {_css_val(zone.get('overflow', _overflow_default))};
     white-space: pre-wrap;
     word-break:  break-word;
     box-sizing:  border-box;

@@ -111,27 +111,34 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption, h
   }
 
   return (
-    <div ref={wrapRef} style={{ marginBottom: 20, background: '#0d1017' }}>
+    <div ref={wrapRef} style={{ marginBottom: 20, background: '#0d1017', position: 'relative' }}>
       <div ref={stageRef} style={{ position: 'relative', width: '100%', height: stageH,
         overflow: 'hidden', background: '#0d1017' }}>
         <iframe ref={iframeRef} src={src} width={SW} height={SH} onLoad={onLoad}
           title="Adobe Animate animation" scrolling="no" sandbox="allow-scripts allow-same-origin"
           style={{ position: 'absolute', top: 0, left: 0, border: 0, transformOrigin: 'top left',
             display: 'block', background: '#0d1017' }} />
-      </div>
 
-      <MediaBar
-        playing={playing}
-        t={mode === 'protocol' ? t : 0}
-        duration={mode === 'protocol' ? dur : 0}
-        stops={stops}
-        onPlayPause={togglePlay}
-        onSeek={(sec) => send({ type: 'oam:seek', t: sec })}
-        onNextStop={() => send({ type: 'oam:nextStop' })}
-        disabled={!canControl}
-        seekable={mode === 'protocol'}
-        onFullscreen={toggleFullscreen}
-      />
+        {/* Media bar overlaid on the LOWER END of the Animate canvas (parity with the
+            video block's bottom-anchored controls and the server _OAM_PLAYER_TPL): it
+            sits ON the stage bottom so it adds NO extra height to the wrap — no overflow,
+            no phantom scrollbar. A soft upward scrim (box-shadow) keeps it legible. */}
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2,
+          boxShadow: '0 -10px 20px rgba(13,17,23,0.55)' }}>
+          <MediaBar
+            playing={playing}
+            t={mode === 'protocol' ? t : 0}
+            duration={mode === 'protocol' ? dur : 0}
+            stops={stops}
+            onPlayPause={togglePlay}
+            onSeek={(sec) => send({ type: 'oam:seek', t: sec })}
+            onNextStop={() => send({ type: 'oam:nextStop' })}
+            disabled={!canControl}
+            seekable={mode === 'protocol'}
+            onFullscreen={toggleFullscreen}
+          />
+        </div>
+      </div>
 
       {mode === 'none' && (
         <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary, #7a7a90)', marginTop: 4,
