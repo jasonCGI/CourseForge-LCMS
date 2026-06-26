@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import OamMediaBar from './OamMediaBar'
 import Model3DViewer from './Model3DViewer'
@@ -1639,7 +1639,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
 
   // Keep the contentEditable box in sync with external text changes (panel input),
   // but never clobber the caret while the author is typing in the box itself.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (boxRef.current && document.activeElement !== boxRef.current
         && boxRef.current.textContent !== text) {
       boxRef.current.textContent = text
@@ -1727,7 +1727,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           is positioned so its facing edge-center sits on that point and extends away
           from the target — same geometry as the static overlay. */}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85))' }}>
         <line x1={lineEnd[0]} y1={lineEnd[1]} x2={tx} y2={ty}
           stroke={S.line} strokeWidth={S.lineWidth} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
@@ -1799,6 +1799,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           contentEditable={active}
           suppressContentEditableWarning
           onMouseDown={e => { if (active) e.stopPropagation() }}  /* let the caret land; don't drag */
+          onInput={() => { if (updateBlock) updateBlock(block.id, { text: boxRef.current.textContent }) }}
           onBlur={commitBoxText}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); boxRef.current.blur() } }}
           style={{
@@ -1806,11 +1807,11 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             padding: `${padding}px`, borderRadius: S.radius,
             background: S.boxBg, color: S.boxText,
             border: `${S.borderWidth} solid ${S.boxBorder}`, boxShadow: S.shadow,
-            font: `600 14px/1.35 'Inter', system-ui, sans-serif`,
+            font: `700 18px/1.35 'Inter', system-ui, sans-serif`,
             textAlign: 'center', whiteSpace: 'nowrap',
             cursor: active ? 'text' : 'move', outline: 'none', minWidth: 24,
           }}
-        >{text}</div>
+        ></div>
       </div>
     </div>
   )

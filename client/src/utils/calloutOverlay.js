@@ -24,7 +24,7 @@ export const CALLOUT_STYLE = {
   boxText:     '#1a2a3a',
   boxBorder:   '#A8572B',
   line:        '#A8572B',
-  shadow:      '0 2px 10px rgba(0,0,0,0.22)',
+  shadow:      '0 0 10px rgba(0,0,0,0.85)',
   radius:      '8px',
   lineWidth:   '4',      // connector stroke px (non-scaling)
   borderWidth: '4px',    // box ("label") border px
@@ -112,7 +112,7 @@ export function buildCalloutOverlayHTML(data) {
 
   const svg =
     `<svg viewBox="0 0 100 100" preserveAspectRatio="none" `
-    + `style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">`
+    + `style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;filter:drop-shadow(0 0 10px rgba(0,0,0,0.85))">`
     + `<line x1="${ex}" y1="${ey}" x2="${tx}" y2="${ty}" `
     + `stroke="${S.line}" stroke-width="${S.lineWidth}" vector-effect="non-scaling-stroke" stroke-linecap="round" /></svg>`
 
@@ -121,7 +121,7 @@ export function buildCalloutOverlayHTML(data) {
     + `transform:${tf};max-width:46%;box-sizing:border-box;`
     + `padding:${padding}px;border-radius:${S.radius};background:${S.boxBg};`
     + `color:${S.boxText};border:${S.borderWidth} solid ${S.boxBorder};box-shadow:${S.shadow};`
-    + `font:600 14px/1.35 'Inter',system-ui,sans-serif;text-align:center">`
+    + `font:700 18px/1.35 'Inter',system-ui,sans-serif;text-align:center">`
     + `${esc(text)}</div>`
 
   return `<div class="cf-callout-overlay" style="position:absolute;inset:0;`
