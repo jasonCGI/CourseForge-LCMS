@@ -2012,47 +2012,47 @@ function PreviewWCN({ block }) {
   const modalMarkup = modalOpen && (
     <div role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
-      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
                zIndex:2000, display:'flex', alignItems:'center',
                justifyContent:'center', padding:24 }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
         onClick={(e) => e.stopPropagation()}
         style={{ background:'#fff', border:`3px solid ${cfg.theme}`, borderRadius:8,
-                 maxWidth:420, width:'100%', overflow:'hidden',
+                 width:'fit-content', maxWidth:'75%', minWidth:320, overflow:'hidden',
                  boxShadow:'0 10px 30px rgba(0,0,0,0.25)' }}>
-        <div style={{ position:'relative', height:50, display:'flex',
+        <div style={{ position:'relative', height:64, display:'flex',
                       alignItems:'center', justifyContent:'center',
                       background:`repeating-linear-gradient(-45deg, ${cfg.theme} 0 14px, #000 14px 28px)` }}>
           <span style={{ background:'#fff', border:'2px solid #000', borderRadius:6,
-                         padding:'7px 14px', fontWeight:800, fontSize:20, lineHeight:1,
+                         padding:'10px 20px', fontWeight:800, fontSize:30, lineHeight:1,
                          color:cfg.chipText }}>{cfg.tag}</span>
           <button onClick={closeModal} aria-label="Close dialog"
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
-            onMouseDown={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(0.95)' }}
-            onMouseUp={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)' }}
-            style={{ position:'absolute', top:'50%', right:10, transform:'translateY(-50%)',
-                     width:20, height:20, borderRadius:'50%', background:'#fff',
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
+            onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)' }}
+            onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
+            style={{ position:'absolute', top:8, right:8,
+                     width:30, height:30, borderRadius:'50%', background:'#fff',
                      border:'2px solid #000', cursor:'pointer', padding:0,
                      display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-            <span style={{ position:'relative', width:10, height:10, display:'block' }}>
-              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:2,
+            <span style={{ position:'relative', width:15, height:15, display:'block' }}>
+              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:3,
                              background:'#000', transform:'translateY(-50%) rotate(45deg)' }} />
-              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:2,
+              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:3,
                              background:'#000', transform:'translateY(-50%) rotate(-45deg)' }} />
             </span>
           </button>
         </div>
         <div style={{ padding:20, textAlign:'center', color:'#1a1a1a' }}>
-          <div id={modalId} style={{ fontSize:15, fontWeight:700, marginBottom:8 }}>
+          <div id={modalId} style={{ fontSize:22, fontWeight:700, marginBottom:8 }}>
             {block.data.title || cfg.tag}
           </div>
-          <div style={{ fontSize:13, lineHeight:1.65 }}>{block.data.text}</div>
+          <div style={{ fontSize:20, lineHeight:1.65 }}>{block.data.text}</div>
           <button onClick={block.data.modal ? acknowledge : closeModal}
             aria-label={block.data.modal ? `${ackLabel} — closes dialog` : 'Close dialog'}
             style={{ marginTop:16, padding:'8px 20px', background:cfg.theme,
                      color:type === 'caution' ? cfg.chipText : '#fff',
-                     border:'none', borderRadius:4, fontSize:13, fontWeight:700,
+                     border:'none', borderRadius:4, fontSize:20, fontWeight:700,
                      cursor:'pointer', fontFamily:'inherit' }}>
             {block.data.modal ? `✓ ${ackLabel}` : 'Close'}
           </button>

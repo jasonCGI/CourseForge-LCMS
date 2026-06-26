@@ -2317,11 +2317,12 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
     PreviewWCN modal and the shell runtime JS (wcnOpenModal/Close/Acknowledge)
     are kept in visual/behavioural sync with this markup by hand.
 
-    Design: ~420px card, 8px radius, 3px theme border, soft shadow, overflow
-    hidden. ~50px header is diagonal hazard stripes (repeating-linear-gradient
+    Design: dynamic-width card (width:fit-content, max-width:75% of the overlay,
+    min-width:320px floor), 8px radius, 3px theme border, soft shadow, overflow
+    hidden. ~64px header is diagonal hazard stripes (repeating-linear-gradient
     of theme + black) with a centered white LABEL CHIP (2px black border) on
-    top, plus a circular white close button (animated X) top-right. Body is
-    white, 20px padding, centered.
+    top, plus a ~30px circular white close button (animated X) pinned to the
+    top-right corner. Body is white, 20px padding, centered.
 
     theme       -- brand hex for stripes / chip border / card border
     chip_text   -- chip LABEL colour (AA on white): theme for warning/note,
@@ -2331,43 +2332,43 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
     return f'''
   <div id="{modal_id}" role="presentation" aria-hidden="true"
        onclick="if(event.target===this)wcnCloseModal('{modal_id}')"
-       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999;
               align-items:center;justify-content:center;padding:24px">
     <div role="dialog" aria-modal="true" aria-labelledby="{title_id}"
          onclick="event.stopPropagation()"
          style="background:#fff;border:3px solid {theme};border-radius:8px;
-                max-width:420px;width:100%;overflow:hidden;
+                width:fit-content;max-width:75%;min-width:320px;overflow:hidden;
                 box-shadow:0 10px 30px rgba(0,0,0,0.25)">
-      <div style="position:relative;height:50px;display:flex;align-items:center;
+      <div style="position:relative;height:64px;display:flex;align-items:center;
                   justify-content:center;
                   background:repeating-linear-gradient(-45deg,{theme} 0 14px,#000 14px 28px)">
         <span style="background:#fff;border:2px solid #000;border-radius:6px;
-                     padding:7px 14px;font-weight:800;font-size:20px;line-height:1;
+                     padding:10px 20px;font-weight:800;font-size:30px;line-height:1;
                      color:{chip_text}">{tag}</span>
         <button onclick="wcnCloseModal('{modal_id}')" aria-label="Close dialog"
                 onmouseover="this.style.transform='scale(1.08)'"
                 onmouseout="this.style.transform='scale(1)'"
                 onmousedown="this.style.transform='scale(0.95)'"
                 onmouseup="this.style.transform='scale(1.08)'"
-                style="position:absolute;top:50%;right:10px;transform:translateY(-50%);
-                       width:20px;height:20px;border-radius:50%;background:#fff;
+                style="position:absolute;top:8px;right:8px;
+                       width:30px;height:30px;border-radius:50%;background:#fff;
                        border:2px solid #000;cursor:pointer;padding:0;
                        display:inline-flex;align-items:center;justify-content:center">
-          <span style="position:relative;width:10px;height:10px;display:block">
-            <span style="position:absolute;top:50%;left:0;width:100%;height:2px;
+          <span style="position:relative;width:15px;height:15px;display:block">
+            <span style="position:absolute;top:50%;left:0;width:100%;height:3px;
                          background:#000;transform:translateY(-50%) rotate(45deg)"></span>
-            <span style="position:absolute;top:50%;left:0;width:100%;height:2px;
+            <span style="position:absolute;top:50%;left:0;width:100%;height:3px;
                          background:#000;transform:translateY(-50%) rotate(-45deg)"></span>
           </span>
         </button>
       </div>
       <div style="padding:20px;text-align:center;color:#1a1a1a">
-        <div id="{title_id}" style="font-size:15px;font-weight:700;margin-bottom:8px">{body_text["title"]}</div>
-        <div style="font-size:13px;line-height:1.65">{body_text["text"]}</div>
+        <div id="{title_id}" style="font-size:22px;font-weight:700;margin-bottom:8px">{body_text["title"]}</div>
+        <div style="font-size:20px;line-height:1.65">{body_text["text"]}</div>
         <button id="{footer_btn_id}" onclick="{footer_onclick}" aria-label="{footer_aria}"
                 style="margin-top:16px;padding:8px 20px;background:{theme};
                        color:{chip_text if tag == 'CAUTION' else '#fff'};
-                       border:none;border-radius:4px;font-size:13px;font-weight:700;
+                       border:none;border-radius:4px;font-size:20px;font-weight:700;
                        cursor:pointer;font-family:inherit">{footer_label}</button>
       </div>
     </div>
