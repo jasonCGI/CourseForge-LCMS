@@ -288,7 +288,7 @@ def _frame_position(project, frame):
     return frame_idx, total, disp_index, req_total
 
 
-def _build_shell_preview(shell, frame, project) -> str | None:
+def _build_shell_preview(shell, frame, project, embed: bool = False) -> str | None:
     """
     Render the frame wrapped in the project's GUI shell exactly as the published
     SCO will (shell becomes the page, blocks injected via window.fgui), then
@@ -362,21 +362,26 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         html = html.replace("</head>", _HEAD_ASSETS + "</head>", 1)
     else:
         html = _HEAD_ASSETS + html
+    banner = "" if embed else _BANNER
     if "</body>" in html:
-        html = html.replace("</body>", _BANNER + chrome_scripts + fit_js + "</body>", 1)
+        html = html.replace("</body>", banner + chrome_scripts + fit_js + "</body>", 1)
     else:
-        html = html + _BANNER + chrome_scripts + fit_js
+        html = html + banner + chrome_scripts + fit_js
     return html
 
 
-def build_frame_preview_html(frame) -> str:
-    """Build a self-contained preview HTML page for a single frame."""
+def build_frame_preview_html(frame, embed: bool = False) -> str:
+    """Build a self-contained preview HTML page for a single frame.
+
+    embed=True drops the page's own LIVE PREVIEW banner — used when the page is
+    iframed inside the editor pane, which already shows its own PreviewHeader.
+    """
     project = _project_for_frame(frame)
 
     # Project-level GUI shell: render the frame inside the shell (the real SCO look).
     shell = _project_shell_for(project)
     if shell:
-        shell_html = _build_shell_preview(shell, frame, project)
+        shell_html = _build_shell_preview(shell, frame, project, embed=embed)
         if shell_html:
             return shell_html
 
@@ -415,7 +420,7 @@ def build_frame_preview_html(frame) -> str:
         f"<title>Preview · {title}</title>",
         _HEAD_ASSETS,
         "<style>", _BASE_CSS, theme_css, "</style></head><body>",
-        _BANNER,
+        ("" if embed else _BANNER),
         "<main class=\"cf-preview-main\">", blocks_html, pager, "</main>",
         "<script>", _STUB_JS, "</script>",
         runtime_js,

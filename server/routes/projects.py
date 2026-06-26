@@ -356,7 +356,10 @@ def preview_frame_html(frame_id):
     """
     from ..services.frame_preview import build_frame_preview_html
     frame = Frame.query.get_or_404(frame_id)
-    html = build_frame_preview_html(frame)
+    # embed=1 suppresses the page's own LIVE PREVIEW banner when the pane already
+    # shows its PreviewHeader (avoids a doubled banner in the in-app Published view).
+    embed = request.args.get('embed') in ('1', 'true')
+    html = build_frame_preview_html(frame, embed=embed)
     return html, 200, {
         'Content-Type': 'text/html; charset=utf-8',
         'X-Frame-Options': 'SAMEORIGIN',

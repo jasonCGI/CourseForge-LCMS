@@ -166,7 +166,7 @@ export default function PersistentPreviewPane() {
         <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
           <iframe
             key={activeFrame.id}
-            src={`/api/frames/${activeFrame.id}/preview-html`}
+            src={`/api/frames/${activeFrame.id}/preview-html?embed=1`}
             title="Published frame preview"
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
           />
