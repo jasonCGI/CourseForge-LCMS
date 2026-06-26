@@ -83,14 +83,17 @@ export default function PersistentPreviewPane() {
   const total = order.length || 1
   const human = idx >= 0 ? idx + 1 : 1
 
-  // Interactive / runtime blocks (3D, iVideo, OAM, hotspot, quiz, branch, WCN)
-  // must render as live React rather than static injected HTML — so the shell
-  // preview is actually clickable and matches the learner experience. When a frame
-  // has any, render the whole block stack as a scaled React overlay over the
-  // content area. Static-only frames (text/image/video/audio) keep HTML injection.
+  // Interactive / runtime blocks (3D, iVideo, OAM, hotspot, quiz, branch, WCN,
+  // callout) must render as live React rather than static injected HTML — so the
+  // shell preview is actually clickable and matches the learner/editor experience.
+  // (Callout: so its box + target are draggable and its text editable WITH the GUI
+  // shell on, identical to the shell-off preview — same InteractiveCallout overlay.)
+  // When a frame has any, render the whole block stack as a scaled React overlay
+  // over the content area. Static-only frames (text/image/video/audio) keep HTML
+  // injection.
   const needsOverlay = useMemo(
     () => (activeFrame?.content?.blocks || []).some(
-      b => ['model3d', 'ivideo', 'oam', 'hotspot', 'quiz', 'branch', 'wcn'].includes(b.type)),
+      b => ['model3d', 'ivideo', 'oam', 'hotspot', 'quiz', 'branch', 'wcn', 'callout'].includes(b.type)),
     [activeFrame?.content?.blocks],
   )
   const frameHtml = useMemo(
