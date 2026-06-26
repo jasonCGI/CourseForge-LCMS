@@ -2341,9 +2341,9 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
     <div role="dialog" aria-modal="true" aria-labelledby="{title_id}"
          onclick="event.stopPropagation()"
          style="background:#fff;border:4px solid {theme};border-radius:8px;
-                width:fit-content;max-width:60%;min-width:320px;overflow:hidden;
+                width:fit-content;max-width:60%;min-width:320px;
                 box-shadow:0 10px 30px rgba(0,0,0,0.25)">
-      <div style="position:relative;height:64px;display:flex;align-items:center;
+      <div style="position:relative;border-radius:4px 4px 0 0;height:64px;display:flex;align-items:center;
                   justify-content:center;
                   background:repeating-linear-gradient(-45deg,{theme} 0 14px,#000 14px 28px)">
         <span style="background:#fff;border:2px solid #000;border-radius:6px;

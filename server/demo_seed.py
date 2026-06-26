@@ -447,26 +447,30 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
     ]},
 
     # ── Summary ──
-    {'name': 'Platform Summary', 'frame_type': 'content', 'lesson': 'Course Summary', 'blocks': [
+    {'name': 'Platform Summary', 'frame_type': 'content', 'lesson': 'Course Summary', 'layout': 'full', 'blocks': [
         _text(body='''<h2>CourseForge Platform Summary</h2>
 <p>You've seen all available block types in the CourseForge ecosystem. Quick reference:</p>
-<h3>Content blocks</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 48px;text-align:left">
+<div><h3>Content blocks</h3>
 <ul><li><strong>Text</strong> — rich HTML + narrator script</li>
 <li><strong>Image</strong> — WebP/PNG via ForgePack Image</li>
 <li><strong>Video</strong> — Video.js via ForgePack Video</li>
 <li><strong>Audio</strong> — MP3/OGG/M4A via ForgePack Audio</li></ul>
-<h3>Assessment blocks</h3>
+</div>
+<div><h3>Assessment blocks</h3>
 <ul><li><strong>Quiz</strong> — multiple choice, 2 attempts, feedback</li>
 <li><strong>Hotspot</strong> — clickable regions on an image</li>
 <li><strong>Branch</strong> — adaptive routing to different frames</li></ul>
-<h3>Safety blocks (WCN)</h3>
+</div>
+<div><h3>Safety blocks (WCN)</h3>
 <ul><li><strong>Warning</strong> — critical safety, MIL-SPEC triangle</li>
 <li><strong>Caution</strong> — equipment risk, MIL-SPEC diamond</li>
 <li><strong>Note</strong> — supplementary information, circle-i</li></ul>
-<h3>Advanced blocks</h3>
+</div>
+<div><h3>Advanced blocks</h3>
 <ul><li><strong>3D Model</strong> — GLB viewer with orbit, zoom, annotations</li>
 <li><strong>Interactive Video</strong> — ForgeClip baked interactions</li>
-<li><strong>OAM</strong> — Adobe Animate Canvas with SCORM bridge</li></ul>''',
+<li><strong>OAM</strong> — Adobe Animate Canvas with SCORM bridge</li></ul></div></div>''',
               narration='This completes the CourseForge Platform Overview. You have seen all block types '
                         'across content, assessment, safety, and advanced categories. Replace the demo '
                         'content with your own assets and publish to SCORM or Web Bundle format.'),

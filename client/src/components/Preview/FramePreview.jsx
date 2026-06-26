@@ -2220,9 +2220,9 @@ function PreviewWCN({ block }) {
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
         onClick={(e) => e.stopPropagation()}
         style={{ background:'#fff', border:`4px solid ${cfg.theme}`, borderRadius:8,
-                 width:'fit-content', maxWidth:'60%', minWidth:320, overflow:'hidden',
+                 width:'fit-content', maxWidth:'60%', minWidth:320,
                  boxShadow:'0 10px 30px rgba(0,0,0,0.25)' }}>
-        <div style={{ position:'relative', height:64, display:'flex',
+        <div style={{ position:'relative', borderRadius:'4px 4px 0 0', height:64, display:'flex',
                       alignItems:'center', justifyContent:'center',
                       background:`repeating-linear-gradient(-45deg, ${cfg.theme} 0 14px, #000 14px 28px)` }}>
           <span style={{ background:'#fff', border:'2px solid #000', borderRadius:6,
