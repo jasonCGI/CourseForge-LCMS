@@ -41,8 +41,11 @@ export default function PersistentPreviewPane() {
   // content_area rect (stage coords) so rich-media (3D/iVideo/OAM) React
   // components can be overlaid exactly over the shell's #fgui-content.
   const [contentArea, setContentArea] = useState(null)
+  // content-area bg_color -> luminance-aware injected body-text color/halo
+  // (mirrors the server's _patch_shell). Default null = transparent/halo fallback.
+  const [contentBg, setContentBg] = useState(null)
   useEffect(() => {
-    if (!shellId) { setStage(null); setContentArea(null); return }
+    if (!shellId) { setStage(null); setContentArea(null); setContentBg(null); return }
     let live = true
     fetch(`/api/gui-shells/${shellId}/shell.json`)
       .then(r => (r.ok ? r.json() : null))
@@ -53,8 +56,9 @@ export default function PersistentPreviewPane() {
         setStage({ w: sw, h: sh })
         const ca = cfg?.content_area || cfg?.contentArea || {}
         setContentArea({ x: ca.x ?? 0, y: ca.y ?? 0, width: ca.width ?? sw, height: ca.height ?? sh })
+        setContentBg(ca.bg_color ?? null)
       })
-      .catch(() => { if (live) { setStage({ w: 1024, h: 768 }); setContentArea({ x: 0, y: 0, width: 1024, height: 768 }) } })
+      .catch(() => { if (live) { setStage({ w: 1024, h: 768 }); setContentArea({ x: 0, y: 0, width: 1024, height: 768 }); setContentBg(null) } })
     return () => { live = false }
   }, [shellId])
 
@@ -84,9 +88,9 @@ export default function PersistentPreviewPane() {
       if (isMenuFrame) {
         return buildMenuHTML(activeFrame?.content?.menu, (it) => resolveMenuTargetFrameId(it, activeProject))
       }
-      return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout)
+      return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout, contentBg)
     },
-    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject],
+    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject, contentBg],
   )
 
   // Shell-injected menu buttons (no React in the iframe) post an fgui_nav message

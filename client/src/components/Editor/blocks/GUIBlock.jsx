@@ -29,6 +29,7 @@ export default function GUIBlock({ block }) {
         zone_count:     data.zone_count,
         html_serve_url: data.html_serve_url,
         json_serve_url: data.json_serve_url,
+        content_bg_color: data.content_bg_color ?? null,
       })
     } catch (e) {
       setError(e.response?.data?.error || 'Upload failed.')

@@ -443,7 +443,7 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, 
   // overlap, no floating). frameLayout() builds the same .cf-layout-zones structure
   // the server emits, with inline styles (the live shell iframe runs the stored
   // shell's CSS, not the server's _patch_shell rules).
-  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout)
+  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, guiBlock.data.content_bg_color)
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -687,6 +687,57 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
   }
 }
 
+// Luminance-aware shelled body text — the JS mirror of scorm12.shell_text_style.
+// When the shell sets a KNOWN OPAQUE content-area bg_color, pick a SOLID text
+// color by that bg's YIQ luminance (light bg -> dark navy, dark bg -> light blue)
+// with NO halo. Transparent / unset / unparseable / alpha<1 -> light blue + a
+// dark text-shadow halo (the universal fallback; the common transparent-over-art
+// shell). Guarded so a malformed bg_color always falls back to the halo path.
+const SHELL_TEXT_LIGHT = '#C8D8E8'   // light glyphs for a DARK bg (default)
+const SHELL_TEXT_DARK  = '#042C53'   // brand navy for a LIGHT bg
+const SHELL_HALO = 'text-shadow:0 1px 2px rgba(0,0,0,0.85),0 0 2px rgba(0,0,0,0.7);'
+
+function parseOpaqueRgb(bgColor) {
+  // Returns [r,g,b] only for a known OPAQUE color; null otherwise. Never throws.
+  try {
+    if (!bgColor) return null
+    const s = String(bgColor).trim().toLowerCase()
+    if (!s || s === 'transparent') return null
+    let m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(s)
+    if (m) {
+      let h = m[1]
+      if (h.length === 3) h = h.split('').map(c => c + c).join('')
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+    }
+    m = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([01]?(?:\.\d+)?|\.\d+)\s*)?\)$/.exec(s)
+    if (m) {
+      if (m[4] !== undefined && parseFloat(m[4]) < 1.0) return null   // alpha<1 -> transparent
+      const r = +m[1], g = +m[2], b = +m[3]
+      if (r > 255 || g > 255 || b > 255) return null
+      return [r, g, b]
+    }
+    return null
+  } catch (e) { return null }
+}
+
+// -> { textColor, halo } (halo true = apply the dark halo, no solid-by-luminance).
+export function shellTextStyle(bgColor) {
+  const rgb = parseOpaqueRgb(bgColor)
+  if (!rgb) return { textColor: SHELL_TEXT_LIGHT, halo: true }
+  const yiq = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
+  return { textColor: yiq >= 128 ? SHELL_TEXT_DARK : SHELL_TEXT_LIGHT, halo: false }
+}
+
+// A <style> rule that colors the injected body text inside #fgui-content per the
+// shell's content-area bg (luminance-aware). The stored shell HTML sets no
+// #fgui-content color of its own, so this is what makes the in-canvas preview
+// match the published SCO's _patch_shell body-text color + halo.
+function shellTextCSS(bgColor) {
+  const { textColor, halo } = shellTextStyle(bgColor)
+  return '<style>#fgui-content{color:' + textColor + ';'
+    + (halo ? SHELL_HALO : '') + '}</style>'
+}
+
 // List CSS for shell-injected rich text. The stored shell's `#fgui-content ul`
 // rule (margin-left, no padding) outranks a plain class, so target
 // `#fgui-content .cf-injected-text` to win specificity and give bullets/numbers a
@@ -702,9 +753,13 @@ const CF_INJ_LIST_CSS =
 // runs the stored shell's CSS, not the server's _patch_shell rules); the
 // .cf-layout-zones layer fills #fgui-content edge-to-edge (0/0/100%/100%). Each
 // element owns its own, non-overlapping space; media/3D/image/video fill their zone.
-export function buildShelledLayoutHTML(contentBlocks, layout) {
+export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null) {
   const blocks = (contentBlocks || []).filter(b => b.type !== 'gui')
   if (blocks.length === 0) return ''
+  // Luminance-aware body-text color/halo per the shell's content-area bg, mirroring
+  // the server's _patch_shell. Prepended to every return so the injected text gets
+  // the right color in the iframe (the stored shell sets no #fgui-content color).
+  const TXT = shellTextCSS(bgColor)
   const lay = ['full', 'text-left', 'text-right'].includes(layout) ? layout : 'text-left'
   const textBlocks  = blocks.filter(b => b.type === 'text')
   const otherBlocks = blocks.filter(b => b.type !== 'text')
@@ -713,7 +768,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
   // full WITH both a text AND a media block = two elements → stack them (text
   // 40px-padded at top, media full-bleed beneath), no overlap. Mirrors the server.
   if (lay === 'full' && hasText && hasMedia) {
-    return CF_INJ_LIST_CSS + `<div class="cf-layout-full">` + blocks.map(b =>
+    return TXT + CF_INJ_LIST_CSS + `<div class="cf-layout-full">` + blocks.map(b =>
       `<div style="padding:${b.type === 'text' ? '40px' : '0'}">${renderBlockToHTML(b)}</div>`
     ).join('\n') + `</div>`
   }
@@ -728,7 +783,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
   // the server's .cf-shelled-text-top text-only path for parity.
   if (hasText && !hasMedia) {
     const inner = textBlocks.map(b => renderBlockToHTML(b)).join('\n')
-    return CF_INJ_LIST_CSS + `<div class="cf-shelled-text-top" style="position:absolute;`
+    return TXT + CF_INJ_LIST_CSS + `<div class="cf-shelled-text-top" style="position:absolute;`
       + `top:0;left:0;width:100%;height:100%;box-sizing:border-box;padding:40px;`
       + `overflow:auto">${inner}</div>`
   }
@@ -751,7 +806,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout) {
     zones.push(`<div class="cf-zone-media" style="position:absolute;top:0;left:${mLeft};`
       + `width:${mW};height:100%;box-sizing:border-box;overflow:hidden">${inner}</div>`)
   }
-  return CF_INJ_LIST_CSS + `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
+  return TXT + CF_INJ_LIST_CSS + `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
     + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>`
 }
 

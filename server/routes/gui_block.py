@@ -118,6 +118,9 @@ def upload_gui():
         'zone_count':     len(shell_config.get('zones',   [])),
         'html_serve_url': f'/api/media/gui/{asset_id}/shell.html',
         'json_serve_url': f'/api/media/gui/{asset_id}/shell.json',
+        # Content-area bg drives luminance-aware injected body text in the preview
+        # (client mirror of scorm12._patch_shell). Null/transparent -> halo fallback.
+        'content_bg_color': (shell_config.get('content_area') or {}).get('bg_color'),
     }), 201
 
 

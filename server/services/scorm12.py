@@ -92,6 +92,77 @@ def _sanitize_rich_html(html):
     return s
 
 
+# ── Luminance-aware shelled body text ───────────────────────────────────────
+# Body text injected into a GUI shell's #fgui-content is #C8D8E8 (reads on navy).
+# On a LIGHT or transparent-over-art content area it nearly vanishes, so the
+# universal fallback (transparent/unknown bg) is #C8D8E8 + a dark text-shadow
+# halo. But when the shell sets a KNOWN OPAQUE content-area bg_color we can do
+# better: pick a SOLID text color by that background's luminance (crisp, no halo).
+#
+# These constants are the resolved (concrete) brand values — this is standalone
+# published output and the in-canvas mirror, neither loads forge-tokens.css.
+_SHELL_TEXT_LIGHT = '#C8D8E8'   # light glyphs for a DARK bg (the current default)
+_SHELL_TEXT_DARK  = '#042C53'   # brand navy for a LIGHT bg (reads crisp on light)
+_SHELL_HALO = ('text-shadow:0 1px 2px rgba(0,0,0,0.85),'
+               '0 0 2px rgba(0,0,0,0.7);')
+
+_HEX_RE = re.compile(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$')
+_RGB_RE = re.compile(
+    r'^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*'
+    r'(?:,\s*([01]?(?:\.\d+)?|\.\d+)\s*)?\)$')
+
+
+def _parse_opaque_rgb(bg_color):
+    """Parse a CSS color string to (r,g,b) ONLY if it is a known OPAQUE color
+    (hex #rgb/#rrggbb, or rgb()/rgba() with alpha == 1). Returns None for
+    transparent / unset / has-meaningful-alpha / unparseable — the caller then
+    keeps the halo fallback. Never raises (a weird bg_color must never throw)."""
+    try:
+        if not bg_color:
+            return None
+        s = str(bg_color).strip().lower()
+        if not s or s == 'transparent':
+            return None
+        m = _HEX_RE.match(s)
+        if m:
+            h = m.group(1)
+            if len(h) == 3:
+                h = ''.join(c * 2 for c in h)
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+        m = _RGB_RE.match(s)
+        if m:
+            a = m.group(4)
+            # Explicit alpha that isn't fully opaque -> treat as transparent.
+            if a is not None and float(a) < 1.0:
+                return None
+            r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if r > 255 or g > 255 or b > 255:
+                return None
+            return (r, g, b)
+        return None
+    except Exception:
+        return None
+
+
+def shell_text_style(bg_color):
+    """Map a shell content-area bg_color -> (text_color, halo_css).
+
+    Opaque & parseable  -> solid color by YIQ luminance (light bg -> dark navy
+                           text, dark bg -> light blue), NO halo (crisp).
+    Transparent / unset / unparseable / alpha<1 -> (#C8D8E8, dark halo) — the
+                           current universal fallback (don't regress it).
+    Guarded so a malformed bg_color always falls back to the halo path."""
+    rgb = _parse_opaque_rgb(bg_color)
+    if rgb is None:
+        return _SHELL_TEXT_LIGHT, _SHELL_HALO
+    r, g, b = rgb
+    # YIQ perceived luminance (0..255). >=128 is a "light" background.
+    yiq = (r * 299 + g * 587 + b * 114) / 1000
+    if yiq >= 128:
+        return _SHELL_TEXT_DARK, ''     # light bg -> dark text, no halo
+    return _SHELL_TEXT_LIGHT, ''        # dark bg -> light text, no halo
+
+
 def _safe_id(value):
     """Validate a frame id / filename token used in navigation. Returns the value
     only if it matches the expected [\\w-]+ shape, else '' (so a malformed/hostile
@@ -2124,9 +2195,18 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
                                         if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
                                        layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
+    # Content-area bg drives luminance-aware body text. The per-frame gui asset
+    # stores the ForgeGUI config under companion_files['shell_config']; guard the
+    # walk so a missing/odd config just falls through to the halo default.
+    content_bg = None
+    try:
+        cfg = (asset.companion_files or {}).get('shell_config') or {}
+        content_bg = (cfg.get('content_area') or {}).get('bg_color')
+    except Exception:
+        content_bg = None
     html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
-                        disp_index, disp_total)
+                        disp_index, disp_total, content_bg=content_bg)
     return html, asset_id
 
 
@@ -2152,20 +2232,37 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
                                        hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
                                        layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
+    # Content-area bg drives luminance-aware body text. The per-project GuiShell
+    # stores the ForgeGUI config in shell.shell_config; guard the walk so a
+    # missing/odd config just falls through to the halo default.
+    content_bg = None
+    try:
+        cfg = shell.shell_config if isinstance(shell.shell_config, dict) else {}
+        content_bg = (cfg.get('content_area') or {}).get('bg_color')
+    except Exception:
+        content_bg = None
     html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
-                        disp_index, disp_total)
+                        disp_index, disp_total, content_bg=content_bg)
     return html, shell.id
 
 
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
-                 lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None):
+                 lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None,
+                 content_bg=None):
     """Namespace a shell's assets to gui_assets/<ns_id>/ and inject the
     CourseForge runtime (content injection + zones + nav + completion).
 
     The visible frame counter uses disp_index/disp_total (required frames only,
     excluding optional); navigation + completion still use the real positions.
+
+    content_bg: the shell's content-area bg_color (shell_config.content_area
+    .bg_color). Drives luminance-aware body text — an opaque bg picks a solid
+    color with no halo; transparent/unknown keeps #C8D8E8 + the dark halo.
     """
+    # Resolve the body-text color + halo from the content-area background. The
+    # CSS literals below are escaped for the JS string the runtime builds.
+    text_color, halo_css = shell_text_style(content_bg)
     # Namespace asset references so multiple shells never collide in the ZIP.
     shell_html = shell_html.replace('assets/', f'gui_assets/{ns_id}/')
 
@@ -2299,12 +2396,13 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
   var style = document.createElement('style');
   style.textContent =
     '#fgui-content{{font-family:\\'IBM Plex Mono\\',\\'Inter\\',system-ui,sans-serif;' +
-    // Body text color presumes a DARK shell content area (#C8D8E8 reads well on
-    // navy). Many shells use a LIGHT content background (or a transparent area over
-    // light background art), where #C8D8E8 nearly vanished. A dark text-shadow halo
-    // supplies the missing contrast on light backgrounds without regressing the dark
-    // case (the halo is invisible behind light glyphs on a dark field).
-    'font-size:14px;color:#C8D8E8;text-shadow:0 1px 2px rgba(0,0,0,0.85),0 0 2px rgba(0,0,0,0.7);line-height:1.6;padding:12px;box-sizing:border-box;' +
+    // Luminance-aware body text. When the shell sets a KNOWN OPAQUE content-area
+    // bg_color, shell_text_style() picks a SOLID color by that bg's luminance
+    // (light bg -> dark navy, dark bg -> #C8D8E8) and DROPS the halo (crisp). For
+    // a transparent / unset / unparseable bg (the common transparent-over-art
+    // shell) it returns #C8D8E8 + a dark text-shadow halo — the universal fallback
+    // that supplies contrast on unknown backgrounds without regressing the dark case.
+    'font-size:14px;color:{text_color};{halo_css}line-height:1.6;padding:12px;box-sizing:border-box;' +
     // Full-size media/zones fill the content area edge to edge (top:0/100%); the
     // content box must NEVER scroll (any sub-pixel overhang would otherwise add a
     // scrollbar). Clip instead — full items fill, overflowing text scrolls its
