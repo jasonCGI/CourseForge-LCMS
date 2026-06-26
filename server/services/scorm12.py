@@ -2336,7 +2336,7 @@ def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
               align-items:center;justify-content:center;padding:24px">
     <div role="dialog" aria-modal="true" aria-labelledby="{title_id}"
          onclick="event.stopPropagation()"
-         style="background:#fff;border:3px solid {theme};border-radius:8px;
+         style="background:#fff;border:4px solid {theme};border-radius:8px;
                 width:fit-content;max-width:60%;min-width:320px;overflow:hidden;
                 box-shadow:0 10px 30px rgba(0,0,0,0.25)">
       <div style="position:relative;height:64px;display:flex;align-items:center;

@@ -1745,7 +1745,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           title="Target — drag to aim the connector line"
           style={{
             position: 'absolute', left: `${tx}%`, top: `${ty}%`,
-            width: 16, height: 16, marginLeft: -8, marginTop: -8,
+            width: 24, height: 24, marginLeft: -12, marginTop: -12,
             borderRadius: '50%', background: S.line,
             border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
             cursor: 'move', pointerEvents: 'auto', zIndex: 7,
@@ -2022,7 +2022,7 @@ function PreviewWCN({ block }) {
                justifyContent:'center', padding:24 }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
         onClick={(e) => e.stopPropagation()}
-        style={{ background:'#fff', border:`3px solid ${cfg.theme}`, borderRadius:8,
+        style={{ background:'#fff', border:`4px solid ${cfg.theme}`, borderRadius:8,
                  width:'fit-content', maxWidth:'60%', minWidth:320, overflow:'hidden',
                  boxShadow:'0 10px 30px rgba(0,0,0,0.25)' }}>
         <div style={{ position:'relative', height:64, display:'flex',
