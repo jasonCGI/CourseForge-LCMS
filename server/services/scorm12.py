@@ -2299,7 +2299,12 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
   var style = document.createElement('style');
   style.textContent =
     '#fgui-content{{font-family:\\'IBM Plex Mono\\',\\'Inter\\',system-ui,sans-serif;' +
-    'font-size:14px;color:#C8D8E8;line-height:1.6;padding:12px;box-sizing:border-box;' +
+    // Body text color presumes a DARK shell content area (#C8D8E8 reads well on
+    // navy). Many shells use a LIGHT content background (or a transparent area over
+    // light background art), where #C8D8E8 nearly vanished. A dark text-shadow halo
+    // supplies the missing contrast on light backgrounds without regressing the dark
+    // case (the halo is invisible behind light glyphs on a dark field).
+    'font-size:14px;color:#C8D8E8;text-shadow:0 1px 2px rgba(0,0,0,0.85),0 0 2px rgba(0,0,0,0.7);line-height:1.6;padding:12px;box-sizing:border-box;' +
     // Full-size media/zones fill the content area edge to edge (top:0/100%); the
     // content box must NEVER scroll (any sub-pixel overhang would otherwise add a
     // scrollbar). Clip instead — full items fill, overflowing text scrolls its

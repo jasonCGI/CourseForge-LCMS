@@ -329,13 +329,30 @@ def _build_shell_preview(shell, frame, project) -> str | None:
     sh = int(getattr(shell, "stage_height", None) or 768)
     fit_js = (
         "<script>(function(){"
-        f"var SW={sw},SH={sh},BH=42;"
+        f"var SW={sw},SH={sh};"
+        # Measure the LIVE banner height instead of a hardcoded guess — the old
+        # BH=42 understated the real banner (~48-52px), so the stage's top title
+        # row slipped UNDER the banner and looked cut off. If the banner is
+        # dismissed the reserved height drops to 0 and the stage uses the full
+        # viewport. Re-measured on every fit() so it stays correct after a resize.
+        "function bannerH(){var b=document.getElementById('cf-preview-banner');"
+        "return b?Math.ceil(b.getBoundingClientRect().height):0;}"
         "function fit(){var s=document.getElementById('fgui-stage');if(!s)return;"
+        "var BH=bannerH();"
         "var aH=Math.max(1,window.innerHeight-BH);"
+        # Math.min fits the WHOLE stage inside the available width AND height, so
+        # neither dimension overflows when the window (or preview pane) shrinks —
+        # this is the responsive shrink behavior. Clamp the offsets to >=0 so a
+        # sub-pixel rounding error can never push the title under the banner or the
+        # footer past the bottom edge.
         "var sc=Math.min(window.innerWidth/SW,aH/SH);"
-        "var ox=(window.innerWidth-SW*sc)/2,oy=BH+(aH-SH*sc)/2;"
+        "var ox=Math.max(0,(window.innerWidth-SW*sc)/2);"
+        "var oy=BH+Math.max(0,(aH-SH*sc)/2);"
         "s.style.transform='translate('+ox+'px,'+oy+'px) scale('+sc+')';}"
         "fit();window.addEventListener('resize',fit);"
+        # Re-fit if the banner is dismissed (its removal frees vertical space).
+        "var bn=document.getElementById('cf-preview-banner');"
+        "if(bn){var x=bn.querySelector('button');if(x)x.addEventListener('click',function(){requestAnimationFrame(fit);});}"
         "requestAnimationFrame(fit);setTimeout(fit,60);setTimeout(fit,250);"
         "})();</script>"
     )
