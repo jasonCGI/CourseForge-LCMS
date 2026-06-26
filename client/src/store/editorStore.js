@@ -19,6 +19,19 @@ function _readDockDefault() {
   } catch { return 'bottom' }
 }
 
+// Inspector display mode — 'stack' (all blocks in a scroll list) or 'tabs' (one
+// tab per block). Hoisted into the store (from InspectorPane local state) so the
+// stable ⚙ View popover in the sidebar can drive it without it moving with the
+// inspector dock. Persisted to the same 'cf-inspector-mode' key as before.
+const MODE_KEY = 'cf-inspector-mode'
+const _MODES = ['stack', 'tabs']
+function _readMode() {
+  try {
+    const v = localStorage.getItem(MODE_KEY)
+    return _MODES.includes(v) ? v : 'stack'
+  } catch { return 'stack' }
+}
+
 // ── Layout-aware content-type exclusivity ────────────────────────────────
 // A frame's content.layout decides how many zone-fillers fit:
 //   'full'                  → ONE zone-filler total (text/quiz OR media share it)
@@ -109,6 +122,14 @@ const useEditorStore = create((set, get) => ({
   lastMenuFrame: null,
   setLastMenuFrame: (frameId, title) =>
     set({ lastMenuFrame: frameId ? { frameId, title: title || '' } : null }),
+
+  // ── Inspector display mode (stack / tabs) ───────────────────────────────
+  inspectorMode: _readMode(),
+  setInspectorMode: (mode) => {
+    const m = _MODES.includes(mode) ? mode : 'stack'
+    set({ inspectorMode: m })
+    try { localStorage.setItem(MODE_KEY, m) } catch {}
+  },
 
   // ── Inspector dock orientation ──────────────────────────────────────────
   inspectorDockDefault: _readDockDefault(),  // global carry-over default

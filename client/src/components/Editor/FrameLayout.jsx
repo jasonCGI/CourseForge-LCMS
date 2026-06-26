@@ -22,6 +22,7 @@ export const DEFAULT_FRAME_LAYOUT = 'text-left'
 
 export default function FrameLayout({ frame }) {
   const setFrameLayout = useEditorStore(s => s.setFrameLayout)
+  const setOptional = useEditorStore(s => s.setOptional)
   const value = frame?.content?.layout || DEFAULT_FRAME_LAYOUT
 
   return (
@@ -43,6 +44,24 @@ export default function FrameLayout({ frame }) {
       </select>
       <div style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
         marginTop: 4, letterSpacing: '0.06em' }}>// reflows the live preview · full-bleed media vs 50/50 split</div>
+
+      {/* Optional frame — relocated here from the inspector action bar. Wired to
+          the same store state (activeFrame.optional / setOptional). */}
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={!!frame?.optional}
+          onChange={e => setOptional(e.target.checked)}
+          aria-label="Mark frame optional"
+          style={{ marginTop: 2, flexShrink: 0 }}
+        />
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 12, color: frame?.optional ? 'var(--forge-amber)' : 'var(--cf-text-primary, #E0E8F0)',
+            fontFamily: 'var(--cf-font)', fontWeight: 500 }}>Optional frame</span>
+          <span style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+            letterSpacing: '0.06em' }}>// excluded from the completion count</span>
+        </span>
+      </label>
     </div>
   )
 }

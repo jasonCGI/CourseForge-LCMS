@@ -10,6 +10,7 @@ import useProjectStore from '../../store/projectStore'
 import useEditorStore  from '../../store/editorStore'
 import { duplicateFrame, createFrame, reorder } from '../../api/client'
 import TemplateLibrary from '../UI/TemplateLibrary'
+import InspectorViewControls from '../Editor/InspectorViewControls'
 import { getFrameCompletion } from '../../utils/frameCompletion'
 
 const byOrder = (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
@@ -565,6 +566,9 @@ export default function ContentTree() {
               color: on ? col : 'var(--cf-text-tertiary)' }}>{f}</button>
         )
       })}
+      {/* Stable home for the inspector view/dock controls. The sidebar never
+          moves when the inspector re-docks, so this ⚙ View popover stays put. */}
+      <InspectorViewControls />
     </div>
     <div role="tree" aria-label={`Project: ${activeProject.name}`} style={{ outline: 'none' }}>
 

@@ -35,6 +35,11 @@ export default function PersistentPreviewPane() {
   // OFF = clean block stack (author/content view). Only meaningful with a shell.
   const [guiOn, setGuiOn] = useState(true)
 
+  // Preview source toggle: 'edit' = the interactive React FramePreview (default,
+  // unchanged); 'published' = the server-rendered truth in an iframe (the same
+  // /preview-html the old popup Preview button opened, now shown in-pane).
+  const [source, setSource] = useState('edit')
+
   // Fetch the shell's stage dimensions so the preview can show the ENTIRE GUI
   // at its true aspect ratio (the shell scales its stage to fit the iframe).
   const [stage, setStage] = useState(null)
@@ -153,8 +158,20 @@ export default function PersistentPreviewPane() {
   return (
     <div className="cf-preview-pane">
       <PreviewHeader human={human} total={total} shell={!!shellId}
-        guiOn={guiOn} onToggleGui={shellId ? () => setGuiOn(v => !v) : null} />
-      {shellId && guiOn ? (
+        guiOn={guiOn} onToggleGui={shellId ? () => setGuiOn(v => !v) : null}
+        source={source} onSource={setSource} />
+      {source === 'published' ? (
+        // Server-rendered truth: the same /preview-html the old popup opened,
+        // now filling the pane. Replaces the removed FrameHeader Preview button.
+        <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
+          <iframe
+            key={activeFrame.id}
+            src={`/api/frames/${activeFrame.id}/preview-html`}
+            title="Published frame preview"
+            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          />
+        </div>
+      ) : shellId && guiOn ? (
         // Always show the WHOLE GUI: contain-fit the stage within the pane (both
         // width AND height), scaled down (or up) so nothing is clipped and there's
         // no scroll. The shell scales its own stage to fill this sized wrapper.
@@ -241,7 +258,7 @@ function ShellFit({ stage, children, contentArea, overlay }) {
   )
 }
 
-function PreviewHeader({ human, total, shell, guiOn, onToggleGui }) {
+function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSource }) {
   return (
     <div style={{
       background: 'var(--cf-navy, #042C53)',
@@ -259,6 +276,17 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui }) {
       <span style={{ color: '#C8D8E8', opacity: 0.6 }}>
         {shell ? 'GUI shell · SCORM API stubbed' : 'SCORM API stubbed'}
       </span>
+
+      {/* Edit ⇄ Published — Edit = interactive React preview; Published = the
+          server-rendered /preview-html truth in an iframe. Replaces the old
+          popup Preview button that lived in the inspector action bar. */}
+      <div role="group" aria-label="Preview source" style={{ marginLeft: 'auto', display: 'flex', gap: 0, flexShrink: 0 }}>
+        <SourceBtn active={source === 'edit'} onClick={() => onSource('edit')} side="left"
+          title="Edit — the interactive in-editor preview">Edit</SourceBtn>
+        <SourceBtn active={source === 'published'} onClick={() => onSource('published')} side="right"
+          title="Published — the server-rendered frame (the real SCO output)">Published</SourceBtn>
+      </div>
+
       {onToggleGui && (
         <button
           type="button"
@@ -279,6 +307,30 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui }) {
         </button>
       )}
     </div>
+  )
+}
+
+// One half of the Edit ⇄ Published segmented toggle.
+function SourceBtn({ active, onClick, side, title, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      style={{
+        flexShrink: 0,
+        fontFamily: 'inherit', fontSize: 10, letterSpacing: '0.06em', fontWeight: 600,
+        cursor: 'pointer', padding: '3px 9px',
+        borderRadius: side === 'left' ? '5px 0 0 5px' : '0 5px 5px 0',
+        border: '1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent)',
+        borderRightWidth: side === 'left' ? 0 : 1,
+        background: active ? 'var(--forge-amber, #D4820A)' : 'transparent',
+        color: active ? '#042C53' : 'var(--forge-amber, #D4820A)',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 

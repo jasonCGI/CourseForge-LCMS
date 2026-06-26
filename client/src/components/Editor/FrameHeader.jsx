@@ -4,14 +4,15 @@ import useEditorStore from '../../store/editorStore'
 /**
  * FrameHeader — the persistent inspector action bar.
  *
- * Frame name, Optional toggle, save status, Preview, and Save live here so they
- * stay reachable no matter which block tab is open (in Tabs mode they used to be
- * buried inside the Frame tab). Rendered once at the top of InspectorPane; the
- * `right` slot holds the Stack/Tabs layout toggle. The Frame tab/section is now
- * reserved for notes + layout/CSS.
+ * Slimmed to just the high-frequency essentials: the frame-name input (which now
+ * gets the room it needs), the save-status text, and the Save button. The view/
+ * dock controls moved to the stable ⚙ View popover in the sidebar (they used to
+ * live here and chased the inspector when you re-docked it); the Optional toggle
+ * moved into the Frame settings section; and the popup Preview button was
+ * replaced by the in-pane Edit ⇄ Published toggle in the preview header.
  */
-export default function FrameHeader({ right = null }) {
-  const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName, setOptional } = useEditorStore()
+export default function FrameHeader() {
+  const { activeFrame, isDirty, isSaving, lastSaved, save, updateFrameName } = useEditorStore()
 
   if (!activeFrame) return null
 
@@ -54,16 +55,6 @@ export default function FrameHeader({ right = null }) {
         }}
       />
 
-      {/* Optional toggle — excluded from completion count */}
-      <label title="Optional frames are excluded from the completion count"
-        style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
-          fontSize: 11, color: activeFrame.optional ? 'var(--forge-amber)' : '#9FB4C9',
-          cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-        <input type="checkbox" checked={!!activeFrame.optional}
-          onChange={e => setOptional(e.target.checked)} aria-label="Mark frame optional" />
-        Optional
-      </label>
-
       {/* Save status */}
       <span style={{
         fontSize: 11,
@@ -74,27 +65,6 @@ export default function FrameHeader({ right = null }) {
       }}>
         {savedLabel}
       </span>
-
-      {/* Preview button — opens the real frame render directly. */}
-      <button
-        onClick={() => window.open(`/api/frames/${activeFrame.id}/preview-html`, '_blank', 'noopener')}
-        title="Open the live frame render in a new tab"
-        style={{
-          padding: '5px 12px',
-          background: 'transparent',
-          // Fixed light text/border — the bar is fixed navy in all modes.
-          // #C8D8E8 text = 9.69:1; #758BA0 border = 4.00:1 (UI ≥3:1 pass).
-          color: '#C8D8E8',
-          border: '1px solid #758BA0',
-          borderRadius: 4,
-          fontSize: 12,
-          cursor: 'pointer',
-          flexShrink: 0,
-          fontFamily: 'var(--font-sans)',
-        }}
-      >
-        ▶ Preview
-      </button>
 
       {/* Manual save button */}
       <button
@@ -117,14 +87,6 @@ export default function FrameHeader({ right = null }) {
       >
         Save
       </button>
-
-      {/* Right slot — the Stack/Tabs layout toggle */}
-      {right && (
-        <>
-          <span style={{ width: 1, height: 18, background: 'var(--cf-border-primary)', flexShrink: 0 }} />
-          {right}
-        </>
-      )}
     </div>
   )
 }
