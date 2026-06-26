@@ -44,6 +44,7 @@ class ProjectSchema(Schema):
     name         = fields.Str(required=True)
     description  = fields.Str()
     gui_shell_id = fields.Str(allow_none=True)
+    text_mode    = fields.Str(allow_none=True)
     courses      = fields.List(fields.Nested(CourseSchema), dump_only=True)
     created_at   = fields.DateTime(dump_only=True)
     updated_at   = fields.DateTime(dump_only=True)

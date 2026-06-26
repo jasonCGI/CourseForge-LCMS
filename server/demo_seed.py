@@ -640,7 +640,13 @@ def seed_demo(app=None):
 
     print('[demo_seed] Creating expanded demo project…')
     project = Project(id=str(uuid.uuid4()), name='CourseForge Demo',
-                      description='Built-in demonstration course covering all CourseForge block types.')
+                      description='Built-in demonstration course covering all CourseForge block types.',
+                      # The demo's user-applied shell is transparent over a LIGHT
+                      # background image, so content_bg auto-derivation returns None
+                      # and 'auto' would keep the washed-out light+halo text. Set the
+                      # PROJECT-level override to 'dark' so shelled frames render crisp
+                      # navy (#042C53) body text over the light art (WCAG-AA readable).
+                      text_mode='dark')
     db.session.add(project); db.session.flush()
 
     course = Course(id=str(uuid.uuid4()), project_id=project.id,

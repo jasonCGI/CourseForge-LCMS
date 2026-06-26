@@ -481,7 +481,13 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, 
   // overlap, no floating). frameLayout() builds the same .cf-layout-zones structure
   // the server emits, with inline styles (the live shell iframe runs the stored
   // shell's CSS, not the server's _patch_shell rules).
-  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, contentBg)
+  // Two-level text cascade (mirror of the server): per-shell text_mode (if the
+  // per-frame GUI block carries one) wins; else the project text_mode; else the
+  // contentBg luminance pick. activeProject.text_mode is the project tier.
+  const shellTextMode   = guiBlock.data.text_mode || 'auto'
+  const projectTextMode = activeProject?.text_mode || 'auto'
+  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, contentBg,
+                                           shellTextMode, projectTextMode)
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -822,12 +828,32 @@ function shellTextStyle(bgColor) {
   return { textColor: dark ? SHELL_TEXT_DARK : SHELL_TEXT_LIGHT, halo: (dark ? cDark : cLight) < 4.5 }
 }
 
+// Coerce a stored text_mode to 'auto'|'light'|'dark' ('auto' default). Mirror of
+// scorm12._norm_text_mode.
+function normTextMode(mode) {
+  const m = mode == null ? 'auto' : String(mode).trim().toLowerCase()
+  return (m === 'light' || m === 'dark') ? m : 'auto'
+}
+
+// Two-level cascade -> { textColor, halo }. Mirror of scorm12.resolve_shell_text_style:
+//   1. per-shell text_mode explicit -> wins
+//   2. else project text_mode explicit -> wins
+//   3. else 'auto' at both -> shellTextStyle(bgColor) luminance pick.
+// Explicit 'dark' => #042C53, no halo; explicit 'light' => #C8D8E8 + halo.
+export function resolveShellTextStyle(shellTextMode, projectTextMode, bgColor) {
+  let mode = normTextMode(shellTextMode)
+  if (mode === 'auto') mode = normTextMode(projectTextMode)
+  if (mode === 'dark')  return { textColor: SHELL_TEXT_DARK,  halo: false }
+  if (mode === 'light') return { textColor: SHELL_TEXT_LIGHT, halo: true }
+  return shellTextStyle(bgColor)
+}
+
 // A <style> rule that colors the injected body text inside #fgui-content per the
-// shell's content-area bg (luminance-aware). The stored shell HTML sets no
-// #fgui-content color of its own, so this is what makes the in-canvas preview
-// match the published SCO's _patch_shell body-text color + halo.
-function shellTextCSS(bgColor) {
-  const { textColor, halo } = shellTextStyle(bgColor)
+// two-level text cascade (per-shell mode, else project mode, else the bg's
+// luminance). The stored shell HTML sets no #fgui-content color of its own, so
+// this is what makes the in-canvas preview match the published SCO's _patch_shell.
+function shellTextCSS(bgColor, shellTextMode = 'auto', projectTextMode = 'auto') {
+  const { textColor, halo } = resolveShellTextStyle(shellTextMode, projectTextMode, bgColor)
   return '<style>#fgui-content{color:' + textColor + ';'
     + (halo ? SHELL_HALO : '') + '}</style>'
 }
@@ -847,13 +873,15 @@ const CF_INJ_LIST_CSS =
 // runs the stored shell's CSS, not the server's _patch_shell rules); the
 // .cf-layout-zones layer fills #fgui-content edge-to-edge (0/0/100%/100%). Each
 // element owns its own, non-overlapping space; media/3D/image/video fill their zone.
-export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null) {
+export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
+                                       shellTextMode = 'auto', projectTextMode = 'auto') {
   const blocks = (contentBlocks || []).filter(b => b.type !== 'gui')
   if (blocks.length === 0) return ''
-  // Luminance-aware body-text color/halo per the shell's content-area bg, mirroring
-  // the server's _patch_shell. Prepended to every return so the injected text gets
-  // the right color in the iframe (the stored shell sets no #fgui-content color).
-  const TXT = shellTextCSS(bgColor)
+  // Body-text color/halo per the two-level cascade (per-shell mode, else project
+  // mode, else the content-area bg's luminance), mirroring the server's
+  // _patch_shell. Prepended to every return so the injected text gets the right
+  // color in the iframe (the stored shell sets no #fgui-content color).
+  const TXT = shellTextCSS(bgColor, shellTextMode, projectTextMode)
   const lay = ['full', 'text-left', 'text-right'].includes(layout) ? layout : 'text-left'
   const textBlocks  = blocks.filter(b => b.type === 'text')
   const otherBlocks = blocks.filter(b => b.type !== 'text')

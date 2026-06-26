@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { getGuiShells, uploadGuiShell, deleteGuiShell, updateProject } from '../../api/client'
+import { getGuiShells, uploadGuiShell, deleteGuiShell, updateGuiShell, updateProject } from '../../api/client'
 import useProjectStore from '../../store/projectStore'
 
 /**
@@ -17,6 +17,9 @@ export default function CourseConfigPanel() {
   const [error, setError]       = useState(null)
 
   const activeShellId = activeProject?.gui_shell_id || null
+  const projectTextMode = activeProject?.text_mode || 'auto'
+  const activeShell = shells.find(s => s.id === activeShellId) || null
+  const shellTextMode = activeShell?.text_mode || 'auto'
 
   useEffect(() => { reload() }, [])
   async function reload() {
@@ -30,6 +33,23 @@ export default function CourseConfigPanel() {
       await updateProject(activeProject.id, { gui_shell_id: shellId })
       await fetchProject(activeProject.id)   // refresh → preview pane + tree pick it up
     } catch (e) { setError(e.message) }
+  }
+
+  async function setTextMode(mode) {
+    if (!activeProject || mode === projectTextMode) return
+    try {
+      await updateProject(activeProject.id, { text_mode: mode })
+      await fetchProject(activeProject.id)   // refresh → preview pane re-resolves text color
+    } catch (e) { setError(e.message) }
+  }
+
+  async function setShellTextMode(mode) {
+    if (!activeShellId) return
+    try {
+      await updateGuiShell(activeShellId, { text_mode: mode })
+      await reload()                          // refresh shell list (new text_mode)
+      if (activeProject) await fetchProject(activeProject.id)  // re-resolve preview text
+    } catch (e) { setError(e.response?.data?.error || e.message) }
   }
 
   async function removeShell(e, shell) {
@@ -119,6 +139,67 @@ export default function CourseConfigPanel() {
                  onChange={handleUpload} disabled={uploading} />
         </label>
         {error && <p style={{ color: '#C0392B', fontSize: 11, marginTop: 8 }}>{error}</p>}
+
+        {activeShell && (
+          <div style={{ marginTop: 14 }}>
+            <h3 className="cf-config-label" style={{ marginBottom: 2 }}>This Shell's Body Text</h3>
+            <p className="cf-config-hint">
+              Overrides the project setting for <strong>{activeShell.name}</strong> only.
+              Auto follows the content background.
+            </p>
+            <div role="radiogroup" aria-label="Shell body text color"
+                 style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {['auto', 'light', 'dark'].map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={shellTextMode === mode}
+                  onClick={() => setShellTextMode(mode)}
+                  style={{
+                    flex: 1, padding: '6px 10px', fontSize: 12, textTransform: 'capitalize',
+                    cursor: 'pointer', borderRadius: 6,
+                    border: shellTextMode === mode ? '1px solid var(--cf-accent, #F59E0B)' : '1px solid var(--cf-border, #2a3340)',
+                    background: shellTextMode === mode ? 'var(--cf-accent, #F59E0B)' : 'transparent',
+                    color: shellTextMode === mode ? '#0d1117' : 'var(--cf-text-primary, #c9d1d9)',
+                    fontWeight: shellTextMode === mode ? 600 : 400,
+                  }}
+                >{mode}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="cf-config-section">
+        <h3 className="cf-config-label">Shelled Body Text</h3>
+        <p className="cf-config-hint">
+          Color of injected body text inside the shell's content area.
+          <strong> Auto</strong> picks light or dark from the content background;
+          choose <strong>Light</strong> or <strong>Dark</strong> to force it when the
+          shell is transparent over an image (auto can't read the art). A per-shell
+          setting overrides this.
+        </p>
+        <div role="radiogroup" aria-label="Shelled body text color"
+             style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {['auto', 'light', 'dark'].map(mode => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={projectTextMode === mode}
+              onClick={() => setTextMode(mode)}
+              style={{
+                flex: 1, padding: '6px 10px', fontSize: 12, textTransform: 'capitalize',
+                cursor: 'pointer', borderRadius: 6,
+                border: projectTextMode === mode ? '1px solid var(--cf-accent, #F59E0B)' : '1px solid var(--cf-border, #2a3340)',
+                background: projectTextMode === mode ? 'var(--cf-accent, #F59E0B)' : 'transparent',
+                color: projectTextMode === mode ? '#0d1117' : 'var(--cf-text-primary, #c9d1d9)',
+                fontWeight: projectTextMode === mode ? 600 : 400,
+              }}
+            >{mode}</button>
+          ))}
+        </div>
       </section>
 
       <section className="cf-config-section">

@@ -233,6 +233,36 @@ def shell_text_style(bg_color):
     return _SHELL_TEXT_LIGHT, ('' if c_light >= 4.5 else _SHELL_HALO)
 
 
+_TEXT_MODES = ('auto', 'light', 'dark')
+
+
+def _norm_text_mode(mode):
+    """Coerce a stored text_mode to one of 'auto'|'light'|'dark' ('auto' default)."""
+    m = str(mode).strip().lower() if mode is not None else 'auto'
+    return m if m in _TEXT_MODES else 'auto'
+
+
+def resolve_shell_text_style(shell_text_mode, project_text_mode, content_bg):
+    """Resolve shelled body text -> (text_color, halo_css) under the two-level cascade.
+
+      1. PER-SHELL text_mode explicit ('light'/'dark')  -> wins.
+      2. else PROJECT text_mode explicit ('light'/'dark') -> wins.
+      3. else ('auto' at both)  -> shell_text_style(content_bg) (the 8d69f02
+         luminance pick; transparent/unknown bg keeps #C8D8E8 + halo).
+
+    Explicit 'dark' => #042C53 + NO halo (crisp); explicit 'light' => #C8D8E8 +
+    the dark halo. These mirror the _SHELL_TEXT_* / _SHELL_HALO constants and
+    bypass shell_text_style entirely (no luminance pick)."""
+    mode = _norm_text_mode(shell_text_mode)
+    if mode == 'auto':
+        mode = _norm_text_mode(project_text_mode)
+    if mode == 'dark':
+        return _SHELL_TEXT_DARK, ''
+    if mode == 'light':
+        return _SHELL_TEXT_LIGHT, _SHELL_HALO
+    return shell_text_style(content_bg)
+
+
 def _safe_id(value):
     """Validate a frame id / filename token used in navigation. Returns the value
     only if it matches the expected [\\w-]+ shape, else '' (so a malformed/hostile
@@ -2321,7 +2351,7 @@ def _wcn_recall_bar(entries):
 
 def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
                      frame_map, cf_version, disp_index=None, disp_total=None, asset_map=None,
-                     hotspot_cfg=None, menu_resolve=None, branch_resolve=None):
+                     hotspot_cfg=None, menu_resolve=None, branch_resolve=None, project_text_mode='auto'):
     """
     Build a GUI-shell SCO frame: the ForgeGUI gui_shell.html becomes the SCO
     page. Returns (patched_html, gui_asset_id) or (None, None).
@@ -2365,9 +2395,12 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     # stores the ForgeGUI config under companion_files['shell_config']; guard the
     # walk so a missing/odd config just falls through to the halo default.
     content_bg = None
+    shell_text_mode = 'auto'
     try:
         cfg = (asset.companion_files or {}).get('shell_config') or {}
-        content_bg = (cfg.get('content_area') or {}).get('bg_color')
+        ca = cfg.get('content_area') or {}
+        content_bg = ca.get('bg_color')
+        shell_text_mode = ca.get('text_mode')
     except Exception:
         content_bg = None
     shell_html = html_path.read_text(encoding='utf-8')
@@ -2378,14 +2411,15 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     content_bg = _resolve_content_bg(content_bg, shell_html)
     html = _patch_shell(shell_html, asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
-                        disp_index, disp_total, content_bg=content_bg)
+                        disp_index, disp_total, content_bg=content_bg,
+                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode)
     return html, asset_id
 
 
 def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_name,
                                section_name, frame_map, cf_version, disp_index=None, disp_total=None,
                                asset_map=None, hotspot_cfg=None, preview=False, menu_resolve=None,
-                               branch_resolve=None):
+                               branch_resolve=None, project_text_mode='auto'):
     """Per-project GuiShell -> SCO page (ALL frame blocks injected).
 
     preview: forwarded to _render_blocks so the live shell preview resolves media
@@ -2408,9 +2442,12 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
     # stores the ForgeGUI config in shell.shell_config; guard the walk so a
     # missing/odd config just falls through to the halo default.
     content_bg = None
+    shell_text_mode = 'auto'
     try:
         cfg = shell.shell_config if isinstance(shell.shell_config, dict) else {}
-        content_bg = (cfg.get('content_area') or {}).get('bg_color')
+        ca = cfg.get('content_area') or {}
+        content_bg = ca.get('bg_color')
+        shell_text_mode = ca.get('text_mode')
     except Exception:
         content_bg = None
     shell_html = _read_text_cached(str(html_path))
@@ -2421,13 +2458,14 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
     content_bg = _resolve_content_bg(content_bg, shell_html)
     html = _patch_shell(shell_html, shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
-                        disp_index, disp_total, content_bg=content_bg)
+                        disp_index, disp_total, content_bg=content_bg,
+                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode)
     return html, shell.id
 
 
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
                  lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                 content_bg=None):
+                 content_bg=None, shell_text_mode='auto', project_text_mode='auto'):
     """Namespace a shell's assets to gui_assets/<ns_id>/ and inject the
     CourseForge runtime (content injection + zones + nav + completion).
 
@@ -2435,12 +2473,14 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     excluding optional); navigation + completion still use the real positions.
 
     content_bg: the shell's content-area bg_color (shell_config.content_area
-    .bg_color). Drives luminance-aware body text — an opaque bg picks a solid
-    color with no halo; transparent/unknown keeps #C8D8E8 + the dark halo.
+    .bg_color). Drives luminance-aware body text in the 'auto' case.
+    shell_text_mode / project_text_mode: 'auto'|'light'|'dark' — the per-shell and
+    project body-text overrides. An explicit per-shell mode wins; else an explicit
+    project mode; else 'auto' falls back to the content_bg luminance pick.
     """
-    # Resolve the body-text color + halo from the content-area background. The
-    # CSS literals below are escaped for the JS string the runtime builds.
-    text_color, halo_css = shell_text_style(content_bg)
+    # Resolve the body-text color + halo via the two-level cascade. The CSS
+    # literals below are escaped for the JS string the runtime builds.
+    text_color, halo_css = resolve_shell_text_style(shell_text_mode, project_text_mode, content_bg)
     # Namespace asset references so multiple shells never collide in the ZIP.
     shell_html = shell_html.replace('assets/', f'gui_assets/{ns_id}/')
 
@@ -2721,6 +2761,11 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
             from ..models.gui_shell import GuiShell
             project_shell = GuiShell.query.get(project.gui_shell_id)
 
+        # Project-level shelled body-text override ('auto'|'light'|'dark'), the
+        # middle tier of the cascade (a per-shell explicit mode still wins; 'auto'
+        # falls through to the content_bg luminance pick).
+        project_text_mode = _norm_text_mode(getattr(project, 'text_mode', None))
+
         # Frame counter excludes optional frames: required total + per-frame
         # running required index (optional frames hold the previous value).
         req_total = sum(1 for (fr, _, _) in all_frames if not getattr(fr, 'optional', False)) or total
@@ -2761,6 +2806,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                     frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
                     menu_resolve=menu_resolve, branch_resolve=branch_resolve,
+                    project_text_mode=project_text_mode,
                 )
                 if gui_html:
                     zf.writestr(fname, comment + gui_html)
@@ -2775,6 +2821,7 @@ def build_scorm12_package(project_id: str) -> tuple[BytesIO, str]:
                     project_shell, frame, idx, total, lesson.name, course.name, frame_map, VERSION,
                     req_index[idx], req_total, asset_map=asset_by_id, hotspot_cfg=hotspot_cfg,
                     menu_resolve=menu_resolve, branch_resolve=branch_resolve,
+                    project_text_mode=project_text_mode,
                 )
                 if ph:
                     zf.writestr(fname, comment + ph)

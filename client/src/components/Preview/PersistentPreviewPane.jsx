@@ -44,8 +44,10 @@ export default function PersistentPreviewPane() {
   // content-area bg_color -> luminance-aware injected body-text color/halo
   // (mirrors the server's _patch_shell). Default null = transparent/halo fallback.
   const [contentBg, setContentBg] = useState(null)
+  // Per-shell text_mode ('auto'|'light'|'dark') — top tier of the text cascade.
+  const [shellTextMode, setShellTextMode] = useState('auto')
   useEffect(() => {
-    if (!shellId) { setStage(null); setContentArea(null); setContentBg(null); return }
+    if (!shellId) { setStage(null); setContentArea(null); setContentBg(null); setShellTextMode('auto'); return }
     let live = true
     fetch(`/api/gui-shells/${shellId}/shell.json`)
       .then(r => (r.ok ? r.json() : null))
@@ -56,6 +58,7 @@ export default function PersistentPreviewPane() {
         setStage({ w: sw, h: sh })
         const ca = cfg?.content_area || cfg?.contentArea || {}
         setContentArea({ x: ca.x ?? 0, y: ca.y ?? 0, width: ca.width ?? sw, height: ca.height ?? sh })
+        setShellTextMode(ca.text_mode || 'auto')
         const configBg = ca.bg_color ?? null
         if (parseOpaqueRgb(configBg) !== null) { setContentBg(configBg); return }
         // Config left bg_color unset/transparent: derive the solid #fgui-content
@@ -98,9 +101,13 @@ export default function PersistentPreviewPane() {
       if (isMenuFrame) {
         return buildMenuHTML(activeFrame?.content?.menu, (it) => resolveMenuTargetFrameId(it, activeProject))
       }
-      return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout, contentBg)
+      // Two-level text cascade (mirror of the server): per-shell text_mode wins;
+      // else project text_mode (activeProject.text_mode); else the contentBg
+      // luminance pick.
+      return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout,
+                                    contentBg, shellTextMode, activeProject?.text_mode || 'auto')
     },
-    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject, contentBg],
+    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject, contentBg, shellTextMode],
   )
 
   // Shell-injected menu buttons (no React in the iframe) post an fgui_nav message

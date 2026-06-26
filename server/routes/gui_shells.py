@@ -146,6 +146,32 @@ def serve_shell_json(shell_id):
     return jsonify(s.shell_config or {})
 
 
+@gui_shells_bp.patch('/api/gui-shells/<shell_id>')
+def update_gui_shell(shell_id):
+    """Patch per-shell config. Currently the shelled body-text override
+    (content_area.text_mode: 'auto'|'light'|'dark'), the TOP tier of the
+    text-color cascade (a per-shell explicit mode beats the project mode and
+    'auto'). Whitelisted server-side — the API is the trust boundary."""
+    s = GuiShell.query.get_or_404(shell_id)
+    data = request.get_json() or {}
+    if 'text_mode' in data:
+        raw = data['text_mode']
+        tm = str(raw).strip().lower() if raw is not None else 'auto'
+        if tm not in ('auto', 'light', 'dark'):
+            tm = 'auto'
+        cfg = dict(s.shell_config) if isinstance(s.shell_config, dict) else {}
+        ca = dict(cfg.get('content_area') or {})
+        ca['text_mode'] = tm
+        cfg['content_area'] = ca
+        s.shell_config = cfg
+        # shell_config is a JSON column; reassigning a NEW dict (above) makes the
+        # change visible to SQLAlchemy without needing flag_modified.
+        db.session.commit()
+    d = s.to_dict()
+    d['text_mode'] = ((s.shell_config or {}).get('content_area') or {}).get('text_mode', 'auto')
+    return jsonify(d)
+
+
 @gui_shells_bp.get('/api/gui-shells/<shell_id>/assets/<path:filename>')
 def serve_shell_asset(shell_id, filename):
     s = GuiShell.query.get_or_404(shell_id)

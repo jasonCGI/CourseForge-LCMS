@@ -308,6 +308,7 @@ def _build_shell_preview(shell, frame, project) -> str | None:
         preview=True,
         menu_resolve=_menu_resolver_for(project),
         branch_resolve=_branch_resolver_for(project),
+        project_text_mode=getattr(project, "text_mode", None) or "auto",
     )
     if not html:
         return None

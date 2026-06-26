@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { getGuiShells, uploadGuiShell, deleteGuiShell, updateProject } from '../../api/client'
+import { getGuiShells, uploadGuiShell, deleteGuiShell, updateGuiShell, updateProject, getProject } from '../../api/client'
 
 const amberBg = 'color-mix(in srgb, var(--forge-amber) 14%, transparent)'
 
@@ -12,12 +12,38 @@ export default function CourseShellModal({ open, onClose, projectId, currentShel
   const [loading, setLoading] = useState(false)
   const [busy, setBusy]       = useState(false)
   const [error, setError]     = useState(null)
+  // Project-level shelled body-text override ('auto'|'light'|'dark') — middle
+  // tier of the cascade. Fetched on open so the footer control reflects it.
+  const [projectTextMode, setProjectTextMode] = useState('auto')
 
   const refresh = () => {
     setLoading(true)
     getGuiShells().then(r => setShells(r.data)).catch(() => {}).finally(() => setLoading(false))
   }
-  useEffect(() => { if (open) { refresh(); setError(null) } }, [open])
+  useEffect(() => {
+    if (!open) return
+    refresh(); setError(null)
+    if (projectId) getProject(projectId).then(r => setProjectTextMode(r.data?.text_mode || 'auto')).catch(() => {})
+  }, [open, projectId])
+
+  const setProjectMode = async (mode) => {
+    if (!projectId || mode === projectTextMode) return
+    setBusy(true)
+    try { await updateProject(projectId, { text_mode: mode }); setProjectTextMode(mode); onChanged?.(currentShellId) }
+    catch (e) { setError('Could not set body-text mode.') }
+    finally { setBusy(false) }
+  }
+
+  const setShellMode = async (shellId, mode, e) => {
+    e.stopPropagation()
+    setBusy(true)
+    try {
+      await updateGuiShell(shellId, { text_mode: mode })
+      setShells(list => list.map(x => x.id === shellId ? { ...x, text_mode: mode } : x))
+      onChanged?.(currentShellId)   // re-resolve the preview text color
+    } catch (err) { setError('Could not set shell body-text mode.') }
+    finally { setBusy(false) }
+  }
 
   const onUpload = async (file) => {
     if (!file) return
@@ -95,24 +121,66 @@ export default function CourseShellModal({ open, onClose, projectId, currentShel
           ) : shells.map(s => {
             const sel = s.id === currentShellId
             return (
-              <button key={s.id} onClick={() => select(s.id)} style={shellRow(sel)}>
-                <span style={{ fontSize: 18 }}>▣</span>
-                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cf-text-primary)',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)' }}>
-                    {s.stage_width}×{s.stage_height}px · {s.button_count} btn · {s.zone_count} zone
+              <div key={s.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                <button onClick={() => select(s.id)} style={shellRow(sel)}>
+                  <span style={{ fontSize: 18 }}>▣</span>
+                  <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--cf-text-primary)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)' }}>
+                      {s.stage_width}×{s.stage_height}px · {s.button_count} btn · {s.zone_count} zone
+                    </div>
                   </div>
-                </div>
-                {sel && <span style={{ color: 'var(--forge-amber)', fontSize: 12 }}>● selected</span>}
-                <span role="button" tabIndex={0} aria-label={`Delete shell ${s.name}`}
-                  onClick={(e) => remove(s.id, e)}
-                  style={{ color: '#E87070', fontSize: 12, cursor: 'pointer', padding: '2px 4px', opacity: 0.6 }}>✕</span>
-              </button>
+                  {sel && <span style={{ color: 'var(--forge-amber)', fontSize: 12 }}>● selected</span>}
+                  <span role="button" tabIndex={0} aria-label={`Delete shell ${s.name}`}
+                    onClick={(e) => remove(s.id, e)}
+                    style={{ color: '#E87070', fontSize: 12, cursor: 'pointer', padding: '2px 4px', opacity: 0.6 }}>✕</span>
+                </button>
+                {sel && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 2px' }}>
+                    <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)' }}>
+                      this shell's body text
+                    </span>
+                    <TextModeButtons value={s.text_mode || 'auto'} disabled={busy}
+                      onPick={(m, e) => setShellMode(s.id, m, e)} ariaLabel={`Body text color for ${s.name}`} />
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
+
+        <div style={{ padding: '10px 18px', borderTop: '1px solid var(--cf-border-tertiary)',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)', flex: 1 }}>
+            // project body text — auto reads the content bg; light/dark force it
+          </span>
+          <TextModeButtons value={projectTextMode} disabled={busy}
+            onPick={(m, e) => { e.stopPropagation(); setProjectMode(m) }} ariaLabel="Project body text color" />
+        </div>
       </div>
+    </div>
+  )
+}
+
+// Auto / Light / Dark segmented control for a shelled body-text override.
+function TextModeButtons({ value, onPick, disabled, ariaLabel }) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', gap: 4 }}>
+      {['auto', 'light', 'dark'].map(mode => {
+        const on = value === mode
+        return (
+          <button key={mode} type="button" role="radio" aria-checked={on} disabled={disabled}
+            onClick={(e) => onPick(mode, e)}
+            style={{
+              padding: '3px 10px', fontSize: 10, textTransform: 'capitalize', cursor: 'pointer',
+              borderRadius: 4, fontFamily: 'var(--cf-font)',
+              border: `1px solid ${on ? 'var(--forge-amber)' : 'var(--cf-border-secondary)'}`,
+              background: on ? 'var(--forge-amber)' : 'transparent',
+              color: on ? '#0d1117' : 'var(--cf-text-secondary)', fontWeight: on ? 600 : 400,
+            }}>{mode}</button>
+        )
+      })}
     </div>
   )
 }

@@ -55,6 +55,11 @@ def update_project(project_id):
         project.description = data['description']
     if 'gui_shell_id' in data:
         project.gui_shell_id = data['gui_shell_id'] or None
+    if 'text_mode' in data:
+        # Project-level shelled body-text override. Whitelist server-side (the API,
+        # not just the UI, is the trust boundary) — anything else falls to 'auto'.
+        tm = str(data['text_mode']).strip().lower() if data['text_mode'] is not None else 'auto'
+        project.text_mode = tm if tm in ('auto', 'light', 'dark') else 'auto'
     db.session.commit()
     return jsonify(project_schema.dump(project))
 

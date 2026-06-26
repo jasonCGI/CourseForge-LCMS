@@ -63,6 +63,7 @@ export const searchFrames        = (projectId, params) => api.get(`/projects/${p
 // ── GUI shell library (per-project course skins) ───────────────────────────────
 export const getGuiShells   = ()   => api.get('/gui-shells')
 export const deleteGuiShell = (id) => api.delete(`/gui-shells/${id}`)
+export const updateGuiShell = (id, data) => api.patch(`/gui-shells/${id}`, data)
 export const uploadGuiShell = (file, name) => {
   const form = new FormData()
   form.append('file', file)

@@ -31,5 +31,8 @@ class GuiShell(db.Model):
             'button_count':  self.button_count,
             'zone_count':    self.zone_count,
             'html_serve_url': f'/api/gui-shells/{self.id}/shell.html',
+            # Per-shell shelled body-text override (top tier of the cascade).
+            'text_mode':     ((self.shell_config or {}).get('content_area') or {}).get('text_mode', 'auto')
+                             if isinstance(self.shell_config, dict) else 'auto',
             'created_at':    self.created_at.isoformat() if self.created_at else None,
         }

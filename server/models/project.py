@@ -22,6 +22,11 @@ class Project(db.Model):
     # Per-project GUI shell (from the GuiShell library). Plain id (no FK
     # constraint) — publish + serializer tolerate a missing/deleted shell.
     gui_shell_id    = db.Column(db.String(36), nullable=True)
+    # Project-level shelled body-text override: 'auto' | 'light' | 'dark'. The
+    # middle tier of the text-color cascade — a per-shell explicit mode wins; an
+    # explicit project mode beats 'auto'; 'auto' falls through to the content_bg
+    # luminance pick. NULL is treated as 'auto'.
+    text_mode       = db.Column(db.String(8), nullable=True, default='auto')
     courses     = db.relationship('Course', back_populates='project', cascade='all, delete-orphan', order_by='Course.order_index')
 
 class Course(db.Model):
