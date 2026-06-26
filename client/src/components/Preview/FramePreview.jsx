@@ -1796,10 +1796,14 @@ function PreviewWCN({ block }) {
   const modalRef    = React.useRef(null)
 
   const type = block.data.wcn_type || 'note'
+  // theme    -- brand hex (stripes / chip border / card border)
+  // chipText -- AA-legible chip LABEL on white: theme for warning/note; caution
+  //             yellow (#eed202) fails on white (1.52:1) so its chip wears
+  //             near-black text while the yellow still drives the stripes/border.
   const cfg  = {
-    warning: { tag:'WARNING', tagBg:'#C0392B', border:'#C0392B', bg:'rgba(192,57,43,0.07)', titleColor:'#8B1A0E', textColor:'#6B3030', headerBg:'#1a0800' },
-    caution: { tag:'CAUTION', tagBg:'#B87A1A', border:'#B87A1A', bg:'rgba(184,122,26,0.07)', titleColor:'#7A4800', textColor:'#5A3800', headerBg:'#1a1000' },
-    note:    { tag:'NOTE',    tagBg:'#185FA5', border:'#185FA5', bg:'rgba(24,95,165,0.07)',  titleColor:'#0E3A6A', textColor:'#1A3C5A', headerBg:'#06080f' },
+    warning: { tag:'WARNING', tagBg:'#C0392B', border:'#C0392B', bg:'rgba(192,57,43,0.07)', titleColor:'#8B1A0E', textColor:'#6B3030', headerBg:'#1a0800', theme:'#D0342C', chipText:'#D0342C' },
+    caution: { tag:'CAUTION', tagBg:'#B87A1A', border:'#B87A1A', bg:'rgba(184,122,26,0.07)', titleColor:'#7A4800', textColor:'#5A3800', headerBg:'#1a1000', theme:'#eed202', chipText:'#141414' },
+    note:    { tag:'NOTE',    tagBg:'#185FA5', border:'#185FA5', bg:'rgba(24,95,165,0.07)',  titleColor:'#0E3A6A', textColor:'#1A3C5A', headerBg:'#06080f', theme:'#2E62D8', chipText:'#2E62D8' },
   }[type]
 
   const ackLabel = block.data.ack_label || 'I understand — proceed'
@@ -1846,42 +1850,54 @@ function PreviewWCN({ block }) {
     return () => window.removeEventListener('cf-wcn-recall', onRecall)
   }, [block.id])
 
-  // Shared modal markup so both modal mode and inline-recall re-show the same UI.
+  // Shared hazard-stripe modal markup so both modal mode and inline-recall
+  // re-show the SAME UI. Visual parity with scorm12._wcn_modal_html (the
+  // published SCO / preview-html modal) — keep the two in sync.
   const modalMarkup = modalOpen && (
     <div role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
-      style={{ position:'fixed', inset:0, background:'rgba(4,44,83,0.75)',
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
                zIndex:2000, display:'flex', alignItems:'center',
                justifyContent:'center', padding:24 }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
-        style={{ background:'#fff', borderRadius:8, maxWidth:480, width:'100%',
-                 overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.4)' }}>
-        <div style={{ background:cfg.headerBg, padding:'14px 18px', display:'flex',
-                      alignItems:'center', gap:12, borderBottom:`3px solid ${cfg.border}` }}>
-          <span style={{ fontSize:28 }} aria-hidden="true">
-            {type === 'warning' ? '⚠' : type === 'caution' ? '◆' : 'ℹ'}
-          </span>
-          <div>
-            <div style={{ fontFamily:'monospace', fontSize:9, fontWeight:700,
-                           color:cfg.tagBg, letterSpacing:'0.12em', marginBottom:3 }}>{cfg.tag}</div>
-            <div id={modalId} style={{ fontSize:15, fontWeight:700, color:cfg.tagBg }}>
-              {block.data.title || cfg.tag}
-            </div>
+        onClick={(e) => e.stopPropagation()}
+        style={{ background:'#fff', border:`3px solid ${cfg.theme}`, borderRadius:8,
+                 maxWidth:420, width:'100%', overflow:'hidden',
+                 boxShadow:'0 10px 30px rgba(0,0,0,0.25)' }}>
+        <div style={{ position:'relative', height:50, display:'flex',
+                      alignItems:'center', justifyContent:'center',
+                      background:`repeating-linear-gradient(-45deg, ${cfg.theme} 0 14px, #000 14px 28px)` }}>
+          <span style={{ background:'#fff', border:'2px solid #000', borderRadius:6,
+                         padding:'7px 14px', fontWeight:800, fontSize:20, lineHeight:1,
+                         color:cfg.chipText }}>{cfg.tag}</span>
+          <button onClick={closeModal} aria-label="Close dialog"
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
+            onMouseDown={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(0.95)' }}
+            onMouseUp={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)' }}
+            style={{ position:'absolute', top:'50%', right:10, transform:'translateY(-50%)',
+                     width:20, height:20, borderRadius:'50%', background:'#fff',
+                     border:'2px solid #000', cursor:'pointer', padding:0,
+                     display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+            <span style={{ position:'relative', width:10, height:10, display:'block' }}>
+              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:2,
+                             background:'#000', transform:'translateY(-50%) rotate(45deg)' }} />
+              <span style={{ position:'absolute', top:'50%', left:0, width:'100%', height:2,
+                             background:'#000', transform:'translateY(-50%) rotate(-45deg)' }} />
+            </span>
+          </button>
+        </div>
+        <div style={{ padding:20, textAlign:'center', color:'#1a1a1a' }}>
+          <div id={modalId} style={{ fontSize:15, fontWeight:700, marginBottom:8 }}>
+            {block.data.title || cfg.tag}
           </div>
-          <button onClick={closeModal} aria-label="Close"
-            style={{ marginLeft:'auto', background:'none', border:'none',
-                     color:cfg.tagBg, fontSize:20, cursor:'default', padding:4, lineHeight:1 }}>✕</button>
-        </div>
-        <div style={{ padding:'16px 18px', fontSize:13, lineHeight:1.65, color:'#1a1a1a' }}>
-          {block.data.text}
-        </div>
-        <div style={{ padding:'12px 18px', borderTop:'1px solid #eee',
-                      display:'flex', justifyContent:'flex-end', background:'#f8f8f8' }}>
+          <div style={{ fontSize:13, lineHeight:1.65 }}>{block.data.text}</div>
           <button onClick={block.data.modal ? acknowledge : closeModal}
             aria-label={block.data.modal ? `${ackLabel} — closes dialog` : 'Close dialog'}
-            style={{ padding:'8px 20px', background:cfg.tagBg, color:'#fff',
-                     border:'none', borderRadius:4, fontSize:13, fontWeight:600,
-                     cursor:'default', fontFamily:'inherit' }}>
+            style={{ marginTop:16, padding:'8px 20px', background:cfg.theme,
+                     color:type === 'caution' ? cfg.chipText : '#fff',
+                     border:'none', borderRadius:4, fontSize:13, fontWeight:700,
+                     cursor:'pointer', fontFamily:'inherit' }}>
             {block.data.modal ? `✓ ${ackLabel}` : 'Close'}
           </button>
         </div>

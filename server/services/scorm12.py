@@ -1458,6 +1458,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             }
             recall_colors = {'warning': '#D0342C', 'caution': '#eed202', 'note': '#2E62D8'}
 
+            # Hazard-stripe modal theme: brand hex for stripes/border, and the
+            # AA-legible chip LABEL colour on white. Caution yellow (#eed202)
+            # fails on white (1.52:1) -> use near-black chip text; the yellow
+            # still drives the stripes + chip border. Warning (4.99:1) and note
+            # (5.45:1) pass on white, so those chips wear the theme colour.
+            themes     = {'warning': '#D0342C', 'caution': '#eed202', 'note': '#2E62D8'}
+            chip_texts = {'warning': '#D0342C', 'caution': '#141414', 'note': '#2E62D8'}
+            theme     = themes.get(wcn_type, themes['note'])
+            chip_text = chip_texts.get(wcn_type, chip_texts['note'])
+
             c     = colors.get(wcn_type, colors['note'])
             icon  = icons.get(wcn_type, icons['note'])
             sicon = small_icons.get(wcn_type, small_icons['note'])
@@ -1470,6 +1480,25 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                                recall_icons.get(wcn_type, recall_icons['note']),
                                recall_colors.get(wcn_type, recall_colors['note']),
                                title))
+
+            body_text = {'title': title or tag, 'text': text}
+
+            # Modal-mode card: footer ACKNOWLEDGES (wcnAcknowledge). Inline-mode
+            # re-show card: footer simply CLOSES. Identical hazard-stripe shell.
+            modal_card_ack = _wcn_modal_html(
+                modal_id=modal_id, title_id=title_id, tag=tag, theme=theme,
+                chip_text=chip_text, body_text=body_text,
+                footer_btn_id=ack_btn_id,
+                footer_onclick=f"wcnAcknowledge('{modal_id}', '{ack_btn_id}')",
+                footer_label=f'✓ {ack_label}',
+                footer_aria=f'{ack_label} — closes dialog')
+            modal_card_close = _wcn_modal_html(
+                modal_id=modal_id, title_id=title_id, tag=tag, theme=theme,
+                chip_text=chip_text, body_text=body_text,
+                footer_btn_id=f'{ack_btn_id}-close',
+                footer_onclick=f"wcnCloseModal('{modal_id}')",
+                footer_label='Close',
+                footer_aria='Close dialog')
 
             if modal:
                 parts.append(f'''
@@ -1486,50 +1515,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
   >
     {sicon} {tag}{': ' + title if title else ''}
   </button>
-  <div
-    id="{modal_id}"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="{title_id}"
-    aria-hidden="true"
-    style="display:none;position:fixed;inset:0;
-           background:rgba(4,44,83,0.75);z-index:999;
-           align-items:center;justify-content:center;padding:24px"
-  >
-    <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;
-                overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-      <div style="background:{c["header"]};padding:14px 18px;display:flex;
-                  align-items:center;gap:12px;border-bottom:3px solid {c["border"]}">
-        {icon}
-        <div style="flex:1">
-          <div style="font-family:'IBM Plex Mono','Courier New',monospace;font-size:9px;font-weight:700;
-                      color:{c["tag"]};letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
-          <div id="{title_id}" style="font-size:15px;font-weight:700;color:{c["tag"]}">{title or tag}</div>
-        </div>
-        <button
-          onclick="wcnCloseModal('{modal_id}')"
-          aria-label="Close dialog"
-          style="background:none;border:none;color:{c["tag"]};
-                 font-size:22px;cursor:pointer;padding:4px;line-height:1;
-                 margin-left:auto;flex-shrink:0"
-        >✕</button>
-      </div>
-      <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">
-        {text}
-      </div>
-      <div style="padding:12px 18px;border-top:1px solid #eee;
-                  display:flex;justify-content:flex-end;background:#f8f8f8">
-        <button
-          id="{ack_btn_id}"
-          onclick="wcnAcknowledge('{modal_id}', '{ack_btn_id}')"
-          aria-label="{ack_label} — closes dialog"
-          style="padding:8px 20px;background:{c["tag"]};color:#fff;border:none;
-                 border-radius:4px;font-size:13px;font-weight:600;
-                 cursor:pointer;font-family:inherit"
-        >✓ {ack_label}</button>
-      </div>
-    </div>
-  </div>
+  {modal_card_ack}
 </div>''')
             else:
                 title_html = f'<span style="font-size:13px;font-weight:600;color:{c["title"]}">{title}</span>' if title else ''
@@ -1556,48 +1542,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     >✓ {ack_label}</button>
   </div>
 </div>
-<div
-  id="{modal_id}"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="{title_id}"
-  aria-hidden="true"
-  style="display:none;position:fixed;inset:0;
-         background:rgba(4,44,83,0.75);z-index:999;
-         align-items:center;justify-content:center;padding:24px"
->
-  <div style="background:#fff;border-radius:8px;max-width:480px;width:100%;
-              overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-    <div style="background:{c["header"]};padding:14px 18px;display:flex;
-                align-items:center;gap:12px;border-bottom:3px solid {c["border"]}">
-      {icon}
-      <div style="flex:1">
-        <div style="font-family:'IBM Plex Mono','Courier New',monospace;font-size:9px;font-weight:700;
-                    color:{c["tag"]};letter-spacing:0.12em;margin-bottom:3px">{tag}</div>
-        <div id="{title_id}" style="font-size:15px;font-weight:700;color:{c["tag"]}">{title or tag}</div>
-      </div>
-      <button
-        onclick="wcnCloseModal('{modal_id}')"
-        aria-label="Close dialog"
-        style="background:none;border:none;color:{c["tag"]};
-               font-size:22px;cursor:pointer;padding:4px;line-height:1;
-               margin-left:auto;flex-shrink:0"
-      >✕</button>
-    </div>
-    <div style="padding:16px 18px;font-size:13px;line-height:1.65;color:#1a1a1a">
-      {text}
-    </div>
-    <div style="padding:12px 18px;border-top:1px solid #eee;
-                display:flex;justify-content:flex-end;background:#f8f8f8">
-      <button
-        onclick="wcnCloseModal('{modal_id}')"
-        style="padding:8px 20px;background:{c["tag"]};color:#fff;border:none;
-               border-radius:4px;font-size:13px;font-weight:600;
-               cursor:pointer;font-family:inherit"
-      >Close</button>
-    </div>
-  </div>
-</div>''')
+{modal_card_close}''')
 
         elif btype == 'oam':
             asset_id = data.get('oam_asset_id', '')
@@ -2225,6 +2170,72 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     if 'cf-swap-link' in out:
         out = _CF_SWAP_LINK_CSS + out
     return out
+
+
+def _wcn_modal_html(*, modal_id, title_id, tag, theme, chip_text, body_text,
+                    footer_btn_id, footer_onclick, footer_label, footer_aria):
+    """Build the hazard-stripe WCN modal markup (overlay + card).
+
+    Single source of truth for BOTH the published-SCO modal-mode modal and the
+    inline re-show modal, so the two server copies can never drift. The React
+    PreviewWCN modal and the shell runtime JS (wcnOpenModal/Close/Acknowledge)
+    are kept in visual/behavioural sync with this markup by hand.
+
+    Design: ~420px card, 8px radius, 3px theme border, soft shadow, overflow
+    hidden. ~50px header is diagonal hazard stripes (repeating-linear-gradient
+    of theme + black) with a centered white LABEL CHIP (2px black border) on
+    top, plus a circular white close button (animated X) top-right. Body is
+    white, 20px padding, centered.
+
+    theme       -- brand hex for stripes / chip border / card border
+    chip_text   -- chip LABEL colour (AA on white): theme for warning/note,
+                   near-black for caution (yellow fails on white).
+    All caller-supplied text is pre-escaped.
+    """
+    return f'''
+  <div id="{modal_id}" role="presentation" aria-hidden="true"
+       onclick="if(event.target===this)wcnCloseModal('{modal_id}')"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;
+              align-items:center;justify-content:center;padding:24px">
+    <div role="dialog" aria-modal="true" aria-labelledby="{title_id}"
+         onclick="event.stopPropagation()"
+         style="background:#fff;border:3px solid {theme};border-radius:8px;
+                max-width:420px;width:100%;overflow:hidden;
+                box-shadow:0 10px 30px rgba(0,0,0,0.25)">
+      <div style="position:relative;height:50px;display:flex;align-items:center;
+                  justify-content:center;
+                  background:repeating-linear-gradient(-45deg,{theme} 0 14px,#000 14px 28px)">
+        <span style="background:#fff;border:2px solid #000;border-radius:6px;
+                     padding:7px 14px;font-weight:800;font-size:20px;line-height:1;
+                     color:{chip_text}">{tag}</span>
+        <button onclick="wcnCloseModal('{modal_id}')" aria-label="Close dialog"
+                onmouseover="this.style.transform='scale(1.08)'"
+                onmouseout="this.style.transform='scale(1)'"
+                onmousedown="this.style.transform='scale(0.95)'"
+                onmouseup="this.style.transform='scale(1.08)'"
+                style="position:absolute;top:50%;right:10px;transform:translateY(-50%);
+                       width:20px;height:20px;border-radius:50%;background:#fff;
+                       border:2px solid #000;cursor:pointer;padding:0;
+                       display:inline-flex;align-items:center;justify-content:center">
+          <span style="position:relative;width:10px;height:10px;display:block">
+            <span style="position:absolute;top:50%;left:0;width:100%;height:2px;
+                         background:#000;transform:translateY(-50%) rotate(45deg)"></span>
+            <span style="position:absolute;top:50%;left:0;width:100%;height:2px;
+                         background:#000;transform:translateY(-50%) rotate(-45deg)"></span>
+          </span>
+        </button>
+      </div>
+      <div style="padding:20px;text-align:center;color:#1a1a1a">
+        <div id="{title_id}" style="font-size:15px;font-weight:700;margin-bottom:8px">{body_text["title"]}</div>
+        <div style="font-size:13px;line-height:1.65">{body_text["text"]}</div>
+        <button id="{footer_btn_id}" onclick="{footer_onclick}" aria-label="{footer_aria}"
+                style="margin-top:16px;padding:8px 20px;background:{theme};
+                       color:{chip_text if tag == 'CAUTION' else '#fff'};
+                       border:none;border-radius:4px;font-size:13px;font-weight:700;
+                       cursor:pointer;font-family:inherit">{footer_label}</button>
+      </div>
+    </div>
+  </div>'''
 
 
 def _wcn_recall_bar(entries):
