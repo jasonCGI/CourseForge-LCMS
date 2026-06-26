@@ -1066,7 +1066,7 @@ def _callout_overlay_html(data):
         f'transform:{tf};max-width:46%;box-sizing:border-box;'
         f'padding:{pad}px;border-radius:{_CALLOUT_RADIUS};background:{_CALLOUT_BOX_BG};'
         f'color:{_CALLOUT_BOX_TEXT};border:{_CALLOUT_BORDER_WIDTH} solid {_CALLOUT_BOX_BORDER};box-shadow:{_CALLOUT_SHADOW};'
-        "font:700 18px/1.35 'Inter',system-ui,sans-serif;text-align:center\">"
+        "font:700 27px/1.35 'Inter',system-ui,sans-serif;text-align:center\">"
         f'{esc(text)}</div>'
     )
     return (
@@ -2719,7 +2719,8 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     // override just those text zones (built OR uploaded shells) to let descenders
     // show and breathe. Matches the in-canvas preview (GUIShellRenderer) override.
     '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],' +
-    '[data-zone-type="section_title"],[data-zone-type="prompt"]' +
+    '[data-zone-type="section_title"],[data-zone-type="prompt"],' +
+    '[data-zone-type="frame_counter"]' +
     '{{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}}';
   document.head.appendChild(style);
 

@@ -1812,7 +1812,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             padding: `${padding}px`, borderRadius: S.radius,
             background: S.boxBg, color: S.boxText,
             border: `${S.borderWidth} solid ${S.boxBorder}`, boxShadow: S.shadow,
-            font: `700 18px/1.35 'Inter', system-ui, sans-serif`,
+            font: `700 27px/1.35 'Inter', system-ui, sans-serif`,
             textAlign: 'center', whiteSpace: 'normal',
             cursor: active ? 'text' : 'move', outline: 'none', minWidth: 24,
           }}

@@ -191,8 +191,14 @@ function TreeRow({
           {/* Completion dot (frames only) */}
           {isFrame && completion && COMPLETION_DOT[completion] && (
             <span title={COMPLETION_DOT[completion].title} aria-hidden="true"
-              style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: COMPLETION_DOT[completion].color, display: 'inline-block' }} />
+              style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                display: 'inline-block', boxSizing: 'border-box',
+                // Optional reads as a HOLLOW ring ("not counted") — distinct from the
+                // filled status dots and legible at this size (a strikethrough / X
+                // muddies at 6-7px).
+                ...(completion === 'optional'
+                  ? { background: 'transparent', border: `1.5px solid ${COMPLETION_DOT[completion].color}` }
+                  : { background: COMPLETION_DOT[completion].color }) }} />
           )}
 
           {/* Glyph — folder for hierarchy, play for frame */}

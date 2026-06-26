@@ -39,7 +39,8 @@ export default function GUIShellRenderer({
           const st = doc.createElement('style')
           st.id = 'cf-zone-descender-fix'
           st.textContent = '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],'
-            + '[data-zone-type="section_title"],[data-zone-type="prompt"]'
+            + '[data-zone-type="section_title"],[data-zone-type="prompt"],'
+            + '[data-zone-type="frame_counter"]'
             + '{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}'
           ;(doc.head || doc.documentElement).appendChild(st)
         }

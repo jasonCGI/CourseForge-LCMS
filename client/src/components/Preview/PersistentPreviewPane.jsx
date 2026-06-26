@@ -269,8 +269,6 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSour
       borderBottom: '1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent)',
       display: 'flex', alignItems: 'center', gap: 10,
     }}>
-      <span>⚙ LIVE PREVIEW</span>
-      <span style={{ opacity: 0.35 }}>│</span>
       <span style={{ color: '#C8D8E8', opacity: 0.75 }}>Frame {human} of {total}</span>
       <span style={{ opacity: 0.35 }}>│</span>
       <span style={{ color: '#C8D8E8', opacity: 0.6 }}>

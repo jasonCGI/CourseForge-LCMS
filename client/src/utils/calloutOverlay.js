@@ -121,7 +121,7 @@ export function buildCalloutOverlayHTML(data) {
     + `transform:${tf};max-width:46%;box-sizing:border-box;`
     + `padding:${padding}px;border-radius:${S.radius};background:${S.boxBg};`
     + `color:${S.boxText};border:${S.borderWidth} solid ${S.boxBorder};box-shadow:${S.shadow};`
-    + `font:700 18px/1.35 'Inter',system-ui,sans-serif;text-align:center">`
+    + `font:700 27px/1.35 'Inter',system-ui,sans-serif;text-align:center">`
     + `${esc(text)}</div>`
 
   return `<div class="cf-callout-overlay" style="position:absolute;inset:0;`
