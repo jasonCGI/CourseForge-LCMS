@@ -80,6 +80,18 @@ export function calloutAnchorTransform(side) {
   }
 }
 
+// The box-side endpoint of the connector, nudged INSET viewBox units PAST the
+// connection point INTO the box (along the line, away from the target) so the
+// OPAQUE box covers the stroke cap and the line reads flush with the box edge —
+// no sliver/gap from the angled 4px cap. Measurement-free. Python twin:
+// scorm12._callout_line_box_end (keep the formula identical for byte parity).
+export function calloutLineBoxEnd(bx, by, tx, ty) {
+  const dx = bx - tx, dy = by - ty
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const INSET = 2.5
+  return [pc(bx + (dx / len) * INSET), pc(by + (dy / len) * INSET)]
+}
+
 // Build the callout overlay HTML (box + connector line, NO target circle). Returns
 // an absolutely-positioned layer (inset:0; pointer-events:none) intended to sit
 // OVER a position:relative content container. JS twin of the server builder.
@@ -96,12 +108,13 @@ export function buildCalloutOverlayHTML(data) {
   const tx = pc(target.x), ty = pc(target.y)
   const side = resolveCalloutAnchor(anchor, bx, by, tx, ty)
   const tf = calloutAnchorTransform(side)
+  const [ex, ey] = calloutLineBoxEnd(bx, by, tx, ty)
 
   const svg =
     `<svg viewBox="0 0 100 100" preserveAspectRatio="none" `
     + `style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">`
-    + `<line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" `
-    + `stroke="${S.line}" stroke-width="${S.lineWidth}" vector-effect="non-scaling-stroke" /></svg>`
+    + `<line x1="${ex}" y1="${ey}" x2="${tx}" y2="${ty}" `
+    + `stroke="${S.line}" stroke-width="${S.lineWidth}" vector-effect="non-scaling-stroke" stroke-linecap="round" /></svg>`
 
   const boxHTML =
     `<div style="position:absolute;left:${bx}%;top:${by}%;`

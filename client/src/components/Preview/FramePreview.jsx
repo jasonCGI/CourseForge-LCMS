@@ -7,7 +7,7 @@ import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
-import { buildCalloutOverlayHTML, CALLOUT_STYLE, resolveCalloutAnchor, calloutAnchorTransform } from '../../utils/calloutOverlay'
+import { buildCalloutOverlayHTML, CALLOUT_STYLE, resolveCalloutAnchor, calloutAnchorTransform, calloutLineBoxEnd } from '../../utils/calloutOverlay'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 import { Play, Pause } from '../icons'
 
@@ -1597,6 +1597,28 @@ function PreviewCallout({ block, interactive = false, active = false, onSelect =
 const _clampPc = v => Math.max(0, Math.min(100, v))
 const _r1 = n => Math.round(n * 10) / 10
 
+// Inject the editor-only "marching ants" keyframes/class ONCE. Animated gradient
+// dashes auto-size to the box and only render when a callout is active (selected/
+// editing). Editor-only — never part of the published overlay.
+let _cfCalloutAntsInjected = false
+function _ensureCalloutAntsCSS() {
+  if (_cfCalloutAntsInjected || typeof document === 'undefined') return
+  _cfCalloutAntsInjected = true
+  const style = document.createElement('style')
+  style.setAttribute('data-cf-callout-ants', '')
+  style.textContent =
+    '@keyframes cfCalloutAnts{to{background-position:14px 0,-14px 100%,0 -14px,100% 14px}}'
+    + '.cf-callout-ants{background-image:linear-gradient(90deg,var(--forge-amber) 50%,transparent 50%),'
+    + 'linear-gradient(90deg,var(--forge-amber) 50%,transparent 50%),'
+    + 'linear-gradient(0deg,var(--forge-amber) 50%,transparent 50%),'
+    + 'linear-gradient(0deg,var(--forge-amber) 50%,transparent 50%);'
+    + 'background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;'
+    + 'background-size:14px 2px,14px 2px,2px 14px,2px 14px;'
+    + 'background-position:0 0,0 100%,0 0,100% 0;'
+    + 'animation:cfCalloutAnts .55s linear infinite}'
+  document.head.appendChild(style)
+}
+
 // Editor-only interactive callout overlay (see PreviewCallout). Drag the box to
 // move (box CENTER), drag the round target handle to aim the line, edit the text
 // inline. Coordinates are normalized 0-100 of the overlay layer (the content area).
@@ -1694,6 +1716,9 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
     ? drag.current.side
     : resolveCalloutAnchor(anchorField, bx, by, tx, ty)
   const boxTransform = calloutAnchorTransform(side)
+  // Box-side line endpoint tucked into the box (parity with the static overlay).
+  const lineEnd = calloutLineBoxEnd(bx, by, tx, ty)
+  _ensureCalloutAntsCSS()
 
   return (
     <div ref={layerRef} className="cf-callout-overlay"
@@ -1703,8 +1728,8 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           from the target — same geometry as the static overlay. */}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-        <line x1={bx} y1={by} x2={tx} y2={ty}
-          stroke={S.line} strokeWidth={S.lineWidth} vectorEffect="non-scaling-stroke" />
+        <line x1={lineEnd[0]} y1={lineEnd[1]} x2={tx} y2={ty}
+          stroke={S.line} strokeWidth={S.lineWidth} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
 
       {/* Target handle — EDITOR-ONLY affordance (never published). Shown on the
@@ -1729,27 +1754,39 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           CALLOUT_STYLE so it matches what publishes. The per-anchor transform places
           the chosen edge-center on (bx,by) so the box extends away from the target. */}
       <div
-        onMouseDown={startDrag('box', box)}
+        onMouseDown={e => { e.stopPropagation(); onSelect && onSelect(block.id) }}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        title="Drag to reposition · click to edit text"
+        title="Drag the grip to move · click the text to edit"
         style={{
           position: 'absolute', left: `${bx}%`, top: `${by}%`,
           transform: boxTransform,
-          maxWidth: '46%', cursor: 'move', pointerEvents: 'auto', zIndex: 6,
+          maxWidth: '46%', cursor: 'default', pointerEvents: 'auto', zIndex: 6,
           outline: active
-            ? '2px solid var(--forge-amber)'
+            ? 'none'
             : `2px dashed color-mix(in srgb, var(--forge-amber) ${hover ? 85 : 45}%, transparent)`,
           outlineOffset: 3, borderRadius: S.radius,
         }}>
-        {/* Drag-handle cue — makes it obvious the box is movable. Editor-only,
-            shown on hover or when selected; never part of the published overlay. */}
+        {/* Marching-ants active outline — animated dashed border that auto-sizes to
+            the box. Editor-only; shown only when the callout is the active block and
+            replaces the solid amber outline. Never part of the published overlay. */}
+        {active && (
+          <div aria-hidden="true" className="cf-callout-ants" style={{
+            position: 'absolute', inset: -5, pointerEvents: 'none', zIndex: 7,
+          }} />
+        )}
+        {/* Move grip — the DEDICATED drag handle. Drag it to reposition the box
+            (startDrag also selects). Editor-only, shown on hover or when selected;
+            never part of the published overlay. */}
         {(hover || active) && (
-          <div aria-hidden="true" style={{
+          <div aria-hidden="true"
+            onMouseDown={startDrag('box', box)}
+            title="Drag to reposition"
+            style={{
             position: 'absolute', top: -11, left: -11, width: 20, height: 20,
             borderRadius: '50%', background: 'var(--forge-amber)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'none', zIndex: 8,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'auto', cursor: 'move', zIndex: 8,
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff"
               strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

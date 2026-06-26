@@ -1038,13 +1038,21 @@ def _callout_overlay_html(data):
     # already-clamped numeric bx/by/tx/ty).
     side = _resolve_callout_anchor(anchor, float(bx), float(by), float(tx), float(ty))
     tf = _callout_anchor_transform(side)
+    # Box-side endpoint nudged 2.5 viewBox units PAST the connection point INTO the
+    # box (along the line, away from the target) so the OPAQUE box covers the round
+    # cap and the line reads flush with the box edge. Twin of calloutOverlay.js
+    # calloutLineBoxEnd — keep the formula identical for byte parity.
+    _dx = float(bx) - float(tx); _dy = float(by) - float(ty)
+    _len = (_dx*_dx + _dy*_dy) ** 0.5 or 1.0
+    ex = _callout_pc(float(bx) + (_dx/_len) * 2.5)
+    ey = _callout_pc(float(by) + (_dy/_len) * 2.5)
 
     svg = (
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" '
         'style="position:absolute;inset:0;width:100%;height:100%;'
         'pointer-events:none;overflow:visible">'
-        f'<line x1="{bx}" y1="{by}" x2="{tx}" y2="{ty}" '
-        f'stroke="{_CALLOUT_LINE}" stroke-width="{_CALLOUT_LINE_WIDTH}" vector-effect="non-scaling-stroke" /></svg>'
+        f'<line x1="{ex}" y1="{ey}" x2="{tx}" y2="{ty}" '
+        f'stroke="{_CALLOUT_LINE}" stroke-width="{_CALLOUT_LINE_WIDTH}" vector-effect="non-scaling-stroke" stroke-linecap="round" /></svg>'
     )
     box_html = (
         f'<div style="position:absolute;left:{bx}%;top:{by}%;'
