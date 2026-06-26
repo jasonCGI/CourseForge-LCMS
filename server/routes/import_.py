@@ -1,6 +1,8 @@
 import json
 from flask import Blueprint, request, jsonify
-from ..services.importer import import_project, ImportValidationError
+from ..services.importer import (
+    import_project, restore_project, is_roundtrip_export, ImportValidationError,
+)
 from ..schemas.project_schemas import ProjectSchema
 
 import_bp = Blueprint('import_', __name__)
@@ -39,7 +41,12 @@ def import_json():
         return jsonify({'error': 'Send a .json file (multipart) or a JSON body.'}), 400
 
     try:
-        project, warnings = import_project(data)
+        # A lossless project export (the ⭳ JSON download) round-trips exactly;
+        # everything else is treated as a ForgeBlueprint authoring payload.
+        if is_roundtrip_export(data):
+            project, warnings = restore_project(data)
+        else:
+            project, warnings = import_project(data)
     except ImportValidationError as e:
         return jsonify({'error': str(e)}), 422
     except Exception as e:

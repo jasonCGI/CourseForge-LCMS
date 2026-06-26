@@ -43,6 +43,10 @@ def export_project_json(project_id):
     """
     project = project_full_query().get_or_404(project_id)
     payload = project_schema.dump(project)
+    # Tag the file so the importer routes it to the lossless round-trip restore
+    # (vs the ForgeBlueprint authoring import, which rebuilds blocks and is lossy).
+    payload['format'] = 'courseforge-project'
+    payload['format_version'] = 1
     body = json.dumps(payload, indent=2, ensure_ascii=False)
     slug = (re.sub(r'[^a-z0-9]+', '-', (project.name or 'course').lower()).strip('-')
             or 'course')

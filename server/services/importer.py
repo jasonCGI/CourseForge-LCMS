@@ -295,3 +295,105 @@ def import_project(data: dict) -> tuple[Project, list]:
     warnings = _collect_warnings(data)
     project = seed_project(data)
     return project, warnings
+
+
+# ---------------------------------------------------------------------------
+# Lossless round-trip restore — the /api/projects/<id>/export.json shape
+# (project_schema.dump). Unlike the ForgeBlueprint import above, this preserves
+# every frame's `content` EXACTLY (callouts, hotspots, layout, custom bounds,
+# swap/links, OAM/3D/iVideo — all of it).
+# ---------------------------------------------------------------------------
+
+def is_roundtrip_export(data: dict) -> bool:
+    """True if `data` is a CourseForge project export (lossless round-trip) rather
+    than a ForgeBlueprint authoring payload. Prefers the exporter's tag; falls back
+    to the field shape (export uses 'name'/'courses[].name' + frame 'content';
+    blueprint uses 'project_name'/'course_name' and/or 'schema_version')."""
+    if not isinstance(data, dict):
+        return False
+    if data.get('format') == 'courseforge-project':
+        return True
+    if data.get('project_name') or data.get('schema_version'):
+        return False
+    return bool(str(data.get('name') or '').strip() and isinstance(data.get('courses'), list))
+
+
+def restore_project(data: dict) -> tuple[Project, list]:
+    """Recreate a project from its lossless export, preserving frame content
+    exactly. Regenerates every id (so a restore can't collide with the source) and
+    remaps internal frame-id references — branch targets, inline data-cf-frame
+    links, menu targets — to the new ids via a whole-content string replace of
+    old→new UUIDs (fixed-length + random, so no false substring hits). Media
+    asset_ids are kept verbatim (they reference this environment's media library)."""
+    import json as _json
+    if not isinstance(data, dict) or not str(data.get('name') or '').strip():
+        raise ImportValidationError("Export must be a JSON object with a 'name'.")
+
+    # Pass 1: old id -> fresh uuid for every entity in the tree.
+    idmap = {}
+    def remember(node):
+        old = node.get('id')
+        if old and old not in idmap:
+            idmap[old] = str(uuid.uuid4())
+    remember(data)
+    for c in data.get('courses') or []:
+        remember(c)
+        for m in c.get('modules') or []:
+            remember(m)
+            for l in m.get('lessons') or []:
+                remember(l)
+                for f in l.get('frames') or []:
+                    remember(f)
+
+    def remap_content(content):
+        if not isinstance(content, dict):
+            return {"blocks": []}
+        s = _json.dumps(content)
+        for old, new in idmap.items():
+            if old in s:
+                s = s.replace(old, new)
+        try:
+            return _json.loads(s)
+        except (ValueError, TypeError):
+            return content
+
+    tm = data.get('text_mode')
+    project = Project(
+        id=idmap.get(data.get('id')) or str(uuid.uuid4()),
+        name=str(data['name']).strip(),
+        description=str(data.get('description') or '').strip(),
+        gui_shell_id=(data.get('gui_shell_id') or None),
+        text_mode=(tm if tm in ('auto', 'light', 'dark') else 'auto'),
+    )
+    db.session.add(project)
+    for ci, c in enumerate(data.get('courses') or []):
+        course = Course(id=idmap.get(c.get('id')) or str(uuid.uuid4()),
+                        name=str(c.get('name') or 'Course'),
+                        order_index=c.get('order_index', ci), project=project)
+        db.session.add(course)
+        for mi, m in enumerate(c.get('modules') or []):
+            module = Module(id=idmap.get(m.get('id')) or str(uuid.uuid4()),
+                            name=str(m.get('name') or 'Module'),
+                            order_index=m.get('order_index', mi), course=course)
+            db.session.add(module)
+            for li, l in enumerate(m.get('lessons') or []):
+                lesson = Lesson(id=idmap.get(l.get('id')) or str(uuid.uuid4()),
+                                name=str(l.get('name') or 'Lesson'),
+                                order_index=l.get('order_index', li), module=module)
+                db.session.add(lesson)
+                for fi, f in enumerate(l.get('frames') or []):
+                    frame = Frame(id=idmap.get(f.get('id')) or str(uuid.uuid4()),
+                                  name=str(f.get('name') or 'Frame'),
+                                  frame_type=str(f.get('frame_type') or 'content'),
+                                  order_index=f.get('order_index', fi),
+                                  content=remap_content(f.get('content')),
+                                  notes=str(f.get('notes') or ''),
+                                  optional=bool(f.get('optional', False)),
+                                  lesson=lesson)
+                    db.session.add(frame)
+    db.session.commit()
+
+    warnings = []
+    if not (data.get('courses') or []):
+        warnings.append("Imported project has no courses.")
+    return project, warnings
