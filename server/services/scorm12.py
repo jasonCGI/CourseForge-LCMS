@@ -136,6 +136,7 @@ def _parse_opaque_rgb(bg_color):
             if a is not None and float(a) < 1.0:
                 return None
             r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            # \d{1,3} permits 256-999; reject out-of-range channels.
             if r > 255 or g > 255 or b > 255:
                 return None
             return (r, g, b)
@@ -144,23 +145,43 @@ def _parse_opaque_rgb(bg_color):
         return None
 
 
+# Brand text colors as RGB, for the WCAG-contrast pick below.
+_SHELL_TEXT_DARK_RGB  = (4, 44, 83)      # #042C53
+_SHELL_TEXT_LIGHT_RGB = (200, 216, 232)  # #C8D8E8
+
+
+def _rel_lum(rgb):
+    """WCAG relative luminance of an (r,g,b) in 0..255."""
+    def f(c):
+        c = c / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2])
+
+
+def _contrast(a, b):
+    """WCAG contrast ratio between two (r,g,b) colors (1..21)."""
+    l1, l2 = _rel_lum(a), _rel_lum(b)
+    return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+
 def shell_text_style(bg_color):
     """Map a shell content-area bg_color -> (text_color, halo_css).
 
-    Opaque & parseable  -> solid color by YIQ luminance (light bg -> dark navy
-                           text, dark bg -> light blue), NO halo (crisp).
+    Opaque & parseable -> the brand text color (navy / light blue) with the BEST
+    WCAG contrast against the bg; the halo is dropped only when that contrast
+    reaches AA (>=4.5:1) for crisp solid text. For mid-gray backgrounds where
+    NEITHER solid color hits AA, the halo is KEPT so the dark outline carries
+    legibility (rather than shipping a bare sub-4.5:1 color).
     Transparent / unset / unparseable / alpha<1 -> (#C8D8E8, dark halo) — the
-                           current universal fallback (don't regress it).
-    Guarded so a malformed bg_color always falls back to the halo path."""
+    universal fallback. Guarded so a malformed bg_color always falls back."""
     rgb = _parse_opaque_rgb(bg_color)
     if rgb is None:
         return _SHELL_TEXT_LIGHT, _SHELL_HALO
-    r, g, b = rgb
-    # YIQ perceived luminance (0..255). >=128 is a "light" background.
-    yiq = (r * 299 + g * 587 + b * 114) / 1000
-    if yiq >= 128:
-        return _SHELL_TEXT_DARK, ''     # light bg -> dark text, no halo
-    return _SHELL_TEXT_LIGHT, ''        # dark bg -> light text, no halo
+    c_dark = _contrast(rgb, _SHELL_TEXT_DARK_RGB)
+    c_light = _contrast(rgb, _SHELL_TEXT_LIGHT_RGB)
+    if c_dark >= c_light:
+        return _SHELL_TEXT_DARK, ('' if c_dark >= 4.5 else _SHELL_HALO)
+    return _SHELL_TEXT_LIGHT, ('' if c_light >= 4.5 else _SHELL_HALO)
 
 
 def _safe_id(value):

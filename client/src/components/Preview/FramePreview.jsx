@@ -713,6 +713,7 @@ function parseOpaqueRgb(bgColor) {
     if (m) {
       if (m[4] !== undefined && parseFloat(m[4]) < 1.0) return null   // alpha<1 -> transparent
       const r = +m[1], g = +m[2], b = +m[3]
+      // \d{1,3} permits 256-999; reject out-of-range channels.
       if (r > 255 || g > 255 || b > 255) return null
       return [r, g, b]
     }
@@ -720,12 +721,29 @@ function parseOpaqueRgb(bgColor) {
   } catch (e) { return null }
 }
 
-// -> { textColor, halo } (halo true = apply the dark halo, no solid-by-luminance).
-export function shellTextStyle(bgColor) {
+// Brand text colors as RGB, for the WCAG-contrast pick below.
+const SHELL_TEXT_DARK_RGB = [4, 44, 83], SHELL_TEXT_LIGHT_RGB = [200, 216, 232]
+
+function relLum(rgb) {
+  // WCAG relative luminance of an [r,g,b] in 0..255.
+  const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4) }
+  return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2])
+}
+function contrastRatio(a, b) {
+  const l1 = relLum(a), l2 = relLum(b)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}
+
+// -> { textColor, halo }. Pick the brand color with the best WCAG contrast against
+// an opaque bg; KEEP the halo when even the best is < 4.5:1 (mid-gray backgrounds)
+// so the dark outline carries legibility. Transparent/unknown -> light + halo.
+function shellTextStyle(bgColor) {
   const rgb = parseOpaqueRgb(bgColor)
   if (!rgb) return { textColor: SHELL_TEXT_LIGHT, halo: true }
-  const yiq = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
-  return { textColor: yiq >= 128 ? SHELL_TEXT_DARK : SHELL_TEXT_LIGHT, halo: false }
+  const cDark = contrastRatio(rgb, SHELL_TEXT_DARK_RGB)
+  const cLight = contrastRatio(rgb, SHELL_TEXT_LIGHT_RGB)
+  const dark = cDark >= cLight
+  return { textColor: dark ? SHELL_TEXT_DARK : SHELL_TEXT_LIGHT, halo: (dark ? cDark : cLight) < 4.5 }
 }
 
 // A <style> rule that colors the injected body text inside #fgui-content per the
