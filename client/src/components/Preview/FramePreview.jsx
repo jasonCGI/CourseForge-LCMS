@@ -7,7 +7,7 @@ import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
-import { buildCalloutOverlayHTML, CALLOUT_STYLE } from '../../utils/calloutOverlay'
+import { buildCalloutOverlayHTML, CALLOUT_STYLE, resolveCalloutAnchor, calloutAnchorTransform } from '../../utils/calloutOverlay'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 import { Play, Pause } from '../icons'
 
@@ -1612,6 +1612,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
   const target  = (live && live.target) || data.target || { x: 32, y: 32 }
   const text    = data.text != null ? data.text : 'Callout'
   const padding = data.padding != null ? Number(data.padding) : 10
+  const anchorField = data.anchor != null ? data.anchor : 'auto'
   const S = CALLOUT_STYLE
 
   // Keep the contentEditable box in sync with external text changes (panel input),
@@ -1636,6 +1637,14 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
     if (onSelect) onSelect(block.id)
     const p = relPos(e)
     drag.current = { mode, dx: p.x - anchor.x, dy: p.y - anchor.y }
+    // FREEZE the resolved side for the duration of a BOX drag (compute it once at
+    // drag start) so an 'auto' callout doesn't flip sides as the box crosses the
+    // target mid-drag. Re-resolved when idle / after drop (and on target drag).
+    if (mode === 'box') {
+      drag.current.side = resolveCalloutAnchor(
+        anchorField, _r1(_clampPc(box.x)), _r1(_clampPc(box.y)),
+        _r1(_clampPc(target.x)), _r1(_clampPc(target.y)))
+    }
     setLive({ box: { ...box }, target: { ...target } })
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -1678,13 +1687,20 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
 
   const bx = _r1(_clampPc(box.x)), by = _r1(_clampPc(box.y))
   const tx = _r1(_clampPc(target.x)), ty = _r1(_clampPc(target.y))
+  // Resolved connecting edge. During an active BOX drag, use the side frozen at
+  // drag start (so 'auto' won't flip mid-drag); otherwise resolve live from the
+  // current geometry. Parity with calloutOverlay.js / scorm12.
+  const side = (drag.current && drag.current.mode === 'box' && drag.current.side)
+    ? drag.current.side
+    : resolveCalloutAnchor(anchorField, bx, by, tx, ty)
+  const boxTransform = calloutAnchorTransform(side)
 
   return (
     <div ref={layerRef} className="cf-callout-overlay"
       style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, userSelect: 'none' }}>
-      {/* Connector line: box CENTER → target. The opaque box (below) covers the
-          portion under it, so the line emerges from the box edge — same geometry
-          as the static overlay (buildCalloutOverlayHTML). */}
+      {/* Connector line: connection point (box.x,box.y) → target, straight. The box
+          is positioned so its facing edge-center sits on that point and extends away
+          from the target — same geometry as the static overlay. */}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
         <line x1={bx} y1={by} x2={tx} y2={ty}
@@ -1707,10 +1723,11 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
         />
       )}
 
-      {/* Box — drag to move (box.x/y = CENTER), click to select. Inline-editable
-          when selected, with LIVE width reflow (inline-block auto-width honoring
-          the per-block padding). Visual style === CALLOUT_STYLE so it matches what
-          publishes. */}
+      {/* Box — drag to move (box.x/y = CONNECTION POINT, the facing edge-center),
+          click to select. Inline-editable when selected, with LIVE width reflow
+          (inline-block auto-width honoring the per-block padding). Visual style ===
+          CALLOUT_STYLE so it matches what publishes. The per-anchor transform places
+          the chosen edge-center on (bx,by) so the box extends away from the target. */}
       <div
         onMouseDown={startDrag('box', box)}
         onMouseEnter={() => setHover(true)}
@@ -1718,7 +1735,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
         title="Drag to reposition · click to edit text"
         style={{
           position: 'absolute', left: `${bx}%`, top: `${by}%`,
-          transform: 'translate(-50%, -50%)',
+          transform: boxTransform,
           maxWidth: '46%', cursor: 'move', pointerEvents: 'auto', zIndex: 6,
           outline: active
             ? '2px solid var(--forge-amber)'

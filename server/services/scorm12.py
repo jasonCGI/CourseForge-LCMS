@@ -974,17 +974,50 @@ def _callout_pc(value):
     return ('%g' % n)
 
 
+def _resolve_callout_anchor(anchor, bx, by, tx, ty):
+    """Resolve a callout's connecting edge to 'top'|'bottom'|'left'|'right'. An
+    explicit anchor passes through; 'auto' (or anything unknown) picks the edge that
+    FACES the target. Python twin of calloutOverlay.js resolveCalloutAnchor. The
+    bx/by/tx/ty here are FLOATS (the pre-format coords) so the comparison matches the
+    JS, which resolves from its already-clamped numeric coords."""
+    if anchor in ('top', 'bottom', 'left', 'right'):
+        return anchor
+    dx = tx - bx
+    dy = ty - by
+    if abs(dx) >= abs(dy):
+        return 'right' if dx >= 0 else 'left'
+    return 'bottom' if dy >= 0 else 'top'
+
+
+def _callout_anchor_transform(side):
+    """CSS transform positioning the box so the chosen edge-center lands on the
+    connection point and the box extends AWAY from the target. Python twin of
+    calloutOverlay.js calloutAnchorTransform — strings must match byte-for-byte."""
+    if side == 'top':
+        return 'translate(-50%, 0%)'
+    if side == 'bottom':
+        return 'translate(-50%, -100%)'
+    if side == 'left':
+        return 'translate(0%, -50%)'
+    if side == 'right':
+        return 'translate(-100%, -50%)'
+    return 'translate(-50%, -50%)'
+
+
 def _callout_overlay_html(data):
     """Build the callout overlay HTML (box + connector line, NO target circle) — the
     Python twin of calloutOverlay.js buildCalloutOverlayHTML. Returns an
     absolutely-positioned layer (inset:0; pointer-events:none) meant to sit OVER a
     position:relative content container.
 
-    The connector line runs box CENTER -> target inside a 0-100 viewBox SVG; the
-    OPAQUE box (drawn on top) covers the part of the line beneath it so the line
-    visually emerges from the box edge (no box-size math; identical to the editor /
-    React preview). The target CIRCLE is an editor-only affordance and is never
-    rendered here.
+    box.{x,y} is the CONNECTION POINT (center of the connecting edge), NOT the box
+    center. The box is positioned (via the per-anchor transform) so its chosen edge-
+    center lands on (box.x, box.y) and extends AWAY from the target; `anchor`
+    ('auto'|'top'|'bottom'|'left'|'right') picks which edge connects. The connector
+    line runs from the connection point straight to the target inside a 0-100 viewBox
+    SVG (pure numeric coords, no box-size math). The OPAQUE box is drawn on top so any
+    incidental overlap is covered. The target CIRCLE is an editor-only affordance and
+    is never rendered here.
     """
     d = data or {}
     box = d.get('box') or {'x': 55, 'y': 60}
@@ -995,9 +1028,16 @@ def _callout_overlay_html(data):
     pad = '%g' % padding
     text = d.get('text')
     text = 'Callout' if text is None else text
+    anchor = d.get('anchor')
+    anchor = 'auto' if anchor is None else anchor
 
     bx = _callout_pc(box.get('x', 55)); by = _callout_pc(box.get('y', 60))
     tx = _callout_pc(target.get('x', 32)); ty = _callout_pc(target.get('y', 32))
+    # Resolve the side from the SAME formatted (clamped, 1-decimal) coords the SVG/box
+    # use, so the auto pick matches the JS builder exactly (which resolves from its
+    # already-clamped numeric bx/by/tx/ty).
+    side = _resolve_callout_anchor(anchor, float(bx), float(by), float(tx), float(ty))
+    tf = _callout_anchor_transform(side)
 
     svg = (
         '<svg viewBox="0 0 100 100" preserveAspectRatio="none" '
@@ -1008,7 +1048,7 @@ def _callout_overlay_html(data):
     )
     box_html = (
         f'<div style="position:absolute;left:{bx}%;top:{by}%;'
-        'transform:translate(-50%,-50%);max-width:46%;box-sizing:border-box;'
+        f'transform:{tf};max-width:46%;box-sizing:border-box;'
         f'padding:{pad}px;border-radius:{_CALLOUT_RADIUS};background:{_CALLOUT_BOX_BG};'
         f'color:{_CALLOUT_BOX_TEXT};border:{_CALLOUT_BORDER_WIDTH} solid {_CALLOUT_BOX_BORDER};box-shadow:{_CALLOUT_SHADOW};'
         "font:600 14px/1.35 'Inter',system-ui,sans-serif;text-align:center\">"

@@ -451,9 +451,11 @@ function _makeBlock(type) {
     gui:     { gui_asset_id: null, shell_name: null, stage_width: 1024, stage_height: 768, button_count: 0, zone_count: 0, html_serve_url: null, json_serve_url: null },
     // Callout = a free-floating annotation overlay over the frame's CONTENT AREA
     // (typically over a still image). box/target are normalized 0-100 (% of the
-    // content area), box is the box CENTER (so width changes never shift it). It's
-    // AUXILIARY (an overlay, never a zone-filler) — see AUXILIARY_TYPES below.
-    callout: { text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 10 },
+    // content area). box is the CONNECTION POINT — the center of the box edge that
+    // faces the target; `anchor` ('auto'|'top'|'bottom'|'left'|'right') picks that
+    // edge ('auto' = the edge facing the target). AUXILIARY (an overlay, never a
+    // zone-filler) — see AUXILIARY_TYPES below.
+    callout: { text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 10, anchor: 'auto' },
   }
   return { id, type, data: defaults[type] || {} }
 }

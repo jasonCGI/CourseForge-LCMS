@@ -128,14 +128,16 @@ def _audio(label='Course Audio', caption='', dock='inline'):
         'dock': dock, 'serve_url': _silent_wav_datauri(),
         'original_name': label.lower().replace(' ', '_') + '.mp3'}}
 
-def _callout(text='Callout', box=None, target=None, padding=10):
+def _callout(text='Callout', box=None, target=None, padding=10, anchor='auto'):
     # Free-floating annotation overlay: rounded box (center text, uniform padding,
     # auto-width) + a connector line to a target point. box/target are normalized
-    # 0-100 (% of the content area); box is the box CENTER. Auxiliary — it overlays
+    # 0-100 (% of the content area); box is the CONNECTION POINT (the center of the
+    # box edge that faces the target). `anchor` ('auto'|'top'|'bottom'|'left'|'right')
+    # picks that edge; 'auto' = the edge facing the target. Auxiliary — it overlays
     # the content area and never consumes a layout zone.
     return {'id': str(uuid.uuid4()), 'type': 'callout', 'data': {
         'text': text, 'box': box or {'x': 55, 'y': 60},
-        'target': target or {'x': 32, 'y': 32}, 'padding': padding}}
+        'target': target or {'x': 32, 'y': 32}, 'padding': padding, 'anchor': anchor}}
 
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
           feedback_incorrect='Not quite — review and try again.'):
@@ -299,9 +301,14 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         # swaps the placeholder graphic for the real bundled demo image after a reset.
         _image(label='Latte with foam art', color='#185FA5', icon='🖼', fill=True,
                caption='Drag each callout box and its round target handle to annotate the image'),
-        _callout(text='Foam art',     box={'x': 70, 'y': 22}, target={'x': 50, 'y': 44}),
-        _callout(text='Ceramic cup',  box={'x': 24, 'y': 74}, target={'x': 44, 'y': 64}),
-        _callout(text='Espresso base', box={'x': 78, 'y': 78}, target={'x': 56, 'y': 60}),
+        # box = the CONNECTION POINT (facing edge-center); 'auto' resolves the edge.
+        # Each box extends AWAY from its target and stays fully on-frame:
+        #   Foam art    -> left edge connects, box extends RIGHT  (sits top-right)
+        #   Ceramic cup -> right edge connects, box extends LEFT  (sits mid-left)
+        #   Espresso    -> left edge connects, box extends RIGHT  (sits bottom-right)
+        _callout(text='Foam art',      box={'x': 76, 'y': 30}, target={'x': 50, 'y': 40}),
+        _callout(text='Ceramic cup',   box={'x': 27, 'y': 66}, target={'x': 47, 'y': 62}),
+        _callout(text='Espresso base', box={'x': 74, 'y': 82}, target={'x': 54, 'y': 74}),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Video fills the entire content area (cover fit), shown as-sent-in (no

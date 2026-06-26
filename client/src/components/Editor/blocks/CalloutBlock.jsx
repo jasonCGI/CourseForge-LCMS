@@ -19,6 +19,14 @@ import { blockWrap, fieldLabel, inputStyle, helpText } from './blockStyles'
 
 const clampPad = v => Math.max(0, Math.min(40, v))
 
+const ANCHOR_OPTIONS = [
+  { value: 'auto',   label: 'Auto' },
+  { value: 'top',    label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+  { value: 'left',   label: 'Left' },
+  { value: 'right',  label: 'Right' },
+]
+
 export default function CalloutBlock({ block }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
   const removeBlock = useEditorStore(s => s.removeBlock)
@@ -27,6 +35,7 @@ export default function CalloutBlock({ block }) {
   const data    = block.data || {}
   const text    = data.text != null ? data.text : 'Callout'
   const padding = data.padding != null ? Number(data.padding) : 10
+  const anchor  = data.anchor != null ? data.anchor : 'auto'
 
   return (
     <div style={blockWrap}>
@@ -60,6 +69,32 @@ export default function CalloutBlock({ block }) {
             />
           </div>
           <p style={helpText}>Uniform on all sides. The box stays thin for one line and grows in height as text wraps.</p>
+        </div>
+
+        {/* Anchor — which box edge the connector line attaches to (its center).
+            Auto picks the edge facing the target. */}
+        <div style={{ marginBottom: 6 }}>
+          <label style={fieldLabel}>Connector anchor</label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {ANCHOR_OPTIONS.map(opt => {
+              const sel = anchor === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => updateBlock(block.id, { anchor: opt.value })}
+                  style={{
+                    flex: 1, padding: '6px 4px', fontSize: 12, fontWeight: 600,
+                    borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${sel ? '#A8572B' : '#cdd5df'}`,
+                    background: sel ? '#A8572B' : '#fff',
+                    color: sel ? '#fff' : '#3a4756',
+                  }}
+                >{opt.label}</button>
+              )
+            })}
+          </div>
+          <p style={helpText}>The line connects to the center of this box edge. Auto picks the edge facing the target.</p>
         </div>
 
         <p style={helpText}>

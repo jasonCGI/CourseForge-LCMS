@@ -1,6 +1,6 @@
 # CourseForge Schema Document
 
-> **version: 0.1.0**
+> **version: 0.1.1**
 > **date: 2026-06-26**
 > **status: DRAFT (Priority-1 artifact of the "ForgeAgent" epic) — for human review**
 
@@ -23,6 +23,7 @@ This document is **dual-purpose**:
 
 | Version | Date       | Notes                                                                 |
 | ------- | ---------- | --------------------------------------------------------------------- |
+| 0.1.1   | 2026-06-26 | Callout: `box` is now the **connection point** (facing edge-center, not box center); added the `anchor` field (`auto\|top\|bottom\|left\|right`, default `auto`) — the line connects to the center of that box edge. §4.10 + §10.3 updated. |
 | 0.1.0   | 2026-06-26 | Initial draft. Derived from `editorStore.js`, the block editors, `scorm12.py`, `menu_frame.py`, and the `Frame`/`Project` models. Covers all 11 palette block types + 10 stored block-`type` values, `content` and `menu` frame types, layouts/zones, exclusivity caps, asset placeholders, design tokens, 508 constraints, and SCORM output requirements. |
 
 Engine versions at time of writing (from `server/version.py`): `VERSION = "1.0.0"`,
@@ -389,12 +390,13 @@ A free-floating annotation overlay (box + connector line to a target point) over
 | Field     | Type           | Req/Opt  | Default              | Notes |
 | --------- | -------------- | -------- | -------------------- | ----- |
 | `text`    | string         | required | `"Callout"`          | Box label. |
-| `box`     | `{x,y}`        | required | `{ x: 55, y: 60 }`   | Box **CENTER**, normalized **0–100** (% of content area). Centering means width changes never shift it. |
-| `target`  | `{x,y}`        | required | `{ x: 32, y: 32 }`   | Connector target point, normalized **0–100**. |
+| `box`     | `{x,y}`        | required | `{ x: 55, y: 60 }`   | **CONNECTION POINT** — the center of the box edge that faces the target — normalized **0–100** (% of content area). The box is positioned so its chosen edge-center lands here and extends AWAY from the target. |
+| `target`  | `{x,y}`        | required | `{ x: 32, y: 32 }`   | Connector target point, normalized **0–100**. The line runs straight from `box` → `target`. |
 | `padding` | int            | optional | `10`                 | Uniform padding (px) on all four sides. Clamped 0–40. |
+| `anchor`  | enum           | optional | `"auto"`             | `auto \| top \| bottom \| left \| right`. The line connects to the center of **this box edge**; `auto` picks the edge facing the target (compare `|target.x−box.x|` vs `|target.y−box.y|`). |
 
-`_makeBlock('callout')` default: `{ text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 10 }`.
-Positioning/aiming is done by dragging in the live preview; the panel sets only text + padding.
+`_makeBlock('callout')` default: `{ text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 10, anchor: 'auto' }`.
+Positioning/aiming is done by dragging in the live preview (the box follows the cursor; its connecting edge stays on `box`); the panel sets text, padding, and the anchor edge.
 
 ### 4.11 `gui` — AUX (project-level)
 
@@ -652,7 +654,8 @@ count against the cap, so they coexist with the full-bleed image. `box`/`target`
           "text": "Basket — holds the coffee puck",
           "box": { "x": 30, "y": 28 },
           "target": { "x": 48, "y": 40 },
-          "padding": 10
+          "padding": 10,
+          "anchor": "auto"
         }
       },
       {
@@ -662,7 +665,8 @@ count against the cap, so they coexist with the full-bleed image. `box`/`target`
           "text": "Spout — directs the flow",
           "box": { "x": 70, "y": 75 },
           "target": { "x": 52, "y": 66 },
-          "padding": 10
+          "padding": 10,
+          "anchor": "auto"
         }
       }
     ]
