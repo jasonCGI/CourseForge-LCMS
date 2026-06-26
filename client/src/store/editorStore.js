@@ -26,11 +26,18 @@ function _readDockDefault() {
 // PRIMARY  = text-zone fillers, mutually exclusive: text, quiz
 // MEDIA    = media-zone fillers, mutually exclusive: media(image/video), model3d, oam, ivideo
 // AUXILIARY (never blocked): wcn, hotspot, branch, audio (media w/ kind==='audio'),
-//   gui, and anything else.
+//   gui, callout, and anything else.
 // Audio is a `media` block with data.kind==='audio' that docks as a bar (not a
 // zone filler), so an existing audio media must NOT count as a MEDIA zone-filler.
+// A callout is a free-floating annotation OVERLAY over the content area — never a
+// zone-filler — so it is auxiliary too (and renders OUTSIDE the layout zones).
 export const PRIMARY_TYPES = ['text', 'quiz']
 export const MEDIA_TYPES   = ['media', 'model3d', 'oam', 'ivideo']
+// Explicit auxiliary set (overlays / docked / non-zone-fillers). Anything not in
+// PRIMARY_TYPES / MEDIA_TYPES is already never blocked by isBlockTypeBlocked, but
+// naming callout here documents intent and guards against it ever being misread as
+// a zone-filler.
+export const AUXILIARY_TYPES = ['wcn', 'hotspot', 'branch', 'audio', 'gui', 'callout']
 
 // Is THIS existing block a zone-filling media? (audio-kind media docks as a bar,
 // so it doesn't occupy the media zone and is treated as auxiliary.)
@@ -442,6 +449,11 @@ function _makeBlock(type) {
     ivideo: { video_asset_id: null, clip_asset_id: null, video_filename: null, video_serve_url: null, interaction_count: null, video_duration: null, caption: '', bounds: null },
     model3d: { model_asset_id: null, model_filename: null, model_serve_url: null, file_size_mb: null, viewer_height: 400, bg_color: null, bounds: null, caption: '', annotations: [] },
     gui:     { gui_asset_id: null, shell_name: null, stage_width: 1024, stage_height: 768, button_count: 0, zone_count: 0, html_serve_url: null, json_serve_url: null },
+    // Callout = a free-floating annotation overlay over the frame's CONTENT AREA
+    // (typically over a still image). box/target are normalized 0-100 (% of the
+    // content area), box is the box CENTER (so width changes never shift it). It's
+    // AUXILIARY (an overlay, never a zone-filler) — see AUXILIARY_TYPES below.
+    callout: { text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 20 },
   }
   return { id, type, data: defaults[type] || {} }
 }

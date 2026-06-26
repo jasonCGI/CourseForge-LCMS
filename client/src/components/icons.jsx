@@ -20,6 +20,7 @@ import {
   Upload,
   ColorFilter,
   SoundHigh,
+  ChatBubbleEmpty,
 } from 'iconoir-react'
 
 // Audio player controls (React AudioBar). Mirrors PLAY_SVG / PAUSE_SVG server-side.
@@ -41,4 +42,5 @@ export const BLOCK_ICONS = {
   oam:     Sparks,           // on-asset media / animated overlay
   ivideo:  PlaySolid,        // interactive video
   model3d: Box3dPoint,       // 3D model
+  callout: ChatBubbleEmpty,  // free-floating annotation callout (speech bubble)
 }

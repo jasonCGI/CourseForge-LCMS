@@ -869,6 +869,76 @@ def _hotspot_radius(shape):
     return '50%' if shape in ('circle', 'round') else ('14%' if shape == 'rounded' else '4px')
 
 
+# Shared Callout overlay styling — the Python twin of client/src/utils/calloutOverlay
+# .js CALLOUT_STYLE. Keep these literals in lock-step so the server (_render_blocks)
+# and the React preview (FramePreview / PreviewCallout) render identical overlays.
+_CALLOUT_BOX_BG     = '#ffffff'
+_CALLOUT_BOX_TEXT   = '#1a2a3a'
+_CALLOUT_BOX_BORDER = '#A8572B'
+_CALLOUT_LINE       = '#A8572B'
+_CALLOUT_SHADOW     = '0 2px 10px rgba(0,0,0,0.22)'
+_CALLOUT_RADIUS     = '8px'
+
+
+def _callout_pc(value):
+    """Clamp a 0-100 coordinate and round to one decimal, formatting WITHOUT a
+    trailing '.0' — mirrors calloutOverlay.js pc() (Math.round(v*10)/10) so the
+    server emits the same coordinate strings as the JS builder (e.g. 55, not 55.0)."""
+    n = _f(value, 0.0)
+    if n < 0:
+        n = 0.0
+    elif n > 100:
+        n = 100.0
+    n = round(n * 10) / 10.0
+    return ('%g' % n)
+
+
+def _callout_overlay_html(data):
+    """Build the callout overlay HTML (box + connector line, NO target circle) — the
+    Python twin of calloutOverlay.js buildCalloutOverlayHTML. Returns an
+    absolutely-positioned layer (inset:0; pointer-events:none) meant to sit OVER a
+    position:relative content container.
+
+    The connector line runs box CENTER -> target inside a 0-100 viewBox SVG; the
+    OPAQUE box (drawn on top) covers the part of the line beneath it so the line
+    visually emerges from the box edge (no box-size math; identical to the editor /
+    React preview). The target CIRCLE is an editor-only affordance and is never
+    rendered here.
+    """
+    d = data or {}
+    box = d.get('box') or {'x': 55, 'y': 60}
+    target = d.get('target') or {'x': 32, 'y': 32}
+    padding = _f(d.get('padding', 20), 20.0)
+    # Padding -> int-ish px string matching JS (`${padding}px`); _f gives a float so
+    # use %g to drop a trailing .0 (20.0 -> '20').
+    pad = '%g' % padding
+    text = d.get('text')
+    text = 'Callout' if text is None else text
+
+    bx = _callout_pc(box.get('x', 55)); by = _callout_pc(box.get('y', 60))
+    tx = _callout_pc(target.get('x', 32)); ty = _callout_pc(target.get('y', 32))
+
+    svg = (
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" '
+        'style="position:absolute;inset:0;width:100%;height:100%;'
+        'pointer-events:none;overflow:visible">'
+        f'<line x1="{bx}" y1="{by}" x2="{tx}" y2="{ty}" '
+        f'stroke="{_CALLOUT_LINE}" stroke-width="0.5" vector-effect="non-scaling-stroke" /></svg>'
+    )
+    box_html = (
+        f'<div style="position:absolute;left:{bx}%;top:{by}%;'
+        'transform:translate(-50%,-50%);max-width:46%;box-sizing:border-box;'
+        f'padding:{pad}px;border-radius:{_CALLOUT_RADIUS};background:{_CALLOUT_BOX_BG};'
+        f'color:{_CALLOUT_BOX_TEXT};border:1px solid {_CALLOUT_BOX_BORDER};box-shadow:{_CALLOUT_SHADOW};'
+        "font:600 14px/1.35 'Inter',system-ui,sans-serif;text-align:center\">"
+        f'{esc(text)}</div>'
+    )
+    return (
+        '<div class="cf-callout-overlay" style="position:absolute;inset:0;'
+        f'pointer-events:none;z-index:5">{svg}{box_html}</div>'
+    )
+
+
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
                    preview=False, layout=None, branch_resolve=None):
     """Convert block list to HTML string.
@@ -946,6 +1016,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             # text+media and skips the proper full-width 40px-padded text box.
             if (btype == 'media' and data.get('kind') == 'audio'
                     and data.get('dock') == 'bottom'):
+                kind_tag = 'aux'
+            elif btype == 'callout':
+                # A callout is a free-floating annotation OVERLAY over the content
+                # area (box + connector line) — NOT a layout zone-filler. Tag it
+                # 'aux' (like docked audio) so the layout reflow ignores it; its
+                # overlay self-positions (absolute/inset:0) against the content
+                # container and is appended OUTSIDE the zones. Parity with
+                # FramePreview.jsx (callout pulled out of `flow`).
                 kind_tag = 'aux'
             elif btype == 'text':
                 kind_tag = 'text'
@@ -1287,6 +1365,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             parts.append(
                 f'<div class="cf-hotspot-wrap">{regions_html}</div>'
             )
+
+        elif btype == 'callout':
+            # Free-floating annotation overlay (box + connector line, NO target
+            # circle). Tagged 'aux' above, so this HTML is collected into aux_html
+            # and appended OUTSIDE the layout zones; the overlay self-positions
+            # (absolute/inset:0) against the position:relative content container.
+            parts.append(_callout_overlay_html(data))
 
         elif btype == 'branch':
             true_label  = esc(data.get('true_label',  'Yes'))

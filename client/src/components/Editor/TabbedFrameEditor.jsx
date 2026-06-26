@@ -25,12 +25,13 @@ import WCNBlock from './blocks/WCNBlock'
 import IVideoBlock from './blocks/IVideoBlock'
 import Model3DBlock from './blocks/Model3DBlock'
 import GUIBlock from './blocks/GUIBlock'
+import CalloutBlock from './blocks/CalloutBlock'
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
   text: TextBlock, media: MediaBlock, quiz: QuizBlock, hotspot: HotspotBlock,
   branch: BranchBlock, oam: OamBlock, wcn: WCNBlock, ivideo: IVideoBlock,
-  model3d: Model3DBlock, gui: GUIBlock,
+  model3d: Model3DBlock, gui: GUIBlock, callout: CalloutBlock,
 }
 const META = Object.fromEntries(BLOCK_TYPES.map(b => [b.type, b]))
 const FRAME_TAB = '__frame__'

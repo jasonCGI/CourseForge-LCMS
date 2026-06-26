@@ -183,6 +183,9 @@ def build_web_bundle(project_id: str) -> tuple[BytesIO, str]:
       max-width: 900px;
       margin: 0 auto;
       width: 100%;
+      /* Anchor for absolutely-positioned auxiliary overlays (callout box + line,
+         WCN recall bar) so they cover the content area, not the viewport. */
+      position: relative;
     }}
     .cf-frame-title {{
       font-size: 22px;

@@ -7,6 +7,7 @@ import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
+import { buildCalloutOverlayHTML } from '../../utils/calloutOverlay'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 import { Play, Pause } from '../icons'
 
@@ -75,7 +76,13 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // the normal flow so they don't anchor to a per-block wrapper.
   const isDockedAudio = b => b.type === 'media' && b.data?.kind === 'audio' && b.data?.dock === 'bottom'
   const dockedAudio = blocks.filter(isDockedAudio)
-  const flow    = (contentArea ? blocks.filter(b => !b.data?.bounds) : blocks).filter(b => !isDockedAudio(b))
+  // Callouts are AUXILIARY overlays over the content area — pulled out of the flow
+  // (like docked audio) so they never consume a layout zone; rendered as absolute
+  // overlay layers anchored to the outer position:relative container below. Parity
+  // with scorm12._render_blocks (callout -> kind_tag 'aux', rendered outside zones).
+  const callouts = blocks.filter(b => b.type === 'callout')
+  const flow    = (contentArea ? blocks.filter(b => !b.data?.bounds) : blocks)
+    .filter(b => !isDockedAudio(b) && b.type !== 'callout')
   const textBlocks  = flow.filter(b => b.type === 'text')
   const otherBlocks = flow.filter(b => b.type !== 'text')
   // Frame layout preset (content.layout): 'full' = single column (media full-bleed,
@@ -187,6 +194,12 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
         return src ? <AudioBar key={`${b.id}-bottom`} src={src} caption={b.data.caption} dock="bottom" /> : null
       })}
+      {/* Callout overlays — free-floating annotation boxes + connector lines over
+          the content area. Auxiliary (never a zone-filler); the target circle is an
+          editor-only affordance and is NOT rendered here. The overlay layer is
+          absolute/inset:0 and anchors to this outer position:relative container,
+          mirroring scorm12's aux callout overlay. */}
+      {callouts.map(b => <PreviewCallout key={b.id} block={b} />)}
       {/* WCN recall bar — persistent re-open icons, lower-left of the content area. */}
       <WCNRecallBar wcnBlocks={blocks.filter(b => b.type === 'wcn')} />
     </div>
@@ -682,6 +695,11 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
       return `<div style="margin:8px 0"><p style="margin-bottom:6px">${d.condition || 'Decision point'}</p>`
         + `${opt(d.true_label || 'Yes')}${opt(d.false_label || 'No')}</div>`
     }
+    case 'callout':
+      // Free-floating annotation overlay (box + connector line, NO target circle).
+      // The shared builder produces the SAME markup the server emits. The overlay
+      // is absolute/inset:0 and anchors to the nearest position:relative ancestor.
+      return buildCalloutOverlayHTML(d)
     default:
       return injectedNote(`${block.type} block`)
   }
@@ -929,6 +947,7 @@ function PreviewBlock({ block, fill = false }) {
     case 'media':   return <PreviewMedia   block={block} fill={fill} />
     case 'quiz':    return <PreviewQuiz    block={block} />
     case 'hotspot': return <PreviewHotspot block={block} />
+    case 'callout': return <PreviewCallout block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
     case 'ivideo':  return <PreviewIVideo  block={block} fill={fill} />
@@ -1461,6 +1480,16 @@ function PreviewQuiz({ block }) {
       )}
     </div>
   )
+}
+
+// In-canvas callout preview — renders the EXACT overlay HTML the string path
+// (renderBlockToHTML) and the server (scorm12._callout_overlay_html) emit, via
+// dangerouslySetInnerHTML, so all three render byte-equivalent markup. Box +
+// connector line only; the target circle is an editor-only affordance, never here.
+// The outer FramePreview container is position:relative (it anchors WCN/audio too),
+// so the absolute/inset:0 overlay covers the whole content area.
+function PreviewCallout({ block }) {
+  return <div dangerouslySetInnerHTML={{ __html: buildCalloutOverlayHTML(block.data || {}) }} />
 }
 
 function PreviewHotspot({ block }) {

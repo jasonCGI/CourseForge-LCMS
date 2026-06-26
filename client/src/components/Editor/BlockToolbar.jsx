@@ -15,6 +15,7 @@ export const BLOCK_TYPES = [
   { type: 'oam',     label: 'OAM',     Icon: BLOCK_ICONS.oam,     color: '#533AB7', available: true  },
   { type: 'ivideo',  label: 'iVideo',  Icon: BLOCK_ICONS.ivideo,  color: '#7A3A9A', available: true  },
   { type: 'model3d', label: '3D Model', Icon: BLOCK_ICONS.model3d, color: '#2A5A8A', available: true  },
+  { type: 'callout', label: 'Callout', Icon: BLOCK_ICONS.callout, color: '#A8572B', available: true  },
   // GUI shells are applied at the PROJECT level (header ▣ Shell button), not per frame.
 ]
 
