@@ -358,12 +358,23 @@ def restore_project(data: dict) -> tuple[Project, list]:
             return content
 
     tm = data.get('text_mode')
+    # theme_id is a real FK to gui_themes — a cross-env import won't have that
+    # theme, so keep it only if it resolves (else fall back to the default theme,
+    # like a missing gui_shell). theme_overrides/forge_config are plain JSON.
+    theme_id = data.get('theme_id') or None
+    if theme_id:
+        from ..models.theme import GUITheme
+        if not GUITheme.query.get(theme_id):
+            theme_id = None
     project = Project(
         id=idmap.get(data.get('id')) or str(uuid.uuid4()),
         name=str(data['name']).strip(),
         description=str(data.get('description') or '').strip(),
         gui_shell_id=(data.get('gui_shell_id') or None),
         text_mode=(tm if tm in ('auto', 'light', 'dark') else 'auto'),
+        theme_id=theme_id,
+        theme_overrides=(data.get('theme_overrides') if isinstance(data.get('theme_overrides'), dict) else {}),
+        forge_config=(data.get('forge_config') if isinstance(data.get('forge_config'), dict) else {}),
     )
     db.session.add(project)
     for ci, c in enumerate(data.get('courses') or []):

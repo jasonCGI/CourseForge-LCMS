@@ -47,6 +47,12 @@ def export_project_json(project_id):
     # (vs the ForgeBlueprint authoring import, which rebuilds blocks and is lossy).
     payload['format'] = 'courseforge-project'
     payload['format_version'] = 1
+    # ProjectSchema omits these project-level styling columns — include them so the
+    # round-trip is truly lossless (forge_config = project-wide hotspot/OAM style,
+    # theme_overrides = theme tweaks, theme_id = library theme link).
+    payload['theme_overrides'] = project.theme_overrides or {}
+    payload['forge_config'] = project.forge_config or {}
+    payload['theme_id'] = project.theme_id
     body = json.dumps(payload, indent=2, ensure_ascii=False)
     slug = (re.sub(r'[^a-z0-9]+', '-', (project.name or 'course').lower()).strip('-')
             or 'course')

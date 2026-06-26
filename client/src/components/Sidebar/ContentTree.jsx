@@ -114,7 +114,7 @@ const LEVELS = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, note, completion, optional, dotStatus, itemId, tabIndex, onKeyDown,
+  frameType, note, optional, dotStatus, itemId, tabIndex, onKeyDown,
   onClick, onContextMenu, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
@@ -680,7 +680,6 @@ export default function ContentTree() {
                                     isFrame={true}
                                     isCurrent={frame.id === activeFrameId}
                                     note={!!(frame.notes && frame.notes.trim())}
-                                    completion={completionByFrame.get(frame.id)}
                                     optional={completionByFrame.get(frame.id) === 'optional'}
                                     dotStatus={completionByFrame.get(frame.id) === 'optional'
                                       ? (baseStatusByFrame.get(frame.id) || 'empty')
