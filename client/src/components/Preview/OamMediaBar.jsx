@@ -17,7 +17,7 @@ export default function OamMediaBar({ src, width = 800, height = 500, caption, h
   const stageRef  = useRef(null)
   const wrapRef   = useRef(null)
   const SW = Number(width)  || 800             // native stage dims (a legacy '100%' → fallback)
-  const SH = Number(height) || 600
+  const SH = Number(height) || 500
   const [stageH, setStageH] = useState(SH)
   const [st, setSt]   = useState(null)        // {t, duration, stops, playing}
   const [mode, setMode] = useState('pending') // 'pending' | 'protocol' | 'ticker' | 'none'

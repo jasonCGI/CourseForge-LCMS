@@ -116,6 +116,9 @@ SYSTEM_INSTRUCTION = (
     "- ALWAYS set human-meaningful fields: alt_text (required for images), caption, "
     "quiz question/choices/feedback, wcn text, callout text, hotspot region "
     "labels, menu labels/title, branch condition/labels.\n"
+    "- A 'callout' block's data needs `text`, plus `box:{x,y}` and `target:{x,y}` as "
+    "numbers 0-100 (percent coords), and `anchor` "
+    "('auto'|'top'|'bottom'|'left'|'right', default 'auto').\n"
     "- emit bounds: null; do not bake in a literal body-text color for shelled output.\n"
     "- Do NOT emit 'gui' blocks (project-level)."
 )

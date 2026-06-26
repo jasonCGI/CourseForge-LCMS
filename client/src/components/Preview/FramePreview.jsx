@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import OamMediaBar from './OamMediaBar'
 import Model3DViewer from './Model3DViewer'
@@ -489,18 +489,23 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, 
   const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, contentBg,
                                            shellTextMode, projectTextMode)
 
+  // Memoize frameData (mirrors PersistentPreviewPane): a fresh inline object every
+  // render would re-trigger GUIShellRenderer's injection effect on every parent
+  // render, re-injecting content and (pre-fix) leaking observers each time.
+  const frameData = useMemo(() => ({
+    frameIndex: human, totalFrames: total,
+    lessonTitle: 'Preview', sectionTitle: 'Preview',
+    frameTitle: frameName || 'Frame Preview',
+    prompt: framePrompt || frameName || '',
+    isFirst: human <= 1, isLast: human >= total,
+  }), [human, total, frameName, framePrompt])
+
   return (
     <div style={{ marginBottom: 16 }}>
       <GUIShellRenderer
         shellUrl={guiBlock.data.html_serve_url}
         frameHtml={frameHtml}
-        frameData={{
-          frameIndex: human, totalFrames: total,
-          lessonTitle: 'Preview', sectionTitle: 'Preview',
-          frameTitle: frameName || 'Frame Preview',
-          prompt: framePrompt || frameName || '',
-          isFirst: human <= 1, isLast: human >= total,
-        }}
+        frameData={frameData}
         onAction={(a) => setAction(a)}
         height={Math.round((guiBlock.data.stage_height || 768) * 0.6)}
       />
@@ -1808,7 +1813,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             background: S.boxBg, color: S.boxText,
             border: `${S.borderWidth} solid ${S.boxBorder}`, boxShadow: S.shadow,
             font: `700 18px/1.35 'Inter', system-ui, sans-serif`,
-            textAlign: 'center', whiteSpace: 'nowrap',
+            textAlign: 'center', whiteSpace: 'normal',
             cursor: active ? 'text' : 'move', outline: 'none', minWidth: 24,
           }}
         ></div>

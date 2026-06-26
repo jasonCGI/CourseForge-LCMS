@@ -1029,7 +1029,7 @@ def _callout_overlay_html(data):
     d = data or {}
     box = d.get('box') or {'x': 55, 'y': 60}
     target = d.get('target') or {'x': 32, 'y': 32}
-    padding = _f(d.get('padding', 20), 20.0)
+    padding = _f(d.get('padding', 10), 10.0)
     # Padding -> int-ish px string matching JS (`${padding}px`); _f gives a float so
     # use %g to drop a trailing .0 (20.0 -> '20').
     pad = '%g' % padding

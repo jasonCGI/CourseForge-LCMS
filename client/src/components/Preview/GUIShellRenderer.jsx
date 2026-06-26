@@ -26,6 +26,7 @@ export default function GUIShellRenderer({
     if (!loaded || !iframeRef.current) return
     const win = iframeRef.current.contentWindow
     if (!win || !win.fgui) return
+    let obs = null
     try {
       // Shell TITLE + PROMPT zones: authors size these boxes to the cap-height, so a
       // fixed border-box height + overflow:hidden clips glyph descenders (g,y,p,j).
@@ -76,7 +77,7 @@ export default function GUIShellRenderer({
       // re-assert whenever anything rewrites them, so our "idx / total" always wins.
       // The !== guard makes the re-assert idempotent (no observer feedback loop).
       try {
-        const obs = new win.MutationObserver(paintCounter)
+        obs = new win.MutationObserver(paintCounter)
         win.document.querySelectorAll('[data-zone-type="frame_counter"]').forEach(n =>
           obs.observe(n, { childList: true, characterData: true, subtree: true }))
       } catch (e) { /* no MutationObserver in this context */ }
@@ -89,6 +90,9 @@ export default function GUIShellRenderer({
     } catch (e) {
       console.warn('[GUIShellRenderer] inject error:', e)
     }
+    // Tear down THIS run's observer so stale observers (with stale desiredCounter
+    // values) can't pile up and fight the current one across frame navigation.
+    return () => { try { obs && obs.disconnect() } catch {} }
   }, [loaded, frameHtml, frameData])
 
   // Listen for shell button actions.

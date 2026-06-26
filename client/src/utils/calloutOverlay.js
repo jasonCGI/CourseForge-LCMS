@@ -99,7 +99,7 @@ export function buildCalloutOverlayHTML(data) {
   const d = data || {}
   const box = d.box || { x: 55, y: 60 }
   const target = d.target || { x: 32, y: 32 }
-  const padding = (d.padding == null ? 20 : Number(d.padding)) || 0
+  const padding = (d.padding == null ? 10 : Number(d.padding)) || 0
   const text = d.text == null ? 'Callout' : d.text
   const anchor = d.anchor == null ? 'auto' : d.anchor
   const S = CALLOUT_STYLE
