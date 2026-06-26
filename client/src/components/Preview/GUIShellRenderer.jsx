@@ -42,6 +42,11 @@ export default function GUIShellRenderer({
             + '[data-zone-type="section_title"],[data-zone-type="prompt"],'
             + '[data-zone-type="frame_counter"]'
             + '{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}'
+            // The counter zone is a fixed-width, text-align:left box (e.g. 150px @
+            // 32px). "1 / 20" fits, but a two-digit current ("11 / 20", "20 / 20")
+            // wraps/clips the second token -> the total looked "missing" from the
+            // assessment frames down. Force one line and let the box size to its text.
+            + '[data-zone-type="frame_counter"]{white-space:nowrap!important;width:auto!important;min-width:max-content!important}'
           ;(doc.head || doc.documentElement).appendChild(st)
         }
       } catch (e) { /* cross-origin / torn down */ }

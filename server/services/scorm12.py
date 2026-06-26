@@ -2725,7 +2725,10 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],' +
     '[data-zone-type="section_title"],[data-zone-type="prompt"],' +
     '[data-zone-type="frame_counter"]' +
-    '{{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}}';
+    '{{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}}' +
+    // Fixed-width text-align:left counter box clips/wraps the second token once
+    // the current frame is two digits ("11 / 20"). One line + size-to-content.
+    '[data-zone-type="frame_counter"]{{white-space:nowrap!important;width:auto!important;min-width:max-content!important}}';
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);
