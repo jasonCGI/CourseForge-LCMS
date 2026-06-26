@@ -1605,6 +1605,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
   const boxRef   = useRef(null)
   const drag     = useRef(null)            // { mode:'box'|'target', dx, dy }
   const [live, setLive] = useState(null)   // { box:{x,y}, target:{x,y} } while dragging
+  const [hover, setHover] = useState(false)
 
   const data    = block.data || {}
   const box     = (live && live.box)    || data.box    || { x: 55, y: 60 }
@@ -1687,7 +1688,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
       <svg viewBox="0 0 100 100" preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
         <line x1={bx} y1={by} x2={tx} y2={ty}
-          stroke={S.line} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+          stroke={S.line} strokeWidth={S.lineWidth} vectorEffect="non-scaling-stroke" />
       </svg>
 
       {/* Target handle — EDITOR-ONLY affordance (never published). Shown on the
@@ -1712,13 +1713,33 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           publishes. */}
       <div
         onMouseDown={startDrag('box', box)}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        title="Drag to reposition · click to edit text"
         style={{
           position: 'absolute', left: `${bx}%`, top: `${by}%`,
           transform: 'translate(-50%, -50%)',
           maxWidth: '46%', cursor: 'move', pointerEvents: 'auto', zIndex: 6,
-          outline: active ? '2px solid var(--forge-amber)' : '2px solid transparent',
+          outline: active
+            ? '2px solid var(--forge-amber)'
+            : `2px dashed color-mix(in srgb, var(--forge-amber) ${hover ? 85 : 45}%, transparent)`,
           outlineOffset: 3, borderRadius: S.radius,
         }}>
+        {/* Drag-handle cue — makes it obvious the box is movable. Editor-only,
+            shown on hover or when selected; never part of the published overlay. */}
+        {(hover || active) && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', top: -11, left: -11, width: 20, height: 20,
+            borderRadius: '50%', background: 'var(--forge-amber)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'none', zIndex: 8,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff"
+              strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+            </svg>
+          </div>
+        )}
         <div
           ref={boxRef}
           contentEditable={active}
@@ -1730,7 +1751,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             display: 'inline-block', boxSizing: 'border-box',
             padding: `${padding}px`, borderRadius: S.radius,
             background: S.boxBg, color: S.boxText,
-            border: `1px solid ${S.boxBorder}`, boxShadow: S.shadow,
+            border: `${S.borderWidth} solid ${S.boxBorder}`, boxShadow: S.shadow,
             font: `600 14px/1.35 'Inter', system-ui, sans-serif`,
             textAlign: 'center', whiteSpace: 'nowrap',
             cursor: active ? 'text' : 'move', outline: 'none', minWidth: 24,

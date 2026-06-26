@@ -957,6 +957,8 @@ _CALLOUT_BOX_BORDER = '#A8572B'
 _CALLOUT_LINE       = '#A8572B'
 _CALLOUT_SHADOW     = '0 2px 10px rgba(0,0,0,0.22)'
 _CALLOUT_RADIUS     = '8px'
+_CALLOUT_LINE_WIDTH   = '4'      # connector stroke px (non-scaling)
+_CALLOUT_BORDER_WIDTH = '4px'    # box ("label") border px
 
 
 def _callout_pc(value):
@@ -1002,13 +1004,13 @@ def _callout_overlay_html(data):
         'style="position:absolute;inset:0;width:100%;height:100%;'
         'pointer-events:none;overflow:visible">'
         f'<line x1="{bx}" y1="{by}" x2="{tx}" y2="{ty}" '
-        f'stroke="{_CALLOUT_LINE}" stroke-width="0.5" vector-effect="non-scaling-stroke" /></svg>'
+        f'stroke="{_CALLOUT_LINE}" stroke-width="{_CALLOUT_LINE_WIDTH}" vector-effect="non-scaling-stroke" /></svg>'
     )
     box_html = (
         f'<div style="position:absolute;left:{bx}%;top:{by}%;'
         'transform:translate(-50%,-50%);max-width:46%;box-sizing:border-box;'
         f'padding:{pad}px;border-radius:{_CALLOUT_RADIUS};background:{_CALLOUT_BOX_BG};'
-        f'color:{_CALLOUT_BOX_TEXT};border:1px solid {_CALLOUT_BOX_BORDER};box-shadow:{_CALLOUT_SHADOW};'
+        f'color:{_CALLOUT_BOX_TEXT};border:{_CALLOUT_BORDER_WIDTH} solid {_CALLOUT_BOX_BORDER};box-shadow:{_CALLOUT_SHADOW};'
         "font:600 14px/1.35 'Inter',system-ui,sans-serif;text-align:center\">"
         f'{esc(text)}</div>'
     )

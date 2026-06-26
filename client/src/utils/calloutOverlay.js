@@ -19,12 +19,14 @@
 // of this overlay.
 
 export const CALLOUT_STYLE = {
-  boxBg:     '#ffffff',
-  boxText:   '#1a2a3a',
-  boxBorder: '#A8572B',
-  line:      '#A8572B',
-  shadow:    '0 2px 10px rgba(0,0,0,0.22)',
-  radius:    '8px',
+  boxBg:       '#ffffff',
+  boxText:     '#1a2a3a',
+  boxBorder:   '#A8572B',
+  line:        '#A8572B',
+  shadow:      '0 2px 10px rgba(0,0,0,0.22)',
+  radius:      '8px',
+  lineWidth:   '4',      // connector stroke px (non-scaling)
+  borderWidth: '4px',    // box ("label") border px
 }
 
 // Escape text for safe insertion into HTML (mirrors the server's esc()).
@@ -61,13 +63,13 @@ export function buildCalloutOverlayHTML(data) {
     `<svg viewBox="0 0 100 100" preserveAspectRatio="none" `
     + `style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">`
     + `<line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" `
-    + `stroke="${S.line}" stroke-width="0.5" vector-effect="non-scaling-stroke" /></svg>`
+    + `stroke="${S.line}" stroke-width="${S.lineWidth}" vector-effect="non-scaling-stroke" /></svg>`
 
   const boxHTML =
     `<div style="position:absolute;left:${bx}%;top:${by}%;`
     + `transform:translate(-50%,-50%);max-width:46%;box-sizing:border-box;`
     + `padding:${padding}px;border-radius:${S.radius};background:${S.boxBg};`
-    + `color:${S.boxText};border:1px solid ${S.boxBorder};box-shadow:${S.shadow};`
+    + `color:${S.boxText};border:${S.borderWidth} solid ${S.boxBorder};box-shadow:${S.shadow};`
     + `font:600 14px/1.35 'Inter',system-ui,sans-serif;text-align:center">`
     + `${esc(text)}</div>`
 
