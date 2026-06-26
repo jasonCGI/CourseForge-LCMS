@@ -6,11 +6,18 @@
  *  'incomplete' — a block is missing required data (errors, not warnings)
  *  'complete'   — all good
  */
-export function getFrameCompletion(frame) {
-  if (frame?.optional) return 'optional'
+// Real authoring status, ignoring the optional flag. The tree shows this in the
+// status dot even for optional frames (optional is surfaced as a separate OPT
+// chip), so a optional-but-unfinished frame still reads as incomplete/empty.
+export function getFrameBaseStatus(frame) {
   const blocks = frame?.content?.blocks || []
   if (blocks.length === 0) return 'empty'
   return getFrameIssues(frame).some(i => i.severity !== 'warning') ? 'incomplete' : 'complete'
+}
+
+export function getFrameCompletion(frame) {
+  if (frame?.optional) return 'optional'
+  return getFrameBaseStatus(frame)
 }
 
 export function getFrameIssues(frame) {

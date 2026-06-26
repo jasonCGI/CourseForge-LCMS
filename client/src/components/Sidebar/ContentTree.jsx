@@ -11,7 +11,7 @@ import useEditorStore  from '../../store/editorStore'
 import { duplicateFrame, createFrame, reorder } from '../../api/client'
 import TemplateLibrary from '../UI/TemplateLibrary'
 import InspectorViewControls from '../Editor/InspectorViewControls'
-import { getFrameCompletion } from '../../utils/frameCompletion'
+import { getFrameCompletion, getFrameBaseStatus } from '../../utils/frameCompletion'
 
 const byOrder = (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
 
@@ -114,7 +114,7 @@ const LEVELS = {
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
-  frameType, note, completion, itemId, tabIndex, onKeyDown,
+  frameType, note, completion, optional, dotStatus, itemId, tabIndex, onKeyDown,
   onClick, onContextMenu, children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
@@ -153,14 +153,13 @@ function TreeRow({
         aria-expanded={!isFrame ? isOpen : undefined}
         aria-selected={isFrame ? (isCurrent ? 'true' : 'false') : undefined}
         aria-current={isCurrent ? 'true' : undefined}
-        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${completion === 'optional' ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
+        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
         tabIndex={tabIndex != null ? tabIndex : 0}
         onClick={onClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown || (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } })}
         title={label}
-        style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none',
-          opacity: completion === 'optional' ? 0.6 : 1 }}
+        style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer', outline: 'none' }}
         className="cf-tree-row"
       >
         {/* Level tab */}
@@ -188,17 +187,24 @@ function TreeRow({
             {isFrame ? '' : isOpen ? '▾' : '▸'}
           </span>
 
-          {/* Completion dot (frames only) */}
-          {isFrame && completion && COMPLETION_DOT[completion] && (
-            <span title={COMPLETION_DOT[completion].title} aria-hidden="true"
+          {/* OPT chip — sits LEFT of the status dot. "optional" is an orthogonal
+              axis from completion, so it gets its own channel and the dot below
+              keeps showing the real authoring status. */}
+          {isFrame && optional && (
+            <span aria-hidden="true" title={COMPLETION_DOT.optional.title}
+              style={{ flexShrink: 0, fontFamily: 'var(--cf-mono, ui-monospace, monospace)',
+                fontSize: 8, fontWeight: 700, lineHeight: 1, letterSpacing: '0.04em',
+                color: COMPLETION_DOT.optional.color,
+                border: `1px solid ${COMPLETION_DOT.optional.color}`,
+                borderRadius: 3, padding: '1.5px 3px', background: 'transparent' }}>OPT</span>
+          )}
+
+          {/* Completion dot (frames only) — always the real status, even when optional */}
+          {isFrame && dotStatus && COMPLETION_DOT[dotStatus] && (
+            <span title={COMPLETION_DOT[dotStatus].title} aria-hidden="true"
               style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                 display: 'inline-block', boxSizing: 'border-box',
-                // Optional reads as a HOLLOW ring ("not counted") — distinct from the
-                // filled status dots and legible at this size (a strikethrough / X
-                // muddies at 6-7px).
-                ...(completion === 'optional'
-                  ? { background: 'transparent', border: `1.5px solid ${COMPLETION_DOT[completion].color}` }
-                  : { background: COMPLETION_DOT[completion].color }) }} />
+                background: COMPLETION_DOT[dotStatus].color }} />
           )}
 
           {/* Glyph — folder for hierarchy, play for frame */}
@@ -408,6 +414,19 @@ export default function ContentTree() {
         for (const l of (m.lessons || []))
           for (const f of (l.frames || []))
             map.set(f.id, getFrameCompletion(f))
+    return map
+  }, [activeProject])
+
+  // Real authoring status for optional frames (complete/incomplete/empty), so the
+  // status dot stays meaningful while the OPT chip carries the optional flag.
+  // Only optional frames differ from completionByFrame, so store just those.
+  const baseStatusByFrame = useMemo(() => {
+    const map = new Map()
+    for (const c of (activeProject?.courses || []))
+      for (const m of (c.modules || []))
+        for (const l of (m.lessons || []))
+          for (const f of (l.frames || []))
+            if (f.optional) map.set(f.id, getFrameBaseStatus(f))
     return map
   }, [activeProject])
 
@@ -662,6 +681,10 @@ export default function ContentTree() {
                                     isCurrent={frame.id === activeFrameId}
                                     note={!!(frame.notes && frame.notes.trim())}
                                     completion={completionByFrame.get(frame.id)}
+                                    optional={completionByFrame.get(frame.id) === 'optional'}
+                                    dotStatus={completionByFrame.get(frame.id) === 'optional'
+                                      ? (baseStatusByFrame.get(frame.id) || 'empty')
+                                      : completionByFrame.get(frame.id)}
                                     itemId={frame.id}
                                     tabIndex={rovingTab(frame.id)}
                                     onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}
