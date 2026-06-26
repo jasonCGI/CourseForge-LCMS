@@ -128,6 +128,15 @@ def _audio(label='Course Audio', caption='', dock='inline'):
         'dock': dock, 'serve_url': _silent_wav_datauri(),
         'original_name': label.lower().replace(' ', '_') + '.mp3'}}
 
+def _callout(text='Callout', box=None, target=None, padding=10):
+    # Free-floating annotation overlay: rounded box (center text, uniform padding,
+    # auto-width) + a connector line to a target point. box/target are normalized
+    # 0-100 (% of the content area); box is the box CENTER. Auxiliary — it overlays
+    # the content area and never consumes a layout zone.
+    return {'id': str(uuid.uuid4()), 'type': 'callout', 'data': {
+        'text': text, 'box': box or {'x': 55, 'y': 60},
+        'target': target or {'x': 32, 'y': 32}, 'padding': padding}}
+
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
           feedback_incorrect='Not quite — review and try again.'):
     return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
@@ -280,6 +289,19 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         )),
         _image(label='Default view', color='#185FA5', icon='🖼',
                caption='Click a term on the left to swap this image'),
+    ]},
+    {'name': 'Image with Callout Labels', 'frame_type': 'content', 'lesson': 'Content Blocks',
+     'layout': 'full', 'blocks': [
+        # A still image fills the content area; callout overlays annotate parts of it.
+        # Callouts are AUXILIARY (they never consume a layout zone), so they coexist
+        # with the full-bleed image. Position/aim them by dragging in the live
+        # preview; the panel sets only text + uniform padding. _wire_demo_assets()
+        # swaps the placeholder graphic for the real bundled demo image after a reset.
+        _image(label='Latte with foam art', color='#185FA5', icon='🖼', fill=True,
+               caption='Drag each callout box and its round target handle to annotate the image'),
+        _callout(text='Foam art',     box={'x': 70, 'y': 22}, target={'x': 50, 'y': 44}),
+        _callout(text='Ceramic cup',  box={'x': 24, 'y': 74}, target={'x': 44, 'y': 64}),
+        _callout(text='Espresso base', box={'x': 78, 'y': 78}, target={'x': 56, 'y': 60}),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Video fills the entire content area (cover fit), shown as-sent-in (no
@@ -554,6 +576,11 @@ def _wire_demo_assets(project):
         for b in blocks:
             d = b.get('data', {}); t = b.get('type')
             if fr.name == 'Image Block' and t == 'media' and d.get('kind') == 'image':
+                d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
+                         original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
+            elif fr.name == 'Image with Callout Labels' and t == 'media' and d.get('kind') == 'image':
+                # The annotated still — the same bundled latte image the Image Block
+                # uses; the callout overlays self-position over it.
                 d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
                          original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
             elif fr.name.startswith('Image Swap') and t == 'media' and d.get('kind') == 'image':

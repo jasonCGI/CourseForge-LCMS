@@ -7,7 +7,7 @@ import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba } from '../../utils/hotspotStyle'
-import { buildCalloutOverlayHTML } from '../../utils/calloutOverlay'
+import { buildCalloutOverlayHTML, CALLOUT_STYLE } from '../../utils/calloutOverlay'
 import { clampBounds } from '../Editor/blocks/BoundsControl'
 import { Play, Pause } from '../icons'
 
@@ -199,7 +199,11 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           editor-only affordance and is NOT rendered here. The overlay layer is
           absolute/inset:0 and anchors to this outer position:relative container,
           mirroring scorm12's aux callout overlay. */}
-      {callouts.map(b => <PreviewCallout key={b.id} block={b} />)}
+      {callouts.map(b => (
+        <PreviewCallout key={b.id} block={b}
+          interactive={!!onBlockSelect} active={b.id === activeBlockId}
+          onSelect={onBlockSelect} updateBlock={updateBlock} />
+      ))}
       {/* WCN recall bar — persistent re-open icons, lower-left of the content area. */}
       <WCNRecallBar wcnBlocks={blocks.filter(b => b.type === 'wcn')} />
     </div>
@@ -1482,14 +1486,179 @@ function PreviewQuiz({ block }) {
   )
 }
 
-// In-canvas callout preview — renders the EXACT overlay HTML the string path
-// (renderBlockToHTML) and the server (scorm12._callout_overlay_html) emit, via
-// dangerouslySetInnerHTML, so all three render byte-equivalent markup. Box +
-// connector line only; the target circle is an editor-only affordance, never here.
-// The outer FramePreview container is position:relative (it anchors WCN/audio too),
-// so the absolute/inset:0 overlay covers the whole content area.
-function PreviewCallout({ block }) {
-  return <div dangerouslySetInnerHTML={{ __html: buildCalloutOverlayHTML(block.data || {}) }} />
+// In-canvas callout overlay.
+//
+// Two modes, gated by `interactive` (true ONLY in the editor's live preview, i.e.
+// when FramePreview was handed an onBlockSelect handler):
+//
+//   • interactive=false → STATIC render. Emits the EXACT overlay HTML the string
+//     path (renderBlockToHTML) and the server (scorm12._callout_overlay_html) emit,
+//     via dangerouslySetInnerHTML, so read-only previews / shelled string renders /
+//     the published SCO all match byte-for-byte (box + connector line only, NO
+//     target handle, NO drag, NO contentEditable).
+//
+//   • interactive=true → EDITABLE overlay. The box is draggable (box.x/y = CENTER),
+//     clicking it selects the block; when selected, a small round TARGET handle (an
+//     editor-only affordance, never published) aims the connector line and the box
+//     text is contentEditable with live width reflow honoring the padding. Geometry
+//     is identical to the static overlay (line box-center→target, opaque box covers
+//     the segment beneath it) and the box style is CALLOUT_STYLE, so what you edit
+//     matches what publishes.
+//
+// The overlay layer is absolute/inset:0 and anchors to the outer FramePreview
+// position:relative container (which also anchors WCN/audio).
+function PreviewCallout({ block, interactive = false, active = false, onSelect = null, updateBlock = null }) {
+  if (!interactive) {
+    return <div dangerouslySetInnerHTML={{ __html: buildCalloutOverlayHTML(block.data || {}) }} />
+  }
+  return <InteractiveCallout block={block} active={active} onSelect={onSelect} updateBlock={updateBlock} />
+}
+
+const _clampPc = v => Math.max(0, Math.min(100, v))
+const _r1 = n => Math.round(n * 10) / 10
+
+// Editor-only interactive callout overlay (see PreviewCallout). Drag the box to
+// move (box CENTER), drag the round target handle to aim the line, edit the text
+// inline. Coordinates are normalized 0-100 of the overlay layer (the content area).
+function InteractiveCallout({ block, active, onSelect, updateBlock }) {
+  const layerRef = useRef(null)
+  const boxRef   = useRef(null)
+  const drag     = useRef(null)            // { mode:'box'|'target', dx, dy }
+  const [live, setLive] = useState(null)   // { box:{x,y}, target:{x,y} } while dragging
+
+  const data    = block.data || {}
+  const box     = (live && live.box)    || data.box    || { x: 55, y: 60 }
+  const target  = (live && live.target) || data.target || { x: 32, y: 32 }
+  const text    = data.text != null ? data.text : 'Callout'
+  const padding = data.padding != null ? Number(data.padding) : 10
+  const S = CALLOUT_STYLE
+
+  // Keep the contentEditable box in sync with external text changes (panel input),
+  // but never clobber the caret while the author is typing in the box itself.
+  useEffect(() => {
+    if (boxRef.current && document.activeElement !== boxRef.current
+        && boxRef.current.textContent !== text) {
+      boxRef.current.textContent = text
+    }
+  }, [text])
+
+  const relPos = e => {
+    const r = layerRef.current.getBoundingClientRect()
+    return {
+      x: _clampPc(((e.clientX - r.left) / r.width) * 100),
+      y: _clampPc(((e.clientY - r.top) / r.height) * 100),
+    }
+  }
+
+  const startDrag = (mode, anchor) => e => {
+    e.stopPropagation(); e.preventDefault()
+    if (onSelect) onSelect(block.id)
+    const p = relPos(e)
+    drag.current = { mode, dx: p.x - anchor.x, dy: p.y - anchor.y }
+    setLive({ box: { ...box }, target: { ...target } })
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const onMove = e => {
+    const d = drag.current
+    if (!d) return
+    const p = relPos(e)
+    const nx = _r1(_clampPc(p.x - d.dx))
+    const ny = _r1(_clampPc(p.y - d.dy))
+    setLive(prev => {
+      const base = prev || { box: { ...box }, target: { ...target } }
+      return d.mode === 'box'
+        ? { ...base, box: { x: nx, y: ny } }
+        : { ...base, target: { x: nx, y: ny } }
+    })
+  }
+
+  // Read the freshest live value off the setter (avoids a stale `live` closure).
+  const onUp = () => {
+    const d = drag.current
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    if (d) {
+      setLive(cur => {
+        if (cur && updateBlock) {
+          updateBlock(block.id, d.mode === 'box' ? { box: cur.box } : { target: cur.target })
+        }
+        return null
+      })
+    }
+    drag.current = null
+  }
+
+  const commitBoxText = () => {
+    const t = (boxRef.current?.textContent || '').replace(/\s+/g, ' ').trim()
+    if (t !== text && updateBlock) updateBlock(block.id, { text: t })
+  }
+
+  const bx = _r1(_clampPc(box.x)), by = _r1(_clampPc(box.y))
+  const tx = _r1(_clampPc(target.x)), ty = _r1(_clampPc(target.y))
+
+  return (
+    <div ref={layerRef} className="cf-callout-overlay"
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5, userSelect: 'none' }}>
+      {/* Connector line: box CENTER → target. The opaque box (below) covers the
+          portion under it, so the line emerges from the box edge — same geometry
+          as the static overlay (buildCalloutOverlayHTML). */}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+        <line x1={bx} y1={by} x2={tx} y2={ty}
+          stroke={S.line} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+
+      {/* Target handle — EDITOR-ONLY affordance (never published). Shown on the
+          selected callout; drag to aim the connector line. */}
+      {active && (
+        <div
+          onMouseDown={startDrag('target', target)}
+          title="Target — drag to aim the connector line"
+          style={{
+            position: 'absolute', left: `${tx}%`, top: `${ty}%`,
+            width: 16, height: 16, marginLeft: -8, marginTop: -8,
+            borderRadius: '50%', background: S.line,
+            border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
+            cursor: 'move', pointerEvents: 'auto', zIndex: 7,
+          }}
+        />
+      )}
+
+      {/* Box — drag to move (box.x/y = CENTER), click to select. Inline-editable
+          when selected, with LIVE width reflow (inline-block auto-width honoring
+          the per-block padding). Visual style === CALLOUT_STYLE so it matches what
+          publishes. */}
+      <div
+        onMouseDown={startDrag('box', box)}
+        style={{
+          position: 'absolute', left: `${bx}%`, top: `${by}%`,
+          transform: 'translate(-50%, -50%)',
+          maxWidth: '46%', cursor: 'move', pointerEvents: 'auto', zIndex: 6,
+          outline: active ? '2px solid var(--forge-amber)' : '2px solid transparent',
+          outlineOffset: 3, borderRadius: S.radius,
+        }}>
+        <div
+          ref={boxRef}
+          contentEditable={active}
+          suppressContentEditableWarning
+          onMouseDown={e => { if (active) e.stopPropagation() }}  /* let the caret land; don't drag */
+          onBlur={commitBoxText}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); boxRef.current.blur() } }}
+          style={{
+            display: 'inline-block', boxSizing: 'border-box',
+            padding: `${padding}px`, borderRadius: S.radius,
+            background: S.boxBg, color: S.boxText,
+            border: `1px solid ${S.boxBorder}`, boxShadow: S.shadow,
+            font: `600 14px/1.35 'Inter', system-ui, sans-serif`,
+            textAlign: 'center', whiteSpace: 'nowrap',
+            cursor: active ? 'text' : 'move', outline: 'none', minWidth: 24,
+          }}
+        >{text}</div>
+      </div>
+    </div>
+  )
 }
 
 function PreviewHotspot({ block }) {

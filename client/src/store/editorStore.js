@@ -453,7 +453,7 @@ function _makeBlock(type) {
     // (typically over a still image). box/target are normalized 0-100 (% of the
     // content area), box is the box CENTER (so width changes never shift it). It's
     // AUXILIARY (an overlay, never a zone-filler) — see AUXILIARY_TYPES below.
-    callout: { text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 20 },
+    callout: { text: 'Callout', box: { x: 55, y: 60 }, target: { x: 32, y: 32 }, padding: 10 },
   }
   return { id, type, data: defaults[type] || {} }
 }
