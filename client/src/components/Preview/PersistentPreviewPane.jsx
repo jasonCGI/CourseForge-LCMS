@@ -229,7 +229,7 @@ function ShellFit({ stage, children, contentArea, overlay }) {
   }, [sw, sh])
   const scale = box ? box.w / sw : 1
   return (
-    <div ref={ref} style={{ flex: 1, overflow: 'hidden', background: '#000',
+    <div ref={ref} style={{ flex: 1, overflow: 'hidden', background: '#000', position: 'relative',
       display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div style={{ position: 'relative', width: box ? box.w : '100%', height: box ? box.h : '100%', flexShrink: 0 }}>
         {children}
@@ -257,6 +257,19 @@ function ShellFit({ stage, children, contentArea, overlay }) {
           </div>
         )}
       </div>
+      {/* Scale readout: shows the preview's current scale vs the shell's native
+          size, so 100% = pixel-for-pixel (any fringing/softness below 100% is just
+          scaling, not a real artifact). Green at 1:1. */}
+      {box && (
+        <div aria-hidden="true"
+          title="Preview scale vs the shell's native size — 100% is pixel-for-pixel"
+          style={{ position: 'absolute', top: 6, right: 8, zIndex: 50, pointerEvents: 'none',
+            background: 'rgba(0,0,0,0.6)', color: scale >= 0.999 ? '#7CFFB0' : '#C8D8E8',
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: '0.04em',
+            padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.18)' }}>
+          {Math.round(scale * 100)}%
+        </div>
+      )}
     </div>
   )
 }

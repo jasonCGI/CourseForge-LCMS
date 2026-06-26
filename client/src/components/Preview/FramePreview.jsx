@@ -1790,12 +1790,12 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             onMouseDown={startDrag('box', box)}
             title="Drag to reposition"
             style={{
-            position: 'absolute', top: -11, left: -11, width: 20, height: 20,
+            position: 'absolute', top: -16, left: -16, width: 32, height: 32,
             borderRadius: '50%', background: 'var(--forge-amber)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'auto', cursor: 'move', zIndex: 8,
           }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff"
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff"
               strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
             </svg>
