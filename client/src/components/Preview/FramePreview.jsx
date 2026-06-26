@@ -688,11 +688,13 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
 }
 
 // Luminance-aware shelled body text — the JS mirror of scorm12.shell_text_style.
-// When the shell sets a KNOWN OPAQUE content-area bg_color, pick a SOLID text
-// color by that bg's YIQ luminance (light bg -> dark navy, dark bg -> light blue)
-// with NO halo. Transparent / unset / unparseable / alpha<1 -> light blue + a
-// dark text-shadow halo (the universal fallback; the common transparent-over-art
-// shell). Guarded so a malformed bg_color always falls back to the halo path.
+// When the shell sets a KNOWN OPAQUE content-area bg_color, pick the brand text
+// color (navy / light blue) with the BEST WCAG contrast against that bg, dropping
+// the halo only when that contrast reaches AA (>=4.5:1) for crisp solid text; for
+// mid-gray backgrounds where neither solid color hits AA, the halo is KEPT so the
+// dark outline carries legibility. Transparent / unset / unparseable / alpha<1 ->
+// light blue + the dark halo (the universal fallback; the common transparent-over-
+// art shell). Guarded so a malformed bg_color always falls back to the halo path.
 const SHELL_TEXT_LIGHT = '#C8D8E8'   // light glyphs for a DARK bg (default)
 const SHELL_TEXT_DARK  = '#042C53'   // brand navy for a LIGHT bg
 const SHELL_HALO = 'text-shadow:0 1px 2px rgba(0,0,0,0.85),0 0 2px rgba(0,0,0,0.7);'
