@@ -145,6 +145,55 @@ def _parse_opaque_rgb(bg_color):
         return None
 
 
+# Pull the `#fgui-content { ... }` rule body out of a stored shell's HTML/CSS so
+# we can read the content area's OWN background. The shell builder emits this rule
+# in a <style> block (forgegui/services/shell_builder.py); authors may also hand-
+# author it. Non-greedy to the first '}', case-insensitive, dotall for multiline.
+_FGUI_CONTENT_RULE_RE = re.compile(r'#fgui-content\s*\{([^}]*)\}', re.IGNORECASE | re.DOTALL)
+# Within that rule, the `background:`/`background-color:` value up to the ';'/'}'.
+# `background` (shorthand) is checked first since the builder uses it; a value that
+# contains url(...)/gradient(...) is rejected by _parse_opaque_rgb (image/gradient
+# -> None -> halo fallback), so the shorthand is safe to read here.
+_FGUI_BG_RE = re.compile(
+    r'background(?:-color)?\s*:\s*([^;}]+)', re.IGNORECASE)
+
+
+def derive_fgui_content_bg(shell_html):
+    """Parse a SOLID OPAQUE `#fgui-content` background color out of a stored shell's
+    HTML/CSS, for use as the content_bg luminance input when the shell config did
+    NOT set content_area.bg_color. Returns the color STRING (e.g. '#f4f6fa' or
+    'rgb(20,24,32)') only when `#fgui-content`'s background is a solid opaque color;
+    returns None for transparent / image / gradient / unparseable / missing (those
+    keep the existing #C8D8E8 + halo fallback). Never raises."""
+    try:
+        if not shell_html:
+            return None
+        m = _FGUI_CONTENT_RULE_RE.search(shell_html)
+        if not m:
+            return None
+        # Last background declaration wins (CSS cascade within one rule).
+        val = None
+        for bm in _FGUI_BG_RE.finditer(m.group(1)):
+            val = bm.group(1).strip()
+        if not val:
+            return None
+        # Only keep it if it parses as a solid opaque color (rejects transparent,
+        # url(...) images, gradients, alpha<1) — exactly the halo-fallback boundary.
+        return val if _parse_opaque_rgb(val) is not None else None
+    except Exception:
+        return None
+
+
+def _resolve_content_bg(content_bg, shell_html):
+    """content_bg precedence: an explicit (opaque) shell_config.content_area.bg_color
+    wins; otherwise DERIVE the solid `#fgui-content` background from the shell HTML.
+    Returns whatever should feed shell_text_style — a solid color or None (None ->
+    the #C8D8E8 + halo fallback for transparent/image/gradient content areas)."""
+    if _parse_opaque_rgb(content_bg) is not None:
+        return content_bg
+    return derive_fgui_content_bg(shell_html)
+
+
 # Brand text colors as RGB, for the WCAG-contrast pick below.
 _SHELL_TEXT_DARK_RGB  = (4, 44, 83)      # #042C53
 _SHELL_TEXT_LIGHT_RGB = (200, 216, 232)  # #C8D8E8
@@ -2321,7 +2370,13 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         content_bg = (cfg.get('content_area') or {}).get('bg_color')
     except Exception:
         content_bg = None
-    html = _patch_shell(html_path.read_text(encoding='utf-8'), asset_id, injected_html,
+    shell_html = html_path.read_text(encoding='utf-8')
+    # When the config left bg_color unset/transparent, derive the content area's
+    # OWN solid background from the shell HTML's #fgui-content rule so the
+    # luminance pick runs (light area -> dark text). Image/gradient/transparent
+    # -> None -> the #C8D8E8 + halo fallback is preserved.
+    content_bg = _resolve_content_bg(content_bg, shell_html)
+    html = _patch_shell(shell_html, asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total, content_bg=content_bg)
     return html, asset_id
@@ -2358,7 +2413,13 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
         content_bg = (cfg.get('content_area') or {}).get('bg_color')
     except Exception:
         content_bg = None
-    html = _patch_shell(_read_text_cached(str(html_path)), shell.id, injected_html,
+    shell_html = _read_text_cached(str(html_path))
+    # When the config left bg_color unset/transparent, derive the content area's
+    # OWN solid background from the shell HTML's #fgui-content rule so the
+    # luminance pick runs (light area -> dark text). Image/gradient/transparent
+    # -> None -> the #C8D8E8 + halo fallback is preserved.
+    content_bg = _resolve_content_bg(content_bg, shell_html)
+    html = _patch_shell(shell_html, shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total, content_bg=content_bg)
     return html, shell.id

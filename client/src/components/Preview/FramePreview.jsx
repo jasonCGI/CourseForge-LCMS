@@ -428,6 +428,27 @@ function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children
 function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, frameLayout }) {
   const [action, setAction] = useState(null)
 
+  // content-area bg -> luminance-aware injected body text (mirrors the server's
+  // _patch_shell / _resolve_content_bg). An explicit opaque shell-config bg wins;
+  // when it's null/transparent, derive the solid #fgui-content bg from the stored
+  // shell HTML so the luminance pick runs (light area -> dark text). Image/
+  // gradient/transparent shells stay null -> the #C8D8E8 + halo fallback.
+  const configBg = guiBlock.data.content_bg_color
+  const [derivedBg, setDerivedBg] = useState(null)
+  const shellHtmlUrl = guiBlock.data.html_serve_url
+  useEffect(() => {
+    setDerivedBg(null)
+    // Skip the fetch when config already gives an opaque color (it wins anyway).
+    if (parseOpaqueRgb(configBg) !== null || !shellHtmlUrl) return
+    let live = true
+    fetch(shellHtmlUrl)
+      .then(r => (r.ok ? r.text() : null))
+      .then(html => { if (live && html) setDerivedBg(parseFguiContentBg(html)) })
+      .catch(() => { if (live) setDerivedBg(null) })
+    return () => { live = false }
+  }, [configBg, shellHtmlUrl])
+  const contentBg = resolveContentBg(configBg, null) ?? derivedBg
+
   // Resolve this frame's real 1-based position / total within the project's
   // ordered frame list so the shell pager reads "N / total" instead of "1 / 1".
   // Copies PersistentPreviewPane's proven computation EXACTLY: the same source
@@ -460,7 +481,7 @@ function PreviewGUI({ guiBlock, contentBlocks, frameName, framePrompt, frameId, 
   // overlap, no floating). frameLayout() builds the same .cf-layout-zones structure
   // the server emits, with inline styles (the live shell iframe runs the stored
   // shell's CSS, not the server's _patch_shell rules).
-  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, guiBlock.data.content_bg_color)
+  const frameHtml = buildShelledLayoutHTML(contentBlocks || [], frameLayout, contentBg)
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -721,7 +742,7 @@ const SHELL_TEXT_LIGHT = '#C8D8E8'   // light glyphs for a DARK bg (default)
 const SHELL_TEXT_DARK  = '#042C53'   // brand navy for a LIGHT bg
 const SHELL_HALO = 'text-shadow:0 1px 2px rgba(0,0,0,0.85),0 0 2px rgba(0,0,0,0.7);'
 
-function parseOpaqueRgb(bgColor) {
+export function parseOpaqueRgb(bgColor) {
   // Returns [r,g,b] only for a known OPAQUE color; null otherwise. Never throws.
   try {
     if (!bgColor) return null
@@ -743,6 +764,37 @@ function parseOpaqueRgb(bgColor) {
     }
     return null
   } catch (e) { return null }
+}
+
+// Parse a SOLID OPAQUE `#fgui-content` background color out of a stored shell's
+// HTML/CSS — the in-canvas mirror of scorm12.derive_fgui_content_bg. Used as the
+// content_bg luminance input when the shell config did NOT set
+// content_area.bg_color. Returns the color STRING only when `#fgui-content`'s
+// background is a solid opaque color; null for transparent/image/gradient/alpha<1/
+// missing (those keep the #C8D8E8 + halo fallback). Never throws.
+const FGUI_CONTENT_RULE_RE = /#fgui-content\s*\{([^}]*)\}/i
+const FGUI_BG_RE = /background(?:-color)?\s*:\s*([^;}]+)/gi
+export function parseFguiContentBg(shellHtml) {
+  try {
+    if (!shellHtml) return null
+    const m = FGUI_CONTENT_RULE_RE.exec(String(shellHtml))
+    if (!m) return null
+    // Last background declaration wins (cascade within one rule).
+    let val = null, bm
+    FGUI_BG_RE.lastIndex = 0
+    while ((bm = FGUI_BG_RE.exec(m[1])) !== null) val = bm[1].trim()
+    if (!val) return null
+    // Keep only a solid opaque color (rejects transparent, url() images,
+    // gradients, alpha<1) — the exact halo-fallback boundary the server uses.
+    return parseOpaqueRgb(val) !== null ? val : null
+  } catch (e) { return null }
+}
+
+// content_bg precedence (mirror of scorm12._resolve_content_bg): an explicit opaque
+// shell-config bg wins; otherwise derive the solid #fgui-content bg from shell HTML.
+export function resolveContentBg(configBg, shellHtml) {
+  if (parseOpaqueRgb(configBg) !== null) return configBg
+  return parseFguiContentBg(shellHtml)
 }
 
 // Brand text colors as RGB, for the WCAG-contrast pick below.

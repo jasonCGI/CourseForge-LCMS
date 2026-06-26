@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId, frameExistsInProject } from './FramePreview'
+import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId, frameExistsInProject, parseFguiContentBg, parseOpaqueRgb } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
 import useEditorStore from '../../store/editorStore'
@@ -56,7 +56,17 @@ export default function PersistentPreviewPane() {
         setStage({ w: sw, h: sh })
         const ca = cfg?.content_area || cfg?.contentArea || {}
         setContentArea({ x: ca.x ?? 0, y: ca.y ?? 0, width: ca.width ?? sw, height: ca.height ?? sh })
-        setContentBg(ca.bg_color ?? null)
+        const configBg = ca.bg_color ?? null
+        if (parseOpaqueRgb(configBg) !== null) { setContentBg(configBg); return }
+        // Config left bg_color unset/transparent: derive the solid #fgui-content
+        // bg from the stored shell HTML so the luminance pick runs (light area ->
+        // dark text). Mirrors the server's _resolve_content_bg. Image/gradient/
+        // transparent shells stay null -> the #C8D8E8 + halo fallback.
+        setContentBg(null)
+        fetch(`/api/gui-shells/${shellId}/shell.html`)
+          .then(r => (r.ok ? r.text() : null))
+          .then(html => { if (live && html) setContentBg(parseFguiContentBg(html)) })
+          .catch(() => {})
       })
       .catch(() => { if (live) { setStage({ w: 1024, h: 768 }); setContentArea({ x: 0, y: 0, width: 1024, height: 768 }); setContentBg(null) } })
     return () => { live = false }
