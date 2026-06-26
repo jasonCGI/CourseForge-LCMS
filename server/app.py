@@ -32,6 +32,7 @@ def create_app(config_name=None):
     from .routes.gui_shells import gui_shells_bp
     from .routes.search import search_bp
     from .routes.forgejs import forgejs_bp
+    from .routes.forgeagent import forgeagent_bp
 
     app.register_blueprint(projects_bp)
     app.register_blueprint(import_bp)
@@ -43,6 +44,7 @@ def create_app(config_name=None):
     app.register_blueprint(gui_shells_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(forgejs_bp)
+    app.register_blueprint(forgeagent_bp)
 
     # Edit-token gate (security review C2): protects destructive/upload/publish
     # routes behind CF_EDIT_TOKEN when set. Registered before the auto-seed hook
