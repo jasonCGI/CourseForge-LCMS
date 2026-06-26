@@ -182,7 +182,9 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       {bounded.map(b => (
         <BoundsBox key={b.id} block={b} contentArea={contentArea} updateBlock={updateBlock}
           active={b.id === activeBlockId} onSelect={onBlockSelect}>
-          <PreviewBlock block={b} />
+          {/* fill: the BoundsBox is a sized (height-providing) container, so a
+              cover image should crop-to-fill it, not aspect-lock to its bounds. */}
+          <PreviewBlock block={b} fill />
         </BoundsBox>
       ))}
       {/* Docked audio bars — pinned to the bottom of the frame container. Derived
@@ -1468,8 +1470,14 @@ function PreviewMedia({ block, fill = false }) {
     // and cap it to the viewport (70vh) so the frame + caption always stay above
     // the fold. Inside a sized BoundsBox the wrapper still fills width and the box
     // clips, so this is safe in both contexts.
+    // Inside a height-providing parent (a BoundsBox or a layout zone — fill=true)
+    // fill it outright so a cover image crops to fill. The aspectRatio + 70vh cap
+    // is ONLY for the flow column, which has no height to fill (there height:100%
+    // would collapse to nothing).
     const coverWrap = b
-      ? { width: '100%', aspectRatio: `${b.width || 16} / ${b.height || 9}`, maxHeight: '70vh' }
+      ? (fill
+          ? { width: '100%', height: '100%' }
+          : { width: '100%', aspectRatio: `${b.width || 16} / ${b.height || 9}`, maxHeight: '70vh' })
       : null
     // Cover image WITH a caption: overlay the caption on the image over a
     // bottom-up gradient scrim (white text, WCAG AA) so it stays readable over
