@@ -398,6 +398,11 @@ def _resolve_swap_links(html, asset_map, preview):
         # Drop any author-set class so our cf-swap-link class is authoritative.
         attrs = re.sub(r'(?is)\sclass="[^"]*"', '', attrs)
         attrs = re.sub(r"(?is)\sclass='[^']*'", '', attrs)
+        # Swap anchors must never navigate or open a window. TipTap stamps
+        # target="_blank" href="#" on authored links, so drop href/target/rel —
+        # the runtime swaps the image on click instead.
+        attrs = re.sub(r'(?is)\s(?:href|target|rel)="[^"]*"', '', attrs)
+        attrs = re.sub(r"(?is)\s(?:href|target|rel)='[^']*'", '', attrs)
         src = ''
         try:
             src = _swap_img_src(aid, asset_map, preview)

@@ -1029,6 +1029,48 @@ export function wireMenuNav(win) {
       } catch (e) { /* iframe torn down */ }
     })
   })
+  // The injected content runs the STORED shell CSS, not our React styles, so
+  // inline frame-links and image-swap triggers render unstyled — inject a small
+  // stylesheet so they're identifiable as interactive terms in the shell preview.
+  try {
+    if (!win.document.getElementById('cf-inline-link-style')) {
+      const st = win.document.createElement('style')
+      st.id = 'cf-inline-link-style'
+      st.textContent =
+        'a[data-cf-frame],a.cf-frame-link{color:#D4820A;text-decoration:underline;' +
+        'text-decoration-thickness:2px;text-underline-offset:2px;cursor:pointer;font-weight:600}' +
+        'a[data-cf-swap],a.cf-swap-link{color:#D4820A;text-decoration:underline;' +
+        'text-decoration-style:dotted;text-decoration-thickness:2px;text-underline-offset:2px;' +
+        'cursor:pointer;font-weight:600}' +
+        'a[data-cf-swap].cf-swap-active,a.cf-swap-link.cf-swap-active{text-decoration-style:solid;' +
+        'background:rgba(245,158,11,.18);border-radius:3px}'
+      ;(win.document.head || win.document.documentElement).appendChild(st)
+    }
+  } catch (e) { /* iframe torn down */ }
+  // Image-swap triggers (<a data-cf-swap>) inside the shell. The authored anchor
+  // still carries TipTap's target="_blank" href="#", so WITHOUT this an unhandled
+  // click opens a blank window (the "popup"). Always preventDefault; swap the
+  // cf-swap-target img in place when a resolved src is present (data-cf-swap-src),
+  // toggling the active highlight. Idempotent per anchor.
+  win.document.querySelectorAll('a[data-cf-swap]').forEach((a) => {
+    if (a.__cfSwapWired) return
+    a.__cfSwapWired = true
+    a.addEventListener('click', (ev) => {
+      try {
+        ev.preventDefault()
+        const doc = win.document
+        const img = doc.querySelector('img.cf-swap-target')
+        const wasActive = a.classList && a.classList.contains('cf-swap-active')
+        doc.querySelectorAll('a[data-cf-swap]').forEach(t => { if (t.classList) t.classList.remove('cf-swap-active') })
+        if (img) {
+          if (!img.__cfDefaultSrc) img.__cfDefaultSrc = img.getAttribute('src')
+          const src = a.getAttribute('data-cf-swap-src')
+          if (wasActive) { img.setAttribute('src', img.__cfDefaultSrc) }
+          else if (src) { img.setAttribute('src', src); if (a.classList) a.classList.add('cf-swap-active') }
+        }
+      } catch (e) { /* iframe torn down */ }
+    })
+  })
 }
 
 function PreviewBlock({ block, fill = false, interactive = false, active = false, onSelect = null, updateBlock = null }) {

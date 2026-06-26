@@ -34,7 +34,11 @@ const FrameLink = Link.extend({
       },
     }
   },
-}).configure({ openOnClick: false, autolink: false })
+  // Don't stamp target="_blank"/rel on these anchors — they're frame-nav / image-
+  // swap triggers, not real outbound links, and target="_blank" makes an unhandled
+  // click (in the shell/published iframe) open a blank window. href is a harmless
+  // '#'; the renderers strip it.
+}).configure({ openOnClick: false, autolink: false, HTMLAttributes: { target: null, rel: null } })
 
 // Flatten the active project tree to a frame-picker list (id + readable path).
 // Mirrors BranchBlock's picker so authors never hand-type a frame UUID.
