@@ -74,13 +74,18 @@ export default function GUIShellRenderer({
       setTimeout(paintCounter, 50)
       setTimeout(paintCounter, 200)
       // The shell's own async updateZones() can rewrite the counter AFTER our
-      // timeouts, dropping the total ("18 / "). Observe the counter zones and
-      // re-assert whenever anything rewrites them, so our "idx / total" always wins.
-      // The !== guard makes the re-assert idempotent (no observer feedback loop).
+      // timeouts, dropping the total ("18 / "). On interactive/overlay frames it can
+      // even REPLACE the counter node entirely, which would make an observer bound to
+      // the old node go deaf (the total never comes back). So observe a STABLE
+      // ANCESTOR (the shell document body): a node swap OR a text rewrite both re-fire
+      // paintCounter, which re-queries the LIVE counter node and re-asserts our value.
+      // The !== guard keeps it idempotent (no observer feedback loop).
       try {
-        obs = new win.MutationObserver(paintCounter)
-        win.document.querySelectorAll('[data-zone-type="frame_counter"]').forEach(n =>
-          obs.observe(n, { childList: true, characterData: true, subtree: true }))
+        const counterRoot = win.document.body || win.document.documentElement
+        if (counterRoot) {
+          obs = new win.MutationObserver(paintCounter)
+          obs.observe(counterRoot, { childList: true, characterData: true, subtree: true })
+        }
       } catch (e) { /* no MutationObserver in this context */ }
       // injectContent uses innerHTML, so the bar's inline <script> never runs —
       // wire the branded audio bars directly in the iframe document instead.
