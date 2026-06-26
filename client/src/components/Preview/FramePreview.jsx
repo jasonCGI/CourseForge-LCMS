@@ -1906,6 +1906,31 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
   const hasImg  = !!(block.data.image_id || block.data.background_url)
   const commit  = next => updateBlock && updateBlock(block.id, { regions: next })
 
+  useEffect(() => { _ensureCalloutAntsCSS() }, [])
+  const selRegion = regions.find(r => r.id === sel) || null
+  // Scale the selected region uniformly about its center — a way to size it without
+  // dragging each corner handle. Clamped into the canvas.
+  const scaleSel = factor => {
+    if (!selRegion) return
+    const r = selRegion, cx = r.x + r.w / 2, cy = r.y + r.h / 2
+    const w = Math.max(3, Math.min(100, r.w * factor)), h = Math.max(3, Math.min(100, r.h * factor))
+    const x = Math.max(0, Math.min(100 - w, cx - w / 2)), y = Math.max(0, Math.min(100 - h, cy - h / 2))
+    commit(regions.map(rr => (rr.id === r.id ? { ...rr, ...roundGeom({ x, y, w, h }) } : rr)))
+  }
+  // Reset the selected region to a true VISUAL square (a real circle for circle
+  // shapes), using the live canvas aspect so a 16:9 image doesn't render it as an
+  // ellipse. Squares to the smaller visual side, kept centered + on-canvas.
+  const resetAspectSel = () => {
+    const rect = canvasRef.current && canvasRef.current.getBoundingClientRect()
+    if (!rect || !selRegion) return
+    const r = selRegion
+    const spx = Math.min((r.w / 100) * rect.width, (r.h / 100) * rect.height)
+    const w = (spx / rect.width) * 100, h = (spx / rect.height) * 100
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2
+    const x = Math.max(0, Math.min(100 - w, cx - w / 2)), y = Math.max(0, Math.min(100 - h, cy - h / 2))
+    commit(regions.map(rr => (rr.id === r.id ? { ...rr, ...roundGeom({ x, y, w, h }) } : rr)))
+  }
+
   const relPos = e => {
     const r = canvasRef.current.getBoundingClientRect()
     return {
@@ -2029,8 +2054,13 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
                 background: isSel ? rgba(st.stroke, 0.3) : st.fill,
                 borderRadius: shapeRadius(r.shape),
                 boxSizing: 'border-box', cursor: 'move',
-                outline: isSel ? '2px dashed var(--forge-amber)' : 'none', outlineOffset: 2,
               }}>
+              {/* Marching ants on the selected region (overlay so it doesn't fight
+                  the region's fill) — makes the one you're editing obvious. */}
+              {isSel && (
+                <div className="cf-callout-ants" aria-hidden="true"
+                  style={{ position: 'absolute', inset: 0, borderRadius: shapeRadius(r.shape), pointerEvents: 'none' }} />
+              )}
               <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none' }}>{r.label}</span>
               {isSel && Object.entries(HOTSPOT_HANDLES).map(([h, pos]) => (
                 <div key={h} onMouseDown={e => startResize(e, r, h)}
@@ -2049,13 +2079,29 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
           }} />
         )}
       </div>
-      {regions.length > 0 && (
+      {selRegion ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, flexWrap: 'wrap' }}>
+          <span style={{ color: '#444', fontWeight: 700 }}>Editing: {selRegion.label}</span>
+          <span style={{ color: '#ccc' }}>│</span>
+          <span style={{ color: '#888' }}>Scale</span>
+          <button type="button" onClick={() => scaleSel(0.9)} title="Scale down 10%" style={HS_CTRL_BTN}>−</button>
+          <button type="button" onClick={() => scaleSel(1.1)} title="Scale up 10%" style={HS_CTRL_BTN}>+</button>
+          <span style={{ color: '#ccc' }}>│</span>
+          <button type="button" onClick={resetAspectSel} title="Square it up — reset to a true circle/square aspect" style={{ ...HS_CTRL_BTN, width: 'auto', padding: '0 9px' }}>⊙ Reset aspect</button>
+        </div>
+      ) : regions.length > 0 ? (
         <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-          Drag a region to move it; drag a corner handle to resize. Draw on empty image area to add a region.
+          Drag a region to move it; drag a corner to resize, or select one for scale + reset-aspect controls. Draw on empty image area to add a region.
         </p>
-      )}
+      ) : null}
     </div>
   )
+}
+
+const HS_CTRL_BTN = {
+  height: 22, minWidth: 22, padding: 0, fontSize: 13, fontWeight: 700, lineHeight: 1,
+  cursor: 'pointer', borderRadius: 5, border: '1px solid #B5D4F4',
+  background: '#fff', color: '#042C53', fontFamily: 'var(--font-sans)',
 }
 
 const _clampPc2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
