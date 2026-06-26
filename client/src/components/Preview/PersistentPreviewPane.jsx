@@ -195,7 +195,7 @@ export default function PersistentPreviewPane() {
           />
         </ShellFit>
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
+        <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
           <PreviewErrorBoundary resetKey={activeFrame.id}>
             <FramePreview frame={activeFrame} ignoreGui={!!shellId}
               activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
@@ -244,7 +244,10 @@ function ShellFit({ stage, children, contentArea, overlay }) {
             height: contentArea.height,
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
-            overflow: 'auto',
+            // No-scroll rule: the preview content area clips rather than scrolls
+            // (image fills the area; oversized callouts clip at the edge). Long
+            // shelled text still scrolls WITHIN #fgui-content, not the pane.
+            overflow: 'hidden',
             background: '#fff',
             zIndex: 5,
             // larger body text inside the shell (clean shell-off view stays 18px)
