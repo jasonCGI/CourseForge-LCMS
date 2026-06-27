@@ -15,6 +15,7 @@ window.initForge3DPreview = function(container, glbPath) {
       '<button type="button" data-env="studio" aria-pressed="false">Studio</button>' +
     '</div>' +
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
+    '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
     '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
     '<span data-section-ctl style="display:none;align-items:center;gap:6px">' +
       '<button type="button" data-section-axis title="Cut axis (X / Y / Z)">Y</button>' +
@@ -188,6 +189,68 @@ window.initForge3DPreview = function(container, glbPath) {
       applyExplode()
     })
 
+    // ── Contact shadow ────────────────────────────────────────────────────
+    // A soft radial-gradient blob on a ground plane under the model (no
+    // postprocessing addon needed — those aren't in the offline bundle). Sized to
+    // the model's footprint after it loads.
+    let shadowOn = true
+    const shadowCanvas = document.createElement('canvas')
+    shadowCanvas.width = shadowCanvas.height = 256
+    const sctx = shadowCanvas.getContext('2d')
+    const sgrad = sctx.createRadialGradient(128, 128, 8, 128, 128, 128)
+    sgrad.addColorStop(0, 'rgba(0,0,0,0.45)')
+    sgrad.addColorStop(1, 'rgba(0,0,0,0)')
+    sctx.fillStyle = sgrad; sctx.fillRect(0, 0, 256, 256)
+    const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+    const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+    const shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat)
+    shadowMesh.rotation.x = -Math.PI / 2
+    shadowMesh.renderOrder = -1
+    shadowMesh.visible = false
+    scene.add(shadowMesh)
+    function placeContactShadow() {
+      if (!model) { shadowMesh.visible = false; return }
+      const b = new THREE.Box3().setFromObject(model)
+      const size = b.getSize(new THREE.Vector3())
+      const c = b.getCenter(new THREE.Vector3())
+      const r = (Math.max(size.x, size.z) * 1.6) || 1
+      shadowMesh.scale.set(r, r, 1)
+      shadowMesh.position.set(c.x, b.min.y + 0.001, c.z)
+      shadowMesh.visible = shadowOn
+    }
+    const shadowBtn = bar.querySelector('[data-shadow]')
+    shadowBtn.addEventListener('click', () => {
+      shadowOn = !shadowOn
+      shadowMesh.visible = shadowOn && !!model
+      shadowBtn.classList.toggle('active', shadowOn)
+      shadowBtn.setAttribute('aria-pressed', String(shadowOn))
+    })
+
+    // ── Double-click to focus ─────────────────────────────────────────────
+    // Raycast the model on dblclick; tween the camera to frame the hit part (or
+    // the whole model on a miss). The tween advances in the render loop.
+    const raycaster = new THREE.Raycaster()
+    const ndc = new THREE.Vector2()
+    let focusAnim = null
+    function focusOnBox(box) {
+      const c = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z) || 0.1
+      const dir = new THREE.Vector3().subVectors(camera.position, controls.target)
+      if (dir.lengthSq() < 1e-6) dir.set(1, 0.7, 1)
+      dir.normalize().multiplyScalar(maxDim * 2.4)
+      focusAnim = { fp: camera.position.clone(), tp: c.clone().add(dir),
+                    ft: controls.target.clone(), tt: c.clone(), t: 0 }
+    }
+    canvas.addEventListener('dblclick', (e) => {
+      if (!model) return
+      const rect = canvas.getBoundingClientRect()
+      ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      raycaster.setFromCamera(ndc, camera)
+      const hits = raycaster.intersectObject(model, true)
+      focusOnBox(new THREE.Box3().setFromObject(hits.length ? hits[0].object : model))
+    })
+
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
     draco.setDecoderPath(V + '/draco/')
@@ -244,6 +307,7 @@ window.initForge3DPreview = function(container, glbPath) {
       })
       if (!followTarget) followTarget = model
       frameModel()
+      placeContactShadow()
 
       // Play every animation clip the GLB carries — confirms animation survived
       // conversion, and gives the viewer a live preview.
@@ -295,6 +359,13 @@ window.initForge3DPreview = function(container, glbPath) {
       const dt = clock.getDelta()
       if (mixer) mixer.update(dt)
       if (following) followModel()
+      if (focusAnim) {
+        focusAnim.t = Math.min(1, focusAnim.t + dt / 0.4)
+        const e = focusAnim.t * focusAnim.t * (3 - 2 * focusAnim.t)   // smoothstep
+        camera.position.lerpVectors(focusAnim.fp, focusAnim.tp, e)
+        controls.target.lerpVectors(focusAnim.ft, focusAnim.tt, e)
+        if (focusAnim.t >= 1) focusAnim = null
+      }
       controls.update()
       renderer.render(scene, camera)
     })()
@@ -308,6 +379,7 @@ window.initForge3DPreview = function(container, glbPath) {
       try { if (curBg) curBg.dispose() } catch (e) {}
       try { pmrem.dispose() } catch (e) {}
       try { draco.dispose() } catch (e) {}
+      try { shadowTex.dispose(); shadowMat.dispose(); shadowMesh.geometry.dispose() } catch (e) {}
       try { renderer.dispose() } catch (e) {}
     }
   })
