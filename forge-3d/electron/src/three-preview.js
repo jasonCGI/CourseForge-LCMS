@@ -375,6 +375,18 @@ window.initForge3DPreview = function(container, glbPath) {
         // clears the part unless the cursor is currently over that part on canvas.
         el.addEventListener('pointerenter', () => { setHoverGlow(o, true); setLabelActive(item, true) })
         el.addEventListener('pointerleave', () => { if (hovered !== o) setHoverGlow(o, false); setLabelActive(item, false) })
+        // Swallow hover only, never drags: on press, mute the label and replay the
+        // pointerdown on the canvas so OrbitControls starts its rotate/pan (it then
+        // tracks move/up on the document). Un-mute on release so hover still works.
+        el.addEventListener('pointerdown', (ev) => {
+          el.style.pointerEvents = 'none'
+          canvas.dispatchEvent(new PointerEvent('pointerdown', {
+            clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons,
+            pointerId: ev.pointerId, pointerType: ev.pointerType, isPrimary: ev.isPrimary,
+            bubbles: true, cancelable: true
+          }))
+          window.addEventListener('pointerup', () => { el.style.pointerEvents = 'auto' }, { once: true })
+        })
         labelItems.push(item)
       })
     }
