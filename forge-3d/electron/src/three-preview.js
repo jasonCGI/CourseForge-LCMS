@@ -173,8 +173,16 @@ window.initForge3DPreview = function(container, glbPath) {
     let explodeParts = null, explodeT = 0, explodeAxis = 'radial'
     const EX_AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }
     function buildExplodeParts() {
+      if (!model) { explodeParts = []; return }
+      // Capture the true rest position once, and restore it before deriving parts,
+      // so directions (and the reset target) are always relative to the ASSEMBLED
+      // model — even when changing the axis mid-explode.
+      model.traverse((o) => {
+        if (!o.isMesh) return
+        if (!o.userData.__restPos) o.userData.__restPos = o.position.clone()
+        else o.position.copy(o.userData.__restPos)
+      })
       explodeParts = []
-      if (!model) return
       const mb = new THREE.Box3().setFromObject(model)
       const center = mb.getCenter(new THREE.Vector3())
       const span = mb.getSize(new THREE.Vector3()).length() || 1
@@ -193,7 +201,7 @@ window.initForge3DPreview = function(container, glbPath) {
         o.parent.updateWorldMatrix(true, false)
         pInv.copy(o.parent.matrixWorld).invert()
         dir.transformDirection(pInv)        // -> unit direction in the mesh's parent space
-        explodeParts.push({ mesh: o, base: o.position.clone(), dir, amt: span * 0.5 })
+        explodeParts.push({ mesh: o, base: o.userData.__restPos, dir, amt: span * 0.5 })
       })
     }
     function applyExplode() {
@@ -308,15 +316,20 @@ window.initForge3DPreview = function(container, glbPath) {
     // One clean escape hatch when the user gets lost: section off, explode off,
     // focus cancelled, and reframe the model.
     bar.querySelector('[data-reset]').addEventListener('click', () => {
-      if (clipOn) {
-        clipOn = false
-        secBtn.classList.remove('active'); secBtn.setAttribute('aria-pressed', 'false')
-        secCtl.style.opacity = '0.4'
-        applyClipMaterials()
-      }
-      explodeT = 0; explodeSlider.value = '0'; applyExplode()
+      // Section off + clear the cut; controls back to defaults.
+      clipOn = false; clipAxis = 'y'; clipFlip = false; clipT = 0.5
+      secBtn.classList.remove('active'); secBtn.setAttribute('aria-pressed', 'false')
+      secCtl.style.opacity = '0.4'
+      secAxisBtn.textContent = 'Y'; secSlider.value = '50'
+      applyClipMaterials()
+      // Explode off + reassemble.
+      explodeT = 0; explodeSlider.value = '0'
+      explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'
+      applyExplode()               // parts back to their rest position
+      explodeParts = null          // next explode rebuilds from the assembled pose
+      // Cancel any focus tween, then reframe.
       focusAnim = null
-      frameModel()   // recenter; the controls 'change' resyncs the zoom slider
+      frameModel()                 // recenter; the controls 'change' resyncs zoom
     })
 
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
