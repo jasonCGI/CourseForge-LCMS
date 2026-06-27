@@ -34,11 +34,12 @@ window.initForge3DPreview = function(container, glbPath) {
       '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
     '</span>' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Explode</span>' +
-    '<button type="button" data-explode-axis title="Explode direction: radial / X / Y / Z">Radial</button>' +
+    '<button type="button" data-explode-axis title="Explode direction: radial (from center) / X / Y / Z">⊕</button>' +
     '<button type="button" data-explode-origin title="Pick the explode origin: click a point on the model">⊙ Origin</button>' +
-    '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts" style="width:90px;vertical-align:middle">' +
+    '<span data-origin-name class="f3d-viewer-bar-label" style="max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Explode origin">center</span>' +
+    '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts" style="width:78px;vertical-align:middle">' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Zoom</span>' +
-    '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:90px;vertical-align:middle">'
+    '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:78px;vertical-align:middle">'
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
   container.appendChild(bar)
@@ -229,7 +230,7 @@ window.initForge3DPreview = function(container, glbPath) {
     })
     explodeAxisBtn.addEventListener('click', () => {
       explodeAxis = explodeAxis === 'radial' ? 'x' : explodeAxis === 'x' ? 'y' : explodeAxis === 'y' ? 'z' : 'radial'
-      explodeAxisBtn.textContent = explodeAxis === 'radial' ? 'Radial' : explodeAxis.toUpperCase()
+      explodeAxisBtn.textContent = explodeAxis === 'radial' ? '⊕' : explodeAxis.toUpperCase()
       buildExplodeParts()       // recompute directions for the new axis
       applyExplode()
     })
@@ -238,6 +239,7 @@ window.initForge3DPreview = function(container, glbPath) {
     let pickingOrigin = false
     const originRay = new THREE.Raycaster(), originNdc = new THREE.Vector2()
     const originBtn = bar2.querySelector('[data-explode-origin]')
+    const originNameEl = bar2.querySelector('[data-origin-name]')
     originBtn.addEventListener('click', () => {
       pickingOrigin = !pickingOrigin
       originBtn.classList.toggle('active', pickingOrigin)
@@ -252,7 +254,11 @@ window.initForge3DPreview = function(container, glbPath) {
       const hits = originRay.intersectObject(model, true)
       if (hits.length) {
         explodeOrigin = hits[0].point.clone()
-        explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'
+        explodeAxis = 'radial'; explodeAxisBtn.textContent = '⊕'
+        const obj = hits[0].object, p = explodeOrigin
+        const nm = (obj.name || (obj.parent && obj.parent.name) || '').trim()
+        originNameEl.textContent = nm || `(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`
+        originNameEl.title = 'Explode origin: ' + originNameEl.textContent
         buildExplodeParts(); applyExplode()
       }
       pickingOrigin = false; originBtn.classList.remove('active')
@@ -393,7 +399,8 @@ window.initForge3DPreview = function(container, glbPath) {
       applyClipMaterials()
       // Explode off + reassemble.
       explodeT = 0; explodeSlider.value = '0'
-      explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'; explodeOrigin = null
+      explodeAxis = 'radial'; explodeAxisBtn.textContent = '⊕'; explodeOrigin = null
+      if (originNameEl) originNameEl.textContent = 'center'
       applyExplode()               // parts back to their rest position
       explodeParts = null          // next explode rebuilds from the assembled pose
       // Cancel any focus tween, re-enable orbit (in case origin-pick was armed),
