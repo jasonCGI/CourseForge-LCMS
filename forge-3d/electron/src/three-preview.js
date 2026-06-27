@@ -152,11 +152,9 @@ window.initForge3DPreview = function(container, glbPath) {
       clipBox.setFromObject(model)
       const n = CLIP_AXES[clipAxis].clone().multiplyScalar(clipFlip ? -1 : 1)
       const lo = clipBox.min[clipAxis], hi = clipBox.max[clipAxis]
-      // clipT 0 = no cut, 1 = max cut. For the CURRENT kept side, sweep the plane
-      // from the far edge toward the near edge -> "no cut" stays no-cut across a flip.
-      const from = clipFlip ? hi : lo
-      const to   = clipFlip ? lo : hi
-      const pos  = from + (to - from) * (clipT * CLIP_MAX)
+      // Plane position from the slider only. Flip keeps the SAME plane and swaps
+      // which side is kept -> "inverse what's shown" (the cut-away piece appears).
+      const pos = lo + (hi - lo) * (clipT * CLIP_MAX)
       clipPlane.normal.copy(n)
       clipPlane.constant = -n[clipAxis] * pos
     }
@@ -179,9 +177,8 @@ window.initForge3DPreview = function(container, glbPath) {
     })
     secSlider.addEventListener('input', () => { clipT = secSlider.value / 100; updateClipPlane() })
     secFlipBtn.addEventListener('click', () => {
-      // The from/to mapping keeps the slider meaning "cut depth" on either side,
-      // so flipping just swaps which side is kept (no-cut stays no-cut).
-      clipFlip = !clipFlip
+      if (clipT <= 0.001) return     // nothing is cut -> nothing to invert
+      clipFlip = !clipFlip           // same plane, swap kept side = inverse what's shown
       updateClipPlane()
     })
 
