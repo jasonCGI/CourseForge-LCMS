@@ -22,8 +22,8 @@ window.initForge3DPreview = function(container, glbPath) {
     '<input type="range" data-anim-scrub min="0" max="1000" value="0" style="display:none;width:90px;vertical-align:middle" title="Scrub the animation" aria-label="Animation time">' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
     '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
-    '<button type="button" data-reset title="Reset the view + tools (section off, explode off, recenter)">↺ Reset</button>' +
-    '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
+    '<button type="button" data-reset title="Reset the view + tools (section off, explode off, recenter)">↺</button>' +
+    '<button type="button" data-capture title="Save a PNG of the current view">📷</button>'
   // Second row: model-inspection tools (section / explode / zoom) so the bar
   // doesn't wrap.
   const bar2 = document.createElement('div')
@@ -37,8 +37,8 @@ window.initForge3DPreview = function(container, glbPath) {
     '</span>' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Explode</span>' +
     '<button type="button" data-explode-axis title="Explode direction: radial (from center) / X / Y / Z">⊕</button>' +
-    '<button type="button" data-explode-origin title="Pick the explode origin: click a point on the model">⊙ Origin</button>' +
-    '<span data-origin-name class="f3d-viewer-bar-label" style="max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Explode origin">center</span>' +
+    '<button type="button" data-explode-origin title="Pick the explode origin: click a point on the model">⊙</button>' +
+    '<span data-origin-name class="f3d-viewer-bar-label" style="max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Explode origin"></span>' +
     '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts" style="width:78px;vertical-align:middle">' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Zoom</span>' +
     '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:78px;vertical-align:middle">'
@@ -457,7 +457,7 @@ window.initForge3DPreview = function(container, glbPath) {
       // Explode off + reassemble.
       explodeT = 0; explodeSlider.value = '0'
       explodeAxis = 'radial'; explodeAxisBtn.textContent = '⊕'; explodeOrigin = null
-      if (originNameEl) originNameEl.textContent = 'center'
+      if (originNameEl) originNameEl.textContent = ''
       applyExplode()               // parts back to their rest position
       explodeParts = null          // next explode rebuilds from the assembled pose
       // Cancel any focus tween, re-enable orbit (in case origin-pick was armed),
