@@ -112,6 +112,8 @@ def apply_decimate(ratio):
     for obj in bpy.data.objects:
         if obj.type != 'MESH':
             continue
+        if obj.find_armature():        # skinned mesh — decimate scrambles skin weights
+            continue
         try:
             mod = obj.modifiers.new(name='ForgeWebDecimate', type='DECIMATE')
             mod.decimate_type = 'COLLAPSE'

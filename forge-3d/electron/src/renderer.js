@@ -340,7 +340,9 @@ function loadPreview(glbPath) {
   // Load the preview module once; reuse it on subsequent previews.
   if (window.initForge3DPreview) { window.initForge3DPreview(area, glbPath); return }
   const script = document.createElement('script')
-  script.src = 'three-preview.js'
+  // Cache-bust so a reload always runs the latest viewer (Electron's renderer/disk
+  // cache otherwise re-serves the old three-preview.js even after a restart).
+  script.src = 'three-preview.js?v=' + Date.now()
   script.onload = () => window.initForge3DPreview(area, glbPath)
   document.body.appendChild(script)
 }

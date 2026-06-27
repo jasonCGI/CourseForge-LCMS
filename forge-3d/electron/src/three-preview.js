@@ -335,7 +335,7 @@ window.initForge3DPreview = function(container, glbPath) {
     const _lblWorld = new THREE.Vector3(), _lblNdc = new THREE.Vector3()
     function projectToScreen(point, cam, w, h) {
       _lblNdc.copy(point).project(cam)
-      const visible = _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
+      const visible = _lblNdc.z > -1 && _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
       return { x: (_lblNdc.x * 0.5 + 0.5) * w, y: (-_lblNdc.y * 0.5 + 0.5) * h, visible }
     }
     function buildLabels() {
@@ -488,6 +488,7 @@ window.initForge3DPreview = function(container, glbPath) {
       // Cancel any focus tween, re-enable orbit (in case origin-pick was armed),
       // then reframe.
       focusAnim = null; controls.enabled = true
+      pickingOrigin = false; originBtn.classList.remove('active'); canvas.style.cursor = ''
       frameModel()                 // recenter; the controls 'change' resyncs zoom
     })
 
@@ -510,7 +511,7 @@ window.initForge3DPreview = function(container, glbPath) {
       if (modelBox.isEmpty()) return
       modelBox.getSize(tmpS)
       const maxDim = Math.max(tmpS.x, tmpS.y, tmpS.z) || 1
-      if (followTarget) followTarget.getWorldPosition(tmpC); else modelBox.getCenter(tmpC)
+      modelBox.getCenter(tmpC)   // frame the visual centre, not the (possibly offset) root pivot
       // Fill the viewport: distance that fits maxDim to the FOV (vertical, plus
       // the horizontal limit on portrait viewports) with a small margin. The old
       // 2.2x bounding-sphere multiple left the model tiny / "far away".
@@ -620,7 +621,7 @@ window.initForge3DPreview = function(container, glbPath) {
       labelsLayer.style.left = canvas.offsetLeft + 'px'; labelsLayer.style.top = canvas.offsetTop + 'px'
       labelsLayer.style.width = w + 'px'; labelsLayer.style.height = h + 'px'
     }
-    new ResizeObserver(fit).observe(canvas); fit()
+    const ro = new ResizeObserver(fit); ro.observe(canvas); fit()
 
     let rafId
     ;(function animate() {
@@ -648,6 +649,7 @@ window.initForge3DPreview = function(container, glbPath) {
     window.__forge3dCleanup = function () {
       cancelAnimationFrame(rafId)
       try { document.removeEventListener('click', onViewDocClick) } catch (e) {}
+      try { ro.disconnect() } catch (e) {}
       try { if (mixer) mixer.stopAllAction() } catch (e) {}
       try { controls.dispose() } catch (e) {}
       try { if (curEnvRT) curEnvRT.dispose() } catch (e) {}
