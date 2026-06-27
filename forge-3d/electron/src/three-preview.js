@@ -337,17 +337,17 @@ window.initForge3DPreview = function(container, glbPath) {
     function glowUnit(u, on) { if (u) for (const m of u.meshes) glowMesh(m, on) }
     function setLabelActive(u, on) {
       if (!u || !u.el) return
-      u.el.style.background = on ? 'rgba(123,110,253,.95)' : 'rgba(18,20,30,.85)'
-      u.el.style.color = on ? '#fff' : '#C9C2FF'
-      u.el.style.borderColor = on ? '#C9C2FF' : 'rgba(123,110,253,.45)'
+      u.el.style.background = on ? '#A8572B' : '#ffffff'
+      u.el.style.color = on ? '#ffffff' : '#1a2a3a'
+      u.el.style.borderColor = '#A8572B'
       u.el.style.zIndex = on ? '5' : ''
     }
     function makeLabelEl(u) {
       const el = document.createElement('div')
       el.textContent = u.name
-      el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(18,20,30,.85);' +
-        'color:#C9C2FF;font:600 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;' +
-        'white-space:nowrap;border:1px solid rgba(123,110,253,.45);pointer-events:auto;cursor:default'
+      el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:#ffffff;' +
+        'color:#1a2a3a;font:700 20px/1.3 Inter,system-ui,sans-serif;padding:6px 11px;border-radius:6px;' +
+        'white-space:nowrap;border:3px solid #A8572B;box-shadow:0 0 8px rgba(0,0,0,.55);pointer-events:auto;cursor:default'
       labelsLayer.appendChild(el)
       u.el = el
       // Hovering the label lights its unit (and itself); leaving it clears the

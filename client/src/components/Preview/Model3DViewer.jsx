@@ -622,18 +622,18 @@ export default function Model3DViewer({
               transition: REDUCE_MOTION ? 'none' : 'transform 0.15s', transform: isActive ? 'scale(1.35)' : 'scale(1)' }} />
             {!isActive && (
               <div className="dot-label" style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)',
-                background: 'rgba(4,44,83,0.9)', color: '#B5D4F4', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
-                fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 3, whiteSpace: 'nowrap',
-                border: '1px solid rgba(24,95,165,0.4)', pointerEvents: 'none' }}>{ann.label}</div>
+                background: '#ffffff', color: '#1a2a3a', fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 20, fontWeight: 700, lineHeight: 1.3, padding: '6px 11px', borderRadius: 6, whiteSpace: 'nowrap',
+                border: '3px solid #A8572B', boxShadow: '0 0 8px rgba(0,0,0,0.55)', pointerEvents: 'none' }}>{ann.label}</div>
             )}
             {isActive && (
               <div role="tooltip" style={{ position: 'absolute', left: 18, top: -8, background: '#0d1017',
                 border: '1px solid #1c2a3a', borderLeft: `3px solid ${color}`, borderRadius: 6, padding: '10px 14px',
                 minWidth: 200, maxWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 animation: REDUCE_MOTION ? 'none' : 'fadeInPop 0.15s ease', zIndex: 40 }}>
-                <div style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 9, fontWeight: 600,
-                  color, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{ann.label}</div>
-                {ann.description && <div style={{ fontSize: 12, color: '#8AAAC0', lineHeight: 1.55 }}>{ann.description}</div>}
+                <div style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 14, fontWeight: 700,
+                  color, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>{ann.label}</div>
+                {ann.description && <div style={{ fontSize: 16, color: '#8AAAC0', lineHeight: 1.5 }}>{ann.description}</div>}
                 <button onClick={(e) => { e.stopPropagation(); setActivePin(null) }} aria-label="Close annotation"
                   style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', color: '#3A5A7A', fontSize: 12, cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>✕</button>
               </div>
@@ -696,15 +696,15 @@ export default function Model3DViewer({
               placeholder="name this part" aria-label="Part name"
               style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
                 transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 27, pointerEvents: 'auto',
-                background: 'rgba(4,44,83,0.97)', color: '#FFE3AE', border: '1px solid var(--forge-amber, #F59E0B)',
-                borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
-                fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', width: 150, outline: 'none', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }} />
+                background: '#ffffff', color: '#1a2a3a', border: '3px solid #A8572B',
+                borderRadius: 6, padding: '6px 11px', fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 20, fontWeight: 700, letterSpacing: '0', width: 190, outline: 'none', boxShadow: '0 0 8px rgba(0,0,0,0.55)' }} />
           ) : (
             <div aria-hidden="true" style={{ position: 'absolute', left: partLabel.x, top: partLabel.y,
               transform: 'translate(-50%, calc(-100% - 10px))', zIndex: 25, pointerEvents: 'none',
-              background: 'rgba(4,44,83,0.92)', color: '#FAC775', border: '1px solid var(--forge-amber, #F59E0B)',
-              borderRadius: 14, padding: '3px 11px', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)',
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
+              background: '#ffffff', color: '#1a2a3a', border: '3px solid #A8572B',
+              borderRadius: 6, padding: '6px 11px', fontFamily: "'Inter', system-ui, sans-serif",
+              fontSize: 20, fontWeight: 700, letterSpacing: '0', whiteSpace: 'nowrap', boxShadow: '0 0 8px rgba(0,0,0,0.55)' }}>
               {partLabel.text}
             </div>
           )}
