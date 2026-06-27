@@ -21,6 +21,8 @@ window.initForge3DPreview = function(container, glbPath) {
       '<input type="range" data-section-slider min="0" max="100" value="50" aria-label="Section position" style="width:90px;vertical-align:middle">' +
       '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
     '</span>' +
+    '<span class="f3d-viewer-bar-label" style="margin-left:8px">Explode</span>' +
+    '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts to show assembly" style="width:90px;vertical-align:middle">' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
@@ -151,6 +153,40 @@ window.initForge3DPreview = function(container, glbPath) {
     })
     secSlider.addEventListener('input', () => { clipT = secSlider.value / 100; updateClipPlane() })
     secFlipBtn.addEventListener('click', () => { clipFlip = !clipFlip; updateClipPlane() })
+
+    // ── Exploded view ─────────────────────────────────────────────────────
+    // Lazily capture each mesh's rest position + an outward unit direction (from
+    // the model center, in the mesh's parent space), then offset by the slider.
+    // Built on first use so it captures the ASSEMBLED rest pose. Best on static
+    // models — a playing animation drives the same positions and will fight it.
+    let explodeParts = null, explodeT = 0
+    function buildExplodeParts() {
+      explodeParts = []
+      if (!model) return
+      const mb = new THREE.Box3().setFromObject(model)
+      const center = mb.getCenter(new THREE.Vector3())
+      const span = mb.getSize(new THREE.Vector3()).length() || 1
+      const pInv = new THREE.Matrix4()
+      model.traverse((o) => {
+        if (!o.isMesh) return
+        const dir = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).sub(center)
+        if (dir.lengthSq() < 1e-9) dir.set(0, 1, 0)
+        o.parent.updateWorldMatrix(true, false)
+        pInv.copy(o.parent.matrixWorld).invert()
+        dir.transformDirection(pInv)   // -> unit direction in the mesh's parent space
+        explodeParts.push({ mesh: o, base: o.position.clone(), dir, amt: span * 0.5 })
+      })
+    }
+    function applyExplode() {
+      if (!explodeParts) return
+      for (const p of explodeParts) p.mesh.position.copy(p.base).addScaledVector(p.dir, explodeT * p.amt)
+    }
+    const explodeSlider = bar.querySelector('[data-explode-slider]')
+    explodeSlider.addEventListener('input', () => {
+      if (!explodeParts) buildExplodeParts()
+      explodeT = explodeSlider.value / 100
+      applyExplode()
+    })
 
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
