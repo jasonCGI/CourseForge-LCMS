@@ -15,6 +15,12 @@ window.initForge3DPreview = function(container, glbPath) {
       '<button type="button" data-env="night" aria-pressed="false">Night</button>' +
     '</div>' +
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
+    '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
+    '<span data-section-ctl style="display:none;align-items:center;gap:6px">' +
+      '<button type="button" data-section-axis title="Cut axis (X / Y / Z)">Y</button>' +
+      '<input type="range" data-section-slider min="0" max="100" value="50" aria-label="Section position" style="width:90px;vertical-align:middle">' +
+      '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
+    '</span>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
@@ -44,6 +50,7 @@ window.initForge3DPreview = function(container, glbPath) {
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
+    renderer.localClippingEnabled = true   // enables the Section / cross-cut tool
 
     const scene  = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000)
@@ -93,6 +100,57 @@ window.initForge3DPreview = function(container, glbPath) {
       gridBtn.classList.toggle('active', grid.visible)
       gridBtn.setAttribute('aria-pressed', String(grid.visible))
     })
+
+    // ── Section / cross-cut ───────────────────────────────────────────────
+    // One clipping plane on every model material; the toolbar drives its axis,
+    // position (along the model's bbox), and side. Materials go DoubleSide while
+    // active so the cut reveals the interior (capped cross-sections are a later
+    // polish). `model` resolves async — these handlers run on click, after load.
+    const clipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+    const CLIP_AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }
+    const clipBox = new THREE.Box3()
+    let clipOn = false, clipAxis = 'y', clipFlip = false, clipT = 0.5
+    function applyClipMaterials() {
+      if (!model) return
+      model.traverse((o) => {
+        if (!o.isMesh) return
+        const mats = Array.isArray(o.material) ? o.material : [o.material]
+        for (const m of mats) {
+          if (!m) continue
+          if (m.__forgeSide === undefined) m.__forgeSide = m.side
+          m.clippingPlanes = clipOn ? [clipPlane] : []
+          m.side = clipOn ? THREE.DoubleSide : m.__forgeSide
+          m.needsUpdate = true
+        }
+      })
+    }
+    function updateClipPlane() {
+      if (!model) return
+      clipBox.setFromObject(model)
+      const n = CLIP_AXES[clipAxis].clone().multiplyScalar(clipFlip ? -1 : 1)
+      const pos = clipBox.min[clipAxis] + (clipBox.max[clipAxis] - clipBox.min[clipAxis]) * clipT
+      clipPlane.normal.copy(n)
+      clipPlane.constant = -n[clipAxis] * pos
+    }
+    const secBtn = bar.querySelector('[data-section]')
+    const secCtl = bar.querySelector('[data-section-ctl]')
+    const secAxisBtn = bar.querySelector('[data-section-axis]')
+    const secSlider = bar.querySelector('[data-section-slider]')
+    const secFlipBtn = bar.querySelector('[data-section-flip]')
+    secBtn.addEventListener('click', () => {
+      clipOn = !clipOn
+      secBtn.classList.toggle('active', clipOn)
+      secBtn.setAttribute('aria-pressed', String(clipOn))
+      secCtl.style.display = clipOn ? 'inline-flex' : 'none'
+      updateClipPlane(); applyClipMaterials()
+    })
+    secAxisBtn.addEventListener('click', () => {
+      clipAxis = clipAxis === 'y' ? 'z' : clipAxis === 'z' ? 'x' : 'y'
+      secAxisBtn.textContent = clipAxis.toUpperCase()
+      updateClipPlane()
+    })
+    secSlider.addEventListener('input', () => { clipT = secSlider.value / 100; updateClipPlane() })
+    secFlipBtn.addEventListener('click', () => { clipFlip = !clipFlip; updateClipPlane() })
 
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
