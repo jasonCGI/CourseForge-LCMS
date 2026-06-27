@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from 'react'
+import { projectToScreen, isOccluded } from '../../utils/project3d'
 
 const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
 const GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'
@@ -211,27 +212,12 @@ export default function Model3DViewer({
     const rc = raycasterRef.current || (raycasterRef.current = new THREE.Raycaster())
     const pins = anns.map(ann => {
       const world = new THREE.Vector3(ann.position.x, ann.position.y, ann.position.z)
-      const ndc = world.clone().project(camera)
-      const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
-      // Occlusion: cast camera→pin and hide the pin if the mesh sits in front of
-      // it (so pins on the far side don't show through the model). far=dist limits
-      // the ray to between camera and pin; a small tolerance avoids the pin's own
-      // surface flickering it off.
-      let occluded = false
-      if (model) {
-        const dir = world.clone().sub(camera.position)
-        const dist = dir.length()
-        rc.set(camera.position, dir.normalize())
-        rc.far = dist
-        const hits = rc.intersectObject(model, true)
-        occluded = hits.length > 0 && hits[0].distance < dist - Math.max(0.01, dist * 0.02)
-      }
-      // Hide a pin that's behind the camera (ndc.z>=1) OR projects OUTSIDE the
-      // canvas (|ndc.x|>1 / |ndc.y|>1) — otherwise zooming in pushes pins past the
-      // viewport edge where they'd overflow the frame. Non-finite NDC (degenerate
-      // camera before first updateCamera) is also not-visible.
-      const onScreen = ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1
-      return { id: ann.id, x, y, visible: ndc.z < 1.0 && onScreen && !occluded && Number.isFinite(x) && Number.isFinite(y) }
+      // Per-frame projection + visibility (behind-camera / off-screen / finite)
+      // and surface occlusion via the shared project3d helper. Skip the occlusion
+      // raycast for already-hidden pins — it can't change a not-visible verdict.
+      const s = projectToScreen(world, camera, w, h)
+      const occluded = s.visible && isOccluded(world, camera, model, rc)
+      return { id: ann.id, x: s.x, y: s.y, visible: s.visible && !occluded }
     })
     // This runs every animation frame. Only re-render React when a pin actually
     // moved (>0.5px) or flipped visibility — otherwise a static model would
@@ -258,9 +244,10 @@ export default function Model3DViewer({
     if ((!partHLRef.current && !editableRef.current) || !entry || !camera || !THREE) { clear(); return }
     const canvas = renderer.domElement
     const w = canvas.clientWidth, h = canvas.clientHeight
-    const ndc = entry.centroid.clone().project(camera)
-    const x = (ndc.x * 0.5 + 0.5) * w, y = (-ndc.y * 0.5 + 0.5) * h
-    const visible = ndc.z < 1 && Number.isFinite(x) && Number.isFinite(y)
+    // Same projection + visibility as the pins (now also on-screen culled, so the
+    // label can't overflow the frame when zoomed/panned). No occlusion: the part
+    // is the user's active selection, so keep its name up even if it rotates back.
+    const { x, y, visible } = projectToScreen(entry.centroid, camera, w, h)
     const text = (partsCfgRef.current[key] || {}).label || key
     const prev = lastPartLabelRef.current
     if (!visible) { clear(); return }
