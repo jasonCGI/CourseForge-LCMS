@@ -35,6 +35,7 @@ window.initForge3DPreview = function(container, glbPath) {
     '</span>' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Explode</span>' +
     '<button type="button" data-explode-axis title="Explode direction: radial / X / Y / Z">Radial</button>' +
+    '<button type="button" data-explode-origin title="Pick the explode origin: click a point on the model">⊙ Origin</button>' +
     '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts" style="width:90px;vertical-align:middle">' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Zoom</span>' +
     '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:90px;vertical-align:middle">'
@@ -139,9 +140,15 @@ window.initForge3DPreview = function(container, glbPath) {
     }
     function updateClipPlane() {
       if (!model) return
+      const CLIP_MAX = 0.9   // max cut keeps a sliver so the model never fully vanishes
       clipBox.setFromObject(model)
       const n = CLIP_AXES[clipAxis].clone().multiplyScalar(clipFlip ? -1 : 1)
-      const pos = clipBox.min[clipAxis] + (clipBox.max[clipAxis] - clipBox.min[clipAxis]) * clipT
+      const lo = clipBox.min[clipAxis], hi = clipBox.max[clipAxis]
+      // clipT 0 = no cut, 1 = max cut. For the CURRENT kept side, sweep the plane
+      // from the far edge toward the near edge -> "no cut" stays no-cut across a flip.
+      const from = clipFlip ? hi : lo
+      const to   = clipFlip ? lo : hi
+      const pos  = from + (to - from) * (clipT * CLIP_MAX)
       clipPlane.normal.copy(n)
       clipPlane.constant = -n[clipAxis] * pos
     }
@@ -164,11 +171,9 @@ window.initForge3DPreview = function(container, glbPath) {
     })
     secSlider.addEventListener('input', () => { clipT = secSlider.value / 100; updateClipPlane() })
     secFlipBtn.addEventListener('click', () => {
-      // Flip the kept side AND mirror the slider, so the cut keeps its depth but
-      // from the opposite end (and "no cut" stays no-cut across a flip).
+      // The from/to mapping keeps the slider meaning "cut depth" on either side,
+      // so flipping just swaps which side is kept (no-cut stays no-cut).
       clipFlip = !clipFlip
-      clipT = 1 - clipT
-      secSlider.value = String(Math.round(clipT * 100))
       updateClipPlane()
     })
 
@@ -177,7 +182,7 @@ window.initForge3DPreview = function(container, glbPath) {
     // the model center, in the mesh's parent space), then offset by the slider.
     // Built on first use so it captures the ASSEMBLED rest pose. Best on static
     // models — a playing animation drives the same positions and will fight it.
-    let explodeParts = null, explodeT = 0, explodeAxis = 'radial'
+    let explodeParts = null, explodeT = 0, explodeAxis = 'radial', explodeOrigin = null
     const EX_AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }
     function buildExplodeParts() {
       if (!model) { explodeParts = []; return }
@@ -191,7 +196,7 @@ window.initForge3DPreview = function(container, glbPath) {
       })
       explodeParts = []
       const mb = new THREE.Box3().setFromObject(model)
-      const center = mb.getCenter(new THREE.Vector3())
+      const center = explodeOrigin ? explodeOrigin.clone() : mb.getCenter(new THREE.Vector3())
       const span = mb.getSize(new THREE.Vector3()).length() || 1
       const pInv = new THREE.Matrix4()
       model.traverse((o) => {
@@ -227,6 +232,31 @@ window.initForge3DPreview = function(container, glbPath) {
       explodeAxisBtn.textContent = explodeAxis === 'radial' ? 'Radial' : explodeAxis.toUpperCase()
       buildExplodeParts()       // recompute directions for the new axis
       applyExplode()
+    })
+    // Pick a custom explode origin by clicking on the model (orbit frozen while
+    // armed). Defaults to the model center; handy to explode away from one part.
+    let pickingOrigin = false
+    const originRay = new THREE.Raycaster(), originNdc = new THREE.Vector2()
+    const originBtn = bar2.querySelector('[data-explode-origin]')
+    originBtn.addEventListener('click', () => {
+      pickingOrigin = !pickingOrigin
+      originBtn.classList.toggle('active', pickingOrigin)
+      canvas.style.cursor = pickingOrigin ? 'crosshair' : ''
+      controls.enabled = !pickingOrigin            // freeze orbit so the click reads cleanly
+    })
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!pickingOrigin || !model) return
+      const rect = canvas.getBoundingClientRect()
+      originNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      originRay.setFromCamera(originNdc, camera)
+      const hits = originRay.intersectObject(model, true)
+      if (hits.length) {
+        explodeOrigin = hits[0].point.clone()
+        explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'
+        buildExplodeParts(); applyExplode()
+      }
+      pickingOrigin = false; originBtn.classList.remove('active')
+      canvas.style.cursor = ''; controls.enabled = true
     })
 
     // ── Contact shadow ────────────────────────────────────────────────────
@@ -331,11 +361,12 @@ window.initForge3DPreview = function(container, glbPath) {
       applyClipMaterials()
       // Explode off + reassemble.
       explodeT = 0; explodeSlider.value = '0'
-      explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'
+      explodeAxis = 'radial'; explodeAxisBtn.textContent = 'Radial'; explodeOrigin = null
       applyExplode()               // parts back to their rest position
       explodeParts = null          // next explode rebuilds from the assembled pose
-      // Cancel any focus tween, then reframe.
-      focusAnim = null
+      // Cancel any focus tween, re-enable orbit (in case origin-pick was armed),
+      // then reframe.
+      focusAnim = null; controls.enabled = true
       frameModel()                 // recenter; the controls 'change' resyncs zoom
     })
 
