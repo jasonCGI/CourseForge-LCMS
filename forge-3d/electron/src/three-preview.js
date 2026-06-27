@@ -163,7 +163,14 @@ window.initForge3DPreview = function(container, glbPath) {
       updateClipPlane()
     })
     secSlider.addEventListener('input', () => { clipT = secSlider.value / 100; updateClipPlane() })
-    secFlipBtn.addEventListener('click', () => { clipFlip = !clipFlip; updateClipPlane() })
+    secFlipBtn.addEventListener('click', () => {
+      // Flip the kept side AND mirror the slider, so the cut keeps its depth but
+      // from the opposite end (and "no cut" stays no-cut across a flip).
+      clipFlip = !clipFlip
+      clipT = 1 - clipT
+      secSlider.value = String(Math.round(clipT * 100))
+      updateClipPlane()
+    })
 
     // ── Exploded view ─────────────────────────────────────────────────────
     // Lazily capture each mesh's rest position + an outward unit direction (from
