@@ -14,9 +14,14 @@ window.initForge3DPreview = function(container, glbPath) {
       '<button type="button" data-env="night" aria-pressed="false">Night</button>' +
       '<button type="button" data-env="studio" aria-pressed="false">Studio</button>' +
     '</div>' +
-    '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
-    '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
-    '<button type="button" data-labels aria-pressed="false" title="Show part-name labels on the model">Labels</button>' +
+    '<span data-view-wrap style="position:relative;display:inline-flex">' +
+      '<button type="button" data-view-toggle aria-haspopup="true" aria-expanded="false" title="View options (grid, shadow, labels)">⚙ View</button>' +
+      '<div data-view-pop style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:20;flex-direction:column;gap:4px;min-width:128px;background:#171b24;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px">' +
+        '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
+        '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
+        '<button type="button" data-labels aria-pressed="false" title="Show part-name labels on the model">Labels</button>' +
+      '</div>' +
+    '</span>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
     '<input type="range" data-anim-scrub min="0" max="1000" value="0" style="display:none;width:90px;vertical-align:middle" title="Scrub the animation" aria-label="Animation time">' +
@@ -122,6 +127,26 @@ window.initForge3DPreview = function(container, glbPath) {
       gridBtn.classList.toggle('active', grid.visible)
       gridBtn.setAttribute('aria-pressed', String(grid.visible))
     })
+
+    // ⚙ View popover — secondary display toggles (grid / shadow / labels) live
+    // here so the bar stays uncrowded. The toggles keep their data-* ids, so the
+    // existing bar.querySelector wiring finds them inside the popover.
+    const viewToggle = bar.querySelector('[data-view-toggle]')
+    const viewPop = bar.querySelector('[data-view-pop]')
+    viewToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const open = viewPop.style.display === 'none'
+      viewPop.style.display = open ? 'flex' : 'none'
+      viewToggle.classList.toggle('active', open)
+      viewToggle.setAttribute('aria-expanded', String(open))
+    })
+    const onViewDocClick = (e) => {
+      if (viewPop.style.display !== 'none' && !viewPop.contains(e.target) && e.target !== viewToggle) {
+        viewPop.style.display = 'none'
+        viewToggle.classList.remove('active'); viewToggle.setAttribute('aria-expanded', 'false')
+      }
+    }
+    document.addEventListener('click', onViewDocClick)
 
     // ── Section / cross-cut ───────────────────────────────────────────────
     // One clipping plane on every model material; the toolbar drives its axis,
@@ -622,6 +647,7 @@ window.initForge3DPreview = function(container, glbPath) {
     // Expose teardown for the next initForge3DPreview call.
     window.__forge3dCleanup = function () {
       cancelAnimationFrame(rafId)
+      try { document.removeEventListener('click', onViewDocClick) } catch (e) {}
       try { if (mixer) mixer.stopAllAction() } catch (e) {}
       try { controls.dispose() } catch (e) {}
       try { if (curEnvRT) curEnvRT.dispose() } catch (e) {}
