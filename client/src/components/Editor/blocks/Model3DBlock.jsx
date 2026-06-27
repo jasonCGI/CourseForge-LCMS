@@ -58,6 +58,10 @@ export default function Model3DBlock({ block }) {
   const updatePart  = (key, field, val) =>
     update('parts', { ...partsCfg, [key]: { ...(partsCfg[key] || {}), [field]: val } })
 
+  // Cross-section ("X-ray") clip — split the model along an axis and keep one half.
+  const section = { enabled: false, axis: 'x', position: 0.5, flip: false, ...(block.data.section || {}) }
+  const updateSection = (field, val) => update('section', { ...section, [field]: val })
+
   const handleUpload = useCallback(async (file) => {
     if (!activeProject?.id) return
     setUploading(true); setError(null)
@@ -157,7 +161,7 @@ export default function Model3DBlock({ block }) {
           </div>
         )}
 
-        {(preview || block.data.part_highlight) && hasModel && (
+        {(preview || block.data.part_highlight || section.enabled) && hasModel && (
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               attribution={block.data.attribution}
@@ -167,6 +171,7 @@ export default function Model3DBlock({ block }) {
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
               selectedPartKey={selPart} onPartSelect={setSelPart} onPartsDetected={setDetectedParts}
               onPartLabel={(key, label) => updatePart(key, 'label', label)}
+              section={section}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
         )}
@@ -296,6 +301,42 @@ export default function Model3DBlock({ block }) {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <input type="checkbox" id={`m3d-section-${block.id}`} checked={section.enabled}
+                onChange={e => updateSection('enabled', e.target.checked)} style={{ marginTop: 2 }} />
+              <label htmlFor={`m3d-section-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)', lineHeight: 1.4 }}>
+                Cross-section (X-ray) — slice the model along an axis to reveal the interior
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>
+                  Pick an axis and where to cut; flip keeps the other half.
+                </span>
+              </label>
+            </div>
+
+            {section.enabled && (
+              <div style={{ marginBottom: 14, border: '1px solid var(--cf-border-tertiary)', borderRadius: 6, padding: '10px 12px', background: 'var(--cf-input-bg, #060810)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <label style={labelStyle}>Cut axis</label>
+                    <select value={section.axis} onChange={e => updateSection('axis', e.target.value)}
+                      aria-label="Cross-section axis" style={{ ...inputStyle, width: '100%' }}>
+                      <option value="x">X — left / right</option>
+                      <option value="y">Y — top / bottom</option>
+                      <option value="z">Z — front / back</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                    <input type="checkbox" id={`m3d-section-flip-${block.id}`} checked={!!section.flip}
+                      onChange={e => updateSection('flip', e.target.checked)} style={{ marginBottom: 8 }} />
+                    <label htmlFor={`m3d-section-flip-${block.id}`} style={{ fontSize: 12, color: 'var(--cf-text-secondary)', paddingBottom: 6 }}>Flip — keep the other half</label>
+                  </div>
+                </div>
+                <label style={labelStyle}>Cut position ({Math.round((section.position ?? 0.5) * 100)}%)</label>
+                <input type="range" min="0" max="1" step="0.01" value={section.position ?? 0.5}
+                  onChange={e => updateSection('position', parseFloat(e.target.value))}
+                  aria-label="Cross-section position" style={{ width: '100%' }} />
               </div>
             )}
 

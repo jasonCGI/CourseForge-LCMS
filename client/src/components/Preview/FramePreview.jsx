@@ -2552,6 +2552,7 @@ function PreviewModel3D({ block, fill = false }) {
         selectedPartKey={selPart}
         onPartSelect={setSelPart}
         onPartLabel={setPartLabel}
+        section={block.data.section}
       />
     </div>
   )

@@ -76,6 +76,40 @@ function applyEnvIntensity(model, intensity) {
   })
 }
 
+// Build a clipping plane for the cross-section ("X-ray") setting. axis x|y|z,
+// position 0..1 along the model's bounding box, flip swaps which half is kept.
+// Mirrors the Forge3D viewer's section math and scorm12's runtime twin — three.js
+// discards fragments on the negative side of the plane, so normal = +axis keeps
+// the high side and flip negates it. Keep the three twins in lock-step.
+function buildSectionPlane(THREE, box, section) {
+  const axis = section.axis === 'y' ? 'y' : section.axis === 'z' ? 'z' : 'x'
+  const dir = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }[axis]
+  const n = new THREE.Vector3(dir[0], dir[1], dir[2]).multiplyScalar(section.flip ? -1 : 1)
+  const lo = box.min[axis], hi = box.max[axis]
+  let t = Number(section.position)
+  if (!Number.isFinite(t)) t = 0.5
+  t = Math.max(0, Math.min(1, t))
+  const pos = lo + (hi - lo) * t
+  return new THREE.Plane(n, -n[axis] * pos)
+}
+
+// Apply (or clear, plane=null) a cross-section clip on every material in the
+// model. Stores the original `side` once so it can be restored when section is
+// turned off; meshes go DoubleSide while clipped so the cut reveals the interior.
+function applySectionToModel(THREE, model, plane) {
+  model.traverse(o => {
+    if (!o.material) return
+    const mats = Array.isArray(o.material) ? o.material : [o.material]
+    mats.forEach(m => {
+      if (!m) return
+      if (m.__forgeSide === undefined) m.__forgeSide = m.side
+      m.clippingPlanes = plane ? [plane] : []
+      m.side = plane ? THREE.DoubleSide : m.__forgeSide
+      m.needsUpdate = true
+    })
+  })
+}
+
 // Highlight a part by swapping each of its meshes to an emissive material clone
 // — isolated so meshes that share a material (e.g. cup + saucer both on cup_Mat)
 // highlight independently. level: 0 none · 1 hover · 2 selected.
@@ -107,6 +141,7 @@ export default function Model3DViewer({
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
   onPartSelect = null, onPartsDetected = null, onPartLabel = null,
+  section = null,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -186,6 +221,21 @@ export default function Model3DViewer({
 
   // Controlled selection: repaint when the parent changes selectedPartKey.
   useEffect(() => { selKeyRef.current = selectedPartKey; applyLevels() }, [selectedPartKey, applyLevels])
+
+  // Cross-section ("X-ray") clip — applied in place on the loaded model, no scene
+  // rebuild. modelBoxRef holds the post-transform bounding box (set on load).
+  const sectionRef  = useRef(section)
+  const modelBoxRef = useRef(null)
+  const applySection = useCallback(() => {
+    const THREE = window.THREE
+    const model = modelRef.current
+    if (!THREE || !model) return
+    const s = sectionRef.current
+    const on = !!(s && s.enabled)
+    const box = modelBoxRef.current || new THREE.Box3().setFromObject(model)
+    applySectionToModel(THREE, model, on ? buildSectionPlane(THREE, box, s) : null)
+  }, [])
+  useEffect(() => { sectionRef.current = section; applySection() }, [section, applySection])
 
   const updateCamera = (camera, orbit) => {
     const THREE = window.THREE
@@ -282,6 +332,7 @@ export default function Model3DViewer({
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.localClippingEnabled = true   // honor per-material clippingPlanes (cross-section)
     rendererRef.current = renderer
 
     const scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor)
@@ -310,6 +361,9 @@ export default function Model3DViewer({
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale))
       scene.add(model)
       modelRef.current = model
+      model.updateMatrixWorld(true)
+      modelBoxRef.current = new THREE.Box3().setFromObject(model)   // post-transform box for section
+      applySection()                                                // honor any active cross-section
       if (scene.environment) applyEnvIntensity(model, envIntensity)   // env may already be set
 
       // Detect selectable PARTS: group meshes by name (each named mesh is a part;

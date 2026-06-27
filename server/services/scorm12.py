@@ -1804,6 +1804,24 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             if env_int != env_int or env_int in (float('inf'), float('-inf')):
                 env_int = 1.0
             env_int = max(0.0, min(env_int, 4.0))
+            # Cross-section ("X-ray") clip — split the model along an axis and keep
+            # one half. Validated so the values drop straight into a JS object
+            # literal; runtime twin of the editor's Model3DViewer section logic.
+            sec_raw = data.get('section') or {}
+            sec_axis = str(sec_raw.get('axis', 'x')).lower()
+            if sec_axis not in ('x', 'y', 'z'):
+                sec_axis = 'x'
+            try:
+                sec_pos = float(sec_raw.get('position', 0.5))
+            except (TypeError, ValueError):
+                sec_pos = 0.5
+            if sec_pos != sec_pos or sec_pos in (float('inf'), float('-inf')):
+                sec_pos = 0.5
+            sec_pos = max(0.0, min(1.0, sec_pos))
+            section_json = json.dumps({
+                'enabled': bool(sec_raw.get('enabled')), 'axis': sec_axis,
+                'position': sec_pos, 'flip': bool(sec_raw.get('flip')),
+            })
 
             if not model_id:
                 parts.append('<div style="padding:32px;text-align:center;color:#2A5A8A;font-size:13px">⬡ 3D Model — no model linked</div>')
@@ -1878,6 +1896,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
   var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
   var PARTS_CFG = {parts_json}, PART_HL = {part_hl_js};   // per-mesh part highlighting config
+  var SECTION = {section_json};   // cross-section ("X-ray") clip config
   var ENV_NAME = '{env_name}', HDRI_SRC = '{hdri_src}';   // 'studio' procedural | 'day'/'night' HDRI | 'none'
   var AUTO_ROTATE = {auto_rotate_js};
   var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1913,6 +1932,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
     renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
+    if (SECTION && SECTION.enabled) renderer.localClippingEnabled = true;   // cross-section clip
     var scene = new THREE.Scene(); scene.background = new THREE.Color(bgColor);
     var camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 1000);
     // Image-based lighting for reflective/metallic surfaces. 'day'/'night' load a
@@ -2071,6 +2091,24 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
       model.scale.setScalar(scale); model.position.sub(center.multiplyScalar(scale));
       scene.add(model); loadedModel = model;
       if (envOn) model.traverse(function(o){{ if(o.material){{ var ms=Array.isArray(o.material)?o.material:[o.material]; ms.forEach(function(mt){{ if('envMapIntensity' in mt){{ mt.envMapIntensity=envIntensity; }} }}); }} }});
+      // Cross-section: clip every material against one plane along the chosen axis.
+      // three.js discards fragments on the plane's negative side, so normal=+axis
+      // keeps the high half and flip negates it (twin of Model3DViewer's section).
+      if (SECTION && SECTION.enabled) {{
+        model.updateMatrixWorld(true);
+        var _sb = new THREE.Box3().setFromObject(model);
+        var _sax = SECTION.axis === 'y' ? 'y' : (SECTION.axis === 'z' ? 'z' : 'x');
+        var _sdir = _sax === 'y' ? [0,1,0] : (_sax === 'z' ? [0,0,1] : [1,0,0]);
+        var _sn = new THREE.Vector3(_sdir[0], _sdir[1], _sdir[2]).multiplyScalar(SECTION.flip ? -1 : 1);
+        var _st = Math.max(0, Math.min(1, (typeof SECTION.position === 'number' ? SECTION.position : 0.5)));
+        var _spos = _sb.min[_sax] + (_sb.max[_sax] - _sb.min[_sax]) * _st;
+        var _splane = new THREE.Plane(_sn, -_sn[_sax] * _spos);
+        model.traverse(function(o) {{
+          if (!o.material) return;
+          var ms = Array.isArray(o.material) ? o.material : [o.material];
+          ms.forEach(function(m) {{ if (!m) return; m.clippingPlanes = [_splane]; m.side = THREE.DoubleSide; m.needsUpdate = true; }});
+        }});
+      }}
       // Group meshes by name into parts; centroid (world space) anchors the label.
       if (PART_HL) {{
         model.updateMatrixWorld(true);
