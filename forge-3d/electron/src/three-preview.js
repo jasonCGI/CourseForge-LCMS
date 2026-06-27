@@ -20,6 +20,7 @@ window.initForge3DPreview = function(container, glbPath) {
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
     '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
+    '<button type="button" data-reset title="Reset the view + tools (section off, explode off, recenter)">↺ Reset</button>' +
     '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
   // Second row: model-inspection tools (section / explode / zoom) so the bar
   // doesn't wrap.
@@ -27,7 +28,7 @@ window.initForge3DPreview = function(container, glbPath) {
   bar2.className = 'f3d-viewer-bar'
   bar2.innerHTML =
     '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
-    '<span data-section-ctl style="display:none;align-items:center;gap:6px">' +
+    '<span data-section-ctl style="display:inline-flex;align-items:center;gap:6px;opacity:0.4;transition:opacity .15s">' +
       '<button type="button" data-section-axis title="Cut axis (X / Y / Z)">Y</button>' +
       '<input type="range" data-section-slider min="0" max="100" value="50" aria-label="Section position" style="width:90px;vertical-align:middle">' +
       '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
@@ -153,7 +154,7 @@ window.initForge3DPreview = function(container, glbPath) {
       clipOn = !clipOn
       secBtn.classList.toggle('active', clipOn)
       secBtn.setAttribute('aria-pressed', String(clipOn))
-      secCtl.style.display = clipOn ? 'inline-flex' : 'none'
+      secCtl.style.opacity = clipOn ? '1' : '0.4'   // dim (not hide) -> no layout jump
       updateClipPlane(); applyClipMaterials()
     })
     secAxisBtn.addEventListener('click', () => {
@@ -303,6 +304,21 @@ window.initForge3DPreview = function(container, glbPath) {
       zoomSlider.value = String(Math.round((1 - Math.max(0, Math.min(1, t))) * 100))
     })
 
+    // ── Reset everything ──────────────────────────────────────────────────
+    // One clean escape hatch when the user gets lost: section off, explode off,
+    // focus cancelled, and reframe the model.
+    bar.querySelector('[data-reset]').addEventListener('click', () => {
+      if (clipOn) {
+        clipOn = false
+        secBtn.classList.remove('active'); secBtn.setAttribute('aria-pressed', 'false')
+        secCtl.style.opacity = '0.4'
+        applyClipMaterials()
+      }
+      explodeT = 0; explodeSlider.value = '0'; applyExplode()
+      focusAnim = null
+      frameModel()   // recenter; the controls 'change' resyncs the zoom slider
+    })
+
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
     draco.setDecoderPath(V + '/draco/')
@@ -353,6 +369,14 @@ window.initForge3DPreview = function(container, glbPath) {
     gltfLoader.setDRACOLoader(draco)
     gltfLoader.load(fileUrl, (gltf) => {
       model = gltf.scene
+      // Some exports ship without vertex normals -> the model renders as a flat
+      // black silhouette under lighting. Recompute them when absent (meshes that
+      // already have normals are left untouched).
+      model.traverse((o) => {
+        if (o.isMesh && o.geometry && !o.geometry.getAttribute('normal')) {
+          o.geometry.computeVertexNormals()
+        }
+      })
       const box = new THREE.Box3().setFromObject(model)
       model.position.sub(box.getCenter(new THREE.Vector3()))   // rest pose at origin
       scene.add(model)
