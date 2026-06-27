@@ -10,9 +10,9 @@ window.initForge3DPreview = function(container, glbPath) {
   bar.innerHTML =
     '<div class="f3d-env-group" role="group" aria-label="Environment lighting">' +
       '<span class="f3d-viewer-bar-label">Environment</span>' +
-      '<button type="button" data-env="studio" class="active" aria-pressed="true">Studio</button>' +
-      '<button type="button" data-env="day" aria-pressed="false">Day</button>' +
+      '<button type="button" data-env="day" class="active" aria-pressed="true">Day</button>' +
       '<button type="button" data-env="night" aria-pressed="false">Night</button>' +
+      '<button type="button" data-env="studio" aria-pressed="false">Studio</button>' +
     '</div>' +
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
     '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
@@ -83,7 +83,7 @@ window.initForge3DPreview = function(container, glbPath) {
         scene.background = tex                              // show the HDRI so day/night reads clearly
       }, undefined, () => { /* keep current env on load error */ })
     }
-    setEnv('studio')
+    setEnv('day')
 
     bar.querySelectorAll('[data-env]').forEach((btn) => {
       btn.addEventListener('click', () => {
