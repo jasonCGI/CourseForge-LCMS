@@ -320,11 +320,13 @@ window.initForge3DPreview = function(container, glbPath) {
       const hits = hoverRay.intersectObject(model, true)
       const mesh = hits.length ? hits[0].object : null
       if (mesh === hovered) return
-      setHoverGlow(hovered, false)
+      setHoverGlow(hovered, false); setLabelActive(labelForMesh(hovered), false)
       hovered = mesh
-      setHoverGlow(hovered, true)
+      setHoverGlow(hovered, true); setLabelActive(labelForMesh(hovered), true)
     })
-    canvas.addEventListener('pointerleave', () => { setHoverGlow(hovered, false); hovered = null })
+    canvas.addEventListener('pointerleave', () => {
+      setLabelActive(labelForMesh(hovered), false); setHoverGlow(hovered, false); hovered = null
+    })
 
     // ── Part labels (HTML overlay) ────────────────────────────────────────
     // Project each named mesh's centre to screen each frame and place an HTML
@@ -337,6 +339,17 @@ window.initForge3DPreview = function(container, glbPath) {
       _lblNdc.copy(point).project(cam)
       const visible = _lblNdc.z > -1 && _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
       return { x: (_lblNdc.x * 0.5 + 0.5) * w, y: (-_lblNdc.y * 0.5 + 0.5) * h, visible }
+    }
+    // Mesh <-> label cross-highlight: hovering a part lights its label, and
+    // hovering a label lights the part. labelForMesh maps a hovered mesh back to
+    // its label item; setLabelActive swaps the label to its highlighted style.
+    function labelForMesh(mesh) { return mesh ? labelItems.find(it => it.mesh === mesh) : null }
+    function setLabelActive(it, on) {
+      if (!it) return
+      it.el.style.background = on ? 'rgba(123,110,253,.95)' : 'rgba(18,20,30,.85)'
+      it.el.style.color = on ? '#fff' : '#C9C2FF'
+      it.el.style.borderColor = on ? '#C9C2FF' : 'rgba(123,110,253,.45)'
+      it.el.style.zIndex = on ? '5' : ''
     }
     function buildLabels() {
       labelItems.forEach(it => it.el.remove())
@@ -355,8 +368,14 @@ window.initForge3DPreview = function(container, glbPath) {
         el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(18,20,30,.85);' +
           'color:#C9C2FF;font:600 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;' +
           'white-space:nowrap;border:1px solid rgba(123,110,253,.45)'
+        el.style.pointerEvents = 'auto'; el.style.cursor = 'default'
         labelsLayer.appendChild(el)
-        labelItems.push({ el, mesh: o, local })
+        const item = { el, mesh: o, local }
+        // Hovering the label lights the part it names (and itself); leaving it
+        // clears the part unless the cursor is currently over that part on canvas.
+        el.addEventListener('pointerenter', () => { setHoverGlow(o, true); setLabelActive(item, true) })
+        el.addEventListener('pointerleave', () => { if (hovered !== o) setHoverGlow(o, false); setLabelActive(item, false) })
+        labelItems.push(item)
       })
     }
     function updateLabels() {
