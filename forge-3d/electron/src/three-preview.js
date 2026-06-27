@@ -308,9 +308,11 @@ window.initForge3DPreview = function(container, glbPath) {
     let labelsOn = false        // labels drawn?
     let labelByGroup = true     // group-level vs per-part (only matters when grouped)
     let grouped = false         // does the model have group-level organisation?
-    let units = []              // { name, meshes[], frameNode, anchorNode, local, el }
+    let units = []              // { name, meshes[], anchorNode, local, el }
     let hoveredUnit = null
     const meshToUnit = new Map()
+    let _layerW = 0, _layerH = 0   // cached overlay size (refreshed in fit(), read per frame)
+    let hoverDirty = false         // a pointermove queued a raycast for the next frame
 
     function projectToScreen(point, cam, w, h) {
       _lblNdc.copy(point).project(cam)
@@ -365,8 +367,15 @@ window.initForge3DPreview = function(container, glbPath) {
         window.addEventListener('pointerup', () => { el.style.pointerEvents = 'auto' }, { once: true })
       })
       // Double-click a label to frame its unit (mirrors dblclick on the mesh).
-      el.addEventListener('dblclick', () => { focusOnBox(new THREE.Box3().setFromObject(u.frameNode)) })
+      el.addEventListener('dblclick', () => { focusOnBox(unitBox(u)) })
     }
+    // "Wheel_FL" / "Wheel.001" / "Wheel-R" -> "Wheel"; single-token names stay whole.
+    function namePrefix(name) {
+      const parts = (name || '').trim().split(/[ _.\-]+/).filter(Boolean)
+      return parts.length > 1 ? parts.slice(0, -1).join('_') : (parts[0] || '')
+    }
+    // World-space union box of a unit's meshes (for framing on dbl-click).
+    function unitBox(u) { const b = new THREE.Box3(); for (const m of u.meshes) b.expandByObject(m); return b }
     // Rebuild the unit list + mesh->unit map (and the label els when labels are
     // on). Called on load and whenever the label mode toggles. Detects grouping
     // by descending past any single wrapper node (e.g. a lone glTF "RootNode") to
@@ -383,20 +392,39 @@ window.initForge3DPreview = function(container, glbPath) {
         break
       }
       const containers = level.children.filter((c) => meshesUnder(c).length)
-      grouped = containers.some((c) => !c.isMesh && meshesUnder(c).length > 1)
+      // 1) Real scene-graph groups: named container nodes holding >1 mesh.
+      let groupDefs = null
+      if (containers.some((c) => !c.isMesh && meshesUnder(c).length > 1)) {
+        groupDefs = containers.map((c, i) => ({ name: (c.name || ('Group ' + (i + 1))).trim(), meshes: meshesUnder(c) }))
+      } else {
+        // 2) Flat model: synthesize groups from shared name prefixes (e.g.
+        //    Wheel_FL / Wheel_FR -> "Wheel"). Adopt only if it actually groups
+        //    parts (more than one prefix, and at least one prefix with >1 mesh).
+        const meshes = meshesUnder(model)
+        const byPrefix = new Map()
+        for (const m of meshes) {
+          const p = namePrefix(m.name) || 'Part'
+          if (!byPrefix.has(p)) byPrefix.set(p, [])
+          byPrefix.get(p).push(m)
+        }
+        if (byPrefix.size > 1 && byPrefix.size < meshes.length && [...byPrefix.values()].some((a) => a.length > 1)) {
+          groupDefs = [...byPrefix.entries()].map(([name, ms]) => ({ name, meshes: ms }))
+        }
+      }
+      grouped = !!groupDefs
       let defs
       if (grouped && labelByGroup) {
-        defs = containers.map((c, i) => ({ node: c, name: (c.name || ('Group ' + (i + 1))).trim(), meshes: meshesUnder(c) }))
+        defs = groupDefs
       } else {
         let i = 0
         defs = meshesUnder(model).map((m) => {
-          i++; return { node: m, name: (m.name || (m.parent && m.parent.name) || ('Part ' + i)).trim(), meshes: [m] }
+          i++; return { name: (m.name || (m.parent && m.parent.name) || ('Part ' + i)).trim(), meshes: [m] }
         })
       }
       for (const d of defs) {
-        const wc = new THREE.Box3().setFromObject(d.node).getCenter(new THREE.Vector3())
-        const local = d.node.worldToLocal(wc.clone())   // anchor kept in the node's frame
-        const u = { name: d.name, meshes: d.meshes, frameNode: d.node, anchorNode: d.node, local, el: null }
+        const u = { name: d.name, meshes: d.meshes, anchorNode: d.meshes[0], local: new THREE.Vector3(), el: null }
+        const wc = unitBox(u).getCenter(new THREE.Vector3())
+        u.local.copy(u.anchorNode.worldToLocal(wc.clone()))   // anchor kept in the first mesh's frame
         if (labelsOn) makeLabelEl(u)
         units.push(u)
         for (const m of d.meshes) meshToUnit.set(m, u)
@@ -405,7 +433,7 @@ window.initForge3DPreview = function(container, glbPath) {
     }
     function updateLabels() {
       if (!labelsOn || !units.length) return
-      const w = labelsLayer.clientWidth, h = labelsLayer.clientHeight
+      const w = _layerW, h = _layerH
       for (const u of units) {
         if (!u.el) continue
         _lblWorld.copy(u.local); u.anchorNode.localToWorld(_lblWorld)
@@ -416,10 +444,18 @@ window.initForge3DPreview = function(container, glbPath) {
       }
     }
 
+    // Pointermove only records the cursor and flags it; the raycast runs once per
+    // frame in updateHover() (called from the render loop) so fast mouse motion
+    // can't fire dozens of raycasts between frames.
     canvas.addEventListener('pointermove', (e) => {
       if (!model || pickingOrigin) return
       const rect = canvas.getBoundingClientRect()
       hoverNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      hoverDirty = true
+    })
+    function updateHover() {
+      if (!hoverDirty || !model || pickingOrigin) return
+      hoverDirty = false
       hoverRay.setFromCamera(hoverNdc, camera)
       const hits = hoverRay.intersectObject(model, true)
       const u = hits.length ? meshToUnit.get(hits[0].object) : null
@@ -427,8 +463,9 @@ window.initForge3DPreview = function(container, glbPath) {
       glowUnit(hoveredUnit, false); setLabelActive(hoveredUnit, false)
       hoveredUnit = u
       glowUnit(hoveredUnit, true); setLabelActive(hoveredUnit, true)
-    })
+    }
     canvas.addEventListener('pointerleave', () => {
+      hoverDirty = false
       glowUnit(hoveredUnit, false); setLabelActive(hoveredUnit, false); hoveredUnit = null
     })
 
@@ -690,6 +727,7 @@ window.initForge3DPreview = function(container, glbPath) {
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix()
       labelsLayer.style.left = canvas.offsetLeft + 'px'; labelsLayer.style.top = canvas.offsetTop + 'px'
       labelsLayer.style.width = w + 'px'; labelsLayer.style.height = h + 'px'
+      _layerW = w; _layerH = h                 // cache for per-frame label projection
     }
     const ro = new ResizeObserver(fit); ro.observe(canvas); fit()
 
@@ -711,6 +749,7 @@ window.initForge3DPreview = function(container, glbPath) {
         if (focusAnim.t >= 1) focusAnim = null
       }
       controls.update()
+      updateHover()
       renderer.render(scene, camera)
       updateLabels()
     })()
