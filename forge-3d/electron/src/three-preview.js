@@ -19,6 +19,7 @@ window.initForge3DPreview = function(container, glbPath) {
     '<button type="button" data-labels aria-pressed="false" title="Show part-name labels on the model">Labels</button>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
+    '<input type="range" data-anim-scrub min="0" max="1000" value="0" style="display:none;width:90px;vertical-align:middle" title="Scrub the animation" aria-label="Animation time">' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
     '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
     '<button type="button" data-reset title="Reset the view + tools (section off, explode off, recenter)">↺ Reset</button>' +
@@ -471,7 +472,8 @@ window.initForge3DPreview = function(container, glbPath) {
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
     const draco = new DRACOLoader()
     draco.setDecoderPath(V + '/draco/')
-    let mixer = null, model = null, followTarget = null, following = false
+    let mixer = null, model = null, followTarget = null, following = false, animMaxDur = 0
+    const animScrub = bar.querySelector('[data-anim-scrub]')
     const clock = new THREE.Clock()
     const modelBox = new THREE.Box3()
     const tmpC = new THREE.Vector3(), tmpD = new THREE.Vector3(), tmpS = new THREE.Vector3()
@@ -547,14 +549,24 @@ window.initForge3DPreview = function(container, glbPath) {
       if (gltf.animations && gltf.animations.length) {
         mixer = new THREE.AnimationMixer(model)
         gltf.animations.forEach((clip) => mixer.clipAction(clip).play())
+        animMaxDur = Math.max(0.001, ...gltf.animations.map(c => c.duration || 0))
         const animBtn = bar.querySelector('[data-anim]')
+        const setAnimLabel = (playing) => {
+          animBtn.setAttribute('aria-pressed', String(playing))
+          animBtn.textContent = `${playing ? '⏸' : '▶'} Anim (${gltf.animations.length})`
+        }
         animBtn.style.display = ''
-        animBtn.textContent = `⏸ Anim (${gltf.animations.length})`
+        if (animScrub) animScrub.style.display = ''
+        setAnimLabel(true)
         animBtn.addEventListener('click', () => {
           const playing = mixer.timeScale !== 0
           mixer.timeScale = playing ? 0 : 1
-          animBtn.setAttribute('aria-pressed', String(!playing))
-          animBtn.textContent = `${playing ? '▶' : '⏸'} Anim (${gltf.animations.length})`
+          setAnimLabel(!playing)
+        })
+        if (animScrub) animScrub.addEventListener('input', () => {
+          mixer.timeScale = 0                       // scrubbing pauses playback
+          mixer.setTime((animScrub.value / 1000) * animMaxDur)
+          setAnimLabel(false)
         })
         // Follow only matters when something moves — reveal it for animated models.
         bar.querySelector('[data-follow]').style.display = ''
@@ -592,7 +604,11 @@ window.initForge3DPreview = function(container, glbPath) {
     ;(function animate() {
       rafId = requestAnimationFrame(animate)
       const dt = clock.getDelta()
-      if (mixer) mixer.update(dt)
+      if (mixer) {
+        mixer.update(dt)
+        if (animScrub && animMaxDur && mixer.timeScale !== 0)
+          animScrub.value = String(Math.round(((mixer.time % animMaxDur) / animMaxDur) * 1000))
+      }
       if (following) followModel()
       if (focusAnim) {
         focusAnim.t = Math.min(1, focusAnim.t + dt / 0.4)
