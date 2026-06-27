@@ -259,6 +259,38 @@ window.initForge3DPreview = function(container, glbPath) {
       canvas.style.cursor = ''; controls.enabled = true
     })
 
+    // ── Hover highlight ───────────────────────────────────────────────────
+    // Emissive glow on the mesh under the cursor (the OutlinePass substitute —
+    // no postprocessing addon in the offline bundle). Restores on leave.
+    const hoverRay = new THREE.Raycaster(), hoverNdc = new THREE.Vector2()
+    let hovered = null
+    function setHoverGlow(mesh, on) {
+      if (!mesh) return
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const m of mats) {
+        if (!m || !m.emissive) continue
+        if (on) {
+          if (m.__forgeEmis === undefined) { m.__forgeEmis = m.emissive.getHex(); m.__forgeEmisI = m.emissiveIntensity }
+          m.emissive.setHex(0x2A3A55); m.emissiveIntensity = 1
+        } else if (m.__forgeEmis !== undefined) {
+          m.emissive.setHex(m.__forgeEmis); m.emissiveIntensity = m.__forgeEmisI
+        }
+      }
+    }
+    canvas.addEventListener('pointermove', (e) => {
+      if (!model || pickingOrigin) return
+      const rect = canvas.getBoundingClientRect()
+      hoverNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      hoverRay.setFromCamera(hoverNdc, camera)
+      const hits = hoverRay.intersectObject(model, true)
+      const mesh = hits.length ? hits[0].object : null
+      if (mesh === hovered) return
+      setHoverGlow(hovered, false)
+      hovered = mesh
+      setHoverGlow(hovered, true)
+    })
+    canvas.addEventListener('pointerleave', () => { setHoverGlow(hovered, false); hovered = null })
+
     // ── Contact shadow ────────────────────────────────────────────────────
     // A soft radial-gradient blob on a ground plane under the model (no
     // postprocessing addon needed — those aren't in the offline bundle). Sized to
