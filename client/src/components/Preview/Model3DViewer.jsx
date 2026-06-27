@@ -141,7 +141,7 @@ export default function Model3DViewer({
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
   onPartSelect = null, onPartsDetected = null, onPartLabel = null,
-  section = null, onCapture = null,
+  section = null, onCapture = null, hideHints = false,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -685,17 +685,17 @@ export default function Model3DViewer({
           <span style={{ fontSize: 28 }}>⚠</span><span style={{ fontSize: 13, color: '#E87070' }}>{error}</span>
         </div>
       )}
-      {hint && !loading && !error && !pinMode && (
+      {hint && !hideHints && !loading && !error && !pinMode && (
         <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(4,44,83,0.75)', color: '#B5D4F4', fontSize: 10, fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '4px 10px', borderRadius: 20, letterSpacing: '0.06em', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
           drag to rotate · scroll to zoom · R to reset
         </div>
       )}
-      {!loading && !error && (
+      {!hideHints && !loading && !error && (
         <div aria-hidden="true" style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', color: '#3A5A7A', fontSize: 9, fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '3px 8px', borderRadius: 4, letterSpacing: '0.06em' }}>
           ↑↓←→ orbit · +/- zoom · R reset
         </div>
       )}
-      {attribution && !loading && !error && (
+      {attribution && !hideHints && !loading && !error && (
         <div style={{ position: 'absolute', bottom: 6, left: 8, maxWidth: '70%',
           background: 'rgba(0,0,0,0.45)', color: '#9FB4CC', fontSize: 8.5,
           fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', padding: '2px 7px',

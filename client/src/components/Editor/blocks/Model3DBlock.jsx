@@ -15,7 +15,7 @@ export default function Model3DBlock({ block }) {
 
   const [uploading, setUploading] = useState(false)
   const [error, setError]         = useState(null)
-  const [editing, setEditing]     = useState(false)   // false = clean still; true = live annotation editor
+  const [placing, setPlacing]     = useState(false)   // false = clean still; true = live "place a pin" workflow
   const [pinMode, setPinMode]     = useState(false)
   const [pendingPin, setPendingPin] = useState(null)
   const [newLabel, setNewLabel]   = useState('')
@@ -65,9 +65,9 @@ export default function Model3DBlock({ block }) {
   const viewerHeight = block.data.bounds?.height || block.data.viewer_height || 400
 
   // The resting editor shows a clean STILL thumbnail of the model; the live
-  // interactive viewer (with pin tools) only mounts in "live mode": while
-  // editing annotations, or when part-highlight / X-ray force it (as before).
-  const liveMode = editing || !!block.data.part_highlight || section.enabled
+  // interactive viewer only mounts in "live mode": while actively placing a pin,
+  // or when part-highlight / X-ray editing force it (as before).
+  const liveMode = placing || !!block.data.part_highlight || section.enabled
 
   // Signature of everything that changes how the still looks. When it drifts from
   // the stored thumb_sig the thumbnail is stale → recapture (mount a hidden viewer).
@@ -100,6 +100,13 @@ export default function Model3DBlock({ block }) {
 
   const onDrop = useCallback((e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f) }, [handleUpload])
 
+  // "✦ Place pin" — the primary action: open the live viewer ALREADY in
+  // pin-placement mode (crosshair + "click the model" prompt), no extra step.
+  const startPlacing = () => { setPlacing(true); setPinMode(true); cancelPin() }
+  // "Done" — leave the live viewer and return to the calm still. The still
+  // recaptures itself from the session capture (model unchanged → no flash).
+  const stopPlacing = () => { setPlacing(false); setPinMode(false); cancelPin() }
+
   const handlePinPlaced = useCallback((position3D) => {
     setPendingPin(position3D); setPinMode(false); setNewLabel(''); setNewDesc('')
   }, [])
@@ -111,8 +118,12 @@ export default function Model3DBlock({ block }) {
       position: pendingPin, color: DOT_COLOR,
     }])
     setPendingPin(null); setNewLabel(''); setNewDesc('')
+    if (placing) setPinMode(true)   // stay armed to place another
   }
-  const cancelPin = () => { setPendingPin(null); setNewLabel(''); setNewDesc('') }
+  const cancelPin = () => {
+    setPendingPin(null); setNewLabel(''); setNewDesc('')
+    if (placing) setPinMode(true)   // back to placement-ready
+  }
 
   const saveEdit = (id, label, desc) => {
     update('annotations', annotations.map(a => a.id === id ? { ...a, label: label.trim(), description: desc.trim() } : a))
@@ -141,12 +152,21 @@ export default function Model3DBlock({ block }) {
           {hasModel ? `${block.data.model_filename} · ${annotations.length} annotation${annotations.length !== 1 ? 's' : ''}` : 'GLB · Three.js viewer'}
         </span>
         {hasModel && (
-          <button onClick={() => { setEditing(p => !p); setPinMode(false) }} aria-pressed={editing}
-            style={{ padding: '3px 10px', background: editing ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'transparent',
-              border: `1px solid ${editing ? 'var(--forge-amber)' : 'var(--cf-border-tertiary)'}`, borderRadius: 4,
-              color: editing ? 'var(--forge-amber)' : 'var(--cf-text-tertiary)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>
-            {editing ? '▼ Done' : '✦ Edit annotations'}
-          </button>
+          placing ? (
+            <button onClick={stopPlacing}
+              style={{ padding: '3px 10px', background: 'color-mix(in srgb, var(--forge-amber) 15%, transparent)',
+                border: '1px solid var(--forge-amber)', borderRadius: 4,
+                color: 'var(--forge-amber)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>
+              ✓ Done
+            </button>
+          ) : (
+            <button onClick={startPlacing}
+              style={{ padding: '3px 10px', background: 'transparent',
+                border: '1px solid var(--cf-border-tertiary)', borderRadius: 4,
+                color: 'var(--cf-text-tertiary)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>
+              ✦ Place pin
+            </button>
+          )
         )}
         <button onClick={() => moveBlock(block.id, 'up')} aria-label="Move block up" style={iconBtn}>↑</button>
         <button onClick={() => moveBlock(block.id, 'down')} aria-label="Move block down" style={iconBtn}>↓</button>
@@ -178,18 +198,32 @@ export default function Model3DBlock({ block }) {
               <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--cf-text-primary)' }}>{block.data.model_filename}</div>
               <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{block.data.file_size_mb ? `${block.data.file_size_mb} MB` : 'GLB model'} · Three.js r128</div>
             </div>
-            <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [], thumb_url: null, thumb_sig: null }); setEditing(false); setPinMode(false) }}
+            <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [], thumb_url: null, thumb_sig: null }); setPlacing(false); setPinMode(false) }}
               aria-label="Remove model" style={{ background: 'none', border: 'none', color: '#E87070', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
           </div>
         )}
 
         {hasModel && liveMode && (
           <div style={{ marginBottom: 14 }}>
+            {placing && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 8,
+                background: 'color-mix(in srgb, var(--forge-amber) 8%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent)', borderRadius: 6 }}>
+                <span style={{ flex: 1, fontSize: 11, color: 'var(--cf-text-secondary)', fontFamily: 'var(--cf-font)' }}>
+                  {pendingPin ? 'Fill in the label below, then ✓ Add annotation.'
+                    : (<><strong style={{ color: 'var(--forge-amber)' }}>Click the model</strong> to place a pin · drag to rotate · scroll to zoom</>)}
+                </span>
+                <button onClick={stopPlacing}
+                  style={{ padding: '4px 12px', background: 'var(--forge-amber)', color: '#042C53', border: 'none',
+                    borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>✓ Done</button>
+              </div>
+            )}
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
-              attribution={block.data.attribution}
+              attribution={placing ? '' : block.data.attribution}
+              hideHints={placing}
               height={viewerHeight} bgColor={bg}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
-              decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
+              decorative={block.data.decorative} autoRotate={placing ? false : block.data.auto_rotate}
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
               selectedPartKey={selPart} onPartSelect={setSelPart} onPartsDetected={setDetectedParts}
               onPartLabel={(key, label) => updatePart(key, 'label', label)}
@@ -208,12 +242,12 @@ export default function Model3DBlock({ block }) {
               style={{ position: 'absolute', top: 8, right: 8, padding: '3px 9px', background: 'rgba(4,44,83,0.7)',
                 border: '1px solid var(--cf-border-tertiary)', borderRadius: 4, color: '#B5D4F4', fontSize: 10,
                 cursor: 'pointer', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)' }}>↻ Re-capture</button>
-            <button onClick={() => { setEditing(true); setPinMode(false) }}
+            <button onClick={startPlacing}
               style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
-                padding: '5px 14px', background: 'color-mix(in srgb, var(--forge-amber) 90%, transparent)',
-                border: 'none', borderRadius: 20, color: '#042C53', fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--cf-font)', boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
-              ✦ Edit annotations
+                padding: '7px 18px', background: 'var(--forge-amber)',
+                border: 'none', borderRadius: 20, color: '#042C53', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'var(--cf-font)', boxShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
+              ✦ Place pin
             </button>
           </div>
         )}
@@ -417,22 +451,19 @@ export default function Model3DBlock({ block }) {
             <div style={{ borderTop: '1px solid var(--cf-border-tertiary)', paddingTop: 14, marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ ...labelStyle, marginBottom: 0, flex: 1 }}>Annotations ({annotations.length})</span>
-                {liveMode && !pendingPin && (
-                  <button onClick={() => setPinMode(p => !p)} aria-pressed={pinMode}
-                    style={{ padding: '5px 12px', background: pinMode ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'transparent',
-                      border: `1px solid ${pinMode ? 'var(--forge-amber)' : 'var(--cf-border-tertiary)'}`, borderRadius: 4,
-                      color: pinMode ? 'var(--forge-amber)' : 'var(--cf-text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--cf-font)', fontWeight: 600 }}>
-                    {pinMode ? '✕ Cancel placement' : '✦ Place pin'}
+                {!pendingPin && (
+                  <button onClick={placing ? stopPlacing : startPlacing} aria-pressed={placing}
+                    style={{ padding: '5px 12px', background: placing ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'var(--forge-amber)',
+                      border: `1px solid ${placing ? 'var(--forge-amber)' : 'transparent'}`, borderRadius: 4,
+                      color: placing ? 'var(--forge-amber)' : '#042C53', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--cf-font)', fontWeight: 700 }}>
+                    {placing ? '✓ Done placing' : '✦ Place pin'}
                   </button>
-                )}
-                {!liveMode && !pendingPin && (
-                  <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontStyle: 'italic' }}>click “Edit annotations” to place pins</span>
                 )}
               </div>
 
               {annotations.length === 0 ? (
                 <p style={{ fontSize: 12, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)' }}>
-                  // no annotations yet · click “Edit annotations” then ✦ Place pin
+                  // no annotations yet · click ✦ Place pin, then click the model
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
