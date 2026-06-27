@@ -141,7 +141,7 @@ export default function Model3DViewer({
   environment = 'studio', envIntensity = 1, decorative = false, autoRotate = false,
   partHighlight = false, parts = {}, selectedPartKey = null,
   onPartSelect = null, onPartsDetected = null, onPartLabel = null,
-  section = null,
+  section = null, onCapture = null,
 }) {
   const canvasRef   = useRef(null)
   const rendererRef = useRef(null)
@@ -175,6 +175,32 @@ export default function Model3DViewer({
   useEffect(() => { autoRotateRef.current = autoRotate }, [autoRotate])
   const pinModeRef = useRef(pinMode)
   useEffect(() => { pinModeRef.current = pinMode }, [pinMode])
+
+  // Thumbnail capture: after the model has loaded and rendered a few frames (so
+  // the env map + camera have settled), grab a downscaled JPEG of the WebGL
+  // canvas and hand it back. Only the canvas pixels are captured — the HTML pin /
+  // label / hint overlays live in the DOM, so the still is automatically clean
+  // (model only, no pins, no control bars). Requires preserveDrawingBuffer.
+  const onCaptureRef     = useRef(onCapture)
+  const capturedRef      = useRef(false)
+  const framesSinceLoad  = useRef(0)
+  useEffect(() => { onCaptureRef.current = onCapture }, [onCapture])
+  const captureThumb = useCallback(() => {
+    const renderer = rendererRef.current
+    if (!renderer || !onCaptureRef.current) return
+    try {
+      const src = renderer.domElement
+      if (!src.width || !src.height) return
+      const maxW = 480
+      const scale = Math.min(1, maxW / src.width)
+      const tc = document.createElement('canvas')
+      tc.width  = Math.max(1, Math.round(src.width * scale))
+      tc.height = Math.max(1, Math.round(src.height * scale))
+      const ctx = tc.getContext('2d')
+      ctx.drawImage(src, 0, 0, tc.width, tc.height)
+      onCaptureRef.current(tc.toDataURL('image/jpeg', 0.85))
+    } catch (_) { /* tainted/lost context — skip; still falls back to placeholder */ }
+  }, [])
 
   // Part-highlighting: parts[] = {key, meshes[], origMats[], clones[], level, centroid}.
   const partsRef       = useRef([])
@@ -329,7 +355,7 @@ export default function Model3DViewer({
     // to the `height` prop before layout settles (clientHeight 0).
     const h = fill ? (canvas.clientHeight || height) : height
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
     renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.localClippingEnabled = true   // honor per-material clippingPlanes (cross-section)
@@ -386,6 +412,7 @@ export default function Model3DViewer({
       applyLevels()   // reflect any pre-set selection
 
       orbitRef.current.radius = 3; updateCamera(camera, orbitRef.current)
+      capturedRef.current = false; framesSinceLoad.current = 0   // arm thumbnail capture
       setLoading(false); onLoad?.()
     }, undefined, () => { setError('Failed to load 3D model.'); setLoading(false) })
 
@@ -400,6 +427,11 @@ export default function Model3DViewer({
         updateCamera(camera, o)
       }
       renderer.render(scene, camera)
+      // One-shot thumbnail grab a few frames after the model loads (env + camera
+      // settled). preserveDrawingBuffer keeps the just-rendered frame readable.
+      if (modelRef.current && onCaptureRef.current && !capturedRef.current) {
+        if (++framesSinceLoad.current >= 8) { capturedRef.current = true; captureThumb() }
+      }
       projectAnnotations(camera, renderer)
       projectPartLabel(camera, renderer)
     }

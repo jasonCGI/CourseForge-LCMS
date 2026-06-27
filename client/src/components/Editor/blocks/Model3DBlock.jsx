@@ -15,7 +15,7 @@ export default function Model3DBlock({ block }) {
 
   const [uploading, setUploading] = useState(false)
   const [error, setError]         = useState(null)
-  const [preview, setPreview]     = useState(false)
+  const [editing, setEditing]     = useState(false)   // false = clean still; true = live annotation editor
   const [pinMode, setPinMode]     = useState(false)
   const [pendingPin, setPendingPin] = useState(null)
   const [newLabel, setNewLabel]   = useState('')
@@ -61,6 +61,28 @@ export default function Model3DBlock({ block }) {
   // Cross-section ("X-ray") clip — split the model along an axis and keep one half.
   const section = { enabled: false, axis: 'x', position: 0.5, flip: false, ...(block.data.section || {}) }
   const updateSection = (field, val) => update('section', { ...section, [field]: val })
+
+  const viewerHeight = block.data.bounds?.height || block.data.viewer_height || 400
+
+  // The resting editor shows a clean STILL thumbnail of the model; the live
+  // interactive viewer (with pin tools) only mounts in "live mode": while
+  // editing annotations, or when part-highlight / X-ray force it (as before).
+  const liveMode = editing || !!block.data.part_highlight || section.enabled
+
+  // Signature of everything that changes how the still looks. When it drifts from
+  // the stored thumb_sig the thumbnail is stale → recapture (mount a hidden viewer).
+  const thumbSig = hasModel ? JSON.stringify({
+    m: block.data.model_serve_url, env: block.data.environment || 'studio',
+    ei: block.data.env_intensity ?? 1, bg, sec: section, h: viewerHeight,
+  }) : null
+  const thumbReady = !!block.data.thumb_url && block.data.thumb_sig === thumbSig
+
+  // Persist a freshly captured still onto the block (model only — pins/overlays
+  // are DOM, never on the WebGL canvas, so the capture is automatically clean).
+  const handleCapture = useCallback((dataUrl) => {
+    if (!dataUrl) return
+    updateBlock(block.id, { thumb_url: dataUrl, thumb_sig: thumbSig })
+  }, [block.id, updateBlock, thumbSig])
 
   const handleUpload = useCallback(async (file) => {
     if (!activeProject?.id) return
@@ -119,11 +141,11 @@ export default function Model3DBlock({ block }) {
           {hasModel ? `${block.data.model_filename} · ${annotations.length} annotation${annotations.length !== 1 ? 's' : ''}` : 'GLB · Three.js viewer'}
         </span>
         {hasModel && (
-          <button onClick={() => { setPreview(p => !p); setPinMode(false) }} aria-pressed={preview}
-            style={{ padding: '3px 10px', background: preview ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'transparent',
-              border: `1px solid ${preview ? 'var(--forge-amber)' : 'var(--cf-border-tertiary)'}`, borderRadius: 4,
-              color: preview ? 'var(--forge-amber)' : 'var(--cf-text-tertiary)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>
-            {preview ? '▼ Hide' : '▶ Preview'}
+          <button onClick={() => { setEditing(p => !p); setPinMode(false) }} aria-pressed={editing}
+            style={{ padding: '3px 10px', background: editing ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'transparent',
+              border: `1px solid ${editing ? 'var(--forge-amber)' : 'var(--cf-border-tertiary)'}`, borderRadius: 4,
+              color: editing ? 'var(--forge-amber)' : 'var(--cf-text-tertiary)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--cf-font)' }}>
+            {editing ? '▼ Done' : '✦ Edit annotations'}
           </button>
         )}
         <button onClick={() => moveBlock(block.id, 'up')} aria-label="Move block up" style={iconBtn}>↑</button>
@@ -156,24 +178,65 @@ export default function Model3DBlock({ block }) {
               <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--cf-text-primary)' }}>{block.data.model_filename}</div>
               <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{block.data.file_size_mb ? `${block.data.file_size_mb} MB` : 'GLB model'} · Three.js r128</div>
             </div>
-            <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [] }); setPreview(false); setPinMode(false) }}
+            <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [], thumb_url: null, thumb_sig: null }); setEditing(false); setPinMode(false) }}
               aria-label="Remove model" style={{ background: 'none', border: 'none', color: '#E87070', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
           </div>
         )}
 
-        {(preview || block.data.part_highlight || section.enabled) && hasModel && (
+        {hasModel && liveMode && (
           <div style={{ marginBottom: 14 }}>
             <Model3DViewer modelUrl={block.data.model_serve_url} caption={block.data.caption}
               attribution={block.data.attribution}
-              height={block.data.bounds?.height || block.data.viewer_height || 400} bgColor={bg}
+              height={viewerHeight} bgColor={bg}
               environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
               decorative={block.data.decorative} autoRotate={block.data.auto_rotate}
               partHighlight={!!block.data.part_highlight} parts={partsCfg}
               selectedPartKey={selPart} onPartSelect={setSelPart} onPartsDetected={setDetectedParts}
               onPartLabel={(key, label) => updatePart(key, 'label', label)}
-              section={section}
+              section={section} onCapture={handleCapture}
               annotations={annotations} pinMode={pinMode} onPinPlaced={handlePinPlaced} />
           </div>
+        )}
+
+        {/* Resting state: clean still thumbnail (model only — no pins, no control bars). */}
+        {hasModel && !liveMode && thumbReady && (
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <img src={block.data.thumb_url} alt={block.data.caption || 'Loaded 3D model preview'}
+              style={{ display: 'block', width: '100%', height: viewerHeight, objectFit: 'contain',
+                background: bg, borderRadius: 6, border: '1px solid var(--cf-border-secondary)' }} />
+            <button onClick={() => update('thumb_url', null)} aria-label="Re-capture still preview"
+              style={{ position: 'absolute', top: 8, right: 8, padding: '3px 9px', background: 'rgba(4,44,83,0.7)',
+                border: '1px solid var(--cf-border-tertiary)', borderRadius: 4, color: '#B5D4F4', fontSize: 10,
+                cursor: 'pointer', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)' }}>↻ Re-capture</button>
+            <button onClick={() => { setEditing(true); setPinMode(false) }}
+              style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
+                padding: '5px 14px', background: 'color-mix(in srgb, var(--forge-amber) 90%, transparent)',
+                border: 'none', borderRadius: 20, color: '#042C53', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--cf-font)', boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+              ✦ Edit annotations
+            </button>
+          </div>
+        )}
+
+        {/* No valid still yet: mount the viewer offscreen just long enough to capture one. */}
+        {hasModel && !liveMode && !thumbReady && (
+          <>
+            <div style={{ marginBottom: 14, height: viewerHeight, borderRadius: 6, background: bg,
+              border: '1px solid var(--cf-border-secondary)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid #1c2a3a',
+                borderTopColor: 'var(--forge-amber)', animation: 'spin3d 0.8s linear infinite' }} />
+              <span style={{ fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontSize: 10,
+                color: 'var(--cf-text-tertiary)', letterSpacing: '0.08em' }}>rendering preview…</span>
+            </div>
+            <div aria-hidden="true" style={{ position: 'absolute', left: -10000, top: 0, width: 600, height: viewerHeight, pointerEvents: 'none' }}>
+              <Model3DViewer key={`cap-${thumbSig}`} modelUrl={block.data.model_serve_url}
+                height={viewerHeight} bgColor={bg}
+                environment={block.data.environment || 'studio'} envIntensity={block.data.env_intensity ?? 1}
+                decorative section={section} onCapture={handleCapture} />
+            </div>
+            <style>{`@keyframes spin3d { to { transform: rotate(360deg); } }`}</style>
+          </>
         )}
 
         {pendingPin && (
@@ -354,7 +417,7 @@ export default function Model3DBlock({ block }) {
             <div style={{ borderTop: '1px solid var(--cf-border-tertiary)', paddingTop: 14, marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ ...labelStyle, marginBottom: 0, flex: 1 }}>Annotations ({annotations.length})</span>
-                {preview && !pendingPin && (
+                {liveMode && !pendingPin && (
                   <button onClick={() => setPinMode(p => !p)} aria-pressed={pinMode}
                     style={{ padding: '5px 12px', background: pinMode ? 'color-mix(in srgb, var(--forge-amber) 15%, transparent)' : 'transparent',
                       border: `1px solid ${pinMode ? 'var(--forge-amber)' : 'var(--cf-border-tertiary)'}`, borderRadius: 4,
@@ -362,14 +425,14 @@ export default function Model3DBlock({ block }) {
                     {pinMode ? '✕ Cancel placement' : '✦ Place pin'}
                   </button>
                 )}
-                {!preview && !pendingPin && (
-                  <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontStyle: 'italic' }}>enable preview to place pins</span>
+                {!liveMode && !pendingPin && (
+                  <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', fontStyle: 'italic' }}>click “Edit annotations” to place pins</span>
                 )}
               </div>
 
               {annotations.length === 0 ? (
                 <p style={{ fontSize: 12, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)' }}>
-                  // no annotations yet · enable preview then click ✦ Place pin
+                  // no annotations yet · click “Edit annotations” then ✦ Place pin
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
