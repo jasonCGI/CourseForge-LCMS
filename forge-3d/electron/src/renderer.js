@@ -270,7 +270,9 @@ async function runConversion() {
     apply_transforms:   document.getElementById('opt-transforms').checked,
     draco:              document.getElementById('opt-draco').checked,
     export_cameras:     document.getElementById('opt-cameras').checked,
-    force_metallic:     document.getElementById('opt-metallic').checked
+    force_metallic:     document.getElementById('opt-metallic').checked,
+    web_protect:        document.getElementById('opt-web-protect').checked,
+    watermark:          (document.getElementById('opt-watermark').value || '').trim() || undefined
   }
 
   clearLog()

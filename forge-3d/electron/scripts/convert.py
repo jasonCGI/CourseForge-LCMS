@@ -98,6 +98,57 @@ def apply_pbr(options):
             log(f"WARN: PBR fixup skipped for a material ({e}).")
 
 
+def apply_decimate(ratio):
+    """Add a Collapse Decimate modifier to every mesh (applied on export via
+    export_apply=True). Reduces poly count for the web-protected export so a
+    scraped copy isn't the full-resolution, sellable original."""
+    if not ratio:
+        return
+    try:
+        r = max(0.01, min(0.999, float(ratio)))
+    except (ValueError, TypeError):
+        return
+    n = 0
+    for obj in bpy.data.objects:
+        if obj.type != 'MESH':
+            continue
+        try:
+            mod = obj.modifiers.new(name='ForgeWebDecimate', type='DECIMATE')
+            mod.decimate_type = 'COLLAPSE'
+            mod.ratio = r
+            n += 1
+        except Exception as e:
+            log(f"WARN: decimate skipped on '{obj.name}' ({e}).")
+    if n:
+        log(f"Web-protect: decimate ratio {r:.2f} on {n} mesh(es).")
+
+
+def downscale_textures(max_size):
+    """Shrink every image to <= max_size px on its long edge (in place, so the
+    GLB embeds the smaller texture). Cuts the texture value of a scraped copy."""
+    if not max_size:
+        return
+    try:
+        m = int(max_size)
+    except (ValueError, TypeError):
+        return
+    if m <= 0:
+        return
+    n = 0
+    for img in bpy.data.images:
+        try:
+            w, h = img.size[0], img.size[1]
+            if w == 0 or h == 0 or max(w, h) <= m:
+                continue
+            s = m / float(max(w, h))
+            img.scale(max(1, int(w * s)), max(1, int(h * s)))
+            n += 1
+        except Exception as e:
+            log(f"WARN: couldn't downscale '{img.name}' ({e}).")
+    if n:
+        log(f"Web-protect: downscaled {n} texture(s) to <= {m}px.")
+
+
 def patch_fbx_light_bug():
     """Blender 5.1's bundled FBX importer crashes on any FBX containing a light
     (blen_read_light does `lamp.cycles.cast_shadow = ...`, an attribute removed
@@ -270,6 +321,16 @@ def main():
     # Recover/override PBR metalness lost on FBX import (see apply_pbr).
     apply_pbr(options)
 
+    # Web-protected export: ship a REDUCED + watermarked asset so a scraped copy
+    # isn't the sellable original — decimate geometry, downscale textures, and
+    # stamp the glTF asset.copyright. Opt-in; a normal export is untouched.
+    if options.get('web_protect'):
+        options.setdefault('decimate', 0.5)
+        options.setdefault('texture_max', 1024)
+        options.setdefault('watermark', 'Protected web export - cardonalab.dev')
+    apply_decimate(options.get('decimate'))
+    downscale_textures(options.get('texture_max'))
+
     mesh_count = sum(1 for o in bpy.data.objects if o.type == 'MESH')
     mat_count  = len(bpy.data.materials)
     arm_count  = sum(1 for o in bpy.data.objects if o.type == 'ARMATURE')
@@ -283,6 +344,7 @@ def main():
             bpy.ops.export_scene.gltf,
             filepath=glb_path,
             export_format='GLB',
+            export_copyright=str(options.get('watermark') or ''),
             export_texcoords=True,
             export_normals=True,
             export_tangents=options.get('export_tangents', False),

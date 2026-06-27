@@ -88,6 +88,10 @@
         <label class="f3d-option"><input type="checkbox" id="opt-draco"> Draco mesh compression</label>
         <label class="f3d-option"><input type="checkbox" id="opt-cameras"> Export cameras</label>
         <label class="f3d-option"><input type="checkbox" id="opt-metallic"> Force metallic (PBR — fixes flat metal from FBX; not needed for glTF)</label>
+        <label class="f3d-option"><input type="checkbox" id="opt-web-protect"> Web-protected export (decimate + downscale textures + watermark — for public demos)</label>
+        <label class="f3d-option" style="display:flex;align-items:center;gap:6px">Watermark / owner
+          <input type="text" id="opt-watermark" placeholder="© Owner — site.com (stamped into the GLB)" style="flex:1;min-width:0">
+        </label>
 
         <div class="f3d-output-row">
           <div class="f3d-section-label">Output directory</div>
