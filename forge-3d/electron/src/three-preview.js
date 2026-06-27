@@ -20,6 +20,7 @@ window.initForge3DPreview = function(container, glbPath) {
         '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
         '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
         '<button type="button" data-labels aria-pressed="false" title="Show part-name labels on the model">Labels</button>' +
+        '<button type="button" data-label-mode aria-pressed="true" title="Switch labels and hover between group level (chassis, interior…) and individual parts" style="display:none">⊟ Groups</button>' +
       '</div>' +
     '</span>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
@@ -294,13 +295,32 @@ window.initForge3DPreview = function(container, glbPath) {
       canvas.style.cursor = ''; controls.enabled = true
     })
 
-    // ── Hover highlight ───────────────────────────────────────────────────
-    // Emissive glow on the mesh under the cursor (the OutlinePass substitute —
-    // no postprocessing addon in the offline bundle). Restores on leave.
+    // ── Hover + labels (group-aware) ──────────────────────────────────────
+    // The atom of interaction is a "unit": either a model GROUP (a named
+    // container node like Chassis / Interior / Wheels, with all its meshes) or a
+    // single part, depending on the label mode. Hover glows every mesh in the
+    // unit (the OutlinePass substitute — no postprocessing addon in the offline
+    // bundle); the matching HTML label, if shown, lights up with it, and vice
+    // versa. projectToScreen() is the shareable helper CF's annotation overlay
+    // can mirror: (worldPoint, camera, w, h) -> {x, y, visible}.
     const hoverRay = new THREE.Raycaster(), hoverNdc = new THREE.Vector2()
-    let hovered = null
-    function setHoverGlow(mesh, on) {
-      if (!mesh) return
+    const _lblWorld = new THREE.Vector3(), _lblNdc = new THREE.Vector3()
+    let labelsOn = false        // labels drawn?
+    let labelByGroup = true     // group-level vs per-part (only matters when grouped)
+    let grouped = false         // does the model have group-level organisation?
+    let units = []              // { name, meshes[], frameNode, anchorNode, local, el }
+    let hoveredUnit = null
+    const meshToUnit = new Map()
+
+    function projectToScreen(point, cam, w, h) {
+      _lblNdc.copy(point).project(cam)
+      const visible = _lblNdc.z > -1 && _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
+      return { x: (_lblNdc.x * 0.5 + 0.5) * w, y: (-_lblNdc.y * 0.5 + 0.5) * h, visible }
+    }
+    function meshesUnder(node) {
+      const out = []; node.traverse((o) => { if (o.isMesh) out.push(o) }); return out
+    }
+    function glowMesh(mesh, on) {
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const m of mats) {
         if (!m || !m.emissive) continue
@@ -312,104 +332,120 @@ window.initForge3DPreview = function(container, glbPath) {
         }
       }
     }
+    function glowUnit(u, on) { if (u) for (const m of u.meshes) glowMesh(m, on) }
+    function setLabelActive(u, on) {
+      if (!u || !u.el) return
+      u.el.style.background = on ? 'rgba(123,110,253,.95)' : 'rgba(18,20,30,.85)'
+      u.el.style.color = on ? '#fff' : '#C9C2FF'
+      u.el.style.borderColor = on ? '#C9C2FF' : 'rgba(123,110,253,.45)'
+      u.el.style.zIndex = on ? '5' : ''
+    }
+    function makeLabelEl(u) {
+      const el = document.createElement('div')
+      el.textContent = u.name
+      el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(18,20,30,.85);' +
+        'color:#C9C2FF;font:600 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;' +
+        'white-space:nowrap;border:1px solid rgba(123,110,253,.45);pointer-events:auto;cursor:default'
+      labelsLayer.appendChild(el)
+      u.el = el
+      // Hovering the label lights its unit (and itself); leaving it clears the
+      // glow unless the cursor is still over that unit on the canvas.
+      el.addEventListener('pointerenter', () => { glowUnit(u, true); setLabelActive(u, true) })
+      el.addEventListener('pointerleave', () => { if (hoveredUnit !== u) glowUnit(u, false); setLabelActive(u, false) })
+      // Swallow hover only, never drags: on press, mute the label and replay the
+      // pointerdown on the canvas so OrbitControls starts its rotate/pan (it then
+      // tracks move/up on the document). Un-mute on release so hover still works.
+      el.addEventListener('pointerdown', (ev) => {
+        el.style.pointerEvents = 'none'
+        canvas.dispatchEvent(new PointerEvent('pointerdown', {
+          clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons,
+          pointerId: ev.pointerId, pointerType: ev.pointerType, isPrimary: ev.isPrimary,
+          bubbles: true, cancelable: true
+        }))
+        window.addEventListener('pointerup', () => { el.style.pointerEvents = 'auto' }, { once: true })
+      })
+      // Double-click a label to frame its unit (mirrors dblclick on the mesh).
+      el.addEventListener('dblclick', () => { focusOnBox(new THREE.Box3().setFromObject(u.frameNode)) })
+    }
+    // Rebuild the unit list + mesh->unit map (and the label els when labels are
+    // on). Called on load and whenever the label mode toggles. Detects grouping
+    // by descending past any single wrapper node (e.g. a lone glTF "RootNode") to
+    // the level that actually partitions the meshes.
+    function buildUnits() {
+      units.forEach((u) => { if (u.el) u.el.remove() })
+      units = []; meshToUnit.clear(); hoveredUnit = null; grouped = false
+      if (!model) return
+      model.updateWorldMatrix(true, true)
+      let level = model
+      while (true) {
+        const kids = level.children.filter((c) => meshesUnder(c).length)
+        if (kids.length === 1 && !kids[0].isMesh) { level = kids[0]; continue }
+        break
+      }
+      const containers = level.children.filter((c) => meshesUnder(c).length)
+      grouped = containers.some((c) => !c.isMesh && meshesUnder(c).length > 1)
+      let defs
+      if (grouped && labelByGroup) {
+        defs = containers.map((c, i) => ({ node: c, name: (c.name || ('Group ' + (i + 1))).trim(), meshes: meshesUnder(c) }))
+      } else {
+        let i = 0
+        defs = meshesUnder(model).map((m) => {
+          i++; return { node: m, name: (m.name || (m.parent && m.parent.name) || ('Part ' + i)).trim(), meshes: [m] }
+        })
+      }
+      for (const d of defs) {
+        const wc = new THREE.Box3().setFromObject(d.node).getCenter(new THREE.Vector3())
+        const local = d.node.worldToLocal(wc.clone())   // anchor kept in the node's frame
+        const u = { name: d.name, meshes: d.meshes, frameNode: d.node, anchorNode: d.node, local, el: null }
+        if (labelsOn) makeLabelEl(u)
+        units.push(u)
+        for (const m of d.meshes) meshToUnit.set(m, u)
+      }
+      syncLabelModeBtn()
+    }
+    function updateLabels() {
+      if (!labelsOn || !units.length) return
+      const w = labelsLayer.clientWidth, h = labelsLayer.clientHeight
+      for (const u of units) {
+        if (!u.el) continue
+        _lblWorld.copy(u.local); u.anchorNode.localToWorld(_lblWorld)
+        const s = projectToScreen(_lblWorld, camera, w, h)
+        if (!s.visible) { u.el.style.display = 'none'; continue }
+        u.el.style.display = ''
+        u.el.style.left = s.x + 'px'; u.el.style.top = s.y + 'px'
+      }
+    }
+
     canvas.addEventListener('pointermove', (e) => {
       if (!model || pickingOrigin) return
       const rect = canvas.getBoundingClientRect()
       hoverNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
       hoverRay.setFromCamera(hoverNdc, camera)
       const hits = hoverRay.intersectObject(model, true)
-      const mesh = hits.length ? hits[0].object : null
-      if (mesh === hovered) return
-      setHoverGlow(hovered, false); setLabelActive(labelForMesh(hovered), false)
-      hovered = mesh
-      setHoverGlow(hovered, true); setLabelActive(labelForMesh(hovered), true)
+      const u = hits.length ? meshToUnit.get(hits[0].object) : null
+      if (u === hoveredUnit) return
+      glowUnit(hoveredUnit, false); setLabelActive(hoveredUnit, false)
+      hoveredUnit = u
+      glowUnit(hoveredUnit, true); setLabelActive(hoveredUnit, true)
     })
     canvas.addEventListener('pointerleave', () => {
-      setLabelActive(labelForMesh(hovered), false); setHoverGlow(hovered, false); hovered = null
+      glowUnit(hoveredUnit, false); setLabelActive(hoveredUnit, false); hoveredUnit = null
     })
 
-    // ── Part labels (HTML overlay) ────────────────────────────────────────
-    // Project each named mesh's centre to screen each frame and place an HTML
-    // label over the canvas. projectToScreen() is the shareable helper CF's
-    // annotation overlay can mirror: (worldPoint, camera, w, h) -> {x, y, visible}.
-    let labelsOn = false
-    const labelItems = []                          // { el, mesh, local }
-    const _lblWorld = new THREE.Vector3(), _lblNdc = new THREE.Vector3()
-    function projectToScreen(point, cam, w, h) {
-      _lblNdc.copy(point).project(cam)
-      const visible = _lblNdc.z > -1 && _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
-      return { x: (_lblNdc.x * 0.5 + 0.5) * w, y: (-_lblNdc.y * 0.5 + 0.5) * h, visible }
+    // The group/parts toggle only appears once a grouped model is loaded.
+    const labelModeBtn = bar.querySelector('[data-label-mode]')
+    function syncLabelModeBtn() {
+      labelModeBtn.style.display = grouped ? '' : 'none'
+      labelModeBtn.textContent = labelByGroup ? '⊟ Groups' : '⊞ Parts'
+      labelModeBtn.setAttribute('aria-pressed', String(labelByGroup))
     }
-    // Mesh <-> label cross-highlight: hovering a part lights its label, and
-    // hovering a label lights the part. labelForMesh maps a hovered mesh back to
-    // its label item; setLabelActive swaps the label to its highlighted style.
-    function labelForMesh(mesh) { return mesh ? labelItems.find(it => it.mesh === mesh) : null }
-    function setLabelActive(it, on) {
-      if (!it) return
-      it.el.style.background = on ? 'rgba(123,110,253,.95)' : 'rgba(18,20,30,.85)'
-      it.el.style.color = on ? '#fff' : '#C9C2FF'
-      it.el.style.borderColor = on ? '#C9C2FF' : 'rgba(123,110,253,.45)'
-      it.el.style.zIndex = on ? '5' : ''
-    }
-    function buildLabels() {
-      labelItems.forEach(it => it.el.remove())
-      labelItems.length = 0
-      if (!model) return
-      let i = 0
-      model.traverse((o) => {
-        if (!o.isMesh) return
-        i++
-        const name = (o.name || (o.parent && o.parent.name) || '').trim() || ('Part ' + i)
-        if (o.geometry && !o.geometry.boundingBox) o.geometry.computeBoundingBox()
-        const local = o.geometry && o.geometry.boundingBox
-          ? o.geometry.boundingBox.getCenter(new THREE.Vector3()) : new THREE.Vector3()
-        const el = document.createElement('div')
-        el.textContent = name
-        el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(18,20,30,.85);' +
-          'color:#C9C2FF;font:600 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;' +
-          'white-space:nowrap;border:1px solid rgba(123,110,253,.45)'
-        el.style.pointerEvents = 'auto'; el.style.cursor = 'default'
-        labelsLayer.appendChild(el)
-        const item = { el, mesh: o, local }
-        // Hovering the label lights the part it names (and itself); leaving it
-        // clears the part unless the cursor is currently over that part on canvas.
-        el.addEventListener('pointerenter', () => { setHoverGlow(o, true); setLabelActive(item, true) })
-        el.addEventListener('pointerleave', () => { if (hovered !== o) setHoverGlow(o, false); setLabelActive(item, false) })
-        // Swallow hover only, never drags: on press, mute the label and replay the
-        // pointerdown on the canvas so OrbitControls starts its rotate/pan (it then
-        // tracks move/up on the document). Un-mute on release so hover still works.
-        el.addEventListener('pointerdown', (ev) => {
-          el.style.pointerEvents = 'none'
-          canvas.dispatchEvent(new PointerEvent('pointerdown', {
-            clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons,
-            pointerId: ev.pointerId, pointerType: ev.pointerType, isPrimary: ev.isPrimary,
-            bubbles: true, cancelable: true
-          }))
-          window.addEventListener('pointerup', () => { el.style.pointerEvents = 'auto' }, { once: true })
-        })
-        // Double-click a label to frame its part (mirrors dblclick on the mesh).
-        // Focuses the named part directly — no raycast through the label needed.
-        el.addEventListener('dblclick', () => { focusOnBox(new THREE.Box3().setFromObject(o)) })
-        labelItems.push(item)
-      })
-    }
-    function updateLabels() {
-      if (!labelsOn || !model || !labelItems.length) return
-      const w = labelsLayer.clientWidth, h = labelsLayer.clientHeight
-      for (const it of labelItems) {
-        _lblWorld.copy(it.local); it.mesh.localToWorld(_lblWorld)
-        const s = projectToScreen(_lblWorld, camera, w, h)
-        if (!s.visible) { it.el.style.display = 'none'; continue }
-        it.el.style.display = ''
-        it.el.style.left = s.x + 'px'; it.el.style.top = s.y + 'px'
-      }
-    }
+    labelModeBtn.addEventListener('click', () => { labelByGroup = !labelByGroup; buildUnits() })
     const labelsBtn = bar.querySelector('[data-labels]')
     labelsBtn.addEventListener('click', () => {
       labelsOn = !labelsOn
       labelsBtn.classList.toggle('active', labelsOn)
       labelsBtn.setAttribute('aria-pressed', String(labelsOn))
-      if (labelsOn) buildLabels()
+      buildUnits()                       // (re)build label els to match labelsOn
       labelsLayer.style.display = labelsOn ? '' : 'none'
     })
 
@@ -599,7 +635,7 @@ window.initForge3DPreview = function(container, glbPath) {
       setZoomBounds()
       frameModel()
       placeContactShadow()
-      if (labelsOn) buildLabels()
+      buildUnits()                       // detect grouping + wire hover (labels build if on)
 
       // Play every animation clip the GLB carries — confirms animation survived
       // conversion, and gives the viewer a live preview.
