@@ -30,7 +30,7 @@ window.initForge3DPreview = function(container, glbPath) {
     '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
     '<span data-section-ctl style="display:inline-flex;align-items:center;gap:6px;opacity:0.4;transition:opacity .15s">' +
       '<button type="button" data-section-axis title="Cut axis (X / Y / Z)">Y</button>' +
-      '<input type="range" data-section-slider min="0" max="100" value="50" aria-label="Section position" style="width:90px;vertical-align:middle">' +
+      '<input type="range" data-section-slider min="0" max="100" value="0" aria-label="Section position" style="width:90px;vertical-align:middle">' +
       '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
     '</span>' +
     '<span class="f3d-viewer-bar-label" style="margin-left:10px">Explode</span>' +
@@ -122,7 +122,7 @@ window.initForge3DPreview = function(container, glbPath) {
     const clipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
     const CLIP_AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }
     const clipBox = new THREE.Box3()
-    let clipOn = false, clipAxis = 'y', clipFlip = false, clipT = 0.5
+    let clipOn = false, clipAxis = 'y', clipFlip = false, clipT = 0   // 0 = no cut (plane at the edge)
     function applyClipMaterials() {
       if (!model) return
       model.traverse((o) => {
@@ -317,10 +317,10 @@ window.initForge3DPreview = function(container, glbPath) {
     // focus cancelled, and reframe the model.
     bar.querySelector('[data-reset]').addEventListener('click', () => {
       // Section off + clear the cut; controls back to defaults.
-      clipOn = false; clipAxis = 'y'; clipFlip = false; clipT = 0.5
+      clipOn = false; clipAxis = 'y'; clipFlip = false; clipT = 0
       secBtn.classList.remove('active'); secBtn.setAttribute('aria-pressed', 'false')
       secCtl.style.opacity = '0.4'
-      secAxisBtn.textContent = 'Y'; secSlider.value = '50'
+      secAxisBtn.textContent = 'Y'; secSlider.value = '0'
       applyClipMaterials()
       // Explode off + reassemble.
       explodeT = 0; explodeSlider.value = '0'
