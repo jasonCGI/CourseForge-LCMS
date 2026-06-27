@@ -387,6 +387,9 @@ window.initForge3DPreview = function(container, glbPath) {
           }))
           window.addEventListener('pointerup', () => { el.style.pointerEvents = 'auto' }, { once: true })
         })
+        // Double-click a label to frame its part (mirrors dblclick on the mesh).
+        // Focuses the named part directly — no raycast through the label needed.
+        el.addEventListener('dblclick', () => { focusOnBox(new THREE.Box3().setFromObject(o)) })
         labelItems.push(item)
       })
     }
