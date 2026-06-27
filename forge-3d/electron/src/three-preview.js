@@ -16,6 +16,7 @@ window.initForge3DPreview = function(container, glbPath) {
     '</div>' +
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
     '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
+    '<button type="button" data-labels aria-pressed="false" title="Show part-name labels on the model">Labels</button>' +
     '<span class="f3d-viewer-bar-spacer"></span>' +
     '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
     '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
@@ -42,9 +43,14 @@ window.initForge3DPreview = function(container, glbPath) {
     '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:78px;vertical-align:middle">'
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
+  // HTML label overlay (CSS2DRenderer isn't in the offline bundle, so DIY).
+  container.style.position = 'relative'
+  const labelsLayer = document.createElement('div')
+  labelsLayer.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;display:none'
   container.appendChild(bar)
   container.appendChild(bar2)
   container.appendChild(canvas)
+  container.appendChild(labelsLayer)
 
   // three + addons are vendored locally (assets/vendor/three) so the preview
   // works fully offline. The addon copies have their bare `three` imports
@@ -297,6 +303,59 @@ window.initForge3DPreview = function(container, glbPath) {
     })
     canvas.addEventListener('pointerleave', () => { setHoverGlow(hovered, false); hovered = null })
 
+    // ── Part labels (HTML overlay) ────────────────────────────────────────
+    // Project each named mesh's centre to screen each frame and place an HTML
+    // label over the canvas. projectToScreen() is the shareable helper CF's
+    // annotation overlay can mirror: (worldPoint, camera, w, h) -> {x, y, visible}.
+    let labelsOn = false
+    const labelItems = []                          // { el, mesh, local }
+    const _lblWorld = new THREE.Vector3(), _lblNdc = new THREE.Vector3()
+    function projectToScreen(point, cam, w, h) {
+      _lblNdc.copy(point).project(cam)
+      const visible = _lblNdc.z < 1 && _lblNdc.x >= -1 && _lblNdc.x <= 1 && _lblNdc.y >= -1 && _lblNdc.y <= 1
+      return { x: (_lblNdc.x * 0.5 + 0.5) * w, y: (-_lblNdc.y * 0.5 + 0.5) * h, visible }
+    }
+    function buildLabels() {
+      labelItems.forEach(it => it.el.remove())
+      labelItems.length = 0
+      if (!model) return
+      let i = 0
+      model.traverse((o) => {
+        if (!o.isMesh) return
+        i++
+        const name = (o.name || (o.parent && o.parent.name) || '').trim() || ('Part ' + i)
+        if (o.geometry && !o.geometry.boundingBox) o.geometry.computeBoundingBox()
+        const local = o.geometry && o.geometry.boundingBox
+          ? o.geometry.boundingBox.getCenter(new THREE.Vector3()) : new THREE.Vector3()
+        const el = document.createElement('div')
+        el.textContent = name
+        el.style.cssText = 'position:absolute;transform:translate(-50%,-50%);background:rgba(18,20,30,.85);' +
+          'color:#C9C2FF;font:600 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;' +
+          'white-space:nowrap;border:1px solid rgba(123,110,253,.45)'
+        labelsLayer.appendChild(el)
+        labelItems.push({ el, mesh: o, local })
+      })
+    }
+    function updateLabels() {
+      if (!labelsOn || !model || !labelItems.length) return
+      const w = labelsLayer.clientWidth, h = labelsLayer.clientHeight
+      for (const it of labelItems) {
+        _lblWorld.copy(it.local); it.mesh.localToWorld(_lblWorld)
+        const s = projectToScreen(_lblWorld, camera, w, h)
+        if (!s.visible) { it.el.style.display = 'none'; continue }
+        it.el.style.display = ''
+        it.el.style.left = s.x + 'px'; it.el.style.top = s.y + 'px'
+      }
+    }
+    const labelsBtn = bar.querySelector('[data-labels]')
+    labelsBtn.addEventListener('click', () => {
+      labelsOn = !labelsOn
+      labelsBtn.classList.toggle('active', labelsOn)
+      labelsBtn.setAttribute('aria-pressed', String(labelsOn))
+      if (labelsOn) buildLabels()
+      labelsLayer.style.display = labelsOn ? '' : 'none'
+    })
+
     // ── Contact shadow ────────────────────────────────────────────────────
     // A soft radial-gradient blob on a ground plane under the model (no
     // postprocessing addon needed — those aren't in the offline bundle). Sized to
@@ -481,6 +540,7 @@ window.initForge3DPreview = function(container, glbPath) {
       setZoomBounds()
       frameModel()
       placeContactShadow()
+      if (labelsOn) buildLabels()
 
       // Play every animation clip the GLB carries — confirms animation survived
       // conversion, and gives the viewer a live preview.
@@ -523,6 +583,8 @@ window.initForge3DPreview = function(container, glbPath) {
       const w = canvas.clientWidth, h = canvas.clientHeight
       if (!w || !h) return
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix()
+      labelsLayer.style.left = canvas.offsetLeft + 'px'; labelsLayer.style.top = canvas.offsetTop + 'px'
+      labelsLayer.style.width = w + 'px'; labelsLayer.style.height = h + 'px'
     }
     new ResizeObserver(fit).observe(canvas); fit()
 
@@ -541,6 +603,7 @@ window.initForge3DPreview = function(container, glbPath) {
       }
       controls.update()
       renderer.render(scene, camera)
+      updateLabels()
     })()
 
     // Expose teardown for the next initForge3DPreview call.
