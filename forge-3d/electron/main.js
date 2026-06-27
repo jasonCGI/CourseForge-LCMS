@@ -4,6 +4,12 @@ const fs = require('fs')
 const { spawn } = require('child_process')
 const stage = require('./scripts/stage')
 
+// Never serve renderer resources (renderer.js, three-preview.js, CSS) from
+// Electron's HTTP cache, so a reload always runs the code on disk. Without this
+// the first reload after a code change re-serves the cached renderer.js —
+// defeating the per-load cache-bust on three-preview.js too.
+app.commandLine.appendSwitch('disable-http-cache')
+
 // The flat temp dir holding the current model + its textures (see stage.js).
 // Cleaned when a new model is resolved, on clear, and on quit.
 let currentStageDir = null
