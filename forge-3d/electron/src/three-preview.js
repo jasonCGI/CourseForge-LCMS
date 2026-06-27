@@ -16,22 +16,31 @@ window.initForge3DPreview = function(container, glbPath) {
     '</div>' +
     '<button type="button" data-grid class="active" aria-pressed="true">Grid</button>' +
     '<button type="button" data-shadow class="active" aria-pressed="true" title="Soft contact shadow under the model">Shadow</button>' +
+    '<span class="f3d-viewer-bar-spacer"></span>' +
+    '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
+    '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
+    '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
+    '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
+  // Second row: model-inspection tools (section / explode / zoom) so the bar
+  // doesn't wrap.
+  const bar2 = document.createElement('div')
+  bar2.className = 'f3d-viewer-bar'
+  bar2.innerHTML =
     '<button type="button" data-section aria-pressed="false" title="Cross-section: slice the model to reveal internals">✂ Section</button>' +
     '<span data-section-ctl style="display:none;align-items:center;gap:6px">' +
       '<button type="button" data-section-axis title="Cut axis (X / Y / Z)">Y</button>' +
       '<input type="range" data-section-slider min="0" max="100" value="50" aria-label="Section position" style="width:90px;vertical-align:middle">' +
       '<button type="button" data-section-flip title="Flip the cut side">⇄</button>' +
     '</span>' +
-    '<span class="f3d-viewer-bar-label" style="margin-left:8px">Explode</span>' +
-    '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts to show assembly" style="width:90px;vertical-align:middle">' +
-    '<span class="f3d-viewer-bar-spacer"></span>' +
-    '<button type="button" data-anim style="display:none" aria-pressed="true" title="Play / pause animation">⏸ Anim</button>' +
-    '<button type="button" data-follow style="display:none" aria-pressed="false" title="Keep an animating model centered in view">⌖ Follow</button>' +
-    '<button type="button" data-recenter title="Reframe the model in view">Recenter</button>' +
-    '<button type="button" data-capture title="Save a PNG of the current view">📷 Capture</button>'
+    '<span class="f3d-viewer-bar-label" style="margin-left:10px">Explode</span>' +
+    '<button type="button" data-explode-axis title="Explode direction: radial / X / Y / Z">Radial</button>' +
+    '<input type="range" data-explode-slider min="0" max="100" value="0" aria-label="Exploded view amount" title="Separate the parts" style="width:90px;vertical-align:middle">' +
+    '<span class="f3d-viewer-bar-label" style="margin-left:10px">Zoom</span>' +
+    '<input type="range" data-zoom-slider min="0" max="100" value="50" aria-label="Zoom" title="Dolly the camera (or use the mouse wheel)" style="width:90px;vertical-align:middle">'
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'flex:1;width:100%;display:block;min-height:0;'
   container.appendChild(bar)
+  container.appendChild(bar2)
   container.appendChild(canvas)
 
   // three + addons are vendored locally (assets/vendor/three) so the preview
@@ -135,11 +144,11 @@ window.initForge3DPreview = function(container, glbPath) {
       clipPlane.normal.copy(n)
       clipPlane.constant = -n[clipAxis] * pos
     }
-    const secBtn = bar.querySelector('[data-section]')
-    const secCtl = bar.querySelector('[data-section-ctl]')
-    const secAxisBtn = bar.querySelector('[data-section-axis]')
-    const secSlider = bar.querySelector('[data-section-slider]')
-    const secFlipBtn = bar.querySelector('[data-section-flip]')
+    const secBtn = bar2.querySelector('[data-section]')
+    const secCtl = bar2.querySelector('[data-section-ctl]')
+    const secAxisBtn = bar2.querySelector('[data-section-axis]')
+    const secSlider = bar2.querySelector('[data-section-slider]')
+    const secFlipBtn = bar2.querySelector('[data-section-flip]')
     secBtn.addEventListener('click', () => {
       clipOn = !clipOn
       secBtn.classList.toggle('active', clipOn)
@@ -160,7 +169,8 @@ window.initForge3DPreview = function(container, glbPath) {
     // the model center, in the mesh's parent space), then offset by the slider.
     // Built on first use so it captures the ASSEMBLED rest pose. Best on static
     // models — a playing animation drives the same positions and will fight it.
-    let explodeParts = null, explodeT = 0
+    let explodeParts = null, explodeT = 0, explodeAxis = 'radial'
+    const EX_AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }
     function buildExplodeParts() {
       explodeParts = []
       if (!model) return
@@ -170,11 +180,18 @@ window.initForge3DPreview = function(container, glbPath) {
       const pInv = new THREE.Matrix4()
       model.traverse((o) => {
         if (!o.isMesh) return
-        const dir = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).sub(center)
-        if (dir.lengthSq() < 1e-9) dir.set(0, 1, 0)
+        const wc = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())
+        let dir
+        if (explodeAxis === 'radial') {
+          dir = wc.sub(center)              // outward from the model center
+          if (dir.lengthSq() < 1e-9) dir.set(0, 1, 0)
+        } else {                            // translate along one axis, split by side
+          const sign = Math.sign(wc[explodeAxis] - center[explodeAxis]) || 1
+          dir = EX_AXES[explodeAxis].clone().multiplyScalar(sign)
+        }
         o.parent.updateWorldMatrix(true, false)
         pInv.copy(o.parent.matrixWorld).invert()
-        dir.transformDirection(pInv)   // -> unit direction in the mesh's parent space
+        dir.transformDirection(pInv)        // -> unit direction in the mesh's parent space
         explodeParts.push({ mesh: o, base: o.position.clone(), dir, amt: span * 0.5 })
       })
     }
@@ -182,10 +199,17 @@ window.initForge3DPreview = function(container, glbPath) {
       if (!explodeParts) return
       for (const p of explodeParts) p.mesh.position.copy(p.base).addScaledVector(p.dir, explodeT * p.amt)
     }
-    const explodeSlider = bar.querySelector('[data-explode-slider]')
+    const explodeAxisBtn = bar2.querySelector('[data-explode-axis]')
+    const explodeSlider = bar2.querySelector('[data-explode-slider]')
     explodeSlider.addEventListener('input', () => {
       if (!explodeParts) buildExplodeParts()
       explodeT = explodeSlider.value / 100
+      applyExplode()
+    })
+    explodeAxisBtn.addEventListener('click', () => {
+      explodeAxis = explodeAxis === 'radial' ? 'x' : explodeAxis === 'x' ? 'y' : explodeAxis === 'y' ? 'z' : 'radial'
+      explodeAxisBtn.textContent = explodeAxis === 'radial' ? 'Radial' : explodeAxis.toUpperCase()
+      buildExplodeParts()       // recompute directions for the new axis
       applyExplode()
     })
 
@@ -236,9 +260,12 @@ window.initForge3DPreview = function(container, glbPath) {
       const c = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       const maxDim = Math.max(size.x, size.y, size.z) || 0.1
+      const _fov = camera.fov * Math.PI / 180
+      const _fit = (maxDim / 2) / Math.tan(_fov / 2)
+      const _dist = Math.max(_fit, _fit / camera.aspect) * 1.4
       const dir = new THREE.Vector3().subVectors(camera.position, controls.target)
       if (dir.lengthSq() < 1e-6) dir.set(1, 0.7, 1)
-      dir.normalize().multiplyScalar(maxDim * 2.4)
+      dir.normalize().multiplyScalar(_dist)
       focusAnim = { fp: camera.position.clone(), tp: c.clone().add(dir),
                     ft: controls.target.clone(), tt: c.clone(), t: 0 }
     }
@@ -249,6 +276,31 @@ window.initForge3DPreview = function(container, glbPath) {
       raycaster.setFromCamera(ndc, camera)
       const hits = raycaster.intersectObject(model, true)
       focusOnBox(new THREE.Box3().setFromObject(hits.length ? hits[0].object : model))
+    })
+
+    // ── Zoom slider ───────────────────────────────────────────────────────
+    // Dolly the camera along its view direction; bounds set from the model size.
+    // Two-way synced with the mouse wheel via OrbitControls' 'change' event.
+    const zoomSlider = bar2.querySelector('[data-zoom-slider]')
+    let zoomMin = 0.1, zoomMax = 100
+    function setZoomBounds() {
+      if (!model) return
+      const md = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3())
+      const maxDim = Math.max(md.x, md.y, md.z) || 1
+      const fit = (maxDim / 2) / Math.tan((camera.fov * Math.PI / 180) / 2)
+      zoomMin = fit * 0.3; zoomMax = fit * 3.0
+    }
+    zoomSlider.addEventListener('input', () => {
+      const d = zoomMin + (1 - parseFloat(zoomSlider.value) / 100) * (zoomMax - zoomMin)
+      const dir = new THREE.Vector3().subVectors(camera.position, controls.target)
+      if (dir.lengthSq() < 1e-6) dir.set(1, 0.7, 1)
+      camera.position.copy(controls.target).addScaledVector(dir.normalize(), d)
+      controls.update()
+    })
+    controls.addEventListener('change', () => {
+      if (zoomMax <= zoomMin) return
+      const t = (camera.position.distanceTo(controls.target) - zoomMin) / (zoomMax - zoomMin)
+      zoomSlider.value = String(Math.round((1 - Math.max(0, Math.min(1, t))) * 100))
     })
 
     // Draco decoder bundled locally so Draco-compressed GLBs load offline.
@@ -270,9 +322,15 @@ window.initForge3DPreview = function(container, glbPath) {
       modelBox.getSize(tmpS)
       const maxDim = Math.max(tmpS.x, tmpS.y, tmpS.z) || 1
       if (followTarget) followTarget.getWorldPosition(tmpC); else modelBox.getCenter(tmpC)
+      // Fill the viewport: distance that fits maxDim to the FOV (vertical, plus
+      // the horizontal limit on portrait viewports) with a small margin. The old
+      // 2.2x bounding-sphere multiple left the model tiny / "far away".
+      const _fov = camera.fov * Math.PI / 180
+      const _fit = (maxDim / 2) / Math.tan(_fov / 2)
+      const _dist = Math.max(_fit, _fit / camera.aspect) * 1.2
       tmpD.subVectors(camera.position, controls.target)
       if (tmpD.lengthSq() < 1e-6) tmpD.set(1, 0.7, 1)
-      tmpD.normalize().multiplyScalar(maxDim * 2.2)
+      tmpD.normalize().multiplyScalar(_dist)
       controls.target.copy(tmpC)
       camera.position.copy(tmpC).add(tmpD)
       controls.update()
@@ -306,6 +364,7 @@ window.initForge3DPreview = function(container, glbPath) {
         }
       })
       if (!followTarget) followTarget = model
+      setZoomBounds()
       frameModel()
       placeContactShadow()
 
