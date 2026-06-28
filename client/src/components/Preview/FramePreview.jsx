@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
+import IVideoEditor from '../Editor/blocks/IVideoEditor'
 import OamMediaBar from './OamMediaBar'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
@@ -1148,7 +1149,8 @@ function PreviewBlock({ block, fill = false, interactive = false, active = false
     case 'callout': return <PreviewCallout block={block} />
     case 'branch':  return <PreviewBranch  block={block} />
     case 'wcn':     return <PreviewWCN     block={block} />
-    case 'ivideo':  return <PreviewIVideo  block={block} fill={fill} />
+    case 'ivideo':  return <PreviewIVideo  block={block} fill={fill}
+                      interactive={interactive} active={active} onSelect={onSelect} updateBlock={updateBlock} />
     case 'model3d': return <PreviewModel3D block={block} fill={fill} />
     case 'oam':     return <PreviewOAM     block={block} fill={fill} />
     default:        return (
@@ -2547,10 +2549,13 @@ function WCNRecallBar({ wcnBlocks }) {
   )
 }
 
-function PreviewIVideo({ block, fill = false }) {
+function PreviewIVideo({ block, fill = false, interactive = false, active = false, onSelect = null, updateBlock = null }) {
   const [clipData, setClipData] = React.useState(null)
+  const activeInteractionId  = useEditorStore(s => s.activeInteractionId)
+  const setActiveInteraction = useEditorStore(s => s.setActiveInteraction)
   const videoId = block.data.video_asset_id
   const clipId  = block.data.clip_asset_id
+  const editable = interactive && active && !!updateBlock
 
   React.useEffect(() => {
     // Prefer interactions edited inline in the block (data.clip); fall back to the
@@ -2580,10 +2585,27 @@ function PreviewIVideo({ block, fill = false }) {
   // In the fill case the runtime fills its box and overlays the controller on the
   // media bottom (no scrollbar); inline it docks the controller below in flow.
   const b = block.data.bounds || fill
+  const videoSrc = block.data.video_serve_url || `/api/media/serve/${videoId}`
+  // Active iVideo block in the editor → live WYSIWYG editing of the interactions
+  // directly on the player (drag/resize), committing native-px coords to data.clip.
+  if (editable) {
+    return (
+      <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
+        <IVideoEditor
+          videoSrc={videoSrc}
+          clip={block.data.clip || clipData}
+          onClipChange={c => updateBlock(block.id, { clip: c })}
+          selectedId={activeInteractionId}
+          onSelect={setActiveInteraction}
+          fill={!!b}
+        />
+      </div>
+    )
+  }
   return (
     <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
       <IVideoRuntime
-        videoSrc={block.data.video_serve_url || `/api/media/serve/${videoId}`}
+        videoSrc={videoSrc}
         clipData={clipData}
         onComplete={() => {}}
         fill={!!b}
