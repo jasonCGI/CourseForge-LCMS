@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import MediaUploader   from './MediaUploader'
-import { uploadMedia, uploadClip, getMediaAsset } from '../../../api/client'
+import { uploadMedia, uploadClip, getMediaAsset, uploadIVideoPackage } from '../../../api/client'
 import BoundsControl from './BoundsControl'
 import useContentArea from '../../../hooks/useContentArea'
 import { hotspotStyle, shapeRadius } from '../../../utils/hotspotStyle'
@@ -14,6 +14,7 @@ const VIDEO_ACCEPT = {
   'video/quicktime': ['.mov'],
 }
 const CLIP_ACCEPT = { 'application/json': ['.json'] }
+const ZIP_ACCEPT  = { 'application/zip': ['.zip'], 'application/x-zip-compressed': ['.zip'], 'application/octet-stream': ['.zip'] }
 
 export default function IVideoBlock({ block }) {
   const updateBlock   = useEditorStore(s => s.updateBlock)
@@ -26,6 +27,8 @@ export default function IVideoBlock({ block }) {
   const [videoError,     setVideoError]     = useState(null)
   const [clipError,      setClipError]      = useState(null)
   const [videoMeta,      setVideoMeta]      = useState(null)
+  const [uploadingPkg,   setUploadingPkg]   = useState(false)
+  const [pkgError,       setPkgError]       = useState(null)
 
   const videoId = block.data.video_asset_id
   const clipId  = block.data.clip_asset_id
@@ -66,6 +69,29 @@ export default function IVideoBlock({ block }) {
     } finally { setUploadingClip(false) }
   }, [activeProject, block.id, updateBlock, videoId])
 
+  // One-drop path: a ForgeClip .zip (Bake & Export / Package) fills BOTH the video
+  // and the .clip.json. The inline editor then seeds block.data.clip from the clip
+  // asset as usual.
+  const handlePackageUpload = useCallback(async (file) => {
+    if (!activeProject?.id) return
+    setUploadingPkg(true); setPkgError(null)
+    try {
+      const { data } = await uploadIVideoPackage(file, activeProject.id)
+      const v = data.video || {}, c = data.clip || {}
+      setVideoMeta(v)
+      updateBlock(block.id, {
+        video_asset_id:    v.id,
+        video_filename:    v.original_name,
+        video_serve_url:   v.serve_url,
+        clip_asset_id:     c.id,
+        interaction_count: c.interaction_count,
+        video_duration:    c.video_duration,
+      })
+    } catch (e) {
+      setPkgError(e.response?.data?.error || 'Package upload failed.')
+    } finally { setUploadingPkg(false) }
+  }, [activeProject, block.id, updateBlock])
+
   const update = (field, val) => updateBlock(block.id, { [field]: val })
   const caDims = useContentArea()
 
@@ -99,6 +125,23 @@ export default function IVideoBlock({ block }) {
       </div>
 
       <div style={{ padding: 16 }}>
+        {/* Quick start — one ForgeClip .zip fills both the video and interactions */}
+        {!videoId && (
+          <div style={{ marginBottom: 14 }}>
+            <span style={sectionLabel}>Quick start — ForgeClip package (.zip)</span>
+            <MediaUploader
+              accept={ZIP_ACCEPT}
+              label="Drop a ForgeClip .zip (Bake & Export or Package) — fills video + interactions"
+              onUpload={handlePackageUpload}
+              uploading={uploadingPkg}
+              error={pkgError}
+            />
+            <p style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', margin: '6px 2px 0', fontFamily: 'var(--forge-font, monospace)' }}>
+              // or set the video + .clip.json individually below
+            </p>
+          </div>
+        )}
+
         {/* Step 1 — Video */}
         <div style={{ marginBottom: 14 }}>
           <span style={sectionLabel}>Step 1 — Video file (.mp4)</span>

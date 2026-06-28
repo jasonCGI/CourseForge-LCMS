@@ -1,6 +1,8 @@
 import os
+import io
 import json
 import uuid
+import zipfile
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
@@ -314,6 +316,93 @@ def upload_clip():
         'interaction_count': len(content.get('interactions', [])),
         'video_duration':    content.get('video', {}).get('duration', 0),
         'schema_version':    content.get('schema_version', '1.0'),
+    }), 201
+
+
+# ── ForgeClip package (.zip) → video + clip in one drop ───────────────────────
+
+@media_bp.post('/api/media/ivideo-package')
+def upload_ivideo_package():
+    """Accept a ForgeClip ZIP (Bake & Export or Package) and split it into the video
+    asset + the .clip.json, storing BOTH — so an ivideo block can be filled from a
+    single drop instead of two uploads. Multipart: file (.zip), project_id."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided.'}), 400
+    f          = request.files['file']
+    project_id = request.form.get('project_id')
+    if not project_id:
+        return jsonify({'error': 'project_id is required.'}), 400
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(f.read()))
+    except Exception:
+        return jsonify({'error': 'Not a valid .zip archive.'}), 422
+
+    def _ext(n):
+        return n.rsplit('.', 1)[-1].lower() if '.' in n else ''
+    names = [n for n in zf.namelist() if not n.endswith('/') and '__MACOSX' not in n]
+    vids  = [n for n in names if _ext(n) in ALLOWED_VIDEO]
+    clips = ([n for n in names if n.lower().endswith('.clip.json')]
+             or [n for n in names if n.lower().endswith('.json')])
+    if not vids:
+        return jsonify({'error': 'No video (.mp4/.webm/.mov) found in the ZIP.'}), 422
+    if not clips:
+        return jsonify({'error': 'No .clip.json found in the ZIP.'}), 422
+    vids.sort(key=lambda n: (0 if _ext(n) == 'mp4' else 1, n))   # prefer mp4
+    video_name, clip_name = vids[0], clips[0]
+
+    try:
+        clip_obj = json.loads(zf.read(clip_name))
+    except Exception:
+        return jsonify({'error': 'Invalid JSON in the .clip.json.'}), 422
+    if not isinstance(clip_obj, dict):
+        return jsonify({'error': 'Unexpected .clip.json structure.'}), 422
+
+    # ── store the video (mirrors upload_media) ──
+    vbytes    = zf.read(video_name)
+    vext      = _ext(video_name) or 'mp4'
+    vasset_id = str(uuid.uuid4())
+    media_dir = get_upload_root() / 'media' / 'video'
+    media_dir.mkdir(parents=True, exist_ok=True)
+    vsafe     = secure_filename(Path(video_name).name)
+    vstored   = media_dir / f"{vasset_id}_{vsafe}"
+    vstored.write_bytes(vbytes)
+    v_media = MediaAsset(
+        id=vasset_id, project_id=project_id, kind='video', original_name=vsafe,
+        stored_path=str(vstored), file_size=len(vbytes), mime_type=f'video/{vext}')
+    db.session.add(v_media)
+    db.session.commit()
+    _pair_companions(v_media, project_id)
+    ha = _mp4_has_audio(str(vstored))
+    if ha is not None:
+        comp = dict(v_media.companion_files or {}); comp['has_audio'] = ha
+        v_media.companion_files = comp
+        db.session.commit()
+
+    # ── store the clip (mirrors upload_clip) + bidirectional link to the video ──
+    casset_id = str(uuid.uuid4())
+    clip_dir  = get_upload_root() / 'clips'
+    clip_dir.mkdir(parents=True, exist_ok=True)
+    cstored   = clip_dir / f"{casset_id}.clip.json"
+    payload   = json.dumps(clip_obj)
+    Path(cstored).write_text(payload, encoding='utf-8')
+    c_media = MediaAsset(
+        id=casset_id, project_id=project_id, kind='clip',
+        original_name=secure_filename(Path(clip_name).name),
+        stored_path=str(cstored), file_size=len(payload.encode('utf-8')),
+        mime_type='application/json', companion_files={'video_asset_id': vasset_id})
+    db.session.add(c_media)
+    comp = dict(v_media.companion_files or {}); comp['clip_asset_id'] = casset_id
+    v_media.companion_files = comp
+    db.session.commit()
+
+    return jsonify({
+        'video': _serialize_media(v_media),
+        'clip': {
+            'id': casset_id, 'kind': 'clip',
+            'serve_url': f'/api/media/clip/{casset_id}',
+            'interaction_count': len(clip_obj.get('interactions', [])),
+            'video_duration': (clip_obj.get('video') or {}).get('duration', 0),
+        },
     }), 201
 
 

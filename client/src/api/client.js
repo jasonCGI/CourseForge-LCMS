@@ -125,6 +125,17 @@ export const uploadClip = (file, projectId, videoAssetId) => {
 
 export const getClipAsset = (id) => api.get(`/media/clip/${id}`)
 
+// ForgeClip package (.zip) — extracts + stores the video AND the .clip.json in one
+// drop, returning both assets so an ivideo block can be filled from a single file.
+export const uploadIVideoPackage = (file, projectId) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('project_id', projectId)
+  return api.post('/media/ivideo-package', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 // 3D model (.glb / .gltf) upload
 export const uploadModel = (file, projectId) => {
   const form = new FormData()
