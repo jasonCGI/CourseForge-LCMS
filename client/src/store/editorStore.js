@@ -113,6 +113,8 @@ const useEditorStore = create((set, get) => ({
                               // editor with the inspector region list (highlight)
   activeInteractionId: null,  // selected iVideo interaction — syncs the live-preview
                               // editor with the block's interaction list (highlight)
+  ivideoEditBlockId: null,    // iVideo block whose interactions are being edited on
+                              // the live preview (explicit "Edit hotspots" toggle)
   previewOpen: false,         // preview modal flag (so global shortcuts can open it)
   _undoStack: [],             // snapshots of blocks arrays (most recent first)
   saveStatus: 'idle',         // 'idle' | 'saving' | 'saved' | 'error' (header indicator)
@@ -273,6 +275,7 @@ const useEditorStore = create((set, get) => ({
   setActiveBlock: (id) => set({ activeBlockId: id }),
   setActiveRegion: (id) => set({ activeRegionId: id }),
   setActiveInteraction: (id) => set({ activeInteractionId: id }),
+  setIvideoEditBlock: (id) => set({ ivideoEditBlockId: id }),
   setPreviewOpen: (v) => set({ previewOpen: v }),
 
   _pushUndo: () => {

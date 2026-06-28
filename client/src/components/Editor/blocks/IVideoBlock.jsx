@@ -252,6 +252,9 @@ export default function IVideoBlock({ block }) {
 function InteractionList({ block, updateBlock }) {
   const activeInteractionId  = useEditorStore(s => s.activeInteractionId)
   const setActiveInteraction = useEditorStore(s => s.setActiveInteraction)
+  const ivideoEditBlockId    = useEditorStore(s => s.ivideoEditBlockId)
+  const setIvideoEditBlock   = useEditorStore(s => s.setIvideoEditBlock)
+  const editing = ivideoEditBlockId === block.id
   const clip = block.data.clip
   const ints = (clip && clip.interactions) || []
   const nW = (clip && clip.video && clip.video.width)  || 1920
@@ -273,12 +276,32 @@ function InteractionList({ block, updateBlock }) {
     commit([...ints, it]); setActiveInteraction(it.id)
   }
 
+  const editToggle = (
+    <button onClick={() => setIvideoEditBlock(editing ? null : block.id)}
+      aria-pressed={editing}
+      style={{ ...addBtnStyle, display: 'flex', width: '100%', justifyContent: 'center', alignItems: 'center',
+        gap: 6, marginBottom: 8, fontWeight: 600,
+        border: `1px solid ${editing ? 'var(--forge-amber)' : '#7A3A9A'}`,
+        color: editing ? '#042C53' : '#B07AD0', background: editing ? 'var(--forge-amber)' : 'transparent' }}>
+      {editing ? '✓ Editing on preview — click to finish' : '✎ Edit hotspots on the preview'}
+    </button>
+  )
+  const editHint = editing ? (
+    <p style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', margin: '0 0 8px', fontFamily: 'var(--forge-font, monospace)' }}>
+      // drag to move · drag a corner to resize · marching ants = editable
+    </p>
+  ) : null
+
   if (!clip) {
     return (
       <div>
         <span style={sectionLabel}>Interactions</span>
+        {editToggle}
+        {editHint}
         <p style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', margin: 0 }}>
-          Select this block to load it in the live preview — interactions initialize there, then drag to position.
+          {editing
+            ? 'Loading the player… interactions appear here once it initializes.'
+            : 'Click "Edit hotspots" (or upload a .clip.json) to add and place interactions.'}
         </p>
       </div>
     )
@@ -292,7 +315,9 @@ function InteractionList({ block, updateBlock }) {
 
   return (
     <div>
-      <span style={sectionLabel}>Interactions ({ints.length}) — drag/resize on the preview · fine-tune here</span>
+      <span style={sectionLabel}>Interactions ({ints.length})</span>
+      {editToggle}
+      {editHint}
       {ints.length === 0 && (
         <p style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', margin: '0 0 8px' }}>No interactions yet — add one below.</p>
       )}

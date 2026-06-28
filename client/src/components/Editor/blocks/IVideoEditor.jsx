@@ -2,6 +2,23 @@ import React, { useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { normalizeClipToPx } from '../../../utils/clipCoords'
 import { hotspotStyle, shapeRadius } from '../../../utils/hotspotStyle'
 
+// Marching-ants outline for editable items (injected once) — the edit-mode signal.
+const ANTS_STYLE_ID = 'cf-ivedit-ants-style'
+function ensureAntsStyle() {
+  if (typeof document === 'undefined' || document.getElementById(ANTS_STYLE_ID)) return
+  const el = document.createElement('style'); el.id = ANTS_STYLE_ID
+  el.textContent =
+    '@keyframes cfIveditMarch{to{background-position:10px 0,-10px 100%,0 -10px,100% 10px}}' +
+    '.cf-ivedit-ants{background-image:' +
+    'linear-gradient(90deg,#fff 50%,transparent 0),linear-gradient(90deg,#fff 50%,transparent 0),' +
+    'linear-gradient(0deg,#fff 50%,transparent 0),linear-gradient(0deg,#fff 50%,transparent 0);' +
+    'background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;' +
+    'background-size:10px 2px,10px 2px,2px 10px,2px 10px;' +
+    'background-position:0 0,0 100%,0 0,100% 0;animation:cfIveditMarch .6s infinite linear}' +
+    '@media (prefers-reduced-motion:reduce){.cf-ivedit-ants{animation:none}}'
+  document.head.appendChild(el)
+}
+
 /**
  * IVideoEditor — live-preview WYSIWYG editor for iVideo interactions.
  *
@@ -38,6 +55,7 @@ export default function IVideoEditor({ videoSrc, posterSrc, clip, onClipChange, 
     if (vh > ch) { vh = ch; vw = ch * ar }
     setRect({ left: (cw - vw) / 2, top: (ch - vh) / 2, width: vw, height: vh })
   }
+  useEffect(() => { ensureAntsStyle() }, [])
   useLayoutEffect(() => { measure() }, [W, H, fill])           // eslint-disable-line
   useEffect(() => {
     const wrap = wrapRef.current
@@ -51,8 +69,11 @@ export default function IVideoEditor({ videoSrc, posterSrc, clip, onClipChange, 
     const nw = (clip && clip.video && clip.video.width)  || v.videoWidth  || 1920
     const nh = (clip && clip.video && clip.video.height) || v.videoHeight || 1080
     setNW(nw); setNH(nh)
-    // Seed: normalize a legacy %-clip to px against the real native resolution, once.
-    if (clip && clip.coords !== 'px') {
+    if (!clip) {
+      // No clip yet — seed an empty px clip so interactions can be authored from scratch.
+      onClipChange && onClipChange({ coords: 'px', schema_version: '2.0', video: { width: nw, height: nh }, interactions: [] })
+    } else if (clip.coords !== 'px') {
+      // Normalize a legacy %-clip to px against the real native resolution, once.
       const seed = { ...clip, video: { ...(clip.video || {}), width: nw, height: nh } }
       normalizeClipToPx(seed)
       onClipChange && onClipChange(seed)
@@ -141,24 +162,33 @@ export default function IVideoEditor({ videoSrc, posterSrc, clip, onClipChange, 
           /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag editing surface; the same coords are keyboard-editable via the block's numeric fields */
           <div onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
             style={{ position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height, zIndex: 15 }}>
+            <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(13,17,23,0.85)', color: 'var(--forge-amber)',
+              border: '1px solid var(--forge-amber)', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+              fontFamily: 'var(--forge-font, monospace)', letterSpacing: '0.06em', pointerEvents: 'none', zIndex: 30 }}>
+              ✎ EDITING — drag to place
+            </div>
             {ints.map(it => {
               if (!it.data || it.data.x == null) return null
               const sel = it.id === selectedId
               if (it.type === 'hotspot') {
-                const g = geomOf(it), st = hotspotStyle(it.data.color)
+                const g = geomOf(it), st = hotspotStyle(it.data.color), rad = shapeRadius(it.data.shape)
                 return (
                   /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag move affordance; coords are also keyboard-editable in the block fields */
                   <div key={it.id} onMouseDown={e => startMove(e, it)} title={it.data.label || 'Hotspot'}
                     style={{ position: 'absolute', left: g.x / W * 100 + '%', top: g.y / H * 100 + '%',
                       width: g.w / W * 100 + '%', height: g.h / H * 100 + '%', transform: 'translate(-50%,-50%)',
-                      border: `2px solid ${st.border}`, background: st.fill, borderRadius: shapeRadius(it.data.shape),
-                      boxSizing: 'border-box', cursor: 'move', boxShadow: sel ? '0 0 0 2px var(--forge-amber)' : 'none' }}>
+                      boxSizing: 'border-box', cursor: 'move', borderRadius: rad,
+                      boxShadow: sel ? '0 0 0 2px var(--forge-amber)' : 'none' }}>
+                    {/* colored fill (under) + marching-ants edges (over) */}
+                    <div style={{ position: 'absolute', inset: 0, background: st.fill, border: `2px solid ${st.border}`,
+                      borderRadius: rad, boxSizing: 'border-box', pointerEvents: 'none' }} />
+                    <div className="cf-ivedit-ants" style={{ position: 'absolute', inset: 0, borderRadius: rad, pointerEvents: 'none' }} />
                     {sel && ['nw', 'ne', 'sw', 'se'].map(c => (
                       /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag resize handle */
                       <div key={c} onMouseDown={e => startResize(e, it, c)} aria-hidden="true"
                         style={{ position: 'absolute', width: 12, height: 12, background: '#fff', border: '2px solid #2563EB',
                           borderRadius: 2, boxSizing: 'border-box', left: c[1] === 'w' ? 0 : '100%', top: c[0] === 'n' ? 0 : '100%',
-                          transform: 'translate(-50%,-50%)', cursor: (c === 'nw' || c === 'se') ? 'nwse-resize' : 'nesw-resize' }} />
+                          transform: 'translate(-50%,-50%)', cursor: (c === 'nw' || c === 'se') ? 'nwse-resize' : 'nesw-resize', zIndex: 1 }} />
                     ))}
                   </div>
                 )
@@ -170,11 +200,12 @@ export default function IVideoEditor({ videoSrc, posterSrc, clip, onClipChange, 
                   <div key={it.id} onMouseDown={e => startMove(e, it)} title="Annotation — drag to move"
                     style={{ position: 'absolute', left: g.x / W * 100 + '%', top: g.y / H * 100 + '%',
                       transform: 'translate(-50%,-50%)', cursor: 'move',
-                      outline: sel ? '2px solid var(--forge-amber)' : 'none', outlineOffset: 2 }}>
+                      boxShadow: sel ? '0 0 0 2px var(--forge-amber)' : 'none' }}>
                     <div style={{ background: 'rgba(4,44,83,0.85)', color: '#B5D4F4', fontSize: 11, padding: '3px 8px',
                       borderRadius: 3, border: '1px solid #185FA5', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
                       {it.data.text || 'Annotation'}
                     </div>
+                    <div className="cf-ivedit-ants" style={{ position: 'absolute', inset: 0, borderRadius: 3, pointerEvents: 'none' }} />
                   </div>
                 )
               }

@@ -2553,9 +2553,11 @@ function PreviewIVideo({ block, fill = false, interactive = false, active = fals
   const [clipData, setClipData] = React.useState(null)
   const activeInteractionId  = useEditorStore(s => s.activeInteractionId)
   const setActiveInteraction = useEditorStore(s => s.setActiveInteraction)
+  const ivideoEditBlockId    = useEditorStore(s => s.ivideoEditBlockId)
   const videoId = block.data.video_asset_id
   const clipId  = block.data.clip_asset_id
-  const editable = interactive && active && !!updateBlock
+  // Editing is OPT-IN: the block must be active AND its "Edit hotspots" toggle on.
+  const editable = interactive && active && !!updateBlock && ivideoEditBlockId === block.id
 
   React.useEffect(() => {
     // Prefer interactions edited inline in the block (data.clip); fall back to the
