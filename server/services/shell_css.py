@@ -53,6 +53,10 @@ SHELL_CONTENT_CSS = (
     ".cf-zone-media .cf-oam .cf-oam-stage{max-height:100%}"
     ".cf-zone-media .cf-oam iframe{width:auto;height:auto}"
     ".cf-zone-media iframe{width:100%;height:100%;border:0;display:block}"
+    # A bare caption <p> directly in a media zone (e.g. the 3D model caption) sits
+    # AFTER a height:100% viewer, so in flow it is pushed past the zone and clipped.
+    # Pin it as a readable bottom overlay so it stays fully visible and never pushes.
+    ".cf-zone-media>p{position:absolute;left:0;right:0;bottom:0;margin:0;padding:6px 12px;font-size:12px;line-height:1.4;color:#C8D8E8;text-align:center;background:linear-gradient(to top,rgba(4,17,34,.85),rgba(4,17,34,0))}"
     # Title/prompt/counter zones: let glyph descenders show; keep the counter on one line.
     '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],'
     '[data-zone-type="section_title"],[data-zone-type="prompt"],'
