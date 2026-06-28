@@ -206,61 +206,67 @@ DEMO_FRAMES = [
     # ── Welcome ──
     {'name': 'Welcome to CourseForge', 'frame_type': 'content', 'lesson': 'Welcome', 'blocks': [
         _text(
-            body='''<h2>CourseForge Platform Overview</h2>
-<p>This demonstration course walks through every block type available in CourseForge — the
-web-native LCMS built for DoD training and simulation courseware production.</p>
-<p>Each frame demonstrates one block type with example content. Replace placeholders with your
-own media, questions, and 3D assets to build a real course.</p>
-<h3>What you'll see in this course:</h3>
+            body='''<h2>Espresso Craft</h2>
+<p>A short, hands-on course in pulling a balanced shot, from dialing in the grind to steaming
+milk for a clean pour. It is also a working demo of CourseForge, so every frame doubles as a
+live example of what the platform builds.</p>
+<p>This course was scoped, designed, and built with <strong>ADDIE</strong>. Watch the method as
+you go: you start in Analysis (who you are, what a good shot is), the material is built through
+Design and Development, you practice in Evaluation, and you operate safely in Implementation.</p>
+<h3>What you'll work through:</h3>
 <ul>
-  <li><strong>Content blocks</strong> — Text, Image, Video, Audio</li>
-  <li><strong>Assessment blocks</strong> — Quiz, Hotspot, Branch</li>
-  <li><strong>Safety blocks</strong> — Warning, Caution, Note</li>
-  <li><strong>Advanced blocks</strong> — 3D Model, Interactive Video, OAM</li>
+  <li><strong>The shot</strong> — dose, grind, extraction, tasting</li>
+  <li><strong>Check your understanding</strong> — quiz, hotspot, a decision point</li>
+  <li><strong>Machine safety</strong> — steam wand, portafilter, milk</li>
+  <li><strong>Go deeper</strong> — 3D parts, interactive video, animation</li>
 </ul>''',
-            narration='Welcome to the CourseForge Platform Overview. This course demonstrates each '
-                      'available block type with example content. Navigate using the content tree in the sidebar.'),
-        _image(label='CourseForge Platform Overview',
-               caption='CourseForge — web-native LCMS for DoD training production', color='#185FA5', icon='⚙'),
+            narration='Welcome to Espresso Craft, a hands-on course in pulling a balanced shot. It is '
+                      'also a live demo of CourseForge. The course was built with ADDIE, so watch the '
+                      'method as you go. Navigate using the content tree in the sidebar.'),
+        _image(label='Barista presenting a fresh shot',
+               caption='Espresso Craft — a hands-on shot-pulling course, built in CourseForge', color='#185FA5', icon='☕'),
     ]},
     {'name': 'How to Navigate This Course', 'frame_type': 'content', 'lesson': 'Welcome', 'blocks': [
         _text(
-            body='''<h2>Navigation</h2>
-<p>Use the <strong>content tree</strong> in the left sidebar to jump to any lesson or frame.</p>
-<p>To preview any frame as a learner would see it, click <strong>▶ Preview</strong> in the frame
-editor toolbar. The preview renders all block interactions — quiz answers, hotspot clicks, WCN
-acknowledgments.</p>
-<p>When ready, click <strong>⬇ Publish</strong> to package the course as SCORM 1.2, SCORM 2004,
-or a Web Bundle.</p>
-<h3>Demo course notes:</h3>
+            body='''<h2>How this course runs</h2>
+<p>Move through the lessons in order. Each frame builds on the one before, from grind and dose
+to extraction, tasting, safety, and a clean pour.</p>
+<p>Some frames ask you to do something: answer a knowledge check, click a part of the machine,
+or make a call at a decision point. Work through them; the course tracks what you have completed.</p>
+<p>Safety frames come up before you touch the machine. A warning or caution asks you to
+acknowledge it before you continue. Read it.</p>
+<h3>If you are evaluating CourseForge</h3>
 <ul>
-  <li>Media blocks show placeholder images until real assets are uploaded</li>
-  <li>3D model and interactive video blocks require uploaded files to activate</li>
-  <li>All text, quiz, and WCN blocks are fully functional as-is</li>
+  <li>Every frame here is one CourseForge block type, shown with real coffee content</li>
+  <li>Preview renders all interactions; Publish packages the course as SCORM or a Web Bundle</li>
+  <li>Swap in your own media, questions, and 3D assets to build a real course</li>
 </ul>''',
-            narration='Use the content tree on the left to navigate. Click Preview to see any frame '
-                      'as a learner would. Click Publish when ready to package the course for your LMS.'),
+            narration='Move through the lessons in order; each frame builds on the last. Some frames ask '
+                      'you to answer, click, or decide. Safety frames ask you to acknowledge them before you '
+                      'continue. If you are evaluating CourseForge, each frame is one block type shown with '
+                      'real coffee content.'),
     ]},
 
     # ── Content Blocks ──
     {'name': 'Text Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(
-            body='''<h2>Text Block</h2>
-<p>The Text block is the foundation of any CourseForge frame. It supports full rich text formatting
-including headings, paragraphs, lists, bold, italic, and inline code.</p>
-<p>Each Text block has two fields:</p>
+            body='''<h2>Anatomy of a shot</h2>
+<p>A balanced espresso is three numbers held in agreement. Get them to line up and the rest of
+the drink takes care of itself.</p>
 <ul>
-  <li><strong>Body</strong> — the HTML content displayed on screen</li>
-  <li><strong>Narrator script</strong> — plain text read aloud, kept separate from the visual layout</li>
+  <li><strong>Dose</strong> — the dry ground coffee in the basket. <code>18 g</code> for a
+  standard double.</li>
+  <li><strong>Yield</strong> — what lands in the cup. <code>36 g</code>, a <code>1:2</code>
+  ratio of dose to yield.</li>
+  <li><strong>Time</strong> — how long the pull takes. <code>25–30 s</code> from first drip.</li>
 </ul>
-<p>Best practices:</p>
-<ul>
-  <li>Keep on-screen text concise — move detail to the narrator script</li>
-  <li>Use headings to establish hierarchy within a frame</li>
-  <li>Pair long text with a supporting image in the next block</li>
-</ul>''',
-            narration='The Text block supports rich HTML formatting for on-screen display, plus a '
-                      'separate narrator script for audio narration. Keep on-screen text concise.'),
+<p>Read the shot as it runs. Too fast and light means under-extracted: sour, thin, sharp. Too
+slow and dark means over-extracted: bitter, ashy, hollow. The grind is your main lever; everything
+in this course comes back to dialing it in.</p>''',
+            narration='A balanced espresso is three numbers in agreement. Dose, eighteen grams in. Yield, '
+                      'thirty-six grams out, a one-to-two ratio. Time, twenty-five to thirty seconds. Too fast '
+                      'is sour and under-extracted; too slow is bitter and over-extracted. The grind is your '
+                      'main lever.'),
     ]},
     {'name': 'Image Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Image fills the entire content area (cover fit), shown as-sent-in (no
@@ -268,7 +274,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         # as a scrim overlay (white text, readable over any image) — it never
         # pushes content below the fold.
         _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True,
-               caption='Live example: cropped to a 16:9 content fit, optimized and EXIF-stripped'),
+               caption='A finished pour, foam set. Cropped to a 16:9 fit, optimized and EXIF-stripped.'),
     ]},
     {'name': 'Image Swap (click to change)', 'frame_type': 'content', 'lesson': 'Content Blocks',
      'layout': 'text-left', 'blocks': [
@@ -317,20 +323,19 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         # autoplay). The caption rides over the bottom of the video as a scrim
         # overlay (white text, readable over any frame) — it never pushes content
         # below the fold. Mirrors the cover Image Block above.
-        _video(label='Sample Clip', fill=True, dock='bottom',
-               caption='Live example: muted, looped, and compressed for fast load'),
+        _video(label='Pulling a shot', fill=True, dock='bottom',
+               caption='A shot pulling in real time. Muted, looped, and compressed for fast load.'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
-        _text(body='<h2>Audio Block</h2><p>The Audio block plays narration or ambient audio in a branded, '
-                   'on-brand slim player — navy bar, amber controls, mono time readout, and the same playback '
-                   'speeds as the video player. Authors choose its placement per block: <strong>inline</strong> '
-                   '(in the content flow) or <strong>docked</strong> (pinned to the bottom of the content area, '
-                   'so narration stays reachable while the learner reads). This live example is normalized to the '
-                   'DoD broadcast standard (−16 LUFS, EBU R128). Process source WAV/AIFF through ForgePack Audio '
-                   'to normalize loudness and output MP3, OGG, and M4A — auto-paired in CourseForge.</p>',
-              narration='The Audio block plays processed narration or ambient audio in a branded slim player. '
-                        'Authors place it inline or docked to the bottom of the content area. This cue is '
-                        'normalized to negative sixteen LUFS.'),
+        _text(body='<h2>Listen as you work</h2><p>Audio carries what a still cannot: the rhythm of the grind, '
+                   'the hiss of the steam wand, a narrator talking you through the pull. This cue plays in a '
+                   'branded slim player you can leave docked at the bottom of the frame, so it stays reachable '
+                   'while you read.</p><p>Source audio runs through ForgePack Audio first, normalized to the '
+                   'broadcast standard (−16 LUFS, EBU R128) and output as MP3, OGG, and M4A, auto-paired in '
+                   'CourseForge.</p>',
+              narration='Audio carries what a still cannot: the grind, the steam wand, a narrator talking you '
+                        'through the pull. Leave the player docked at the bottom so it stays reachable while you '
+                        'read. The cue is normalized to negative sixteen LUFS.'),
         # Single docked example — pinned full-width to the bottom of the content
         # area (the demo uses only the docked player to avoid two media elements).
         _audio(label='Narration — Lesson Intro',
@@ -362,12 +367,13 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                                'correct a grind that is letting water race through.'),
     ]},
     {'name': 'Hotspot Block', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
-        _text(body='<h2>Hotspot Block</h2><p>The Hotspot block overlays clickable regions on an image. '
-                   'Learners click each region to reveal information. Upload a background image, then draw '
-                   'regions and add labels and descriptions in the editor.</p>'
-                   '<p>Click each highlighted region below to explore the interaction.</p>',
-              narration='The Hotspot block lets learners explore an image by clicking labeled regions. '
-                        'Upload a background image, draw regions, and add a label and description for each.'),
+        _text(body='<h2>Know your setup</h2><p>Before you pull a shot, recognize the four things in front of '
+                   'you and what each one does: the dose of fresh grounds, the tamper, the loaded portafilter, '
+                   'and the finished drink.</p>'
+                   '<p>Click each highlighted region on the image to check yourself.</p>',
+              narration='Before you pull a shot, recognize the four things in front of you: the dose of fresh '
+                        'grounds, the tamper, the loaded portafilter, and the finished drink. Click each '
+                        'highlighted region to check yourself.'),
         _hotspot(),
     ]},
     {'name': 'Branch Block', 'frame_type': 'branch', 'lesson': 'Assessment Blocks', 'blocks': [
@@ -427,74 +433,75 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
 
     # ── Advanced Blocks ──
     {'name': '3D Model Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'text-left', 'blocks': [
-        _text(body='<h2>3D Model Block</h2><p>The 3D Model block renders interactive GLB files using Three.js. '
-                   'Learners orbit and zoom to examine the model from any angle. Authors place annotation pins '
-                   'on the model surface directly in the editor with the <strong>✦ Place pin</strong> button.</p>'
-                   '<p>Export GLB from 3ds Max via <em>File → Export → glTF 2.0</em> with textures embedded. '
-                   'Run Reset XForm before export.</p>',
-              narration='The 3D Model block renders interactive GLB files. Learners orbit and zoom using mouse '
-                        'or keyboard. Authors place annotation pins on the model surface to label parts.'),
-        _model3d(caption='Upload a .glb file to activate this block. Export from 3ds Max: '
-                         'File → Export → glTF 2.0 · embed textures · Reset XForm first'),
+        _text(body='<h2>Examine the cup</h2><p>Look at the finished drink from any angle: the crema and poured '
+                   'microfoam on top, the mug and its handle. Drag to rotate, scroll to zoom, press R to reset. '
+                   'Click a pin to read what it marks.</p>'
+                   '<p>This is a GLB model rendered in the browser. Export your own from 3ds Max or Blender via '
+                   '<em>glTF 2.0</em> with textures embedded, run Reset XForm first, and place annotation pins '
+                   'right in the editor.</p>',
+              narration='Look at the finished drink from any angle: the crema and microfoam on top, the mug and '
+                        'its handle. Drag to rotate, scroll to zoom, press R to reset. Click a pin to read what '
+                        'it marks. Export your own model from 3ds Max or Blender as glTF 2.0.'),
+        _model3d(caption='Drag to orbit · scroll to zoom · R to reset. Upload a .glb to swap in your own model '
+                         '(3ds Max or Blender → glTF 2.0 · embed textures · Reset XForm first).'),
     ]},
     {'name': 'Interactive Video Block', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
         # Media-only, full screen — this is how an iVideo is used in production.
-        _ivideo(caption='Live example — annotation (2-8s) + pause-on-reach hotspot (4-9s), authored in ForgeClip'),
+        _ivideo(caption='A shot pulling, with an annotation (2-8s) and a pause-on-reach hotspot (4-9s), authored in ForgeClip'),
     ]},
     {'name': 'OAM Block — Adobe Animate', 'frame_type': 'content', 'lesson': 'Advanced Blocks', 'layout': 'full', 'blocks': [
         # Media-only, full screen — this is how an OAM is used in production.
-        _oam(caption='Upload .oam exported from Adobe Animate CC to activate. '
-                     'File → Publish Settings → OAM package in Animate'),
+        _oam(caption='A looping latte-art animation. Upload .oam exported from Adobe Animate CC to swap it '
+                     '(File → Publish Settings → OAM package).'),
     ]},
 
     # ── Summary ──
     {'name': 'Platform Summary', 'frame_type': 'content', 'lesson': 'Course Summary', 'layout': 'full', 'blocks': [
-        _text(body='''<h2>CourseForge Platform Summary</h2>
-<p>You've seen all available block types in the CourseForge ecosystem. Quick reference:</p>
+        _text(body='''<h2>What you've pulled together</h2>
+<p>The whole shot in one view:</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 48px;text-align:left">
-<div><h3>Content blocks</h3>
-<ul><li><strong>Text</strong> — rich HTML + narrator script</li>
-<li><strong>Image</strong> — WebP/PNG via ForgePack Image</li>
-<li><strong>Video</strong> — Video.js via ForgePack Video</li>
-<li><strong>Audio</strong> — MP3/OGG/M4A via ForgePack Audio</li></ul>
+<div><h3>The numbers</h3>
+<ul><li><strong>Dose</strong> — 18 g of fresh grounds in</li>
+<li><strong>Yield</strong> — 36 g out, a 1:2 ratio</li>
+<li><strong>Time</strong> — 25–30 seconds from first drip</li></ul>
 </div>
-<div><h3>Assessment blocks</h3>
-<ul><li><strong>Quiz</strong> — multiple choice, 2 attempts, feedback</li>
-<li><strong>Hotspot</strong> — clickable regions on an image</li>
-<li><strong>Branch</strong> — adaptive routing to different frames</li></ul>
+<div><h3>Reading the shot</h3>
+<ul><li><strong>Fast & sour</strong> — under-extracted, grind finer</li>
+<li><strong>Slow & bitter</strong> — over-extracted, grind coarser</li>
+<li><strong>The lever</strong> — grind size, every time</li></ul>
 </div>
-<div><h3>Safety blocks (WCN)</h3>
-<ul><li><strong>Warning</strong> — critical safety, MIL-SPEC triangle</li>
-<li><strong>Caution</strong> — equipment risk, MIL-SPEC diamond</li>
-<li><strong>Note</strong> — supplementary information, circle-i</li></ul>
+<div><h3>The machine</h3>
+<ul><li><strong>Portafilter</strong> — seat and lock before you brew</li>
+<li><strong>Steam wand</strong> — over 150 °C, purge and wipe</li>
+<li><strong>Milk</strong> — steam to 60–65 °C for glossy microfoam</li></ul>
 </div>
-<div><h3>Advanced blocks</h3>
-<ul><li><strong>3D Model</strong> — GLB viewer with orbit, zoom, annotations</li>
-<li><strong>Interactive Video</strong> — ForgeClip baked interactions</li>
-<li><strong>OAM</strong> — Adobe Animate Canvas with SCORM bridge</li></ul></div></div>''',
-              narration='This completes the CourseForge Platform Overview. You have seen all block types '
-                        'across content, assessment, safety, and advanced categories. Replace the demo '
-                        'content with your own assets and publish to SCORM or Web Bundle format.'),
+<div><h3>The pour</h3>
+<ul><li><strong>Microfoam</strong> — glossy, paint-like, no big bubbles</li>
+<li><strong>Crema</strong> — even, hazelnut, on a balanced shot</li>
+<li><strong>Latte art</strong> — set foam over a clean base</li></ul></div></div>
+<p style="margin-top:14px;font-size:13px;color:#9fb4c9">Every frame above is one CourseForge block — text, image, video, audio, quiz, hotspot, branch, warning/caution/note, 3D, interactive video, and Animate output — shown with real content.</p>''',
+              narration='The whole shot in one view. The numbers: eighteen grams in, thirty-six out, '
+                        'twenty-five to thirty seconds. Read the shot: fast and sour means grind finer, slow '
+                        'and bitter means grind coarser. Mind the machine, and steam milk to sixty to '
+                        'sixty-five degrees for a glossy pour.'),
     ]},
     {'name': 'Next Steps', 'frame_type': 'content', 'lesson': 'Course Summary', 'blocks': [
-        _text(body='''<h2>Next Steps</h2>
-<p>You're ready to build your first real course. Recommended workflow:</p>
-<h3>1. Plan structure in ForgeBlueprint</h3>
-<p>Define your hierarchy (Course → Module → Lesson → Frame) and spec narration, media placeholders,
-and KC questions per frame. Export the enriched JSON and import it into CourseForge.</p>
-<h3>2. Process assets in ForgePack</h3>
-<ul><li>Video → MP4 + WebM + VTT + poster</li>
-<li>Audio → MP3 + OGG + M4A at −16 LUFS</li>
-<li>Image → WebP + PNG + @2x + thumb + OG</li></ul>
-<h3>3. Author interactions in ForgeClip</h3>
-<p>Upload your processed video, place markers, then Bake &amp; Export the mediaPackage and upload
-the baked files to CourseForge.</p>
-<h3>4. Publish from CourseForge</h3>
-<p>Click ⬇ Publish, run the 508 audit, select your format, and download. Validate in SCORM Cloud
-before submitting to your LMS.</p>''',
-              narration='You are ready to build your first real course. Plan structure in ForgeBlueprint, '
-                        'process assets in ForgePack, author interactions in ForgeClip, then assemble and '
-                        'publish in CourseForge. Validate in SCORM Cloud before submitting to your LMS.'),
+        _text(body='''<h2>Next steps</h2>
+<p>Now pull shots. Dial the grind a touch finer or coarser and taste what changes. Chase 25–30
+seconds and a 1:2 ratio until you can hit it by feel, then start steaming milk and working on the
+pour. Consistency comes from changing one variable at a time.</p>
+<h3>Building your own course?</h3>
+<p>This whole demo was assembled in the CourseForge suite. The same workflow builds any course:</p>
+<ul><li><strong>ForgeBlueprint</strong> — plan the hierarchy (Course → Module → Lesson → Frame) and spec narration, media, and questions</li>
+<li><strong>ForgePack</strong> — process media: video to MP4/WebM/VTT/poster, audio to MP3/OGG/M4A at −16 LUFS, images to WebP/PNG/@2x</li>
+<li><strong>ForgeClip</strong> — author interactive video, then bake and export the package</li>
+<li><strong>CourseForge</strong> — assemble, run the 508 audit, and publish as SCORM or a Web Bundle</li></ul>
+<p>Validate in SCORM Cloud before sending it to your LMS.</p>''',
+              narration='Now pull shots. Change one variable at a time: dial the grind finer or coarser and '
+                        'taste what changes. Chase twenty-five to thirty seconds and a one-to-two ratio until '
+                        'you can hit it by feel, then start on milk and the pour. Building your own course? This '
+                        'demo was assembled in the CourseForge suite, from ForgeBlueprint through ForgePack and '
+                        'ForgeClip to CourseForge. Validate in SCORM Cloud before sending it to your LMS.'),
     ]},
 ]
 
