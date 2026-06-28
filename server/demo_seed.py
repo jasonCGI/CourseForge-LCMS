@@ -294,7 +294,7 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
                caption='Click a term on the left to swap this cup'),
     ]},
     {'name': 'Image with Callout Labels', 'frame_type': 'content', 'lesson': 'Content Blocks',
-     'layout': 'full', 'blocks': [
+     'optional': True, 'layout': 'full', 'blocks': [
         # A still image fills the content area; callout overlays annotate parts of it.
         # Callouts are AUXILIARY (they never consume a layout zone), so they coexist
         # with the full-bleed image. Position/aim them by dragging in the live
@@ -693,7 +693,7 @@ def seed_demo(app=None):
             content['layout'] = fd['layout']
         db.session.add(Frame(id=fid, lesson_id=lesson.id, name=fd['name'],
                              frame_type=fd.get('frame_type', 'content'), order_index=order,
-                             content=content))
+                             optional=fd.get('optional', False), content=content))
 
     # Wire the demo Branch block's targets to real frames so it's clickable out of
     # the box: Yes -> Video Block, No -> Welcome (review). The branch dict is the
