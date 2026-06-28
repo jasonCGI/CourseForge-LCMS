@@ -1768,11 +1768,21 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 <script>
 (function() {{
   var clipData = {clip_json};
-  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clipData && clipData.interactions) || [], {{
-    coords: (clipData && clipData.coords) || null,
-    nW: (clipData && clipData.video && clipData.video.width) || 1920,
-    nH: (clipData && clipData.video && clipData.video.height) || 1080
-  }});
+  function boot() {{
+    if (!window.iVideoInit) return false;
+    iVideoInit("ivideo-{block_id}", (clipData && clipData.interactions) || [], {{
+      coords: (clipData && clipData.coords) || null,
+      nW: (clipData && clipData.video && clipData.video.width) || 1920,
+      nH: (clipData && clipData.video && clipData.video.height) || 1080
+    }});
+    return true;
+  }}
+  // The iVideo runtime <script> can load AFTER this injected block (preview pages
+  // append it last; shell injection re-runs this call before its chrome scripts),
+  // so retry until iVideoInit is defined rather than no-op once.
+  if (!boot()) {{
+    var n = 0, t = setInterval(function() {{ if (boot() || ++n > 60) clearInterval(t); }}, 50);
+  }}
 }})();
 </script>''')
 
@@ -2576,6 +2586,27 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
     return html, shell.id
 
 
+_IVIDEO_RUNTIME_CACHE = None
+def _ivideo_runtime_block() -> str:
+    """The self-contained iVideo runtime <script> lifted from sco_shell.html, for
+    injecting into GUI-shell SCOs — which render the UPLOADED shell (not sco_shell.html)
+    and so otherwise never define iVideoInit / the transport bar / blocking modals for
+    an injected ivideo block. Cached; '' if unavailable."""
+    global _IVIDEO_RUNTIME_CACHE
+    if _IVIDEO_RUNTIME_CACHE is not None:
+        return _IVIDEO_RUNTIME_CACHE
+    try:
+        src = (Path(__file__).resolve().parent.parent / 'templates' / 'sco_shell.html').read_text(encoding='utf-8')
+    except OSError:
+        _IVIDEO_RUNTIME_CACHE = ''
+        return ''
+    m = src.find('IVideo runtime')
+    start = src.rfind('<script>', 0, m) if m != -1 else -1
+    end = src.find('</script>', m) if m != -1 else -1
+    _IVIDEO_RUNTIME_CACHE = src[start:end + len('</script>')] if (start != -1 and end != -1) else ''
+    return _IVIDEO_RUNTIME_CACHE
+
+
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
                  lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None,
                  content_bg=None, shell_text_mode='auto', project_text_mode='auto'):
@@ -2788,10 +2819,13 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
 </script>
 """
 
+    # Define the iVideo runtime BEFORE cf_runtime so iVideoInit exists when the GUI
+    # runtime's inject()/runInjectedScripts re-runs an ivideo block's boot() call.
+    iv_runtime = _ivideo_runtime_block()
     if '</body>' in shell_html:
-        shell_html = shell_html.replace('</body>', cf_runtime + '\n</body>')
+        shell_html = shell_html.replace('</body>', iv_runtime + cf_runtime + '\n</body>')
     else:
-        shell_html += cf_runtime
+        shell_html += iv_runtime + cf_runtime
 
     return shell_html
 
