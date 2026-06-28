@@ -2787,7 +2787,15 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '.cf-shelled-text-top{{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto}}' +
     '.cf-zone-text{{font-size:14px}}' +
     '.cf-zone-media>*{{margin:0!important}}' +
-    '.cf-zone-media img,.cf-zone-media video{{width:100%;height:100%;object-fit:contain;display:block;max-width:none}}' +
+    // <img>/<video> are REPLACED elements: a %-height evaluated against a
+    // containing block with a computed-indefinite height is treated as auto, so
+    // on load the element snaps to its INTRINSIC pixel size and grows the zone,
+    // covering the GUI ("correct for a second, then covers"). The 3D canvas / OAM
+    // iframe escape this because their own JS sets a pixel height. Edge-bind the
+    // media instead: absolute + inset:0 resolves against the zone's USED height
+    // (always definite) and is out of flow, so it can neither balloon to intrinsic
+    // size nor push its container. object-fit:contain still letterboxes inside.
+    '.cf-zone-media img,.cf-zone-media video{{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}}' +
     // Bind the iVideo container to the zone by EDGES, not the %-height cascade.
     // Unlike the 3D canvas / OAM iframe (sized by their own JS), the native <video>
     // re-evaluates its used height on loadedmetadata; if the %-height chain resolves
