@@ -275,22 +275,23 @@ including headings, paragraphs, lists, bold, italic, and inline code.</p>
         # Half-layout (text left, image right). The text carries inline image-swap
         # triggers: <a data-cf-swap="<assetId>">term</a>. Clicking a term swaps the
         # image on the right (the first cf-swap-target <img>) to that asset; clicking
-        # the active term again reverts to the default. The data-cf-swap ids below are
-        # PLACEHOLDERS (__SWAP_A/B/C__) that _wire_demo_assets() rewrites to the real
-        # demo image asset ids once they're registered — so the demo works after a
-        # reset with zero manual uploads.
+        # the active term again reverts to the default. The default image is cf1; the
+        # two terms below are PLACEHOLDERS (__SWAP_B__/__SWAP_C__) that
+        # _wire_demo_assets() rewrites to the OTHER two demo image asset ids (cf2/cf3)
+        # once registered — so the demo works after a reset with zero manual uploads.
         _text(body=(
-            '<h2>Image swap — click a term</h2>'
-            '<p>This frame shows the inline image-swap interaction. The image on the '
-            'right starts on its default view. Click '
-            '<a data-cf-swap="__SWAP_A__">view&nbsp;one</a>, '
-            '<a data-cf-swap="__SWAP_B__">view&nbsp;two</a>, or '
-            '<a data-cf-swap="__SWAP_C__">view&nbsp;three</a> '
-            'to change it in place. Click the active term again to return to the '
-            'default. The same markup drives the live preview and the published SCO.</p>'
+            '<h2>Milk glass in a Japanese café</h2>'
+            '<p>In a quiet kissaten, the same pour-over arrives in whatever cup the '
+            'house favours that morning. This one is patterned milk glass on its '
+            'matching saucer. Swap it for a '
+            '<a data-cf-swap="__SWAP_B__">frosted milk-glass cup</a> or a '
+            '<a data-cf-swap="__SWAP_C__">blue floral cup&nbsp;and&nbsp;saucer</a>. '
+            'Click a cup to change the photo in place; click the active term again to '
+            'return to the first. The same markup drives the live preview and the '
+            'published SCO.</p>'
         )),
-        _image(label='Default view', color='#185FA5', icon='🖼',
-               caption='Click a term on the left to swap this image'),
+        _image(label='Patterned milk-glass coffee, Japanese café', color='#185FA5', icon='☕',
+               caption='Click a term on the left to swap this cup'),
     ]},
     {'name': 'Image with Callout Labels', 'frame_type': 'content', 'lesson': 'Content Blocks',
      'layout': 'full', 'blocks': [
@@ -544,7 +545,8 @@ def _wire_demo_assets(project):
     aud = reg('beneath-the-still-water.mp3', 'audio', 'audio/mpeg')
     glb = reg('coffee_cup.glb', 'model3d', 'model/gltf-binary')
     hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
-    # Image-swap demo views (Firefly coffee-cup renders): default + three swap targets.
+    # Image-swap demo views (Firefly coffee-cup renders): cf1 = default, cf2/cf3 = the
+    # two swap targets the inline terms switch to.
     cf1 = reg('firefly_coffee_1.jpg', 'image', 'image/jpeg')
     cf2 = reg('firefly_coffee_2.jpg', 'image', 'image/jpeg')
     cf3 = reg('firefly_coffee_3.jpg', 'image', 'image/jpeg')
@@ -603,12 +605,12 @@ def _wire_demo_assets(project):
                 d.update(asset_id=cf1.id, serve_url=f'/api/media/serve/{cf1.id}',
                          original_name='firefly_coffee_1.jpg', asset_meta=_serialize_media(cf1)); changed = True
             elif fr.name.startswith('Image Swap') and t == 'text':
-                # Rewrite the placeholder swap ids to three real, already-bundled demo
-                # image assets so the swap works in preview AND the published SCO.
+                # Rewrite the two placeholder swap ids to the OTHER two bundled coffee
+                # renders (cf2/cf3) so each term swaps the default (cf1) to a real,
+                # visibly-different cup in both the live preview and the published SCO.
                 body = d.get('body', '') or ''
-                body = (body.replace('__SWAP_A__', img.id)
-                            .replace('__SWAP_B__', poster.id)
-                            .replace('__SWAP_C__', hb.id))
+                body = (body.replace('__SWAP_B__', cf2.id)
+                            .replace('__SWAP_C__', cf3.id))
                 if body != d.get('body'):
                     d['body'] = body; changed = True
             elif fr.name == 'Video Block' and t == 'media' and d.get('kind') == 'video':
