@@ -262,10 +262,10 @@ function InteractionList({ block, updateBlock }) {
 
   const commit    = next => updateBlock(block.id, { clip: { ...clip, interactions: next } })
   const patchData = (id, dataPatch) => commit(ints.map(it => it.id === id ? { ...it, data: { ...it.data, ...dataPatch } } : it))
-  const del = id => { commit(ints.filter(it => it.id !== id)); if (activeInteractionId === id) setActiveInteraction(null) }
-  // CF edits POSITION + SIZE only. Timing (timecode) and the interaction SET drive
-  // the bake slippage, so they stay owned by ForgeClip + the bake — editing them
-  // here would desync a baked clip's freeze segments. (See the iVideo notes.)
+  // CF edits POSITION + SIZE only. Timing (timecode) and the interaction SET
+  // (add/remove) drive the bake slippage, so they stay owned by ForgeClip + the
+  // bake — editing them here would desync a baked clip's freeze segments. x/y/w/h
+  // are slippage-independent and safe. (See the iVideo notes.)
 
   const editToggle = (
     <button onClick={() => setIvideoEditBlock(editing ? null : block.id)}
@@ -333,8 +333,6 @@ function InteractionList({ block, updateBlock }) {
               <input value={d.label ?? d.text ?? ''} placeholder={it.type === 'hotspot' ? 'Label' : 'Text'}
                 onChange={e => patchData(it.id, it.type === 'hotspot' ? { label: e.target.value } : { text: e.target.value })}
                 aria-label="Interaction label" style={{ ...inputStyle, flex: 1, padding: '4px 6px', fontSize: 12 }} />
-              <button onClick={e => { e.stopPropagation(); del(it.id) }} aria-label="Delete interaction"
-                style={{ ...iconBtnStyle, color: '#E87070' }}>✕</button>
             </div>
             {sel && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, alignItems: 'center' }}>
