@@ -89,7 +89,31 @@ SHELL_CONTENT_CSS = (
 )
 
 
+def _signals_light_bg(text_color):
+    """The body text color is already luminance-derived: a DARK body color means the
+    content background is LIGHT. On a light background the brand-amber heading
+    (#F59E0B in SHELL_CONTENT_CSS) fails WCAG AA (~1.7:1), so callers swap headings
+    to a dark color there. Returns True when text_color is dark (=> light bg)."""
+    h = (text_color or '').lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    if len(h) != 6:
+        return False
+    try:
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return False
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 140
+
+
 def fgui_text_css(text_color, halo_css):
     """Per-frame dynamic rule appended after SHELL_CONTENT_CSS by each renderer:
-    the luminance-derived body text color (+ optional text-shadow halo)."""
-    return '#fgui-content{color:' + (text_color or '') + ';' + (halo_css or '') + '}'
+    the luminance-derived body text color (+ optional text-shadow halo), plus a
+    luminance-aware HEADING color. Amber headings (the SHELL_CONTENT_CSS default)
+    are brand + pass on dark content areas; on a LIGHT content area they fail AA, so
+    override headings to brand navy (#042C53) there — matching the body's adaptation
+    and the live-preview (Edit) render."""
+    css = '#fgui-content{color:' + (text_color or '') + ';' + (halo_css or '') + '}'
+    if _signals_light_bg(text_color):
+        css += '#fgui-content h1,#fgui-content h2,#fgui-content h3{color:#042C53}'
+    return css

@@ -863,10 +863,26 @@ export function resolveShellTextStyle(shellTextMode, projectTextMode, bgColor) {
 // two-level text cascade (per-shell mode, else project mode, else the bg's
 // luminance). The stored shell HTML sets no #fgui-content color of its own, so
 // this is what makes the in-canvas preview match the published SCO's _patch_shell.
+// A DARK body text color (luminance-derived) signals a LIGHT content background,
+// where the brand-amber heading (#F59E0B) fails WCAG AA. Mirror of shell_css.py
+// _signals_light_bg so the Edit preview and the published SCO agree.
+function _signalsLightBg(hex) {
+  let h = (hex || '').replace('#', '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  if (h.length !== 6) return false
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  if ([r, g, b].some(Number.isNaN)) return false
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 140
+}
+
 function shellTextCSS(bgColor, shellTextMode = 'auto', projectTextMode = 'auto') {
   const { textColor, halo } = resolveShellTextStyle(shellTextMode, projectTextMode, bgColor)
-  return '<style>#fgui-content{color:' + textColor + ';'
-    + (halo ? SHELL_HALO : '') + '}</style>'
+  let css = '#fgui-content{color:' + textColor + ';' + (halo ? SHELL_HALO : '') + '}'
+  // Luminance-aware heading color: amber on dark areas (brand, passes), brand navy
+  // on light areas where amber fails AA. Mirrors scorm12.fgui_text_css.
+  if (_signalsLightBg(textColor))
+    css += '#fgui-content h1,#fgui-content h2,#fgui-content h3{color:#042C53}'
+  return '<style>' + css + '</style>'
 }
 
 // List CSS for shell-injected rich text. The stored shell's `#fgui-content ul`
