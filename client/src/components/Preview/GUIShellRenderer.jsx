@@ -62,6 +62,19 @@ export default function GUIShellRenderer({
             + '.cf-zone-media>img,.cf-zone-media>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block;margin:0!important}'
             + '.cf-zone-media>div:not([class]):not([id]){position:absolute!important;inset:0!important;margin:0!important;overflow:hidden}'
             + '.cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block}'
+            // Content typography — MIRROR of scorm12._patch_shell's #fgui-content
+            // rules. The stored shell carries none of these, so the GUI-ON edit
+            // preview rendered injected content in the shell's default font/heading
+            // color (sans, navy) while the published SCO showed IBM Plex Mono + amber
+            // headings -- a visible color/font shift between Edit and Published.
+            // (Body text color/halo is already supplied per text-mode by the injected
+            // frameHtml's shellTextCSS, so it is intentionally NOT set here.)
+            + '#fgui-content{font-family:\'IBM Plex Mono\',\'Inter\',system-ui,sans-serif}'
+            + '#fgui-content h1,#fgui-content h2,#fgui-content h3{color:#F59E0B;margin-bottom:12px}'
+            + '#fgui-content p{margin-bottom:10px}'
+            + '#fgui-content ul,#fgui-content ol{margin:8px 0 10px 0;padding-left:1.6em}'
+            + '#fgui-content li{margin-bottom:4px}'
+            + '#fgui-content img{max-width:100%;height:auto}'
           ;(doc.head || doc.documentElement).appendChild(st)
         }
       } catch (e) { /* cross-origin / torn down */ }
