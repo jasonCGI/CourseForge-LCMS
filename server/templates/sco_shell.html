@@ -671,6 +671,9 @@
         // Pause once the playhead reaches the marker (within its active window if one
         // is set) so a seek past it doesn't strand an unaddressed interaction.
         if (t >= it.timecode && (!it.end_timecode || t <= it.end_timecode)) {
+          // Snap onto the exact stop timecode (timeupdate overshoots ~250ms; the
+          // bake hold slippage makes the gap visible) so playhead + marker align.
+          if (typeof it.timecode === 'number' && Math.abs(video.currentTime - it.timecode) > 0.02) { try { video.currentTime = it.timecode; } catch (e) {} }
           state.blocking = true; video.pause();
           iVideoShowBlocking(container, video, it, answered, state);
           break;

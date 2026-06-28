@@ -47,6 +47,12 @@ export default function IVideoRuntime({
     // Pause at each pause-point marker (within its active window) once reached.
     const blocker = inRange.find(i => shouldPause(i) && !answered[i.id])
     if (blocker && !blocking) {
+      // Snap the playhead onto the exact stop timecode. timeupdate only fires every
+      // ~250ms, so the playhead overshoots the marker on a stop (more visible with the
+      // bake tool's hold slippage); snapping keeps the marker + playhead precise.
+      if (typeof blocker.timecode === 'number' && Math.abs(v.currentTime - blocker.timecode) > 0.02) {
+        v.currentTime = blocker.timecode
+      }
       v.pause()
       setBlocking(blocker)
     }
