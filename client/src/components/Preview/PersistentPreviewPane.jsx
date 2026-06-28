@@ -22,6 +22,13 @@ export default function PersistentPreviewPane() {
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
   const loadFrame    = useEditorStore(s => s.loadFrame)
   const setLastMenuFrame = useEditorStore(s => s.setLastMenuFrame)
+  // lastSaved drives a cache-bust on the Published iframe: it is keyed by frame id
+  // only, so a content edit (e.g. menu reorder) + autosave would otherwise leave the
+  // server-rendered iframe showing the PRE-edit render until the frame changed. Tying
+  // the src to lastSaved makes it refetch whenever a save lands.
+  const lastSaved    = useEditorStore(s => s.lastSaved)
+  const isDirty      = useEditorStore(s => s.isDirty)
+  const save         = useEditorStore(s => s.save)
   const activeProject = useProjectStore(s => s.activeProject)
 
   // A menu frame stores its nav items in content.menu (no content.blocks), so the
@@ -172,6 +179,13 @@ export default function PersistentPreviewPane() {
     isFirst: true, isLast: true,
   }), [human, total, activeFrame?.name, activeFrame?.content?.prompt, ctx])
 
+  // Switching to the Published (server-rendered) view with unsaved edits: flush the
+  // pending autosave now so the iframe fetches the just-edited render instead of the
+  // last-autosaved one (the cache-bust src then tracks the new lastSaved).
+  useEffect(() => {
+    if (source === 'published' && isDirty) save()
+  }, [source, isDirty, save])
+
   if (!activeFrame) return null
 
   return (
@@ -185,7 +199,7 @@ export default function PersistentPreviewPane() {
         <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
           <iframe
             key={activeFrame.id}
-            src={`/api/frames/${activeFrame.id}/preview-html?embed=1`}
+            src={`/api/frames/${activeFrame.id}/preview-html?embed=1&_v=${lastSaved ? lastSaved.getTime() : 0}`}
             title="Published frame preview"
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
           />
