@@ -18,6 +18,7 @@ mediaPackage ZIP:
 """
 
 import os
+import re
 import json
 import uuid
 import zipfile
@@ -95,13 +96,40 @@ def build_filter_complex(timecodes, has_audio, hold_duration=HOLD_DURATION, fade
     return ';'.join(v + a)
 
 
+# Tracks at or below this peak level are treated as digital silence (no audible
+# signal). Pure silence probes at ~-91 dB; real speech/music peaks well above -60.
+SILENCE_MAX_VOLUME_DB = -60.0
+
+
 def check_has_audio(input_path):
+    # A stream merely existing isn't enough — splash/title videos often carry an
+    # empty, digitally-silent track. Confirm the stream is present, then verify it
+    # actually carries audible signal via a quick volumedetect pass.
     try:
         r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a',
                             '-show_entries', 'stream=codec_type', '-of',
                             'default=noprint_wrappers=1:nokey=1', input_path],
                            capture_output=True, text=True, timeout=30)
-        return 'audio' in r.stdout.lower()
+        if 'audio' not in r.stdout.lower():
+            return False
+    except Exception:
+        return False
+    return not _is_silent(input_path)
+
+
+def _is_silent(input_path):
+    # True if the audio track is digital silence (peak <= threshold). Degrades
+    # gracefully: on any probe failure returns False so a present stream is still
+    # reported as audio (preserves prior behaviour).
+    try:
+        r = subprocess.run(['ffmpeg', '-hide_banner', '-nostats',
+                            '-i', input_path, '-map', '0:a:0',
+                            '-af', 'volumedetect', '-f', 'null', os.devnull],
+                           capture_output=True, text=True, timeout=120)
+        m = re.search(r'max_volume:\s*(-?\d+(?:\.\d+)?)\s*dB', r.stderr)
+        if not m:
+            return False  # couldn't measure → assume audible
+        return float(m.group(1)) <= SILENCE_MAX_VOLUME_DB
     except Exception:
         return False
 

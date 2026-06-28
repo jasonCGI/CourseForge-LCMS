@@ -84,8 +84,21 @@ def get_video_duration(input_path: str) -> float:
         return 5.0  # fallback
 
 
+# Tracks at or below this peak level are treated as digital silence (no audible
+# signal). Pure silence probes at ~-91 dB; real speech/music peaks well above -60.
+SILENCE_MAX_VOLUME_DB = -60.0
+
+
 def check_has_audio(input_path: str) -> bool:
-    """Check if video file has an audio stream."""
+    """
+    Check if a video file has an *audible* audio stream.
+
+    A stream merely existing (codec_type == 'audio') is not enough — splash/title
+    videos often carry an empty, digitally-silent track. We first confirm a stream
+    is present, then run a quick volumedetect pass; if its peak (max_volume) sits at
+    or below SILENCE_MAX_VOLUME_DB we treat it as no audio. If the volume probe
+    fails for any reason we fall back to the stream-presence result.
+    """
     try:
         result = subprocess.run([
             'ffprobe', '-v', 'error',
@@ -94,7 +107,34 @@ def check_has_audio(input_path: str) -> bool:
             '-of', 'default=noprint_wrappers=1:nokey=1',
             input_path,
         ], capture_output=True, text=True, timeout=30)
-        return 'audio' in result.stdout.lower()
+        if 'audio' not in result.stdout.lower():
+            return False
+    except Exception:
+        return False
+
+    # A stream exists — confirm it actually carries audible signal.
+    return not _is_silent(input_path)
+
+
+def _is_silent(input_path: str) -> bool:
+    """
+    Return True if the file's audio track is digital silence (peak <= threshold).
+    Degrades gracefully: on any probe failure returns False so a present stream is
+    still reported as audio (preserves prior behaviour).
+    """
+    try:
+        result = subprocess.run([
+            'ffmpeg', '-hide_banner', '-nostats',
+            '-i', input_path,
+            '-map', '0:a:0',
+            '-af', 'volumedetect',
+            '-f', 'null', os.devnull,
+        ], capture_output=True, text=True, timeout=120)
+        # volumedetect writes "max_volume: -91.0 dB" to stderr.
+        m = re.search(r'max_volume:\s*(-?\d+(?:\.\d+)?)\s*dB', result.stderr)
+        if not m:
+            return False  # couldn't measure → assume audible
+        return float(m.group(1)) <= SILENCE_MAX_VOLUME_DB
     except Exception:
         return False
 
