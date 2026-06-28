@@ -2788,6 +2788,7 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '.cf-zone-text{{font-size:14px}}' +
     '.cf-zone-media>*{{margin:0!important}}' +
     '.cf-zone-media img,.cf-zone-media video{{width:100%;height:100%;object-fit:contain;display:block;max-width:none}}' +
+    '.cf-zone-media [id^="ivideo-"]{{height:100%!important;margin:0!important}}' +
     '.cf-zone-media .cf-3d-viewer{{height:100%!important;margin:0!important}}' +
     // OAM player in a full-bleed zone: the wrap fills the zone and centers the
     // scaled stage. The media bar (play/pause/scrub) is absolutely positioned ON
