@@ -262,19 +262,10 @@ function InteractionList({ block, updateBlock }) {
 
   const commit    = next => updateBlock(block.id, { clip: { ...clip, interactions: next } })
   const patchData = (id, dataPatch) => commit(ints.map(it => it.id === id ? { ...it, data: { ...it.data, ...dataPatch } } : it))
-  const patchTop  = (id, topPatch)  => commit(ints.map(it => it.id === id ? { ...it, ...topPatch } : it))
   const del = id => { commit(ints.filter(it => it.id !== id)); if (activeInteractionId === id) setActiveInteraction(null) }
-  const add = (type) => {
-    if (!clip) return
-    const it = {
-      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'i' + Date.now(),
-      type, timecode: 0, pause_on_reach: type !== 'annotation',
-      data: type === 'hotspot'
-        ? { x: Math.round(nW / 2), y: Math.round(nH / 2), w: Math.round(0.22 * nW), h: Math.round(0.22 * nH), shape: 'round', color: null, label: 'New Hotspot', description: '' }
-        : { x: Math.round(nW / 2), y: Math.round(0.30 * nH), text: 'Label', style: 'label' },
-    }
-    commit([...ints, it]); setActiveInteraction(it.id)
-  }
+  // CF edits POSITION + SIZE only. Timing (timecode) and the interaction SET drive
+  // the bake slippage, so they stay owned by ForgeClip + the bake — editing them
+  // here would desync a baked clip's freeze segments. (See the iVideo notes.)
 
   const editToggle = (
     <button onClick={() => setIvideoEditBlock(editing ? null : block.id)}
@@ -319,7 +310,7 @@ function InteractionList({ block, updateBlock }) {
       {editToggle}
       {editHint}
       {ints.length === 0 && (
-        <p style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', margin: '0 0 8px' }}>No interactions yet — add one below.</p>
+        <p style={{ fontSize: 11, color: 'var(--cf-text-tertiary)', margin: '0 0 8px' }}>No interactions — author them in ForgeClip, then fine-tune positions here.</p>
       )}
       {ints.slice().sort((a, b) => (a.timecode || 0) - (b.timecode || 0)).map(it => {
         const sel = it.id === activeInteractionId
@@ -337,6 +328,8 @@ function InteractionList({ block, updateBlock }) {
               )}
               <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, letterSpacing: '0.06em',
                 background: it.type === 'hotspot' ? '#7A3A9A' : '#185FA5', color: '#fff', textTransform: 'uppercase', flexShrink: 0 }}>{it.type}</span>
+              <span title="Fires at this timecode — set in ForgeClip / the bake" style={{ fontSize: 10, color: 'var(--cf-text-tertiary)',
+                fontFamily: 'var(--forge-font, monospace)', flexShrink: 0 }}>{(it.timecode || 0).toFixed(1)}s</span>
               <input value={d.label ?? d.text ?? ''} placeholder={it.type === 'hotspot' ? 'Label' : 'Text'}
                 onChange={e => patchData(it.id, it.type === 'hotspot' ? { label: e.target.value } : { text: e.target.value })}
                 aria-label="Interaction label" style={{ ...inputStyle, flex: 1, padding: '4px 6px', fontSize: 12 }} />
@@ -345,11 +338,6 @@ function InteractionList({ block, updateBlock }) {
             </div>
             {sel && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, alignItems: 'center' }}>
-                <label style={fieldTag}>t(s)
-                  <input type="number" step="0.1" min={0} value={it.timecode ?? 0}
-                    onChange={e => patchTop(it.id, { timecode: Number(e.target.value) || 0 })}
-                    aria-label="Timecode (seconds)" style={{ ...inputStyle, width: 60, padding: '4px 6px', fontSize: 12 }} />
-                </label>
                 <label style={fieldTag}>X {numPx(d.x, v => patchData(it.id, { x: v }), nW)}</label>
                 <label style={fieldTag}>Y {numPx(d.y, v => patchData(it.id, { y: v }), nH)}</label>
                 {it.type === 'hotspot' && <label style={fieldTag}>W {numPx(d.w, v => patchData(it.id, { w: v }), nW)}</label>}
@@ -359,11 +347,9 @@ function InteractionList({ block, updateBlock }) {
           </div>
         )
       })}
-      <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
-        <button onClick={() => add('hotspot')} style={addBtnStyle}>⊕ Hotspot</button>
-        <button onClick={() => add('annotation')} style={addBtnStyle}>✎ Annotation</button>
-        <span style={{ fontSize: 10, color: 'var(--cf-text-tertiary)' }}>px @ {nW}×{nH}</span>
-      </div>
+      <p style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', margin: '6px 0 0', fontFamily: 'var(--forge-font, monospace)' }}>
+        // position &amp; size only — timing &amp; adding/removing interactions live in ForgeClip + the bake · px @ {nW}×{nH}
+      </p>
     </div>
   )
 }
