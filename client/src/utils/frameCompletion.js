@@ -57,7 +57,8 @@ export function getFrameIssues(frame) {
         break
       case 'ivideo':
         if (!data.video_asset_id) issues.push({ block_type: 'ivideo', issue: 'Interactive video not uploaded' })
-        if (!data.clip_asset_id) issues.push({ block_type: 'ivideo', issue: '.clip.json not uploaded', severity: 'warning' })
+        if (!data.clip_asset_id && !(data.clip && (data.clip.interactions || []).length))
+          issues.push({ block_type: 'ivideo', issue: '.clip.json not uploaded', severity: 'warning' })
         break
       case 'model3d':
         if (!data.model_asset_id) issues.push({ block_type: 'model3d', issue: '3D model not uploaded' })

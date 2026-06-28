@@ -2553,12 +2553,15 @@ function PreviewIVideo({ block, fill = false }) {
   const clipId  = block.data.clip_asset_id
 
   React.useEffect(() => {
+    // Prefer interactions edited inline in the block (data.clip); fall back to the
+    // imported .clip.json asset for un-edited blocks.
+    if (block.data.clip) { setClipData(block.data.clip); return }
     if (!clipId) { setClipData(null); return }
     fetch(`/api/media/clip/${clipId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setClipData)
       .catch(() => {})
-  }, [clipId])
+  }, [clipId, block.data.clip])
 
   if (!videoId) {
     return (

@@ -1735,9 +1735,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # type -> validate so neither can break out of the attribute.
                 video_src = f'media/video/{_safe_id(video_id)}.{vext}'
 
-                # Inline the clip interactions — robust across LMS that block fetch()
+                # Inline the clip interactions — robust across LMS that block fetch().
+                # Prefer interactions edited inline in the CourseForge block (data.clip);
+                # fall back to the imported .clip.json asset for un-edited blocks.
                 clip_json = '{"interactions":[]}'
-                if clip_id:
+                if isinstance(data.get('clip'), dict):
+                    clip_json = json.dumps(data['clip'])
+                elif clip_id:
                     c_asset = _get_asset(clip_id, asset_map)
                     if c_asset and c_asset.stored_path and Path(c_asset.stored_path).exists():
                         clip_json = _read_clip_cached(c_asset.stored_path, os.path.getmtime(c_asset.stored_path))
