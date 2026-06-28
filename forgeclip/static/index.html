@@ -229,7 +229,6 @@
       width: 300px;
       flex-shrink: 0;
       background: var(--bg2);
-      border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -443,10 +442,17 @@
       width: 320px;
       flex-shrink: 0;
       background: var(--bg);
-      border-right: 1px solid var(--border);
       padding: 14px 16px;
       overflow-y: auto;
     }
+
+    /* Draggable vertical divider between top-row panes (vanilla split-pane). */
+    .pane-resizer {
+      width: 6px; flex-shrink: 0; cursor: col-resize;
+      background: var(--border); transition: background .12s;
+      touch-action: none;
+    }
+    .pane-resizer:hover, .pane-resizer.dragging { background: var(--amber); }
 
     .props-title {
       font-size: 11px; font-weight: 600; color: var(--text2);
@@ -599,6 +605,8 @@
       </div>
     </div>
 
+    <div class="pane-resizer" data-resize="props" role="separator" aria-orientation="vertical" aria-label="Resize config panel"></div>
+
     <div class="video-panel" id="video-panel">
       <div class="upload-state" id="upload-state">
         <div class="icon">🎬</div>
@@ -621,6 +629,8 @@
         <div id="overlays" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:20"></div>
       </div>
     </div>
+
+    <div class="pane-resizer" data-resize="interactions" role="separator" aria-orientation="vertical" aria-label="Resize interactions panel"></div>
 
     <div class="interaction-panel" role="complementary" aria-label="Interactions">
       <div class="panel-header">
@@ -696,6 +706,36 @@ function setMode(mode) {
   try { localStorage.setItem('fk_mode', mode) } catch (e) {}
 }
 applyMode(document.documentElement.getAttribute('data-mode') || 'dark')
+
+// ── Resizable panes (vanilla split-pane; widths persist in localStorage) ──
+;(function() {
+  function setupResizer(handleSel, paneSel, side, key, min, max) {
+    var handle = document.querySelector(handleSel)
+    var pane   = document.querySelector(paneSel)
+    if (!handle || !pane) return
+    try { var saved = localStorage.getItem(key); if (saved) pane.style.width = saved + 'px' } catch (e) {}
+    handle.addEventListener('pointerdown', function(e) {
+      e.preventDefault()
+      handle.classList.add('dragging')
+      var startX = e.clientX, startW = pane.getBoundingClientRect().width
+      function move(ev) {
+        var dx = ev.clientX - startX
+        var w = side === 'left' ? startW + dx : startW - dx   // left pane grows rightward; right pane grows leftward
+        pane.style.width = Math.max(min, Math.min(max, w)) + 'px'
+      }
+      function up() {
+        handle.classList.remove('dragging')
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        try { localStorage.setItem(key, String(Math.round(pane.getBoundingClientRect().width))) } catch (e) {}
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    })
+  }
+  setupResizer('[data-resize="props"]',        '.props-panel',       'left',  'fk_w_props', 220, 560)
+  setupResizer('[data-resize="interactions"]', '.interaction-panel', 'right', 'fk_w_ints',  220, 520)
+})()
 
 // ── State ──────────────────────────────────────────────────────
 var state = {
