@@ -200,6 +200,7 @@ export default function IVideoRuntime({
       <div style={fill
         ? { position: 'absolute', inset: 0, background: '#000', overflow: 'hidden' }
         : { position: 'relative', width: '100%', background: '#000', overflow: 'hidden' }}>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- captions <track> is rendered conditionally below when a VTT companion exists */}
         <video ref={videoRef} controls={false}
           style={fill
             ? { width: '100%', height: '100%', objectFit: 'contain', display: 'block' }

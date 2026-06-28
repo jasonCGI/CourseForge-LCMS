@@ -1904,7 +1904,6 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             (startDrag also selects). Editor-only, shown on hover or when selected;
             never part of the published overlay. */}
         {(hover || active) && (
-          /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag grip (aria-hidden); no keyboard-drag equivalent */
           <div aria-hidden="true"
             onMouseDown={startDrag('box', box)}
             title="Drag to reposition"
@@ -1920,6 +1919,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             </svg>
           </div>
         )}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- contentEditable inline text editor; native editing semantics are exposed to assistive tech and Enter is handled in onKeyDown */}
         <div
           ref={boxRef}
           contentEditable={active}
@@ -2390,12 +2390,12 @@ function PreviewWCN({ block }) {
   // re-show the SAME UI. Visual parity with scorm12._wcn_modal_html (the
   // published SCO / preview-html modal) — keep the two in sync.
   const modalMarkup = modalOpen && (
-    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the dialog's own controls provide a keyboard-accessible close */
     <div role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
       style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
                zIndex:2000, display:'flex', alignItems:'center',
                justifyContent:'center', padding:24 }}>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- onClick only stops backdrop-dismiss bubbling; not an interactive control */}
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={modalId}
         onClick={(e) => e.stopPropagation()}
         style={{ background:'#fff', border:`4px solid ${cfg.theme}`, borderRadius:8,
