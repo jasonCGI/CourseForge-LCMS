@@ -617,7 +617,16 @@
     video.addEventListener('loadeddata', meta);
     video.addEventListener('playing', detectAudio);
     video.addEventListener('timeupdate', detectAudio);
-    video.addEventListener('ended', function(){ ico(false); });
+    // Replay: clear answered IN PLACE so a replay re-arms every interaction.
+    video.addEventListener('ended', function(){ ico(false); for (var k in answered) delete answered[k]; state.blocking = false; });
+    // Scrub-back: re-arm any interaction at/after the new playhead.
+    video.addEventListener('seeked', function(){
+      var tt = video.currentTime;
+      for (var j = 0; j < interactions.length; j++) {
+        var it = interactions[j];
+        if (answered[it.id] && typeof it.timecode === 'number' && it.timecode >= tt - 0.05) delete answered[it.id];
+      }
+    });
 
     seek.addEventListener('input', function(){
       seeking = true;

@@ -76,7 +76,23 @@ export default function IVideoRuntime({
     const v = videoRef.current
     if (!v) return
     const meta = () => { setDuration(v.duration || 0); detectAudio() }
-    const ended = () => { setPlaying(false); onComplete?.() }
+    // Replay: when the clip ends, clear consumed/answered interactions so a
+    // replay re-arms every hotspot/quiz/branch from the top.
+    const ended = () => { setPlaying(false); onComplete?.(); setAnswered({}); setBlocking(null) }
+    // Scrub-back: re-arm any interaction at/after the new playhead so seeking
+    // backward (or replaying from 0) makes those interactions fire again.
+    const onSeeked = () => {
+      const tt = v.currentTime
+      setAnswered(prev => {
+        const next = {}; let changed = false
+        for (const k in prev) {
+          const it = interactions.find(i => i.id === k)
+          if (it && it.timecode >= tt - 0.05) { changed = true; continue }
+          next[k] = prev[k]
+        }
+        return changed ? next : prev
+      })
+    }
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)
     const onVol = () => { setVolume(v.volume); setMuted(v.muted) }
@@ -87,6 +103,7 @@ export default function IVideoRuntime({
     v.addEventListener('playing', onProgress)
     v.addEventListener('timeupdate', onProgress)
     v.addEventListener('ended', ended)
+    v.addEventListener('seeked', onSeeked)
     v.addEventListener('play', onPlay)
     v.addEventListener('pause', onPause)
     v.addEventListener('volumechange', onVol)
@@ -97,6 +114,7 @@ export default function IVideoRuntime({
       v.removeEventListener('timeupdate', onProgress)
       v.removeEventListener('loadedmetadata', meta)
       v.removeEventListener('ended', ended)
+      v.removeEventListener('seeked', onSeeked)
       v.removeEventListener('play', onPlay)
       v.removeEventListener('pause', onPause)
       v.removeEventListener('volumechange', onVol)

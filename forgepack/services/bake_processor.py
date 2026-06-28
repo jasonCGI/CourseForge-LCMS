@@ -216,22 +216,22 @@ def bake_job(job_id, video_path, clip_data, base_name, output_dir):
             f"Audio handling:  Muted during holds (fade {FADE_DURATION}s in/out)\n"
             f"Source duration: {duration:.1f}s\n"
             f"Baked duration:  {duration + len(timecodes) * HOLD_DURATION:.1f}s\n\n"
-            "CONTENTS\n"
-            f"  {base_name}.mp4              original video (pre-bake) - re-author in ForgeClip\n"
-            f"  {base_name}.clip.json        original markers (pre-bake timecodes)\n"
+            "CONTENTS (baked files only — drop straight into CourseForge)\n"
             f"  {base_name}_baked.mp4        hold-expanded video - import to CourseForge\n"
             f"  {base_name}_baked.clip.json  corrected timecodes - import to CourseForge\n\n"
             "TO IMPORT INTO COURSEFORGE\n"
-            f"  Upload {base_name}_baked.mp4 and {base_name}_baked.clip.json to a\n"
-            "  CourseForge ivideo block. They auto-pair by base name.\n\n"
+            "  Drop this ZIP directly into a CourseForge ivideo block (or upload the\n"
+            f"  two {base_name}_baked.* files). They auto-pair by base name.\n\n"
             "TO RE-AUTHOR\n"
-            "  Drop this ZIP into ForgeClip - it restores the source mp4 + clip.json.\n\n"
+            "  Export a Package (.zip) from ForgeClip - that one carries the source\n"
+            "  mp4 + clip.json for re-authoring (this baked ZIP is import-only).\n\n"
             "BAKE LOG (original -> baked):\n" + log_lines + "\n")
 
+        # Baked-only package: just the hold-expanded video + corrected markers, so
+        # the artifact is a clean drop-in for a CourseForge ivideo block (the source
+        # mp4/clip live in ForgeClip's separate Package export for re-authoring).
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            zf.write(video_path,         f"{base_name}.mp4")
             zf.write(baked_video_path,   f"{base_name}_baked.mp4")
-            zf.write(original_clip_path, f"{base_name}.clip.json")
             zf.write(baked_clip_path,    f"{base_name}_baked.clip.json")
             zf.writestr('README.txt', readme)
 
