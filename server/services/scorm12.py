@@ -2787,15 +2787,21 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     '.cf-shelled-text-top{{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto}}' +
     '.cf-zone-text{{font-size:14px}}' +
     '.cf-zone-media>*{{margin:0!important}}' +
-    // <img>/<video> are REPLACED elements: a %-height evaluated against a
-    // containing block with a computed-indefinite height is treated as auto, so
-    // on load the element snaps to its INTRINSIC pixel size and grows the zone,
-    // covering the GUI ("correct for a second, then covers"). The 3D canvas / OAM
-    // iframe escape this because their own JS sets a pixel height. Edge-bind the
-    // media instead: absolute + inset:0 resolves against the zone's USED height
-    // (always definite) and is out of flow, so it can neither balloon to intrinsic
-    // size nor push its container. object-fit:contain still letterboxes inside.
-    '.cf-zone-media img,.cf-zone-media video{{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}}' +
+    // Media BLOCK wrappers in a zone are class-less, id-less <div>s (iVideo=#ivideo-,
+    // OAM=.cf-oam, 3D=.cf-3d-viewer, hotspot=.cf-hotspot-wrap, video.js all carry an
+    // id/class, so :not([class]):not([id]) / :not(.video-js) exclude them). The inline
+    // height:auto on the <img>/<video> beats a plain external rule, so on load the
+    // REPLACED element snaps to its intrinsic aspect height and overflows / gaps a
+    // full-bleed zone (covering the GUI bottom). Fill the wrapper to the zone (it is
+    // also the positioning context for a cover-caption overlay) and the media to the
+    // wrapper, with !important to override the inline height. object-fit has NO
+    // !important so an authored object-fit:cover (full-bleed images/videos) still
+    // wins edge-to-edge; plain media falls back to contain (no stretch).
+    '.cf-zone-media>div:not([class]):not([id]){{position:absolute!important;inset:0!important;margin:0!important;overflow:hidden}}' +
+    '.cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block}}' +
+    // iVideo's <video> has no inline position; fill its zone-bound #ivideo- box
+    // directly so hotspot/overlay alignment holds.
+    '.cf-zone-media [id^="ivideo-"] video{{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}}' +
     // Bind the iVideo container to the zone by EDGES, not the %-height cascade.
     // Unlike the 3D canvas / OAM iframe (sized by their own JS), the native <video>
     // re-evaluates its used height on loadedmetadata; if the %-height chain resolves
