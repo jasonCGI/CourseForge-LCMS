@@ -14,6 +14,7 @@ const SHORTCUTS = [
 export default function ShortcutHelp({ open, onClose }) {
   if (!open) return null
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the ✕ button provides a keyboard-accessible close */
     <div
       role="dialog" aria-modal="true" aria-label="Keyboard shortcuts"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}

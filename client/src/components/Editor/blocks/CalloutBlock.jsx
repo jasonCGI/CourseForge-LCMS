@@ -44,8 +44,9 @@ export default function CalloutBlock({ block }) {
 
         {/* Text */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Callout text</label>
+          <label htmlFor={`callout-text-${block.id}`} style={fieldLabel}>Callout text</label>
           <input
+            id={`callout-text-${block.id}`}
             value={text}
             onChange={e => updateBlock(block.id, { text: e.target.value })}
             placeholder="Callout"
@@ -55,7 +56,7 @@ export default function CalloutBlock({ block }) {
 
         {/* Padding — uniform on all four sides */}
         <div style={{ marginBottom: 6 }}>
-          <label style={fieldLabel}>Padding (px)</label>
+          <span style={fieldLabel}>Padding (px)</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
               type="range" min={0} max={40} step={1} value={padding}
@@ -74,7 +75,7 @@ export default function CalloutBlock({ block }) {
         {/* Anchor — which box edge the connector line attaches to (its center).
             Auto picks the edge facing the target. */}
         <div style={{ marginBottom: 6 }}>
-          <label style={fieldLabel}>Connector anchor</label>
+          <span style={fieldLabel}>Connector anchor</span>
           <div style={{ display: 'flex', gap: 4 }}>
             {ANCHOR_OPTIONS.map(opt => {
               const sel = anchor === opt.value

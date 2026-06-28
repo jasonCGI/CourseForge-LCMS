@@ -99,7 +99,7 @@ export default function IVideoBlock({ block }) {
       <div style={{ padding: 16 }}>
         {/* Step 1 — Video */}
         <div style={{ marginBottom: 14 }}>
-          <label style={sectionLabel}>Step 1 — Video file (.mp4)</label>
+          <span style={sectionLabel}>Step 1 — Video file (.mp4)</span>
           {!videoId ? (
             <MediaUploader
               accept={VIDEO_ACCEPT}
@@ -127,7 +127,7 @@ export default function IVideoBlock({ block }) {
 
         {/* Step 2 — Clip */}
         <div style={{ marginBottom: 14 }}>
-          <label style={sectionLabel}>Step 2 — ForgeClip file (.clip.json)</label>
+          <span style={sectionLabel}>Step 2 — ForgeClip file (.clip.json)</span>
           {!clipId ? (
             <MediaUploader
               accept={CLIP_ACCEPT}
@@ -163,7 +163,7 @@ export default function IVideoBlock({ block }) {
 
         {/* Caption */}
         <div>
-          <label style={sectionLabel}>Caption (optional)</label>
+          <span style={sectionLabel}>Caption (optional)</span>
           <input value={block.data.caption || ''} onChange={e => update('caption', e.target.value)}
             placeholder="Optional caption shown below the player"
             aria-label="Interactive video caption" style={inputStyle} />

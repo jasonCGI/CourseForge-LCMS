@@ -120,8 +120,9 @@ export default function HotspotBlock({ block }) {
 
         {/* Image ID field */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Image asset ID</label>
+          <label htmlFor={`hotspot-image-${block.id}`} style={fieldLabel}>Image asset ID</label>
           <input
+            id={`hotspot-image-${block.id}`}
             value={block.data.image_id || ''}
             onChange={e => updateBlock(block.id, { image_id: e.target.value })}
             placeholder="Paste media asset ID here"
@@ -139,6 +140,7 @@ export default function HotspotBlock({ block }) {
         </div>
 
         {/* Canvas */}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag drawing surface; regions are also created/edited via the keyboard-accessible region list and numeric fields below */}
         <div
           ref={canvasRef}
           onMouseDown={onCanvasDown}
@@ -171,6 +173,7 @@ export default function HotspotBlock({ block }) {
             const g = geomOf(r)
             const st = hotspotStyle(r.color)
             return (
+              /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag move affordance on the canvas; the same region is keyboard-editable in the region list below */
               <div key={r.id}
                 onMouseDown={e => startMove(e, r)}
                 style={{
@@ -183,6 +186,7 @@ export default function HotspotBlock({ block }) {
                 }}>
                 <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.label}</span>
                 {Object.entries(HANDLES).map(([h, pos]) => (
+                  /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- pointer-drag resize handle; region size is also keyboard-editable via numeric fields */
                   <div key={h} onMouseDown={e => startResize(e, r, h)}
                     style={{ position: 'absolute', width: 10, height: 10, background: 'var(--forge-amber)',
                       border: '1px solid #042C53', borderRadius: 2, ...pos }} />
@@ -206,6 +210,7 @@ export default function HotspotBlock({ block }) {
           <div>
             <label style={fieldLabel}>Regions ({regions.length})</label>
             {regions.map(r => (
+              /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- row-select convenience; the row's label/color/delete controls are themselves keyboard-focusable */
               <div key={r.id} onMouseDown={() => setActiveRegion(r.id)}
                 style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center',
                   padding: '4px 6px', borderRadius: 6,

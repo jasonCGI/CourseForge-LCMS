@@ -34,8 +34,9 @@ export default function QuizBlock({ block }) {
 
         {/* Question */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Question</label>
+          <label htmlFor={`quiz-question-${block.id}`} style={fieldLabel}>Question</label>
           <textarea
+            id={`quiz-question-${block.id}`}
             value={block.data.question || ''}
             onChange={e => update('question', e.target.value)}
             rows={3}
@@ -46,7 +47,7 @@ export default function QuizBlock({ block }) {
 
         {/* Choices */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Answer choices</label>
+          <span style={fieldLabel}>Answer choices</span>
           {choices.map((choice, idx) => (
             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               {/* Correct radio */}
@@ -86,8 +87,9 @@ export default function QuizBlock({ block }) {
         {/* Feedback */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label style={fieldLabel}>Correct feedback</label>
+            <label htmlFor={`quiz-feedback-correct-${block.id}`} style={fieldLabel}>Correct feedback</label>
             <textarea
+              id={`quiz-feedback-correct-${block.id}`}
               value={block.data.feedback_correct || ''}
               onChange={e => update('feedback_correct', e.target.value)}
               rows={2}
@@ -96,8 +98,9 @@ export default function QuizBlock({ block }) {
             />
           </div>
           <div>
-            <label style={fieldLabel}>Incorrect feedback</label>
+            <label htmlFor={`quiz-feedback-incorrect-${block.id}`} style={fieldLabel}>Incorrect feedback</label>
             <textarea
+              id={`quiz-feedback-incorrect-${block.id}`}
               value={block.data.feedback_incorrect || ''}
               onChange={e => update('feedback_incorrect', e.target.value)}
               rows={2}

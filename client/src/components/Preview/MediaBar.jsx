@@ -48,6 +48,15 @@ export default function MediaBar({
         style={barBtn(!disabled)}>{playing ? '⏸' : '▶'}</button>
 
       <div onClick={seekClick} role="slider" aria-label="Seek"
+        tabIndex={canSeek && onSeek ? 0 : -1}
+        onKeyDown={e => {
+          if (!canSeek || !onSeek) return
+          const step = 5
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); onSeek(clamp(t + step, 0, duration)) }
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); onSeek(clamp(t - step, 0, duration)) }
+          else if (e.key === 'Home') { e.preventDefault(); onSeek(0) }
+          else if (e.key === 'End') { e.preventDefault(); onSeek(duration) }
+        }}
         aria-valuemin={0} aria-valuemax={Math.round(duration)} aria-valuenow={Math.round(t)}
         style={{ flex: 1, position: 'relative', height: 8, background: '#1c2a3a', borderRadius: 4,
                  cursor: canSeek ? 'pointer' : 'default', opacity: (canSeek || !onSeek) ? 1 : 0.5 }}>

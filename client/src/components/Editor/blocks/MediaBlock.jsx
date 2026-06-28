@@ -80,7 +80,7 @@ export default function MediaBlock({ block }) {
       <div style={{ padding: '16px' }}>
         {/* Kind selector */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Media type</label>
+          <span style={fieldLabel}>Media type</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {MEDIA_KINDS.map(k => (
               <button
@@ -105,8 +105,9 @@ export default function MediaBlock({ block }) {
 
         {/* Placeholder label */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Placeholder label</label>
+          <label htmlFor={`media-placeholder-${block.id}`} style={fieldLabel}>Placeholder label</label>
           <input
+            id={`media-placeholder-${block.id}`}
             value={block.data.placeholder_label || ''}
             onChange={e => update('placeholder_label', e.target.value)}
             placeholder="e.g. nose_section_photo"
@@ -119,8 +120,9 @@ export default function MediaBlock({ block }) {
 
         {/* Caption */}
         <div>
-          <label style={fieldLabel}>Caption</label>
+          <label htmlFor={`media-caption-${block.id}`} style={fieldLabel}>Caption</label>
           <input
+            id={`media-caption-${block.id}`}
             value={block.data.caption || ''}
             onChange={e => update('caption', e.target.value)}
             placeholder="Optional caption shown below media"
@@ -132,7 +134,7 @@ export default function MediaBlock({ block }) {
             persistent slim bar pinned to the bottom of the content area. */}
         {kind === 'audio' && (
           <div style={{ marginTop: 12 }}>
-            <label style={fieldLabel}>Placement</label>
+            <span style={fieldLabel}>Placement</span>
             <div style={{ display: 'flex', gap: 8 }}>
               {[['inline', 'Inline'], ['bottom', 'Docked (bottom)']].map(([val, lbl]) => {
                 const active = (block.data.dock || 'inline') === val
@@ -167,7 +169,7 @@ export default function MediaBlock({ block }) {
             Only meaningful when the video uses cover/fill (fit:'cover'). */}
         {kind === 'video' && (
           <div style={{ marginTop: 12 }}>
-            <label style={fieldLabel}>Playbar</label>
+            <span style={fieldLabel}>Playbar</span>
             <div style={{ display: 'flex', gap: 8 }}>
               {[['inline', 'Inline'], ['bottom', 'Snap to bottom']].map(([val, lbl]) => {
                 const active = (block.data.dock || 'inline') === val
@@ -321,12 +323,16 @@ export default function MediaBlock({ block }) {
                 />
               </Suspense>
             ) : (
+              /* eslint-disable-next-line jsx-a11y/media-has-caption -- captions <track> rendered conditionally when a VTT companion exists; raw fallback player */
               <video
                 src={`/api/media/serve/${block.data.asset_id}`}
                 controls
                 style={{ width: '100%', borderRadius: 4 }}
                 aria-label={block.data.original_name || 'Video'}
-              />
+              >
+                {block.data.asset_meta?.has_captions && block.data.asset_meta.companion_files?.vtt_asset_id &&
+                  <track kind="captions" src={`/api/media/serve/${block.data.asset_meta.companion_files.vtt_asset_id}`} srcLang="en" label="English" default />}
+              </video>
             )}
           </div>
         )}

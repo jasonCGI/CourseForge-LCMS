@@ -279,12 +279,13 @@ export default function Model3DBlock({ block }) {
               New annotation — {pendingPin.x.toFixed(2)}, {pendingPin.y.toFixed(2)}, {pendingPin.z.toFixed(2)}
             </div>
             <div style={{ marginBottom: 8 }}>
-              <label style={labelStyle}>Label *</label>
+              <span style={labelStyle}>Label *</span>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus -- annotation popover opened on demand; focusing the label field is expected */}
               <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="e.g. Fuel injector" autoFocus aria-label="Annotation label"
                 onKeyDown={e => { if (e.key === 'Enter') confirmPin(); if (e.key === 'Escape') cancelPin() }} style={{ ...inputStyle, width: '100%' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={labelStyle}>Description (optional)</label>
+              <span style={labelStyle}>Description (optional)</span>
               <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Explain what this component is or does…" rows={2}
                 aria-label="Annotation description" style={{ ...inputStyle, width: '100%', resize: 'vertical', lineHeight: 1.5 }} />
             </div>
@@ -302,12 +303,12 @@ export default function Model3DBlock({ block }) {
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
-                <label style={labelStyle}>Viewer height (px)</label>
+                <span style={labelStyle}>Viewer height (px)</span>
                 <input type="number" min="200" max="800" step="50" value={block.data.viewer_height || 400}
                   onChange={e => update('viewer_height', parseInt(e.target.value, 10))} aria-label="Viewer height in pixels" style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Background</label>
+                <span style={labelStyle}>Background</span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input type="color" value={bg} onChange={e => update('bg_color', e.target.value)} aria-label="Viewer background color" style={{ width: 36, height: 32, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 2 }} />
                   <input type="text" value={bg} onChange={e => update('bg_color', e.target.value)} aria-label="Background color hex" style={{ ...inputStyle, flex: 1 }} />
@@ -320,7 +321,7 @@ export default function Model3DBlock({ block }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
               <div>
-                <label style={labelStyle}>Environment (reflections)</label>
+                <span style={labelStyle}>Environment (reflections)</span>
                 <select value={block.data.environment || 'studio'} onChange={e => update('environment', e.target.value)}
                   aria-label="Viewer environment" style={{ ...inputStyle, width: '100%' }}>
                   <option value="studio">Studio — procedural</option>
@@ -330,7 +331,7 @@ export default function Model3DBlock({ block }) {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Reflection intensity</label>
+                <span style={labelStyle}>Reflection intensity</span>
                 <input type="range" min="0" max="2" step="0.1" value={block.data.env_intensity ?? 1}
                   onChange={e => update('env_intensity', parseFloat(e.target.value))}
                   disabled={(block.data.environment || 'studio') === 'none'}
@@ -339,12 +340,12 @@ export default function Model3DBlock({ block }) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Caption (optional)</label>
+              <span style={labelStyle}>Caption (optional)</span>
               <input value={block.data.caption || ''} onChange={e => update('caption', e.target.value)} placeholder="Describe the model for learners and screen readers" aria-label="3D model caption" style={{ ...inputStyle, width: '100%' }} />
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Attribution / credit (optional)</label>
+              <span style={labelStyle}>Attribution / credit (optional)</span>
               <input value={block.data.attribution || ''} onChange={e => update('attribution', e.target.value)} placeholder="e.g. “Model” by Author (CC BY) — shown as a small overlay; leave empty to hide" aria-label="3D model attribution" style={{ ...inputStyle, width: '100%' }} />
             </div>
 
@@ -416,7 +417,7 @@ export default function Model3DBlock({ block }) {
               <div style={{ marginBottom: 14, border: '1px solid var(--cf-border-tertiary)', borderRadius: 6, padding: '10px 12px', background: 'var(--cf-input-bg, #060810)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <label style={labelStyle}>Cut axis</label>
+                    <span style={labelStyle}>Cut axis</span>
                     <select value={section.axis} onChange={e => updateSection('axis', e.target.value)}
                       aria-label="Cross-section axis" style={{ ...inputStyle, width: '100%' }}>
                       <option value="x">X — left / right</option>
@@ -508,11 +509,12 @@ function AnnotationRow({ ann, idx, total, isEditing, onEdit, onSave, onDelete, o
       {isEditing && (
         <div style={{ padding: '10px 12px', borderTop: '1px solid var(--cf-border-tertiary)' }}>
           <div style={{ marginBottom: 8 }}>
-            <label style={labelStyle}>Label</label>
+            <span style={labelStyle}>Label</span>
+            {/* eslint-disable-next-line jsx-a11y/no-autofocus -- inline annotation editor opened on demand; focusing the label field is expected */}
             <input value={label} onChange={e => setLabel(e.target.value)} autoFocus aria-label="Edit annotation label" style={{ ...inputStyle, width: '100%' }} />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <label style={labelStyle}>Description</label>
+            <span style={labelStyle}>Description</span>
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} aria-label="Edit annotation description" style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
           </div>
           <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font, IBM Plex Mono, monospace)', marginBottom: 8 }}>

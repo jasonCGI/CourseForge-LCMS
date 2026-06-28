@@ -360,6 +360,7 @@ function SelectableBlock({ block, active, onSelect, updateBlock = null, fill = f
   }, [active])
   if (!onSelect) return <PreviewBlock block={block} fill={fill} />
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- editor-canvas selection wrapper around arbitrary block content (whose own controls are keyboard-reachable); a role=button here would invalidly nest interactive descendants */
     <div ref={ref} onClick={() => onSelect(block.id)}
       style={{
         position: 'relative', cursor: 'pointer', borderRadius: 6,
@@ -411,6 +412,7 @@ function BoundsBox({ block, contentArea, updateBlock, active, onSelect, children
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- editor-canvas selection/bounds wrapper around arbitrary block content (whose own controls are keyboard-reachable); a role=button here would invalidly nest interactive descendants */
     <div ref={ref} onClick={() => onSelect && onSelect(block.id)}
       style={{ position: 'absolute', left: b.x, top: b.y, width: b.width, height: b.height, zIndex: 2,
         boxShadow: active ? `0 0 0 2px ${AC}` : `0 0 0 1px ${AC}99` }}>
@@ -1081,9 +1083,15 @@ export function wireMenuNav(win) {
     doc.querySelectorAll('a[data-cf-swap]').forEach((a) => {
       if (a.__cfSwapWired) return
       a.__cfSwapWired = true
+      // Prefer a server-stamped data-cf-swap-src; otherwise resolve the asset id
+      // directly to its serve URL (mirrors the non-shell PreviewText swapImage path)
+      // so the swap also works in the GUI-shell preview — the injected shell
+      // frameHtml carries only data-cf-swap=<assetId>, never the resolved src.
+      const cfId = a.getAttribute('data-cf-swap')
       const src = a.getAttribute('data-cf-swap-src')
+        || (cfId && /^[\w-]+$/.test(cfId) ? '/api/media/serve/' + cfId : '')
       if (!src) {
-        // Inert (unresolved) trigger — never navigates, never operable.
+        // Inert (truly unresolvable) trigger — never navigates, never operable.
         a.setAttribute('aria-disabled', 'true')
         a.addEventListener('click', (ev) => { try { ev.preventDefault() } catch (e) { /* torn down */ } })
         return
@@ -1273,6 +1281,7 @@ function PreviewText({ block }) {
   return (
     <div style={previewBlockWrap}>
       {block.data.body && (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- delegated click on rendered rich text (image-swap affordance); editor-only convenience, primary controls live in the block panel
         <div
           className="cf-preview-richtext"
           onClick={onBodyClick}
@@ -1347,6 +1356,7 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
       background: docked ? 'rgba(4,44,83,0.96)' : CF_AUDIO_NAVY, color: '#E8EEF6',
       fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
     }}>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- audio narration element; a captions <track> is not applicable, transcript/caption text is surfaced separately */}
       <audio
         ref={audioRef}
         src={src}
@@ -1419,6 +1429,7 @@ function PreviewMedia({ block, fill = false }) {
     const b = _fillBounds
     return (
       <div style={b ? { width: '100%', height: '100%' } : { ...previewBlockWrap, textAlign: 'center' }}>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- captions <track> rendered conditionally below when a VTT companion exists */}
         <video controls src={`/api/media/serve/${d.asset_id}`} poster={poster}
           style={b ? { width: '100%', height: '100%', objectFit: d.fit || 'contain' } : { maxWidth: '100%' }} aria-label={d.original_name || 'Video'}>
           {d.asset_meta?.has_captions && cf?.vtt_asset_id &&
@@ -1847,6 +1858,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
       {/* Target handle — EDITOR-ONLY affordance (never published). Shown on the
           selected callout; drag to aim the connector line. */}
       {active && (
+        /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag handle to aim the connector; no keyboard-drag equivalent, target is also set via block fields */
         <div
           onMouseDown={startDrag('target', target)}
           title="Target — drag to aim the connector line"
@@ -1865,6 +1877,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
           (inline-block auto-width honoring the per-block padding). Visual style ===
           CALLOUT_STYLE so it matches what publishes. The per-anchor transform places
           the chosen edge-center on (bx,by) so the box extends away from the target. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer affordance to select/drag the callout box; the block is also selectable via its SelectableBlock wrapper */}
       <div
         onMouseDown={e => { e.stopPropagation(); onSelect && onSelect(block.id) }}
         onMouseEnter={() => setHover(true)}
@@ -1891,6 +1904,7 @@ function InteractiveCallout({ block, active, onSelect, updateBlock }) {
             (startDrag also selects). Editor-only, shown on hover or when selected;
             never part of the published overlay. */}
         {(hover || active) && (
+          /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag grip (aria-hidden); no keyboard-drag equivalent */
           <div aria-hidden="true"
             onMouseDown={startDrag('box', box)}
             title="Drag to reposition"
@@ -2080,6 +2094,7 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
 
   return (
     <div style={previewBlockWrap}>
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag drawing surface; regions are also keyboard-editable via the block panel */}
       <div
         ref={canvasRef}
         onMouseDown={onCanvasDown}
@@ -2105,6 +2120,7 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
           const st = hotspotStyle(r.color)
           const isSel = sel === r.id
           return (
+            /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag move affordance; region geometry is also keyboard-editable via the block panel */
             <div key={r.id}
               onMouseDown={e => startMove(e, r)}
               title="Drag to move · drag a corner to resize"
@@ -2123,6 +2139,7 @@ function InteractiveHotspot({ block, active, onSelect, updateBlock }) {
               )}
               <span style={{ position: 'absolute', top: 2, left: 6, fontSize: 10, color: st.stroke, fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none' }}>{r.label}</span>
               {isSel && Object.entries(HOTSPOT_HANDLES).map(([h, pos]) => (
+                /* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- editor-only pointer-drag resize handle; no keyboard-drag equivalent */
                 <div key={h} onMouseDown={e => startResize(e, r, h)}
                   style={{ position: 'absolute', width: 10, height: 10, background: 'var(--forge-amber)',
                     border: '1px solid #042C53', borderRadius: 2, cursor: pos.cursor, ...pos }} />
@@ -2212,7 +2229,12 @@ function StaticHotspot({ block }) {
           return (
           <div
             key={r.id}
+            role="button"
+            tabIndex={0}
+            aria-pressed={active === r.id}
+            aria-label={r.label}
             onClick={() => setActive(active === r.id ? null : r.id)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActive(active === r.id ? null : r.id) } }}
             style={{
               position: 'absolute',
               left: `${r.x}%`, top: `${r.y}%`,
@@ -2368,6 +2390,7 @@ function PreviewWCN({ block }) {
   // re-show the SAME UI. Visual parity with scorm12._wcn_modal_html (the
   // published SCO / preview-html modal) — keep the two in sync.
   const modalMarkup = modalOpen && (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the dialog's own controls provide a keyboard-accessible close */
     <div role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
       style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',

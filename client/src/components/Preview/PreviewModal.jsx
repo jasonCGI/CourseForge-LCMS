@@ -40,6 +40,7 @@ export default function PreviewModal({ onClose }) {
   }, [])
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click-to-dismiss backdrop; Escape closes (handler above) and the header ✕ button provides a keyboard-accessible close */
     <div
       onClick={onClose}
       style={{
@@ -52,6 +53,7 @@ export default function PreviewModal({ onClose }) {
         padding: 32,
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- onClick only stops backdrop-dismiss bubbling; not an interactive control */}
       <div
         id="preview-modal"
         role="dialog"

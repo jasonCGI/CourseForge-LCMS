@@ -736,6 +736,7 @@ export default function ContentTree() {
 
       {/* Frame context menu */}
       {contextMenu && (
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops bubbling so an in-menu click doesn't dismiss the menu; menu items below are real buttons */
         <div
           style={{
             position: 'fixed', top: contextMenu.y, left: contextMenu.x,
@@ -767,6 +768,7 @@ export default function ContentTree() {
 
       {/* Copy frame to lesson modal */}
       {copyToLessonFrameId && (
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the dialog's own controls provide a keyboard-accessible close */
         <div role="dialog" aria-modal="true" aria-label="Copy frame to lesson"
           onClick={e => { if (e.target === e.currentTarget) setCopyToLessonFrameId(null) }}
           style={{

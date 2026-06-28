@@ -38,6 +38,7 @@ export default function FrameSearch({ projectId, open, onClose, onNavigate }) {
 
   if (!open) return null
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; Escape closes (input handler) and the ✕ button provides a keyboard-accessible close */
     <div role="dialog" aria-modal="true" aria-label="Search frames"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(4,44,83,0.75)', zIndex: 2000,

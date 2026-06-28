@@ -718,6 +718,7 @@ export default function Model3DViewer({
             zIndex: 26, pointerEvents: 'none' }} />
           {/* label pill — becomes an inline name field while editing this part */}
           {partEdit ? (
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opened on demand; focusing it is the expected behavior
             <input autoFocus value={partEdit.value}
               onChange={(e) => setPartEdit({ key: partEdit.key, value: e.target.value })}
               onKeyDown={(e) => {

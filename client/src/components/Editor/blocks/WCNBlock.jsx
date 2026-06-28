@@ -185,9 +185,9 @@ export default function WCNBlock({ block }) {
 
           {/* Acknowledge button label */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
               Ack button:
-            </label>
+            </span>
             <input
               value={block.data.ack_label || 'I understand — proceed'}
               onChange={e => update('ack_label', e.target.value)}

@@ -185,7 +185,7 @@ export default function OamBlock({ block }) {
             {!block.data.responsive && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div>
-                  <label style={fieldLabel}>Width (px)</label>
+                  <span style={fieldLabel}>Width (px)</span>
                   <input
                     type="number"
                     value={block.data.width || 800}
@@ -195,7 +195,7 @@ export default function OamBlock({ block }) {
                   />
                 </div>
                 <div>
-                  <label style={fieldLabel}>Height (px)</label>
+                  <span style={fieldLabel}>Height (px)</span>
                   <input
                     type="number"
                     value={block.data.height || 600}
@@ -238,7 +238,7 @@ export default function OamBlock({ block }) {
 
             {/* Caption */}
             <div>
-              <label style={fieldLabel}>Caption</label>
+              <span style={fieldLabel}>Caption</span>
               <input
                 value={block.data.caption || ''}
                 onChange={e => update('caption', e.target.value)}
@@ -251,7 +251,7 @@ export default function OamBlock({ block }) {
             {/* Stop prompts — shown in the shell prompt zone at each stop, in
                 order (line 1 → stop 1). A blank line keeps the previous prompt. */}
             <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>Stop prompts (one per line, in stop order)</label>
+              <span style={fieldLabel}>Stop prompts (one per line, in stop order)</span>
               <textarea
                 value={(block.data.prompts || []).join('\n')}
                 onChange={e => update('prompts', e.target.value.split('\n'))}
@@ -267,7 +267,7 @@ export default function OamBlock({ block }) {
 
             {/* End prompt — final-frame fallback */}
             <div style={{ marginTop: 14 }}>
-              <label style={fieldLabel}>End prompt (final frame)</label>
+              <span style={fieldLabel}>End prompt (final frame)</span>
               <input
                 value={block.data.end_prompt || ''}
                 onChange={e => update('end_prompt', e.target.value)}
@@ -317,7 +317,7 @@ export default function OamBlock({ block }) {
                   <NumField label="Corner radius" value={effHs.radius} min={0} max={40}
                     onChange={v => patchHotspot({ radius: v })} />
                   <div>
-                    <label style={fieldLabel}>Fill opacity</label>
+                    <span style={fieldLabel}>Fill opacity</span>
                     <input type="range" min={0} max={0.6} step={0.02} value={alphaOf(effHs.fill)}
                       aria-label="Hotspot fill opacity"
                       onChange={e => patchHotspot({ fill: hexToRgba(effHs.strokeColor, parseFloat(e.target.value)) })}
@@ -346,6 +346,7 @@ export default function OamBlock({ block }) {
 
       {/* Preview modal */}
       {showPreview && oamMeta && (
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the header ✕ button provides a keyboard-accessible close */
         <div
           onClick={() => setShowPreview(false)}
           role="dialog"
@@ -359,6 +360,7 @@ export default function OamBlock({ block }) {
             padding: 32,
           }}
         >
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops backdrop-dismiss bubbling; not an interactive control */}
           <div onClick={e => e.stopPropagation()} style={{
             background: '#fff', borderRadius: 8,
             overflow: 'hidden', maxWidth: '90vw', maxHeight: '85vh',

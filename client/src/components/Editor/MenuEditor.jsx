@@ -64,8 +64,9 @@ export default function MenuEditor() {
           </p>
         </div>
 
-        <label style={fieldLabel}>Menu title (optional)</label>
+        <label htmlFor="menu-title" style={fieldLabel}>Menu title (optional)</label>
         <input
+          id="menu-title"
           value={menu.title || ''}
           onChange={e => setMenuTitle(e.target.value)}
           placeholder="e.g. Course Menu"
@@ -90,8 +91,9 @@ export default function MenuEditor() {
                 </div>
                 <div style={{ flex: 1, display: 'grid', gap: 8 }}>
                   <div>
-                    <label style={fieldLabel}>Label</label>
+                    <label htmlFor={`menu-item-label-${it.id}`} style={fieldLabel}>Label</label>
                     <input
+                      id={`menu-item-label-${it.id}`}
                       value={it.label || ''}
                       onChange={e => updateMenuItem(it.id, { label: e.target.value })}
                       placeholder="Button label"
@@ -99,8 +101,8 @@ export default function MenuEditor() {
                     />
                   </div>
                   <div>
-                    <label style={fieldLabel}>Target</label>
-                    <select value={value} onChange={e => onTargetChange(it.id, e.target.value)} style={selectStyle}>
+                    <label htmlFor={`menu-item-target-${it.id}`} style={fieldLabel}>Target</label>
+                    <select id={`menu-item-target-${it.id}`} value={value} onChange={e => onTargetChange(it.id, e.target.value)} style={selectStyle}>
                       <option value="">— select target —</option>
                       <optgroup label="Frames">
                         {targets.frames.map(f => <option key={f.id} value={`frame:${f.id}`}>{f.label}</option>)}

@@ -103,6 +103,7 @@ export default function VideoPlayer({
 
   return (
     <div data-vjs-player style={{ width: width ? `${width}px` : '100%' }}>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- captions added at runtime via video.js addRemoteTextTrack when a VTT companion exists (see effect above) */}
       <video
         ref={videoRef}
         className="video-js vjs-big-play-centered cf-video-player"

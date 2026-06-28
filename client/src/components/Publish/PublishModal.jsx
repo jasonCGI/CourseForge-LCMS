@@ -58,6 +58,7 @@ export default function PublishModal({ onClose }) {
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click-to-dismiss backdrop; the header ✕ button provides a keyboard-accessible close */
     <div
       onClick={onClose}
       style={{
@@ -68,6 +69,7 @@ export default function PublishModal({ onClose }) {
         padding: 32,
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops backdrop-dismiss bubbling; not an interactive control */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
@@ -107,15 +109,20 @@ export default function PublishModal({ onClose }) {
 
           {/* Format selector */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{
+            <span style={{
               display: 'block', fontSize: 11, fontWeight: 600,
               color: 'var(--color-text-secondary)', letterSpacing: '0.08em',
               textTransform: 'uppercase', marginBottom: 10,
-            }}>Output format</label>
+            }}>Output format</span>
             {FORMATS.map(f => (
               <div
                 key={f.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={format === f.id}
+                aria-label={f.label}
                 onClick={() => { setFormat(f.id); setValidation(null); setDone(false) }}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFormat(f.id); setValidation(null); setDone(false) } }}
                 style={{
                   padding: '14px 16px',
                   border: `2px solid ${format === f.id ? '#185FA5' : 'var(--color-border-tertiary)'}`,

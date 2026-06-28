@@ -83,6 +83,7 @@ export default function ThemeEditorModal({ onClose }) {
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the header ✕ button provides a keyboard-accessible close */
     <div
       onClick={onClose}
       role="dialog" aria-modal="true" aria-label="Theme editor"
@@ -93,6 +94,7 @@ export default function ThemeEditorModal({ onClose }) {
         alignItems: 'center', justifyContent: 'center', padding: 24,
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick only stops backdrop-dismiss bubbling; not an interactive control */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
@@ -129,7 +131,7 @@ export default function ThemeEditorModal({ onClose }) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              aria-selected={tab === t.id}
+              aria-pressed={tab === t.id}
               style={{
                 padding: '10px 20px', border: 'none',
                 background: 'transparent',

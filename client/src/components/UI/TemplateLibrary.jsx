@@ -43,6 +43,7 @@ export default function TemplateLibrary({ open, onClose, onSelect, currentFrameB
   if (!open) return null
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-dismiss backdrop; the header ✕ button provides a keyboard-accessible close */
     <div role="dialog" aria-modal="true" aria-label="Frame template library"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(4,44,83,0.75)', zIndex: 2000,
@@ -75,6 +76,7 @@ export default function TemplateLibrary({ open, onClose, onSelect, currentFrameB
         {showSave && (
           <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--cf-border-tertiary)', background: amberBg }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus -- primary field of the save form revealed on demand; focusing it is expected */}
               <input value={saveName} onChange={e => setSaveName(e.target.value)} placeholder="Template name *" autoFocus
                 style={{ flex: 1, background: 'var(--cf-input-bg)', border: '1px solid var(--cf-input-border, #3a3a5a)',
                   borderRadius: 4, padding: '7px 10px', fontSize: 13, color: 'var(--cf-input-text, #e6e6ea)', fontFamily: 'var(--cf-font)' }}

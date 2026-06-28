@@ -134,6 +134,7 @@ export default function CourseShellModal({ open, onClose, projectId, currentShel
                   {sel && <span style={{ color: 'var(--forge-amber)', fontSize: 12 }}>● selected</span>}
                   <span role="button" tabIndex={0} aria-label={`Delete shell ${s.name}`}
                     onClick={(e) => remove(s.id, e)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); remove(s.id, e) } }}
                     style={{ color: '#E87070', fontSize: 12, cursor: 'pointer', padding: '2px 4px', opacity: 0.6 }}>✕</span>
                 </button>
                 {sel && (

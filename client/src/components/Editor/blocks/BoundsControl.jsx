@@ -74,7 +74,7 @@ export default function BoundsControl({ bounds, contentArea, onChange, fit, onFi
           {field('height', 'Height (px)', ca.height)}
           {onFitChange && (
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={lbl}>Fit</label>
+              <span style={lbl}>Fit</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[['contain', 'Contain (fit, no crop)'], ['cover', 'Cover (fill, crops)']].map(([f, label]) => (
                   <button key={f} type="button" onClick={() => onFitChange(f)} aria-pressed={(fit || 'contain') === f}

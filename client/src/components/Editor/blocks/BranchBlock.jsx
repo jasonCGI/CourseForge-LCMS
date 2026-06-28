@@ -44,8 +44,9 @@ export default function BranchBlock({ block }) {
 
         {/* Condition / prompt */}
         <div style={{ marginBottom: 14 }}>
-          <label style={fieldLabel}>Condition / decision prompt</label>
+          <label htmlFor={`branch-condition-${block.id}`} style={fieldLabel}>Condition / decision prompt</label>
           <textarea
+            id={`branch-condition-${block.id}`}
             value={block.data.condition || ''}
             onChange={e => update('condition', e.target.value)}
             rows={2}
@@ -59,15 +60,17 @@ export default function BranchBlock({ block }) {
 
           {/* True path */}
           <div style={{ ...branchCard, borderColor: '#3B8A4A' }}>
-            <label style={{ ...fieldLabel, color: '#3B8A4A' }}>✓ True path</label>
+            <label htmlFor={`branch-true-label-${block.id}`} style={{ ...fieldLabel, color: '#3B8A4A' }}>✓ True path</label>
             <input
+              id={`branch-true-label-${block.id}`}
               value={block.data.true_label || 'Yes'}
               onChange={e => update('true_label', e.target.value)}
               placeholder="Button label"
               style={{ ...inputStyle, marginBottom: 8 }}
             />
-            <label style={fieldLabel}>Go to frame</label>
+            <label htmlFor={`branch-true-frame-${block.id}`} style={fieldLabel}>Go to frame</label>
             <select
+              id={`branch-true-frame-${block.id}`}
               value={block.data.true_frame_id || ''}
               onChange={e => update('true_frame_id', e.target.value)}
               style={selectStyle}
@@ -81,15 +84,17 @@ export default function BranchBlock({ block }) {
 
           {/* False path */}
           <div style={{ ...branchCard, borderColor: '#C0392B' }}>
-            <label style={{ ...fieldLabel, color: '#C0392B' }}>✕ False path</label>
+            <label htmlFor={`branch-false-label-${block.id}`} style={{ ...fieldLabel, color: '#C0392B' }}>✕ False path</label>
             <input
+              id={`branch-false-label-${block.id}`}
               value={block.data.false_label || 'No'}
               onChange={e => update('false_label', e.target.value)}
               placeholder="Button label"
               style={{ ...inputStyle, marginBottom: 8 }}
             />
-            <label style={fieldLabel}>Go to frame</label>
+            <label htmlFor={`branch-false-frame-${block.id}`} style={fieldLabel}>Go to frame</label>
             <select
+              id={`branch-false-frame-${block.id}`}
               value={block.data.false_frame_id || ''}
               onChange={e => update('false_frame_id', e.target.value)}
               style={selectStyle}
