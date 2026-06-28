@@ -78,20 +78,21 @@ export default function IVideoRuntime({
     const meta = () => { setDuration(v.duration || 0); detectAudio() }
     // Replay: when the clip ends, clear consumed/answered interactions so a
     // replay re-arms every hotspot/quiz/branch from the top.
-    const ended = () => { setPlaying(false); onComplete?.(); setAnswered({}); setBlocking(null) }
+    const ended = () => { setPlaying(false); onComplete?.(); setAnswered({}); setQuizSelected({}); setBlocking(null) }
     // Scrub-back: re-arm any interaction at/after the new playhead so seeking
-    // backward (or replaying from 0) makes those interactions fire again.
+    // backward (or replaying from 0) makes those interactions fire again — and
+    // drop their stale quiz selection so a re-blocked quiz starts unanswered.
     const onSeeked = () => {
       const tt = v.currentTime
-      setAnswered(prev => {
-        const next = {}; let changed = false
-        for (const k in prev) {
-          const it = interactions.find(i => i.id === k)
-          if (it && it.timecode >= tt - 0.05) { changed = true; continue }
-          next[k] = prev[k]
-        }
-        return changed ? next : prev
-      })
+      const reArmed = new Set(interactions.filter(i => i.timecode >= tt - 0.05).map(i => i.id))
+      if (!reArmed.size) return
+      const prune = obj => {
+        let changed = false; const out = {}
+        for (const k in obj) { if (reArmed.has(k)) { changed = true; continue } out[k] = obj[k] }
+        return changed ? out : obj
+      }
+      setAnswered(prune)
+      setQuizSelected(prune)
     }
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)

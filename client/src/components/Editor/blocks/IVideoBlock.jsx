@@ -223,29 +223,39 @@ function IVideoInteractionEditor({ block, updateBlock, videoSrc }) {
   const clipId = block.data.clip_asset_id
 
   // Fetch the imported .clip.json once to seed block.data.clip (if not yet inlined).
+  // On failure/non-ok, fall back to an empty clip so the editor still mounts
+  // (rather than hanging on the "Preparing…" probe).
   React.useEffect(() => {
     if (clip || !clipId) return
+    let alive = true
     fetch(`/api/media/clip/${clipId}`).then(r => r.ok ? r.json() : null)
-      .then(c => { if (c) setPending(c) }).catch(() => {})
+      .then(c => { if (alive) setPending(c || { interactions: [], video: {} }) })
+      .catch(() => { if (alive) setPending({ interactions: [], video: {} }) })
+    return () => { alive = false }
   }, [clip, clipId])
 
+  // Set native res from the video (or the clip/pending video dims). Runs on the
+  // hidden probe (no clip yet) AND the visible editor video.
   const onMeta = () => {
     const v = videoRef.current; if (!v) return
-    const w = v.videoWidth || 0, h = v.videoHeight || 0
-    if (!clip && pending) {
-      const seed = { ...pending, video: {
-        ...(pending.video || {}),
-        width:  (pending.video && pending.video.width)  || w || 1920,
-        height: (pending.video && pending.video.height) || h || 1080,
-      } }
-      normalizeClipToPx(seed)              // legacy % -> px (idempotent for px clips)
-      updateBlock(block.id, { clip: seed })
-      setPending(null); setNW(seed.video.width); setNH(seed.video.height)
-      return
-    }
-    const cv = (clip && clip.video) || {}
-    setNW(cv.width || w || 1920); setNH(cv.height || h || 1080)
+    const cv = (clip && clip.video) || (pending && pending.video) || {}
+    setNW(cv.width || v.videoWidth || 1920)
+    setNH(cv.height || v.videoHeight || 1080)
   }
+
+  // Seed block.data.clip once both the fetched clip AND native res are known —
+  // order-independent (handles loadedmetadata firing before or after the fetch).
+  React.useEffect(() => {
+    if (clip || !pending || !nW) return
+    const seed = { ...pending, video: {
+      ...(pending.video || {}),
+      width:  (pending.video && pending.video.width)  || nW || 1920,
+      height: (pending.video && pending.video.height) || nH || 1080,
+    } }
+    normalizeClipToPx(seed)                 // legacy % -> px (idempotent for px clips)
+    updateBlock(block.id, { clip: seed })
+    setPending(null)
+  }, [clip, pending, nW, nH, block.id, updateBlock])
 
   // No inline clip yet — mount a hidden probe to fetch native res + seed it.
   if (!clip) {

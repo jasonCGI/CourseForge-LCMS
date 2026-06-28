@@ -618,6 +618,9 @@
   // legacy %-coords pass through. Mirrors clipCoords.pxToPct / the React IVideoRuntime.
   function ivPctX(d, state){ return (state && state.coords === 'px') ? (d.x / (state.nW || 1920) * 100) : d.x; }
   function ivPctY(d, state){ return (state && state.coords === 'px') ? (d.y / (state.nH || 1080) * 100) : d.y; }
+  // Size honors authored w/h (px -> % of native, or legacy % verbatim), 22% fallback.
+  function ivPctW(d, state){ return (state && state.coords === 'px') ? (d.w != null ? d.w / (state.nW || 1920) * 100 : 22) : (d.w != null ? d.w : 22); }
+  function ivPctH(d, state){ return (state && state.coords === 'px') ? (d.h != null ? d.h / (state.nH || 1080) * 100 : 22) : (d.h != null ? d.h : 22); }
   function iVideoInit(containerId, interactions, options) {
     var container = document.getElementById(containerId);
     if (!container) return;
@@ -652,9 +655,9 @@
             a.appendChild(inner); overlay.appendChild(a);
           } else if (i.type === 'hotspot' && i.data.x != null) {
             var h = document.createElement('div');
-            h.style.cssText = 'position:absolute;left:' + ivPctX(i.data, state) + '%;top:' + ivPctY(i.data, state) + '%;transform:translate(-50%,-50%);z-index:10';
+            h.style.cssText = 'position:absolute;left:' + ivPctX(i.data, state) + '%;top:' + ivPctY(i.data, state) + '%;width:' + ivPctW(i.data, state) + '%;height:' + ivPctH(i.data, state) + '%;transform:translate(-50%,-50%);z-index:10';
             var dot = document.createElement('div');
-            dot.style.cssText = 'width:64px;height:64px;border-radius:4px;background:rgba(245,158,11,0.12);border:3px solid #F59E0B';
+            dot.style.cssText = 'width:100%;height:100%;border-radius:4px;background:rgba(245,158,11,0.12);border:3px solid #F59E0B;box-sizing:border-box';
             dot.setAttribute('role','button'); dot.setAttribute('tabindex','0');
             dot.setAttribute('aria-label', i.data.label || 'Hotspot'); dot.title = i.data.label || '';
             h.appendChild(dot); overlay.appendChild(h);
@@ -817,7 +820,7 @@
       ov.style.cssText = 'position:absolute;inset:0;background:rgba(4,44,83,0.45);z-index:50';
       var hs = document.createElement('button');
       hs.setAttribute('aria-label', (d.label || 'Hotspot') + ' — click to continue'); hs.title = d.label || '';
-      hs.style.cssText = 'position:absolute;left:' + hx + '%;top:' + hy + '%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:4px;background:rgba(245,158,11,0.18);border:3px solid #F59E0B;cursor:pointer;box-shadow:0 0 0 4px rgba(245,158,11,0.25)';
+      hs.style.cssText = 'position:absolute;left:' + hx + '%;top:' + hy + '%;transform:translate(-50%,-50%);width:' + ivPctW(d, state) + '%;height:' + ivPctH(d, state) + '%;border-radius:4px;background:rgba(245,158,11,0.18);border:3px solid #F59E0B;cursor:pointer;box-sizing:border-box;box-shadow:0 0 0 4px rgba(245,158,11,0.25)';
       hs.onclick = function() { answered[i.id] = true; iVideoResume(ov, video, state); };
       ov.appendChild(hs);
       if (d.description) {

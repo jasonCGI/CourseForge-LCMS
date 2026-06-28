@@ -199,7 +199,6 @@ def bake_job(job_id, video_path, clip_data, base_name, output_dir):
             baked_clip['video']['filename'] = f"{base_name}_baked.mp4"
             baked_clip['video']['duration'] = duration + len(timecodes) * HOLD_DURATION
         Path(baked_clip_path).write_text(json.dumps(baked_clip, indent=2), encoding='utf-8')
-        Path(original_clip_path).write_text(json.dumps(clip_data, indent=2), encoding='utf-8')
         JOBS[job_id]['progress'] = 88
 
         JOBS[job_id]['message'] = 'Assembling mediaPackage…'
