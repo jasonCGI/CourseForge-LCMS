@@ -92,6 +92,29 @@ const useProjectStore = create((set, get) => ({
   // Set active frame (for editor)
   setActiveFrameId: (id) => set({ activeFrameId: id }),
 
+  // Immutably patch one frame in the active-project tree so views that read
+  // activeProject (the content tree's OPT chip + completion dots) reflect an edit
+  // 1:1 without a refetch. No-op if the frame isn't found.
+  patchFrame: (frameId, patch) => set(state => {
+    const ap = state.activeProject
+    if (!ap) return {}
+    return {
+      activeProject: {
+        ...ap,
+        courses: (ap.courses || []).map(c => ({
+          ...c,
+          modules: (c.modules || []).map(m => ({
+            ...m,
+            lessons: (m.lessons || []).map(l => ({
+              ...l,
+              frames: (l.frames || []).map(f => f.id === frameId ? { ...f, ...patch } : f),
+            })),
+          })),
+        })),
+      },
+    }
+  }),
+
   // Clear error
   clearError: () => set({ error: null }),
 }))

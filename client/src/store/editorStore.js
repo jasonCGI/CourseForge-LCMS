@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getFrame, updateFrame } from '../api/client'
+import useProjectStore from './projectStore'
 
 let autosaveTimer = null
 let saveStatusTimer = null
@@ -346,6 +347,9 @@ const useEditorStore = create((set, get) => ({
     const { activeFrame } = get()
     if (!activeFrame) return
     set({ activeFrame: { ...activeFrame, optional: val } })
+    // 1:1 sync: reflect the toggle in the tree's data source immediately so the
+    // OPT chip appears/disappears live, not just after a reload.
+    useProjectStore.getState().patchFrame(activeFrame.id, { optional: val })
     updateFrame(activeFrame.id, { optional: val }).catch(() => {})
   },
 
