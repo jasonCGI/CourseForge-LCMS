@@ -7,13 +7,24 @@ import json
 import zipfile
 import shutil
 from pathlib import Path
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, send_file, current_app, Response
 from werkzeug.utils import secure_filename
 from ..extensions import db
 from ..models.gui_shell import GuiShell
 from ..models.project import Project
+from ..services.shell_css import SHELL_CONTENT_CSS
 
 gui_shells_bp = Blueprint('gui_shells', __name__)
+
+
+@gui_shells_bp.get('/api/shell-content.css')
+def shell_content_css():
+    """Canonical shelled-content CSS — the SINGLE SOURCE OF TRUTH also inlined into
+    the published SCO by scorm12._patch_shell. The GUI-ON edit preview
+    (GUIShellRenderer) fetches this and injects it, so the two renderers cannot
+    drift. Static only; per-frame text color/halo is appended by each renderer."""
+    return Response(SHELL_CONTENT_CSS, mimetype='text/css',
+                    headers={'Cache-Control': 'public, max-age=300'})
 
 
 def _lib_root():

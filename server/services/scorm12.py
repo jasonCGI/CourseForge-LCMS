@@ -458,6 +458,7 @@ def _read_text_cached(path):
 from ..models.media import MediaAsset
 from ..services.theme_resolver import resolve_theme, tokens_to_css
 from ..services.cf_icons import PLAY_SVG, PLAY_SVG_JS, PAUSE_SVG_JS
+from ..services.shell_css import SHELL_CONTENT_CSS, fgui_text_css
 from ..version import VERSION, SCHEMA_VERSION
 
 
@@ -2758,82 +2759,12 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
 
   // Style the injected CourseForge content inside the shell content area.
   var style = document.createElement('style');
-  style.textContent =
-    '#fgui-content{{font-family:\\'IBM Plex Mono\\',\\'Inter\\',system-ui,sans-serif;' +
-    // Luminance-aware body text. When the shell sets a KNOWN OPAQUE content-area
-    // bg_color, shell_text_style() picks a SOLID color by that bg's luminance
-    // (light bg -> dark navy, dark bg -> #C8D8E8) and DROPS the halo (crisp). For
-    // a transparent / unset / unparseable bg (the common transparent-over-art
-    // shell) it returns #C8D8E8 + a dark text-shadow halo — the universal fallback
-    // that supplies contrast on unknown backgrounds without regressing the dark case.
-    'font-size:14px;color:{text_color};{halo_css}line-height:1.6;padding:12px;box-sizing:border-box;' +
-    // Full-size media/zones fill the content area edge to edge (top:0/100%); the
-    // content box must NEVER scroll (any sub-pixel overhang would otherwise add a
-    // scrollbar). Clip instead — full items fill, overflowing text scrolls its
-    // OWN zone (.cf-zone-text / .cf-shelled-text-top carry overflow:auto).
-    'overflow:hidden;height:100%}}' +
-    '#fgui-content h1,#fgui-content h2,#fgui-content h3{{color:#F59E0B;margin-bottom:12px}}' +
-    '#fgui-content p{{margin-bottom:10px}}' +
-    // List indent: the global *{{padding:0}} reset zeroes padding-left, so an
-    // outside marker would hug the text edge. Restore a real padding-left so
-    // bullets/numbers sit clearly indented from the body text.
-    '#fgui-content ul,#fgui-content ol{{margin:8px 0 10px 0;padding-left:1.6em}}' +
-    '#fgui-content li{{margin-bottom:4px}}#fgui-content img{{max-width:100%;height:auto}}' +
-    '.cf-bounds{{margin:0}}.cf-bounds video,.cf-bounds img{{width:100%;height:100%;object-fit:contain;border-radius:0}}' +
-    '.cf-fit-cover video,.cf-fit-cover img{{object-fit:cover}}' +
-    // A text-only shelled frame fills the whole content area; this box applies
-    // the 40px-on-all-sides padding rule (top AND right AND bottom AND left) and
-    // scrolls itself if the copy is long, so the content area never scrolls.
-    '.cf-shelled-text-top{{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto}}' +
-    '.cf-zone-text{{font-size:14px}}' +
-    '.cf-zone-media>*{{margin:0!important}}' +
-    // Media BLOCK wrappers in a zone are class-less, id-less <div>s (iVideo=#ivideo-,
-    // OAM=.cf-oam, 3D=.cf-3d-viewer, hotspot=.cf-hotspot-wrap, video.js all carry an
-    // id/class, so :not([class]):not([id]) / :not(.video-js) exclude them). The inline
-    // height:auto on the <img>/<video> beats a plain external rule, so on load the
-    // REPLACED element snaps to its intrinsic aspect height and overflows / gaps a
-    // full-bleed zone (covering the GUI bottom). Fill the wrapper to the zone (it is
-    // also the positioning context for a cover-caption overlay) and the media to the
-    // wrapper, with !important to override the inline height. object-fit has NO
-    // !important so an authored object-fit:cover (full-bleed images/videos) still
-    // wins edge-to-edge; plain media falls back to contain (no stretch).
-    '.cf-zone-media>div:not([class]):not([id]){{position:absolute!important;inset:0!important;margin:0!important;overflow:hidden}}' +
-    '.cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block}}' +
-    // iVideo's <video> has no inline position; fill its zone-bound #ivideo- box
-    // directly so hotspot/overlay alignment holds.
-    '.cf-zone-media [id^="ivideo-"] video{{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}}' +
-    // Bind the iVideo container to the zone by EDGES, not the %-height cascade.
-    // Unlike the 3D canvas / OAM iframe (sized by their own JS), the native <video>
-    // re-evaluates its used height on loadedmetadata; if the %-height chain resolves
-    // to auto for that frame, the video snaps to its intrinsic pixel height and
-    // overflows the zone ("correct for a second, then covers the GUI"). cf-zone-media
-    // is position:absolute, so inset:0 locks the box to the zone regardless.
-    '.cf-zone-media [id^="ivideo-"]{{position:absolute!important;inset:0!important;margin:0!important}}' +
-    '.cf-zone-media .cf-3d-viewer{{height:100%!important;margin:0!important}}' +
-    // OAM player in a full-bleed zone: the wrap fills the zone and centers the
-    // scaled stage. The media bar (play/pause/scrub) is absolutely positioned ON
-    // the stage bottom (overlay), so it no longer needs its own row in a flex
-    // column — centering the stage keeps the player + overlaid bar inside the
-    // clipped zone with no extra height (no phantom scrollbar). The OAM iframe is
-    // transform-scaled by the player's own fit() (width/height come from the SW×SH
-    // attributes), so it MUST be exempted from the blanket iframe{{height:100%}} rule
-    // below — that override would defeat the scale.
-    '.cf-zone-media .cf-oam{{height:100%!important;margin:0!important;display:flex!important;align-items:center;justify-content:center;overflow:hidden}}' +
-    '.cf-zone-media .cf-oam .cf-oam-stage{{max-height:100%}}' +
-    '.cf-zone-media .cf-oam iframe{{width:auto;height:auto}}' +
-    '.cf-zone-media iframe{{width:100%;height:100%;border:0;display:block}}' +
-    // Shell TITLE + PROMPT zones: authors size these boxes to the cap-height, so a
-    // fixed border-box height + overflow:hidden clips glyph descenders (g,y,p,j) off
-    // the bottom. Every shell_builder version tags zones with data-zone-type, so
-    // override just those text zones (built OR uploaded shells) to let descenders
-    // show and breathe. Matches the in-canvas preview (GUIShellRenderer) override.
-    '[data-zone-type="frame_title"],[data-zone-type="lesson_title"],' +
-    '[data-zone-type="section_title"],[data-zone-type="prompt"],' +
-    '[data-zone-type="frame_counter"]' +
-    '{{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}}' +
-    // Fixed-width text-align:left counter box clips/wraps the second token once
-    // the current frame is two digits ("11 / 20"). One line + size-to-content.
-    '[data-zone-type="frame_counter"]{{white-space:nowrap!important;width:auto!important;min-width:max-content!important}}';
+  // Single source of truth: the static shelled-content CSS lives in
+  // server/services/shell_css.py (SHELL_CONTENT_CSS) and is ALSO fetched by the
+  // GUI-ON edit preview via GET /api/shell-content.css, so the two renderers can no
+  // longer drift. Only the per-frame, luminance-derived text color + halo is dynamic
+  // (fgui_text_css), appended here per frame.
+  style.textContent = {json.dumps(SHELL_CONTENT_CSS + fgui_text_css(text_color, halo_css))};
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);
