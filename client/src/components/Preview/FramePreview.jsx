@@ -2559,16 +2559,19 @@ function PreviewIVideo({ block, fill = false, interactive = false, active = fals
   // Editing is OPT-IN: the block must be active AND its "Edit hotspots" toggle on.
   const editable = interactive && active && !!updateBlock && ivideoEditBlockId === block.id
 
+  const inlineClip = block.data.clip
+  const hasInlineInteractions = !!(inlineClip && (inlineClip.interactions || []).length)
   React.useEffect(() => {
-    // Prefer interactions edited inline in the block (data.clip); fall back to the
-    // imported .clip.json asset for un-edited blocks.
-    if (block.data.clip) { setClipData(block.data.clip); return }
-    if (!clipId) { setClipData(null); return }
+    // Prefer inline edits ONLY when they carry interactions; an empty data.clip
+    // (e.g. a stray editor seed) falls back to the imported .clip.json asset so the
+    // block never shows blank.
+    if (hasInlineInteractions) { setClipData(inlineClip); return }
+    if (!clipId) { setClipData(inlineClip || null); return }
     fetch(`/api/media/clip/${clipId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setClipData)
       .catch(() => {})
-  }, [clipId, block.data.clip])
+  }, [clipId, hasInlineInteractions, inlineClip])
 
   if (!videoId) {
     return (
@@ -2591,11 +2594,20 @@ function PreviewIVideo({ block, fill = false, interactive = false, active = fals
   // Active iVideo block in the editor → live WYSIWYG editing of the interactions
   // directly on the player (drag/resize), committing native-px coords to data.clip.
   if (editable) {
+    // Don't mount the editor until the imported clip resolves — otherwise its
+    // from-scratch path would seed an EMPTY clip over the asset's interactions.
+    if (clipId && !hasInlineInteractions && clipData == null) {
+      return (
+        <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
+          <div style={{ padding: 24, color: '#7A90A8', fontSize: 13, fontFamily: 'var(--cf-mono, monospace)' }}>Loading interactions…</div>
+        </div>
+      )
+    }
     return (
       <div style={b ? { width: '100%', height: '100%' } : previewBlockWrap}>
         <IVideoEditor
           videoSrc={videoSrc}
-          clip={block.data.clip || clipData}
+          clip={hasInlineInteractions ? inlineClip : clipData}
           onClipChange={c => updateBlock(block.id, { clip: c })}
           selectedId={activeInteractionId}
           onSelect={setActiveInteraction}
