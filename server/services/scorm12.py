@@ -1238,7 +1238,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 #   underneath); dock='inline': height:auto in the flow as before.
                 v_height = '100%' if docked else 'auto'
                 video_html = (
-                    f'<video controls muted loop autoplay playsinline {poster_attr} '
+                    f'<video controls muted autoplay playsinline {poster_attr} '
                     f'style="display:block;width:100%;height:{v_height};object-fit:cover" '
                     f'aria-label="{title}"><source src="{src}">'
                     f'<p>Your browser does not support HTML5 video.</p></video>')
@@ -1320,7 +1320,7 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 # rides on a TOP-down gradient scrim (white text, WCAG AA) and never
                 # overlaps the controls. Mirrors the cover Image Block branch below.
                 video_html = (
-                    f'<video controls muted loop autoplay playsinline {poster_attr} '
+                    f'<video controls muted autoplay playsinline {poster_attr} '
                     f'style="display:block;width:100%;height:{v_height};object-fit:cover" '
                     f'aria-label="{title}">{sources}{track}'
                     f'<p>Your browser does not support HTML5 video.</p></video>')

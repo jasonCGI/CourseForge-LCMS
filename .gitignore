@@ -13,3 +13,6 @@ client/node_modules/
 *.egg-info/
 .DS_Store
 .claude/
+
+# raw image sources (optimized copies live in server/demo_assets/)
+FireFly_Images/

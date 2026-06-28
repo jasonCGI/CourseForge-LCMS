@@ -544,6 +544,10 @@ def _wire_demo_assets(project):
     aud = reg('beneath-the-still-water.mp3', 'audio', 'audio/mpeg')
     glb = reg('coffee_cup.glb', 'model3d', 'model/gltf-binary')
     hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
+    # Image-swap demo views (Firefly coffee-cup renders): default + three swap targets.
+    cf1 = reg('firefly_coffee_1.jpg', 'image', 'image/jpeg')
+    cf2 = reg('firefly_coffee_2.jpg', 'image', 'image/jpeg')
+    cf3 = reg('firefly_coffee_3.jpg', 'image', 'image/jpeg')
     db.session.flush()
 
     mp4_meta = _serialize_media(mp4)
@@ -596,8 +600,8 @@ def _wire_demo_assets(project):
                          original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
             elif fr.name.startswith('Image Swap') and t == 'media' and d.get('kind') == 'image':
                 # Default image shown before any swap (the cf-swap-target surface).
-                d.update(asset_id=hb.id, serve_url=f'/api/media/serve/{hb.id}',
-                         original_name='hotspot_bg.jpg', asset_meta=_serialize_media(hb)); changed = True
+                d.update(asset_id=cf1.id, serve_url=f'/api/media/serve/{cf1.id}',
+                         original_name='firefly_coffee_1.jpg', asset_meta=_serialize_media(cf1)); changed = True
             elif fr.name.startswith('Image Swap') and t == 'text':
                 # Rewrite the placeholder swap ids to three real, already-bundled demo
                 # image assets so the swap works in preview AND the published SCO.

@@ -40,6 +40,12 @@ export default function PersistentPreviewPane() {
   // /preview-html the old popup Preview button opened, now shown in-pane).
   const [source, setSource] = useState('edit')
 
+  // Preview zoom for the GUI-shell view: 'fit' contain-fits the whole stage in the
+  // pane; a number renders the stage at that exact scale (pane scrolls if it
+  // overflows). Default 1 = true 1:1, so the 1080p stage previews pixel-for-pixel
+  // on a 1440p+ display. Fit + 25/50/75/100 buttons live in the preview corner.
+  const [zoom, setZoom] = useState(1)
+
   // Fetch the shell's stage dimensions so the preview can show the ENTIRE GUI
   // at its true aspect ratio (the shell scales its stage to fit the iframe).
   const [stage, setStage] = useState(null)
@@ -177,6 +183,7 @@ export default function PersistentPreviewPane() {
         // no scroll. The shell scales its own stage to fill this sized wrapper.
         <ShellFit
           stage={stage}
+          zoom={zoom} onZoom={setZoom}
           contentArea={needsOverlay ? contentArea : null}
           overlay={needsOverlay ? (
             <PreviewErrorBoundary resetKey={activeFrame.id}>
@@ -209,11 +216,14 @@ export default function PersistentPreviewPane() {
 // Sizes its child to the largest box with the stage's aspect ratio that fits
 // entirely inside the pane (contain). Measured via ResizeObserver because pure
 // CSS can't contain-fit an aspect-ratio box against both dimensions at once.
-function ShellFit({ stage, children, contentArea, overlay }) {
+function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom }) {
   const ref = useRef(null)
-  const [box, setBox] = useState(null)
+  const [fitBox, setFitBox] = useState(null)
   const sw = stage?.w || 1024, sh = stage?.h || 768
+  const fitMode = zoom === 'fit'
+  // Contain-fit measurement only runs in Fit mode; fixed zooms are a direct multiply.
   useEffect(() => {
+    if (!fitMode) return
     const el = ref.current
     if (!el) return
     const PAD = 20
@@ -221,16 +231,21 @@ function ShellFit({ stage, children, contentArea, overlay }) {
       const w = el.clientWidth - PAD, h = el.clientHeight - PAD
       if (w <= 0 || h <= 0) return
       const s = Math.min(w / sw, h / sh)
-      setBox({ w: Math.round(sw * s), h: Math.round(sh * s) })
+      setFitBox({ w: Math.round(sw * s), h: Math.round(sh * s) })
     }
     const ro = new ResizeObserver(compute)
     ro.observe(el); compute()
     return () => ro.disconnect()
-  }, [sw, sh])
+  }, [sw, sh, fitMode])
+  const box = fitMode ? fitBox : { w: Math.round(sw * zoom), h: Math.round(sh * zoom) }
   const scale = box ? box.w / sw : 1
+  // Fixed zoom: pane scrolls if the stage overflows; `safe center` keeps it centered
+  // when it fits but aligns to the start (so all corners stay reachable) when it
+  // doesn't. Fit: contain, no scroll.
+  const ZOOMS = [['fit', 'Fit'], [0.25, '25'], [0.5, '50'], [0.75, '75'], [1, '100']]
   return (
-    <div ref={ref} style={{ flex: 1, overflow: 'hidden', background: '#000', position: 'relative',
-      display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <div ref={ref} style={{ flex: 1, overflow: fitMode ? 'hidden' : 'auto', background: '#000', position: 'relative',
+      display: 'flex', justifyContent: 'safe center', alignItems: 'safe center' }}>
       <div style={{ position: 'relative', width: box ? box.w : '100%', height: box ? box.h : '100%', flexShrink: 0 }}>
         {children}
         {overlay && box && contentArea && (
@@ -257,6 +272,26 @@ function ShellFit({ stage, children, contentArea, overlay }) {
           </div>
         )}
       </div>
+      {/* Zoom controls (top-left): Fit + fixed scales; default 100% = 1:1. */}
+      {onZoom && (
+        <div style={{ position: 'absolute', top: 6, left: 8, zIndex: 50, display: 'flex',
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}>
+          {ZOOMS.map(([val, label], i) => {
+            const active = zoom === val
+            return (
+              <button key={label} type="button" onClick={() => onZoom(val)} aria-pressed={active}
+                title={val === 'fit' ? 'Fit the whole frame in the pane' : `${label}% scale (100% = pixel-for-pixel)`}
+                style={{ cursor: 'pointer', padding: '2px 7px', fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.18)', borderLeftWidth: i === 0 ? 1 : 0,
+                  borderRadius: i === 0 ? '4px 0 0 4px' : (i === ZOOMS.length - 1 ? '0 4px 4px 0' : 0),
+                  background: active ? '#7CFFB0' : 'rgba(0,0,0,0.6)',
+                  color: active ? '#042C53' : '#C8D8E8' }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      )}
       {/* Scale readout: shows the preview's current scale vs the shell's native
           size, so 100% = pixel-for-pixel (any fringing/softness below 100% is just
           scaling, not a real artifact). Green at 1:1. */}

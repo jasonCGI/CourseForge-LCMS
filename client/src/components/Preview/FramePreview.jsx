@@ -682,13 +682,13 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
         const fillH = b || vDocked
         if (videoIsCover && d.caption)
           return `<div style="position:relative;${fillH ? 'width:100%;height:100%' : 'display:block;margin:8px 0;line-height:0'}">`
-            + `<video src="${src}" controls muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+            + `<video src="${src}" controls muted autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
             + `style="width:100%;height:${fillH ? '100%' : 'auto'};object-fit:cover;display:block"></video>`
             + `<div style="position:absolute;left:0;right:0;top:0;padding:12px 16px 28px;`
             + `color:#fff;font-size:13px;line-height:1.45;`
             + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,.45) 50%,transparent)">${d.caption}</div></div>`
         if (videoIsCover)
-          return `<video src="${src}" controls muted loop autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
+          return `<video src="${src}" controls muted autoplay playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
             + `style="width:100%;height:${fillH ? '100%' : 'auto'};object-fit:cover;display:block;margin:${fillH ? '0' : '8px 0'}"></video>`
         return `<video src="${src}" controls playsinline ${d.poster_url ? `poster="${d.poster_url}"` : ''} `
              + `style="max-width:100%;height:auto;display:block;margin:8px 0;background:#000"></video>`
@@ -1405,7 +1405,7 @@ function PreviewMedia({ block, fill = false }) {
     return (
       <div style={{ position: 'relative', overflow: 'hidden',
         ...(coverWrap || { width: '100%', display: 'block', lineHeight: 0 }) }}>
-        <video controls muted loop autoPlay playsInline src={`/api/media/serve/${d.asset_id}`} poster={poster}
+        <video controls muted autoPlay playsInline src={`/api/media/serve/${d.asset_id}`} poster={poster}
           style={fillH ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
                    : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
           aria-label={d.original_name || 'Video'}>
@@ -1442,7 +1442,7 @@ function PreviewMedia({ block, fill = false }) {
     return (
       <div style={{ position: 'relative', overflow: 'hidden',
         ...(coverWrap || { width: '100%', display: 'block', lineHeight: 0 }) }}>
-        <video controls muted loop playsInline poster={poster} src={d.serve_url}
+        <video controls muted playsInline poster={poster} src={d.serve_url}
           style={fillH ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
                    : { width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
           aria-label={d.original_name || 'Video'} />

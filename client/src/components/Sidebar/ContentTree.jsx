@@ -35,10 +35,13 @@ function SortableFrameRow({ id, children }) {
 }
 
 const COMPLETION_DOT = {
-  complete:   { color: '#4CAF50', title: 'All blocks complete' },
-  incomplete: { color: 'var(--forge-amber)', title: 'Missing required assets or content' },
-  empty:      { color: '#3A5A7A', title: 'No blocks in frame' },
-  optional:   { color: '#5A7AA8', title: 'Optional — excluded from completion count' },
+  // glyph: a distinct SHAPE per status so the indicator is never color-only
+  // (WCAG 1.4.1) — distinguishable at a glance for colorblind users, with color
+  // kept as a redundant cue and the status also surfaced in the row aria-label.
+  complete:   { color: '#4CAF50', glyph: '✓', title: 'All blocks complete' },
+  incomplete: { color: 'var(--forge-amber)', glyph: '▲', title: 'Missing required assets or content' },
+  empty:      { color: '#3A5A7A', glyph: '○', title: 'No blocks in frame' },
+  optional:   { color: '#5A7AA8', glyph: '○', title: 'Optional — excluded from completion count' },
 }
 
 // ── SVG helpers ──────────────────────────────────────────────────
@@ -153,7 +156,7 @@ function TreeRow({
         aria-expanded={!isFrame ? isOpen : undefined}
         aria-selected={isFrame ? (isCurrent ? 'true' : 'false') : undefined}
         aria-current={isCurrent ? 'true' : undefined}
-        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
+        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isFrame && dotStatus ? `, ${dotStatus}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
         tabIndex={tabIndex != null ? tabIndex : 0}
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -202,9 +205,11 @@ function TreeRow({
           {/* Completion dot (frames only) — always the real status, even when optional */}
           {isFrame && dotStatus && COMPLETION_DOT[dotStatus] && (
             <span title={COMPLETION_DOT[dotStatus].title} aria-hidden="true"
-              style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                display: 'inline-block', boxSizing: 'border-box',
-                background: COMPLETION_DOT[dotStatus].color }} />
+              style={{ flexShrink: 0, display: 'inline-block', width: 11, textAlign: 'center',
+                fontSize: 11, lineHeight: 1, fontWeight: 700,
+                color: COMPLETION_DOT[dotStatus].color }}>
+              {COMPLETION_DOT[dotStatus].glyph}
+            </span>
           )}
 
           {/* Glyph — folder for hierarchy, play for frame */}
