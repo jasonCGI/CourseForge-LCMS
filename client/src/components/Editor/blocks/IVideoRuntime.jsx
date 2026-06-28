@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import MediaBar from '../../Preview/MediaBar'
 import { hotspotStyle, shapeRadius, rgba } from '../../../utils/hotspotStyle'
+import { nativeRes, pxToPct } from '../../../utils/clipCoords'
 
 // An interaction is a *pause point* when reaching it should hold playback so the
 // learner addresses it. Hotspots/quiz/branch/wcn pause by default (opt out with
@@ -214,13 +215,14 @@ export default function IVideoRuntime({
 
         {/* Non-blocking overlays */}
         {overlayInts.map(i => (
-          <Overlay key={i.id} i={i} />
+          <Overlay key={i.id} i={i} clip={clipData} />
         ))}
 
         {/* Blocking overlay */}
         {blocking && (
           <Blocking
             i={blocking}
+            clip={clipData}
             answered={answered[blocking.id]}
             quizSelected={quizSelected}
             onQuizSelect={(id, idx) => setQuizSelected(prev => ({ ...prev, [id]: idx }))}
@@ -242,21 +244,34 @@ export default function IVideoRuntime({
   )
 }
 
-function Overlay({ i }) {
+// Position an overlay datum on the video. Native-px coords (clip.coords==='px')
+// map through pxToPct against the video's native resolution; legacy %-coords
+// render verbatim. Mirrors the published sco_shell renderer for byte-for-byte parity.
+function overlayPos(d, clip) {
+  if (clip && clip.coords === 'px') {
+    const { nW, nH } = nativeRes(clip)
+    const p = pxToPct(d, nW, nH)
+    return { left: p.leftPct + '%', top: p.topPct + '%', width: p.wPct + '%', height: p.hPct + '%' }
+  }
+  return { left: (d.x ?? 0) + '%', top: (d.y ?? 0) + '%', width: (d.w ?? 22) + '%', height: (d.h ?? 22) + '%' }
+}
+
+function Overlay({ i, clip }) {
   const d = i.data || {}
+  const pos = overlayPos(d, clip)
   if (i.type === 'hotspot' && d.x != null) {
     const st = hotspotStyle(d.color)
     return (
       <div role="button" tabIndex={0} aria-label={d.label} title={d.label}
-        style={{ position: 'absolute', left: d.x + '%', top: d.y + '%',
-          width: (d.w ?? 22) + '%', height: (d.h ?? 22) + '%', transform: 'translate(-50%,-50%)',
+        style={{ position: 'absolute', left: pos.left, top: pos.top,
+          width: pos.width, height: pos.height, transform: 'translate(-50%,-50%)',
           border: `3px solid ${st.border}`, background: st.fill, borderRadius: shapeRadius(d.shape),
           boxSizing: 'border-box', cursor: 'pointer', zIndex: 10 }} />
     )
   }
   if (i.type === 'annotation' && d.x != null) {
     return (
-      <div style={{ position: 'absolute', left: d.x + '%', top: d.y + '%', zIndex: 10, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', left: pos.left, top: pos.top, zIndex: 10, pointerEvents: 'none' }}>
         <div style={{ background: 'rgba(4,44,83,0.85)', color: '#B5D4F4', fontSize: 11, padding: '3px 8px',
                       borderRadius: 3, border: '1px solid #185FA5', whiteSpace: 'nowrap' }}>{d.text}</div>
       </div>
@@ -276,8 +291,9 @@ function Overlay({ i }) {
   return null
 }
 
-function Blocking({ i, answered, quizSelected, onQuizSelect, onQuizSubmit, onBranch, onAck }) {
+function Blocking({ i, clip, answered, quizSelected, onQuizSelect, onQuizSubmit, onBranch, onAck }) {
   const d = i.data || {}
+  const pos = overlayPos(d, clip)
 
   // Hotspot HOLD — video is paused; the hotspot shows as a larger yellow square
   // over a dimmed video, and clicking it resumes playback.
@@ -287,13 +303,13 @@ function Blocking({ i, answered, quizSelected, onQuizSelect, onQuizSubmit, onBra
         style={{ position: 'absolute', inset: 0, background: 'rgba(4,44,83,0.45)', zIndex: 50 }}>
         <button onClick={() => onAck(i)} title={d.label}
           aria-label={(d.label || 'Hotspot') + ' — click to continue'}
-          style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: (d.y ?? 50) + '%',
-                   transform: 'translate(-50%,-50%)', width: (d.w ?? 22) + '%', height: (d.h ?? 22) + '%',
+          style={{ position: 'absolute', left: pos.left, top: pos.top,
+                   transform: 'translate(-50%,-50%)', width: pos.width, height: pos.height,
                    borderRadius: shapeRadius(d.shape), boxSizing: 'border-box',
                    background: hotspotStyle(d.color).fill, border: `3px solid ${hotspotStyle(d.color).border}`,
                    cursor: 'pointer', boxShadow: `0 0 0 4px ${rgba(hotspotStyle(d.color).stroke, 0.25)}` }} />
         {d.description && (
-          <div style={{ position: 'absolute', left: (d.x ?? 50) + '%', top: `calc(${d.y ?? 50}% + 52px)`,
+          <div style={{ position: 'absolute', left: pos.left, top: `calc(${pos.top} + 52px)`,
             transform: 'translateX(-50%)', background: '#0d1017', color: '#B5D4F4', border: '1px solid #185FA5',
             borderRadius: 6, padding: '6px 10px', fontSize: 12, maxWidth: 240, textAlign: 'center' }}>
             {d.description}

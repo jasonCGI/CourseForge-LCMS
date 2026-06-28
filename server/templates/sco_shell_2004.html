@@ -487,6 +487,10 @@
   function iVideoShouldPause(i) {
     return i.type === 'annotation' ? !!i.pause_on_reach : i.pause_on_reach !== false;
   }
+  // Native-px coords (clip.coords==='px') map to % of the video's native resolution;
+  // legacy %-coords pass through. Mirrors clipCoords.pxToPct / the React IVideoRuntime.
+  function ivPctX(d, state){ return (state && state.coords === 'px') ? (d.x / (state.nW || 1920) * 100) : d.x; }
+  function ivPctY(d, state){ return (state && state.coords === 'px') ? (d.y / (state.nH || 1080) * 100) : d.y; }
   function iVideoInit(containerId, interactions, options) {
     var container = document.getElementById(containerId);
     if (!container) return;
@@ -495,6 +499,9 @@
     if (!video) return;
     var answered = {};
     var state = { blocking: false };
+    state.coords = (options && options.coords) || null;
+    state.nW = (options && options.nW) || 1920;
+    state.nH = (options && options.nH) || 1080;
 
     // Wire the branded transport bar (custom controls, replacing native ones) and
     // keep a handle so the timeupdate loop below can refresh it.
@@ -511,14 +518,14 @@
           if (!inRange || !i.data || (i.type === 'hotspot' && answered[i.id])) return;
           if (i.type === 'annotation' && i.data.x != null) {
             var a = document.createElement('div');
-            a.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;pointer-events:none;z-index:10';
+            a.style.cssText = 'position:absolute;left:' + ivPctX(i.data, state) + '%;top:' + ivPctY(i.data, state) + '%;pointer-events:none;z-index:10';
             var inner = document.createElement('div');
             inner.style.cssText = 'background:rgba(4,44,83,0.85);color:#B5D4F4;font-size:11px;padding:3px 8px;border-radius:3px;border:1px solid #185FA5;white-space:nowrap';
             inner.textContent = i.data.text || '';
             a.appendChild(inner); overlay.appendChild(a);
           } else if (i.type === 'hotspot' && i.data.x != null) {
             var h = document.createElement('div');
-            h.style.cssText = 'position:absolute;left:' + i.data.x + '%;top:' + i.data.y + '%;transform:translate(-50%,-50%);z-index:10';
+            h.style.cssText = 'position:absolute;left:' + ivPctX(i.data, state) + '%;top:' + ivPctY(i.data, state) + '%;transform:translate(-50%,-50%);z-index:10';
             var dot = document.createElement('div');
             dot.style.cssText = 'width:64px;height:64px;border-radius:4px;background:rgba(245,158,11,0.12);border:3px solid #F59E0B';
             dot.setAttribute('role','button'); dot.setAttribute('tabindex','0');
@@ -668,7 +675,7 @@
 
     // Hotspot HOLD — pause, show a larger yellow square; click it to resume.
     if (i.type === 'hotspot') {
-      var hx = (d.x != null ? d.x : 50), hy = (d.y != null ? d.y : 50);
+      var hx = (d.x != null ? ivPctX(d, state) : 50), hy = (d.y != null ? ivPctY(d, state) : 50);
       ov.style.cssText = 'position:absolute;inset:0;background:rgba(4,44,83,0.45);z-index:50';
       var hs = document.createElement('button');
       hs.setAttribute('aria-label', (d.label || 'Hotspot') + ' — click to continue'); hs.title = d.label || '';

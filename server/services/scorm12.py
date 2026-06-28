@@ -1764,7 +1764,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 <script>
 (function() {{
   var clipData = {clip_json};
-  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clipData && clipData.interactions) || [], {{}});
+  if (window.iVideoInit) iVideoInit("ivideo-{block_id}", (clipData && clipData.interactions) || [], {{
+    coords: (clipData && clipData.coords) || null,
+    nW: (clipData && clipData.video && clipData.video.width) || 1920,
+    nH: (clipData && clipData.video && clipData.video.height) || 1080
+  }});
 }})();
 </script>''')
 
