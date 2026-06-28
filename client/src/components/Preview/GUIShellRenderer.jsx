@@ -47,6 +47,21 @@ export default function GUIShellRenderer({
             // wraps/clips the second token -> the total looked "missing" from the
             // assessment frames down. Force one line and let the box size to its text.
             + '[data-zone-type="frame_counter"]{white-space:nowrap!important;width:auto!important;min-width:max-content!important}'
+            // Media containment — MIRROR of scorm12._patch_shell's cf_runtime media
+            // rules. The stored shell carries none of these, so injected media
+            // (cf-zone-media + inline height:auto / replaced-element height:100% off
+            // an indefinite chain) could balloon to intrinsic size and overflow the
+            // content area, covering the shell chrome. Edge-bind it instead. The
+            // client mirror sometimes emits the media as a DIRECT child of the zone
+            // (cover/contain, no caption) and sometimes inside a class-less wrapper
+            // (cover WITH caption), so handle both. object-fit has NO !important so an
+            // authored object-fit:cover still wins; plain media -> contain. (Interactive
+            // frames render via the React overlay, not here, so no 3D/iVideo/OAM case.)
+            + '.cf-layout-zones,.cf-zone-media{overflow:hidden!important}'
+            + '.cf-zone-media>*{margin:0!important}'
+            + '.cf-zone-media>img,.cf-zone-media>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block;margin:0!important}'
+            + '.cf-zone-media>div:not([class]):not([id]){position:absolute!important;inset:0!important;margin:0!important;overflow:hidden}'
+            + '.cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block}'
           ;(doc.head || doc.documentElement).appendChild(st)
         }
       } catch (e) { /* cross-origin / torn down */ }
