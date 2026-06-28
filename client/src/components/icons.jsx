@@ -21,6 +21,7 @@ import {
   ColorFilter,
   SoundHigh,
   ChatBubbleEmpty,
+  Menu,
 } from 'iconoir-react'
 
 // Audio player controls (React AudioBar). Mirrors PLAY_SVG / PAUSE_SVG server-side.
@@ -28,6 +29,9 @@ export { Play, Pause }
 
 // Toolbar glyphs.
 export { Upload, ColorFilter }
+
+// Slide-out lesson menu trigger (hamburger). Mirrors MENU_SVG server-side.
+export { Menu }
 
 // blockType -> Iconoir component, used by the add-block palette and block tabs.
 // Confirmed against the installed iconoir-react package export names.

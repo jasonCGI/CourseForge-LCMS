@@ -29,6 +29,12 @@ _PAUSE_PATHS = (
 )
 
 
+_MENU_PATHS = (
+    '<path d="M3 5H21M3 12H21M3 19H21" stroke="currentColor" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+)
+
+
 def _svg(inner, size=18):
     """Wrap inner path markup in a sized, currentColor SVG element."""
     return (
@@ -44,7 +50,11 @@ def _svg(inner, size=18):
 PLAY_SVG = _svg(_PLAY_PATHS)
 PAUSE_SVG = _svg(_PAUSE_PATHS)
 
+# Hamburger glyph for the slide-out lesson menu (sized to the 40px trigger button).
+MENU_SVG = _svg(_MENU_PATHS, size=22)
+
 # A JS-string-literal form (double-quotes escaped) for embedding inside the
 # inline <script> that swaps the glyph on play/pause.
 PLAY_SVG_JS = PLAY_SVG.replace('"', '\\"')
 PAUSE_SVG_JS = PAUSE_SVG.replace('"', '\\"')
+MENU_SVG_JS = MENU_SVG.replace('"', '\\"')

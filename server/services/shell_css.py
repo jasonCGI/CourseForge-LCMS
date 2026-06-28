@@ -59,6 +59,29 @@ SHELL_CONTENT_CSS = (
     '[data-zone-type="frame_counter"]'
     "{overflow:visible!important;line-height:1.35!important;transform:translateY(-5px)!important}"
     '[data-zone-type="frame_counter"]{white-space:nowrap!important;width:auto!important;min-width:max-content!important}'
+    # ── Slide-out lesson menu (nav drawer) ────────────────────────────────────
+    # A self-contained .cf-lmenu-root block, position:absolute within the content
+    # area (its nearest positioned ancestor: #fgui-content / .cf-content), so the
+    # drawer is bounded to the CONTENT AREA and never escapes into the shell chrome.
+    # Hamburger trigger top-right; drawer slides in from the LEFT (L->R); scrim
+    # dims the content behind it. Open state = .cf-lmenu-root.is-open (runtime
+    # toggles it + the aria-* on the button/aside). Locked items are completion-gated.
+    ".cf-lmenu-root{position:absolute;inset:0;z-index:40;pointer-events:none}"
+    ".cf-lmenu-root.is-open{pointer-events:auto}"
+    ".cf-lmenu-btn{position:absolute;top:10px;right:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#042C53;color:#F59E0B;border:1px solid #F59E0B;border-radius:6px;cursor:pointer;pointer-events:auto;z-index:43}"
+    ".cf-lmenu-btn:hover{background:#063D72}"
+    ".cf-lmenu-scrim{position:absolute;inset:0;background:rgba(4,17,34,.5);opacity:0;transition:opacity .25s ease;z-index:41}"
+    ".cf-lmenu-root.is-open .cf-lmenu-scrim{opacity:1}"
+    ".cf-lmenu{position:absolute;top:0;left:0;bottom:0;width:min(300px,80%);background:#042C53;color:#E8EEF6;box-shadow:2px 0 18px rgba(0,0,0,.45);transform:translateX(-100%);transition:transform .25s ease;z-index:42;overflow-y:auto;-webkit-overflow-scrolling:touch}"
+    ".cf-lmenu-root.is-open .cf-lmenu{transform:translateX(0)}"
+    ".cf-lmenu-title{font-family:'IBM Plex Mono','Inter',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#F59E0B;padding:16px 18px 10px;border-bottom:1px solid #F59E0B}"
+    ".cf-lmenu-list{display:flex;flex-direction:column;padding:8px}"
+    ".cf-lmenu-item{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:6px;color:#E8EEF6;text-decoration:none;font-size:14px;cursor:pointer;border:0;background:none;text-align:left;width:100%;box-sizing:border-box;font:inherit}"
+    ".cf-lmenu-item:hover{background:#063D72}"
+    ".cf-lmenu-item.is-current{background:#063D72;box-shadow:inset 3px 0 0 #F59E0B}"
+    ".cf-lmenu-item.is-locked{color:#7d8da0;cursor:not-allowed;pointer-events:none}"
+    ".cf-lmenu-item .cf-lmenu-mark{margin-left:auto;font-size:12px;opacity:.85}"
+    "@media (prefers-reduced-motion:reduce){.cf-lmenu,.cf-lmenu-scrim{transition:none}}"
 )
 
 
