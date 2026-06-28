@@ -502,6 +502,12 @@
   // the active state (a simple toggle-off). Everything is guarded so a missing
   // target / inert trigger / thrown handler silently no-ops and NEVER aborts the
   // rest of the page runtime (a recent bug let one block kill the whole preview).
+  //
+  // A11y (kept in lock-step with the React FramePreview runtime): each operable
+  // trigger gets button semantics (role="button" + tabindex + aria-pressed
+  // reflecting which variant is showing) and is keyboard-operable (Enter / Space,
+  // Space preventDefault'd to stop page scroll). One visually-hidden aria-live
+  // region announces the current view; the target img's alt is updated to match.
   (function(){
     try {
       var host = document.querySelector('.cf-content')
@@ -515,34 +521,84 @@
       // every trigger is a harmless no-op (degrade gracefully, never throw).
       function target(){ try { return host.querySelector('img.cf-swap-target'); } catch(e){ return null; } }
       var defaultSrc = null;   // captured lazily on the first successful swap
+      var defaultAlt = null;   // the target img's original alt (restored on revert)
       var active = null;       // the currently-active trigger element (or null)
+      // One polite live-region per document, reused for every announcement.
+      function statusEl(){
+        try {
+          var s = document.getElementById('cf-swap-status');
+          if (!s){
+            s = document.createElement('div');
+            s.id = 'cf-swap-status';
+            s.setAttribute('role', 'status');
+            s.setAttribute('aria-live', 'polite');
+            s.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;'
+              + 'border:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden;white-space:nowrap';
+            (document.body || document.documentElement).appendChild(s);
+          }
+          return s;
+        } catch(e){ return null; }
+      }
+      function announce(msg){ try { var s = statusEl(); if (s) s.textContent = msg; } catch(e){} }
       function clearActive(){
         try {
-          for (var i=0;i<triggers.length;i++) triggers[i].classList.remove('cf-swap-active');
+          for (var i=0;i<triggers.length;i++){
+            triggers[i].classList.remove('cf-swap-active');
+            if (triggers[i].getAttribute('data-cf-swap-src')) triggers[i].setAttribute('aria-pressed', 'false');
+          }
         } catch(e){}
         active = null;
+      }
+      function activate(a){
+        try {
+          var img = target();
+          if (!img) return;                          // no surface -> no-op
+          var src = a.getAttribute('data-cf-swap-src');
+          if (!src) return;                          // inert (unresolved) trigger
+          if (defaultSrc === null) defaultSrc = img.getAttribute('src') || '';
+          if (defaultAlt === null) defaultAlt = img.getAttribute('alt') || '';
+          var term = (a.textContent || '').replace(/^\s+|\s+$/g, '');
+          if (active === a){                         // toggle-off -> revert
+            if (defaultSrc) img.setAttribute('src', defaultSrc);
+            img.setAttribute('alt', defaultAlt);
+            clearActive();
+            announce('Showing default image');
+            return;
+          }
+          clearActive();
+          img.setAttribute('src', src);
+          img.setAttribute('alt', term ? ('Showing ' + term) : defaultAlt);
+          try { a.classList.add('cf-swap-active'); } catch(e){}
+          a.setAttribute('aria-pressed', 'true');
+          active = a;
+          announce(term ? ('Showing ' + term) : 'Showing image');
+        } catch(e){ /* a single bad activation never breaks the page */ }
       }
       for (var i=0;i<triggers.length;i++){
         (function(a){
           if (a.__cfSwapWired) return; a.__cfSwapWired = true;
+          if (!a.getAttribute('data-cf-swap-src')){   // inert -> not operable
+            a.setAttribute('aria-disabled', 'true');
+            // Still swallow the click so the authored href="#"/target="_blank"
+            // never opens a blank tab (parity with the React runtime).
+            a.addEventListener('click', function(ev){
+              try { if (ev && ev.preventDefault) ev.preventDefault(); } catch(e){}
+            });
+            return;
+          }
+          a.setAttribute('role', 'button');
+          a.setAttribute('tabindex', '0');
+          if (!a.hasAttribute('aria-pressed')) a.setAttribute('aria-pressed', 'false');
           a.addEventListener('click', function(ev){
-            try {
-              if (ev && ev.preventDefault) ev.preventDefault();
-              var img = target();
-              if (!img) return;                          // no surface -> no-op
-              var src = a.getAttribute('data-cf-swap-src');
-              if (!src) return;                          // inert (unresolved) trigger
-              if (defaultSrc === null) defaultSrc = img.getAttribute('src') || '';
-              if (active === a){                         // toggle-off -> revert
-                if (defaultSrc) img.setAttribute('src', defaultSrc);
-                clearActive();
-                return;
-              }
-              clearActive();
-              img.setAttribute('src', src);
-              try { a.classList.add('cf-swap-active'); } catch(e){}
-              active = a;
-            } catch(e){ /* a single bad click never breaks the page */ }
+            try { if (ev && ev.preventDefault) ev.preventDefault(); } catch(e){}
+            activate(a);
+          });
+          a.addEventListener('keydown', function(ev){
+            var k = ev.key;
+            if (k === 'Enter' || k === ' ' || k === 'Spacebar'){
+              try { if (ev.preventDefault) ev.preventDefault(); } catch(e){}
+              activate(a);
+            }
           });
         })(triggers[i]);
       }

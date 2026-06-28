@@ -1054,25 +1054,80 @@ export function wireMenuNav(win) {
   // click opens a blank window (the "popup"). Always preventDefault; swap the
   // cf-swap-target img in place when a resolved src is present (data-cf-swap-src),
   // toggling the active highlight. Idempotent per anchor.
-  win.document.querySelectorAll('a[data-cf-swap]').forEach((a) => {
-    if (a.__cfSwapWired) return
-    a.__cfSwapWired = true
-    a.addEventListener('click', (ev) => {
-      try {
-        ev.preventDefault()
-        const doc = win.document
-        const img = doc.querySelector('img.cf-swap-target')
-        const wasActive = a.classList && a.classList.contains('cf-swap-active')
-        doc.querySelectorAll('a[data-cf-swap]').forEach(t => { if (t.classList) t.classList.remove('cf-swap-active') })
-        if (img) {
-          if (!img.__cfDefaultSrc) img.__cfDefaultSrc = img.getAttribute('src')
-          const src = a.getAttribute('data-cf-swap-src')
-          if (wasActive) { img.setAttribute('src', img.__cfDefaultSrc) }
-          else if (src) { img.setAttribute('src', src); if (a.classList) a.classList.add('cf-swap-active') }
+  //
+  // A11y (kept in lock-step with the published sco_shell.html runtime): each
+  // operable trigger gets button semantics (role="button" + tabindex + aria-pressed
+  // reflecting which variant is showing) and is keyboard-operable (Enter / Space,
+  // Space preventDefault'd to stop page scroll). One visually-hidden aria-live
+  // region per document announces the current view ("Showing <term>" / "Showing
+  // default image"), and the target img's alt is updated so the swap is meaningful
+  // without sight/color. The dead (unresolved) variant stays inert/aria-disabled.
+  try {
+    const doc = win.document
+    // One polite live-region per document, reused for every announcement.
+    const ensureSwapStatus = () => {
+      let s = doc.getElementById('cf-swap-status')
+      if (!s) {
+        s = doc.createElement('div')
+        s.id = 'cf-swap-status'
+        s.setAttribute('role', 'status')
+        s.setAttribute('aria-live', 'polite')
+        s.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;'
+          + 'border:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden;white-space:nowrap'
+        ;(doc.body || doc.documentElement).appendChild(s)
+      }
+      return s
+    }
+    doc.querySelectorAll('a[data-cf-swap]').forEach((a) => {
+      if (a.__cfSwapWired) return
+      a.__cfSwapWired = true
+      const src = a.getAttribute('data-cf-swap-src')
+      if (!src) {
+        // Inert (unresolved) trigger — never navigates, never operable.
+        a.setAttribute('aria-disabled', 'true')
+        a.addEventListener('click', (ev) => { try { ev.preventDefault() } catch (e) { /* torn down */ } })
+        return
+      }
+      a.setAttribute('role', 'button')
+      a.setAttribute('tabindex', '0')
+      if (!a.hasAttribute('aria-pressed')) a.setAttribute('aria-pressed', 'false')
+      const activate = () => {
+        try {
+          const img = doc.querySelector('img.cf-swap-target')
+          const wasActive = a.classList && a.classList.contains('cf-swap-active')
+          // Reset every trigger's visual + pressed state, then re-assert the live one.
+          doc.querySelectorAll('a[data-cf-swap]').forEach((t) => {
+            if (t.classList) t.classList.remove('cf-swap-active')
+            if (t.getAttribute('data-cf-swap-src')) t.setAttribute('aria-pressed', 'false')
+          })
+          const status = ensureSwapStatus()
+          if (img) {
+            if (!img.__cfDefaultSrc) img.__cfDefaultSrc = img.getAttribute('src')
+            if (img.__cfDefaultAlt == null) img.__cfDefaultAlt = img.getAttribute('alt') || ''
+            const term = (a.textContent || '').trim()
+            if (wasActive) {
+              img.setAttribute('src', img.__cfDefaultSrc)
+              img.setAttribute('alt', img.__cfDefaultAlt)
+              status.textContent = 'Showing default image'
+            } else {
+              img.setAttribute('src', src)
+              img.setAttribute('alt', term ? ('Showing ' + term) : (img.__cfDefaultAlt || ''))
+              if (a.classList) a.classList.add('cf-swap-active')
+              a.setAttribute('aria-pressed', 'true')
+              status.textContent = term ? ('Showing ' + term) : 'Showing image'
+            }
+          }
+        } catch (e) { /* iframe torn down */ }
+      }
+      a.addEventListener('click', (ev) => { try { ev.preventDefault() } catch (e) { /* torn down */ } ; activate() })
+      a.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+          try { ev.preventDefault() } catch (e) { /* torn down */ }
+          activate()
         }
-      } catch (e) { /* iframe torn down */ }
+      })
     })
-  })
+  } catch (e) { /* iframe torn down */ }
 }
 
 function PreviewBlock({ block, fill = false, interactive = false, active = false, onSelect = null, updateBlock = null }) {

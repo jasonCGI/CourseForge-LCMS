@@ -485,7 +485,7 @@ _COURSE_PREVIEW_TPL = """<!DOCTYPE html>
   function go(n){
     i=Math.max(0,Math.min(FRAMES.length-1,n));
     var f=FRAMES[i];
-    frame.src='/api/frames/'+f.id+'/preview-html?cp='+i;
+    frame.src='/api/frames/'+f.id+'/preview-html?embed=1&cp='+i;
     ctx.textContent=[f.course,f.lesson,f.name].filter(Boolean).join('  ·  ');
     counter.textContent='Frame '+(i+1)+' of '+FRAMES.length;
     prev.disabled=(i===0); next.disabled=(i===FRAMES.length-1);
