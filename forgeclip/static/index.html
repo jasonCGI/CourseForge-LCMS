@@ -429,8 +429,8 @@
     .timeline-marker:hover::after { opacity: 1; }
 
     /* ── Properties panel ── */
+    /* Bottom strip now holds only the export block (config moved into .top-row). */
     .properties-row {
-      height: 200px;
       flex-shrink: 0;
       background: var(--bg);
       border-top: 1px solid var(--border);
@@ -438,8 +438,12 @@
       overflow: hidden;
     }
 
+    /* Config panel — docked as the LEFT column of .top-row, beside the video. */
     .props-panel {
-      flex: 1;
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
       padding: 14px 16px;
       overflow-y: auto;
     }
@@ -470,11 +474,11 @@
     .prop-input:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
 
     .export-row {
-      width: 220px; flex-shrink: 0;
-      border-left: 1px solid var(--border);
-      padding: 14px;
-      display: flex; flex-direction: column; gap: 8px;
+      flex: 1;
+      padding: 10px 16px;
+      display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px;
     }
+    .export-row .btn { width: auto; padding: 5px 14px; font-size: 11px; }
 
     .btn {
       padding: 8px 14px; border-radius: var(--radius);
@@ -585,6 +589,16 @@
 
   <div class="top-row">
 
+    <!-- Config docked LEFT of the video (was a full-width row underneath) -->
+    <div class="props-panel" id="properties-dock">
+      <div class="props-title" id="props-title">Select an interaction to edit</div>
+      <div id="props-content">
+        <p style="font-size:12px;color:var(--text3)">
+          Click an interaction in the list or timeline to edit its properties.
+        </p>
+      </div>
+    </div>
+
     <div class="video-panel" id="video-panel">
       <div class="upload-state" id="upload-state">
         <div class="icon">🎬</div>
@@ -655,14 +669,6 @@
   </div>
 
   <div class="properties-row" id="properties-row">
-    <div class="props-panel">
-      <div class="props-title" id="props-title">Select an interaction to edit</div>
-      <div id="props-content">
-        <p style="font-size:12px;color:var(--text3)">
-          Click an interaction in the list or timeline to edit its properties.
-        </p>
-      </div>
-    </div>
     <div class="export-row">
       <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">Export</div>
       <button class="btn btn-amber" onclick="exportPackage()" id="export-pkg-2" disabled aria-label="Export package zip (media + clip.json)">⬇ Package (.zip)</button>
