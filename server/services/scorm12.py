@@ -1082,7 +1082,7 @@ def _callout_overlay_html(data):
 
 
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
-                   preview=False, layout=None, branch_resolve=None):
+                   preview=False, layout=None, branch_resolve=None, content_h=None):
     """Convert block list to HTML string.
 
     branch_resolve: for a branch block, a callable frame_id -> href (the real
@@ -2205,6 +2205,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             _shelled_has_bounds = True
             x = max(0, int(b.get('x') or 0)); y = max(0, int(b.get('y') or 0))
             w = max(1, int(b.get('width') or 0)); h = max(1, int(b.get('height') or 0))
+            # Bounds are content-area pixels. A full-bleed box is often authored
+            # against the full STAGE (e.g. h:1080), but the real content area is
+            # shorter (e.g. 900). Clamp to the shell's content_area height so the box
+            # fits the content area exactly (cover media crops within 900, not 1080)
+            # instead of spilling under the chrome.
+            if content_h:
+                y = min(y, content_h)
+                h = max(1, min(h, content_h - y))
             seg = '\n'.join(parts[start:]); del parts[start:]
             fit = 'cover' if data.get('fit') == 'cover' else 'contain'
             # #fgui-content carries 12px padding; offset by it so the box anchors to
@@ -2511,12 +2519,17 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
         html_path = candidates[0]
 
     from .menu_frame import is_menu_frame, get_menu, render_menu_html
+    # Content-area height bounds full-bleed media (see _render_blocks cf-bounds clamp).
+    try:
+        _ca_h = int(((asset.companion_files or {}).get('shell_config') or {}).get('content_area', {}).get('height') or 0) or None
+    except Exception:
+        _ca_h = None
     if is_menu_frame(frame):
         injected_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None), shelled=True)
     else:
         injected_html = _render_blocks([b for b in (frame.content or {}).get('blocks', [])
                                         if b.get('type') != 'gui'], asset_map=asset_map, hotspot_cfg=hotspot_cfg, shelled=True,
-                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
+                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve, content_h=_ca_h)
     # Content-area bg drives luminance-aware body text. The per-frame gui asset
     # stores the ForgeGUI config under companion_files['shell_config']; guard the
     # walk so a missing/odd config just falls through to the halo default.
@@ -2558,12 +2571,18 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
             return None, None
         html_path = cands[0]
     from .menu_frame import is_menu_frame, get_menu, render_menu_html
+    # Content-area height bounds full-bleed media (see _render_blocks cf-bounds clamp).
+    try:
+        _ca_h = int(((shell.shell_config if isinstance(shell.shell_config, dict) else {})
+                     .get('content_area', {}).get('height')) or 0) or None
+    except Exception:
+        _ca_h = None
     if is_menu_frame(frame):
         injected_html = render_menu_html(get_menu(frame), menu_resolve or (lambda _i: None), shelled=True)
     else:
         injected_html = _render_blocks((frame.content or {}).get('blocks', []), asset_map=asset_map,
                                        hotspot_cfg=hotspot_cfg, shelled=True, preview=preview,
-                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve)
+                                       layout=(frame.content or {}).get('layout'), branch_resolve=branch_resolve, content_h=_ca_h)
     # Content-area bg drives luminance-aware body text. The per-project GuiShell
     # stores the ForgeGUI config in shell.shell_config; guard the walk so a
     # missing/odd config just falls through to the halo default.
