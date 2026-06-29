@@ -910,16 +910,28 @@ export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
   // color in the iframe (the stored shell sets no #fgui-content color).
   const TXT = shellTextCSS(bgColor, shellTextMode, projectTextMode)
   const lay = ['full', 'text-left', 'text-right'].includes(layout) ? layout : 'text-left'
-  const textBlocks  = blocks.filter(b => b.type === 'text')
-  const otherBlocks = blocks.filter(b => b.type !== 'text')
+  // AUX blocks are NOT layout zone-fillers (parity with the server _render_blocks
+  // 'aux' tag): a docked audio bar pins itself full-width to the content-area
+  // bottom, and a callout is a free-floating overlay. Exclude them from the
+  // text/media zone decision — else a text+docked-audio frame reads as text+media
+  // and renders a half split with an empty media zone, diverging from the published
+  // render (which collapses to a full-width text box). They're still emitted
+  // (appended after the zones) so their own absolute positioning places them.
+  const isAux = (b) => (b.type === 'media' && b.data && b.data.kind === 'audio' && b.data.dock === 'bottom')
+    || b.type === 'callout'
+  const auxBlocks  = blocks.filter(isAux)
+  const zoneBlocks = blocks.filter(b => !isAux(b))
+  const auxHTML    = auxBlocks.map(b => renderBlockToHTML(b)).join('\n')
+  const textBlocks  = zoneBlocks.filter(b => b.type === 'text')
+  const otherBlocks = zoneBlocks.filter(b => b.type !== 'text')
   const hasText = textBlocks.length > 0, hasMedia = otherBlocks.length > 0
 
   // full WITH both a text AND a media block = two elements → stack them (text
   // 40px-padded at top, media full-bleed beneath), no overlap. Mirrors the server.
   if (lay === 'full' && hasText && hasMedia) {
-    return TXT + CF_INJ_LIST_CSS + `<div class="cf-layout-full">` + blocks.map(b =>
+    return TXT + CF_INJ_LIST_CSS + `<div class="cf-layout-full">` + zoneBlocks.map(b =>
       `<div style="padding:${b.type === 'text' ? '40px' : '0'}">${renderBlockToHTML(b)}</div>`
-    ).join('\n') + `</div>`
+    ).join('\n') + `</div>` + auxHTML
   }
 
   // Text-only content (no media zone-filler): a split layout is meaningless with
@@ -934,7 +946,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
     const inner = textBlocks.map(b => renderBlockToHTML(b)).join('\n')
     return TXT + CF_INJ_LIST_CSS + `<div class="cf-shelled-text-top" style="position:absolute;`
       + `top:0;left:0;width:100%;height:100%;box-sizing:border-box;padding:40px;`
-      + `overflow:auto">${inner}</div>`
+      + `overflow:auto">${inner}</div>` + auxHTML
   }
 
   // Zone geometry as % of the content area (y=0, height=100%).
@@ -956,7 +968,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
       + `width:${mW};height:100%;box-sizing:border-box;overflow:hidden">${inner}</div>`)
   }
   return TXT + CF_INJ_LIST_CSS + `<div class="cf-layout-zones" style="position:absolute;top:0;left:0;`
-    + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>`
+    + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>` + auxHTML
 }
 
 // Build the menu-frame nav HTML for injection into the GUI shell iframe — the
