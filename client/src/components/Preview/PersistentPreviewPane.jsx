@@ -167,8 +167,15 @@ export default function PersistentPreviewPane() {
   // Lesson/course names for the lesson_title / section_title shell zones (mirrors
   // the publish side: lessonTitle=lesson.name, sectionTitle=course.name).
   const ctx = useMemo(() => frameContext(activeProject, activeFrame?.id), [activeProject, activeFrame?.id])
+  // Learner-facing counter = required-only (mirror of the server _frame_position /
+  // packager req_total): the shell zone must read the SAME "N / total" the published
+  // SCO shows, which EXCLUDES optional frames. Previously this fed the all-frames
+  // human/total, so toggling Edit→Published made the total jump (e.g. 20→19). The
+  // top-bar PreviewHeader still shows the all-frames human/total for authoring.
+  const disp = useMemo(() => requiredFramePosition(activeProject, activeFrame?.id),
+    [activeProject, activeFrame?.id])
   const frameData = useMemo(() => ({
-    frameIndex: human, totalFrames: total,
+    frameIndex: disp.index, totalFrames: disp.total,
     lessonTitle: ctx.lessonName, sectionTitle: ctx.courseName,
     frameTitle: activeFrame?.name || '',
     // Prompt zone: per-frame prompt (set in the Frame section), else inherit the
@@ -177,7 +184,7 @@ export default function PersistentPreviewPane() {
     // Single-frame live preview: disable NEXT/PREV (isFirst && isLast). Real
     // navigation is exercised in the full-course preview, not here.
     isFirst: true, isLast: true,
-  }), [human, total, activeFrame?.name, activeFrame?.content?.prompt, ctx])
+  }), [disp, activeFrame?.name, activeFrame?.content?.prompt, ctx])
 
   // Switching to the Published (server-rendered) view with unsaved edits: flush the
   // pending autosave now so the iframe fetches the just-edited render instead of the
@@ -434,3 +441,33 @@ export function flatFrameOrder(project) {
   return ids
 }
 const byOrder = (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+
+// Ordered [{id, optional}] for the project — same walk/sort as flatFrameOrder but
+// carries the `optional` flag so the learner-facing counter can exclude optional
+// frames (mirror of the server's _frame_position / packager req_total).
+export function flatFrameMeta(project) {
+  const out = []
+  if (!project) return out
+  for (const c of [...(project.courses || [])].sort(byOrder))
+    for (const m of [...(c.modules || [])].sort(byOrder))
+      for (const l of [...(m.lessons || [])].sort(byOrder))
+        for (const f of [...(l.frames || [])].sort(byOrder))
+          out.push({ id: f.id, optional: !!f.optional })
+  return out
+}
+
+// Required-only counter position for a frame, mirroring the server _frame_position:
+// the total excludes optional frames, and an optional frame reports the running
+// count of the required frames before it (it doesn't advance the counter). Returns
+// 1-based { index, total }; falls back to { index:1, total } when the id isn't found.
+export function requiredFramePosition(project, frameId) {
+  const frames = flatFrameMeta(project)
+  const total = frames.filter(f => !f.optional).length || frames.length || 1
+  const idx = frames.findIndex(f => f.id === frameId)
+  let run = 0, index = 1
+  for (let i = 0; i < frames.length; i++) {
+    if (!frames[i].optional) run += 1
+    if (i === idx) { index = run || 1; break }
+  }
+  return { index, total }
+}
