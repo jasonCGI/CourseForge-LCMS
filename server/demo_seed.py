@@ -273,8 +273,8 @@ in this course comes back to dialing it in.</p>''',
         # engine rounding or crop). The caption rides over the bottom of the image
         # as a scrim overlay (white text, readable over any image) — it never
         # pushes content below the fold.
-        _image(label='Barista presenting a latte', color='#185FA5', icon='🖼', fill=True,
-               caption='A finished pour, foam set. Cropped to a 16:9 fit, optimized and EXIF-stripped.'),
+        _image(label='Barista presenting an espresso in a German café', color='#185FA5', icon='🖼', fill=True,
+               caption='A pulled espresso, crema settled. Cropped to a 16:9 fit, optimized and EXIF-stripped.'),
     ]},
     {'name': 'Image Swap (click to change)', 'frame_type': 'content', 'lesson': 'Content Blocks',
      'layout': 'text-left', 'blocks': [
@@ -306,16 +306,18 @@ in this course comes back to dialing it in.</p>''',
         # with the full-bleed image. Position/aim them by dragging in the live
         # preview; the panel sets only text + uniform padding. _wire_demo_assets()
         # swaps the placeholder graphic for the real bundled demo image after a reset.
-        _image(label='Latte with foam art', color='#185FA5', icon='🖼', fill=True,
+        _image(label='Japanese-café barista, flat white', color='#185FA5', icon='🖼', fill=True,
                caption='Drag each callout box and its round target handle to annotate the image'),
         # box = the CONNECTION POINT (facing edge-center); 'auto' resolves the edge.
-        # Each box extends AWAY from its target and stays fully on-frame:
-        #   Foam art    -> left edge connects, box extends RIGHT  (sits top-right)
-        #   Ceramic cup -> right edge connects, box extends LEFT  (sits mid-left)
-        #   Espresso    -> left edge connects, box extends RIGHT  (sits bottom-right)
-        _callout(text='Foam art',      box={'x': 76, 'y': 30}, target={'x': 50, 'y': 40}),
-        _callout(text='Ceramic cup',   box={'x': 27, 'y': 66}, target={'x': 47, 'y': 62}),
-        _callout(text='Espresso base', box={'x': 74, 'y': 82}, target={'x': 54, 'y': 74}),
+        # Positioned against the FULL image (1920x900 = the published content-area
+        # aspect, so the whole scene shows uncropped). Each box sits in open/readable
+        # space and points at a real subject:
+        #   Foam art         -> the latte art in the glass (box on the apron, right)
+        #   Ceramic cups     -> the cups on the back shelf (box in the upper wall)
+        #   Espresso machine -> the silver machine (box in the darker room, left)
+        _callout(text='Foam art',         box={'x': 64, 'y': 64}, target={'x': 49, 'y': 63}),
+        _callout(text='Ceramic cups',     box={'x': 49, 'y': 10}, target={'x': 28, 'y': 14}),
+        _callout(text='Espresso machine', box={'x': 15, 'y': 60}, target={'x': 37, 'y': 47}),
     ]},
     {'name': 'Video Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
         # Video fills the entire content area (cover fit), shown as-sent-in (no
@@ -548,7 +550,7 @@ def _wire_demo_assets(project):
     mp4 = reg('sample_video.mp4', 'video', 'video/mp4', companions={
         'webm_asset_id': webm.id, 'poster_asset_id': poster.id,
         'vtt_asset_id': vtt.id, 'has_audio': False})
-    img = reg('sample_image.jpg', 'image', 'image/jpeg')
+    espresso = reg('CF_German_Espresso.jpg', 'image', 'image/jpeg')
     aud = reg('beneath-the-still-water.mp3', 'audio', 'audio/mpeg')
     glb = reg('coffee_cup.glb', 'model3d', 'model/gltf-binary')
     hb  = reg('hotspot_bg.jpg',  'image', 'image/jpeg')
@@ -557,6 +559,9 @@ def _wire_demo_assets(project):
     cf1 = reg('firefly_coffee_1.jpg', 'image', 'image/jpeg')
     cf2 = reg('firefly_coffee_2.jpg', 'image', 'image/jpeg')
     cf3 = reg('firefly_coffee_3.jpg', 'image', 'image/jpeg')
+    # The annotated still for the "Image with Callout Labels" frame: a Japanese-café
+    # barista handing over a flat white (latte art in a glass).
+    barista = reg('CF_Barista_Japan_Flat_White.jpg', 'image', 'image/jpeg')
     db.session.flush()
 
     mp4_meta = _serialize_media(mp4)
@@ -600,13 +605,14 @@ def _wire_demo_assets(project):
         for b in blocks:
             d = b.get('data', {}); t = b.get('type')
             if fr.name == 'Image Block' and t == 'media' and d.get('kind') == 'image':
-                d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
-                         original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
+                d.update(asset_id=espresso.id, serve_url=f'/api/media/serve/{espresso.id}',
+                         original_name='CF_German_Espresso.jpg', asset_meta=_serialize_media(espresso)); changed = True
             elif fr.name == 'Image with Callout Labels' and t == 'media' and d.get('kind') == 'image':
-                # The annotated still — the same bundled latte image the Image Block
-                # uses; the callout overlays self-position over it.
-                d.update(asset_id=img.id, serve_url=f'/api/media/serve/{img.id}',
-                         original_name='sample_image.jpg', asset_meta=_serialize_media(img)); changed = True
+                # The annotated still — a Japanese-café barista handing over a flat
+                # white; the callout overlays self-position over it.
+                d.update(asset_id=barista.id, serve_url=f'/api/media/serve/{barista.id}',
+                         original_name='CF_Barista_Japan_Flat_White.jpg',
+                         asset_meta=_serialize_media(barista)); changed = True
             elif fr.name.startswith('Image Swap') and t == 'media' and d.get('kind') == 'image':
                 # Default image shown before any swap (the cf-swap-target surface).
                 d.update(asset_id=cf1.id, serve_url=f'/api/media/serve/{cf1.id}',
