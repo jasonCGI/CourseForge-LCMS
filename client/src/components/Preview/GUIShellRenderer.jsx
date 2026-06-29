@@ -16,14 +16,19 @@ import { wireAudioBars, wireMenuNav } from './FramePreview'
 // GET /api/shell-content.css), so the GUI-ON edit preview cannot drift from the
 // published render. Per-frame text color/halo is NOT here; the injected frameHtml's
 // shellTextCSS supplies it per text-mode.
-let _shellCssPromise = null
+let _shellCss = null            // cached CSS text — set ONLY on a successful fetch
+let _shellCssInflight = null    // de-dupe concurrent fetches
 function loadShellCss() {
-  if (!_shellCssPromise) {
-    _shellCssPromise = fetch('/api/shell-content.css')
-      .then(r => (r.ok ? r.text() : ''))
-      .catch(() => '')
-  }
-  return _shellCssPromise
+  if (_shellCss != null) return Promise.resolve(_shellCss)
+  if (_shellCssInflight) return _shellCssInflight
+  // Do NOT cache failures: a transient blip would otherwise pin the edit preview
+  // to empty CSS (unstyled/uncontained) for the whole session. On error return ''
+  // for this call but leave the cache empty so the next call retries.
+  _shellCssInflight = fetch('/api/shell-content.css')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text() })
+    .then(css => { _shellCss = css; _shellCssInflight = null; return css })
+    .catch(() => { _shellCssInflight = null; return '' })
+  return _shellCssInflight
 }
 
 export default function GUIShellRenderer({

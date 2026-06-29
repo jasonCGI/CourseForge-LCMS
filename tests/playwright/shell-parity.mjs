@@ -26,7 +26,9 @@ import { chromium } from 'playwright'
 
 const BASE = (process.argv[2] || 'https://courseforge.dev').replace(/\/$/, '')
 const TOL = 2 // px tolerance for sub-pixel rounding
+// Headings are luminance-aware: amber on dark content areas, brand navy on light.
 const AMBER = 'rgb(245, 158, 11)'
+const NAVY = 'rgb(4, 44, 83)'
 let failures = 0
 const fail = (m) => { console.error('  ✗ ' + m); failures++ }
 const ok = (m) => console.log('  ✓ ' + m)
@@ -76,36 +78,54 @@ async function main() {
   for (const f of frames) {
     console.log(`\nFrame: ${f.name}`)
     await page.goto(`${BASE}/api/frames/${f.id}/preview-html?embed=1`, { waitUntil: 'networkidle' })
-    const r = await page.evaluate((tol) => {
-      const out = { overflows: [], fguiFont: null, fguiOverflow: null, headingColors: [] }
+    const r = await page.evaluate(() => {
+      const out = { fguiFont: null, fguiOverflow: null, headingColors: [] }
       const fgui = document.getElementById('fgui-content')
       if (!fgui) return { error: 'no #fgui-content' }
       const fr = fgui.getBoundingClientRect()
       const cs = getComputedStyle(fgui)
       out.fguiFont = cs.fontFamily
       out.fguiOverflow = cs.overflow
+      // The content box must stay in the content REGION, not fill the whole stage:
+      // filling 1080 pushed content under the title/prompt chrome. Measure vs the
+      // stage (everything is overflow:hidden, so child media clipping is by design —
+      // the meaningful invariant is #fgui-content's own size/position).
+      const stage = document.getElementById('fgui-stage') || document.body
+      const sr = stage.getBoundingClientRect()
+      out.fguiTop = Math.round(fr.top - sr.top)
+      out.fguiH = Math.round(fr.height)
+      out.stageH = Math.round(sr.height)
       document.querySelectorAll('#fgui-content h1,#fgui-content h2,#fgui-content h3')
         .forEach(h => out.headingColors.push(getComputedStyle(h).color))
-      document.querySelectorAll('.cf-bounds img,.cf-bounds video,.cf-zone-media img,.cf-zone-media video')
-        .forEach(el => {
-          const b = el.getBoundingClientRect()
-          if (b.right - fr.right > tol || b.bottom - fr.bottom > tol)
-            out.overflows.push({ tag: el.tagName, dr: Math.round(b.right - fr.right), db: Math.round(b.bottom - fr.bottom) })
-        })
+      // Shelled body text is 26px (matches the live-edit preview).
+      const bodyEl = document.querySelector('.cf-zone-text p,.cf-shelled-text-top p,.cf-zone-text li')
+      out.bodyFontSize = bodyEl ? getComputedStyle(bodyEl).fontSize : null
+      // Zone IMAGES cover (match edit); videos/iVideo may legitimately contain, so
+      // only assert fit on images.
+      const imgEl = document.querySelector('.cf-zone-media img')
+      out.imgFit = imgEl ? getComputedStyle(imgEl).objectFit : null
       return out
-    }, TOL)
+    })
 
     if (r.error) { fail(r.error); continue }
     r.fguiOverflow === 'hidden' ? ok('#fgui-content clips') : fail(`#fgui-content overflow=${r.fguiOverflow}`)
-    /IBM Plex Mono/.test(r.fguiFont) ? ok('IBM Plex Mono') : fail(`font=${r.fguiFont}`)
+    r.fguiFont.includes('IBM Plex Mono') ? ok('IBM Plex Mono') : fail(`font=${r.fguiFont}`)
     if (r.headingColors.length) {
-      r.headingColors.every(c => c === AMBER)
-        ? ok(`headings amber (${r.headingColors.length})`)
-        : fail(`heading color(s) ${[...new Set(r.headingColors)].join(', ')} != ${AMBER}`)
+      r.headingColors.every(c => c === AMBER || c === NAVY)
+        ? ok(`headings luminance-aware (${r.headingColors.length})`)
+        : fail(`heading color(s) ${[...new Set(r.headingColors)].join(', ')} not amber/navy`)
     }
-    r.overflows.length === 0
-      ? ok('no media overflow')
-      : fail(`media overflow: ${JSON.stringify(r.overflows)}`)
+    if (r.bodyFontSize) {
+      r.bodyFontSize === '26px' ? ok('body 26px') : fail(`body font-size ${r.bodyFontSize} != 26px`)
+    }
+    if (r.imgFit) {
+      r.imgFit === 'cover' ? ok('zone image cover') : fail(`zone image object-fit ${r.imgFit} != cover`)
+    }
+    // Content box stays inside the content region (positioned below the top chrome,
+    // shorter than the full stage) — the "content filled the stage / covered the GUI"
+    // regression made #fgui-content the full 1080.
+    if (r.fguiTop > 0 && r.fguiH < r.stageH - 1) ok(`content region ok (top ${r.fguiTop}, h ${r.fguiH}/${r.stageH})`)
+    else fail(`#fgui-content fills/exceeds the stage (top ${r.fguiTop}, h ${r.fguiH}/${r.stageH})`)
   }
   await browser.close()
 

@@ -117,14 +117,22 @@ def _signals_light_bg(text_color):
     return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 140
 
 
-def fgui_text_css(text_color, halo_css):
+def fgui_text_css(text_color, halo_css, content_h=None):
     """Per-frame dynamic rule appended after SHELL_CONTENT_CSS by each renderer:
-    the luminance-derived body text color (+ optional text-shadow halo), plus a
-    luminance-aware HEADING color. Amber headings (the SHELL_CONTENT_CSS default)
-    are brand + pass on dark content areas; on a LIGHT content area they fail AA, so
-    override headings to brand navy (#042C53) there — matching the body's adaptation
-    and the live-preview (Edit) render."""
+    the luminance-derived body text color (+ optional text-shadow halo), a
+    luminance-aware HEADING color, and (defensively) the content-area height.
+
+    Heading color: amber (the SHELL_CONTENT_CSS default) is brand + passes on dark
+    content areas; on a LIGHT content area it fails AA, so override to brand navy
+    (#042C53) there — matching the body's adaptation and the live (Edit) render.
+
+    content_h: the shell's content_area height. SHELL_CONTENT_CSS deliberately sets
+    NO #fgui-content height (so the shell's own content-area sizing governs); pin it
+    here from the config so the content box can't collapse if a shell omits a height
+    in its CSS. For conforming shells this just re-asserts the correct value."""
     css = '#fgui-content{color:' + (text_color or '') + ';' + (halo_css or '') + '}'
     if _signals_light_bg(text_color):
         css += '#fgui-content h1,#fgui-content h2,#fgui-content h3{color:#042C53}'
+    if content_h:
+        css += '#fgui-content{height:' + str(int(content_h)) + 'px}'
     return css

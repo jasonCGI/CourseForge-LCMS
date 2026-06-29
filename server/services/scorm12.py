@@ -2551,7 +2551,7 @@ def _build_gui_frame(frame, frame_idx, total_frames, lesson_name, section_name,
     html = _patch_shell(shell_html, asset_id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total, content_bg=content_bg,
-                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode)
+                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode, content_h=_ca_h)
     return html, asset_id
 
 
@@ -2604,7 +2604,7 @@ def _build_project_shell_frame(shell, frame, frame_idx, total_frames, lesson_nam
     html = _patch_shell(shell_html, shell.id, injected_html,
                         frame, frame_idx, total_frames, lesson_name, section_name, frame_map, cf_version,
                         disp_index, disp_total, content_bg=content_bg,
-                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode)
+                        shell_text_mode=shell_text_mode, project_text_mode=project_text_mode, content_h=_ca_h)
     return html, shell.id
 
 
@@ -2631,7 +2631,7 @@ def _ivideo_runtime_block() -> str:
 
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
                  lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None,
-                 content_bg=None, shell_text_mode='auto', project_text_mode='auto'):
+                 content_bg=None, shell_text_mode='auto', project_text_mode='auto', content_h=None):
     """Namespace a shell's assets to gui_assets/<ns_id>/ and inject the
     CourseForge runtime (content injection + zones + nav + completion).
 
@@ -2783,7 +2783,7 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
   // GUI-ON edit preview via GET /api/shell-content.css, so the two renderers can no
   // longer drift. Only the per-frame, luminance-derived text color + halo is dynamic
   // (fgui_text_css), appended here per frame.
-  style.textContent = {json.dumps(SHELL_CONTENT_CSS + fgui_text_css(text_color, halo_css))};
+  style.textContent = {json.dumps(SHELL_CONTENT_CSS + fgui_text_css(text_color, halo_css, content_h))};
   document.head.appendChild(style);
 
   window.addEventListener('load', inject);
