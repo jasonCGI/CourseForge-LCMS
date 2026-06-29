@@ -1008,7 +1008,12 @@ export function buildMenuHTML(menu, resolve) {
     }).join('')
   }
 
-  return `<div style="background:#fff;color:#1a1a1a;font-family:Inter,system-ui,sans-serif;`
+  // No opaque background/color: this is injected into the GUI shell's content area,
+  // so let the shell's real content-area bg (+ luminance-aware body text) show
+  // through — faithful to the published render_menu_html (which paints neither).
+  // Previously forced background:#fff, which covered the shell's gray and was the
+  // sole Edit-vs-Published menu drift.
+  return `<div style="font-family:Inter,system-ui,sans-serif;`
     + `min-height:100%;padding:32px 24px;box-sizing:border-box">`
     + titleHTML
     + `<div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px">`
@@ -1121,9 +1126,14 @@ export function wireMenuNav(win) {
           const img = doc.querySelector('img.cf-swap-target')
           const wasActive = a.classList && a.classList.contains('cf-swap-active')
           // Reset every trigger's visual + pressed state, then re-assert the live one.
+          // Gate the aria-pressed reset on "is operable" (has an aria-pressed attr,
+          // set at wiring time) NOT on data-cf-swap-src — the EDIT path's injected
+          // anchors carry only data-cf-swap=<id> (src resolved via the serve-route
+          // fallback), so keying on data-cf-swap-src would skip the reset and leave
+          // aria-pressed stuck true after a self-revert.
           doc.querySelectorAll('a[data-cf-swap]').forEach((t) => {
             if (t.classList) t.classList.remove('cf-swap-active')
-            if (t.getAttribute('data-cf-swap-src')) t.setAttribute('aria-pressed', 'false')
+            if (t.hasAttribute('aria-pressed')) t.setAttribute('aria-pressed', 'false')
           })
           const status = ensureSwapStatus()
           if (img) {

@@ -550,7 +550,11 @@
         try {
           for (var i=0;i<triggers.length;i++){
             triggers[i].classList.remove('cf-swap-active');
-            if (triggers[i].getAttribute('data-cf-swap-src')) triggers[i].setAttribute('aria-pressed', 'false');
+            // Gate on "is operable" (has aria-pressed) not data-cf-swap-src, so this
+            // stays in lock-step with the React wireMenuNav runtime (whose edit-path
+            // anchors lack data-cf-swap-src). Equivalent here — operable published
+            // anchors always carry both.
+            if (triggers[i].hasAttribute('aria-pressed')) triggers[i].setAttribute('aria-pressed', 'false');
           }
         } catch(e){}
         active = null;
