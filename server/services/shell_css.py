@@ -38,16 +38,22 @@ SHELL_CONTENT_CSS = (
     # Explicit-bounds blocks + cover/contain fit.
     ".cf-bounds{margin:0}.cf-bounds video,.cf-bounds img{width:100%;height:100%;object-fit:contain;border-radius:0}"
     ".cf-fit-cover video,.cf-fit-cover img{object-fit:cover}"
-    # Text-only shelled frame fills the content area and scrolls itself.
-    ".cf-shelled-text-top{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto}"
-    ".cf-zone-text{font-size:14px}"
+    # Text-only shelled frame fills the content area and scrolls itself. Shelled
+    # body text is 26px (matches the live-edit preview's .cf-injected-text base, so
+    # headings scale to h2 39 / h3 30 / body+li 26 in BOTH renderers); 14px rendered
+    # tiny on the 1920 stage and diverged from the editor.
+    ".cf-shelled-text-top{position:absolute;top:0;left:0;width:100%;height:100%;padding:40px;box-sizing:border-box;overflow:auto;font-size:26px}"
+    ".cf-zone-text{font-size:26px}"
     ".cf-zone-media>*{margin:0!important}"
     # Media containment: class-less, id-less <div> wrappers (iVideo=#ivideo-, OAM=.cf-oam,
     # 3D=.cf-3d-viewer, hotspot=.cf-hotspot-wrap, video.js all carry an id/class, so the
     # :not() guards exclude them). Inline height:auto on the <img>/<video> would otherwise
     # win and let the REPLACED element snap to intrinsic height, overflowing the zone.
     ".cf-zone-media>div:not([class]):not([id]){position:absolute!important;inset:0!important;margin:0!important;overflow:hidden}"
-    ".cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain;display:block}"
+    # Zone media defaults to cover (fill + crop), matching the live-edit preview
+    # (renderBlockToHTML treats anything but fit:contain as cover). object-fit has NO
+    # !important so an authored object-fit:contain still wins.
+    ".cf-zone-media>div:not([class]):not([id])>img,.cf-zone-media>div:not([class]):not([id])>video:not(.video-js){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover;display:block}"
     # iVideo: container edge-bound to the zone (the native <video> re-evaluates its used
     # height on loadedmetadata and would overflow off an indefinite %-height chain).
     '.cf-zone-media [id^="ivideo-"] video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}'
