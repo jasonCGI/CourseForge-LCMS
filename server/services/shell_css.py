@@ -22,9 +22,14 @@ each renderer. Everything in this constant is static and shared verbatim.
 # caller). Property order within a rule is irrelevant to rendering.
 SHELL_CONTENT_CSS = (
     # Base content box (font/metrics/clip). Color + halo are appended per-frame.
+    # NOTE: do NOT set height here. The shell positions #fgui-content at the
+    # Figma-exported content_area (e.g. y:100, height:900) via its own runtime style;
+    # forcing height:100% would override that and stretch the content box to the FULL
+    # stage (1080), pushing content past the content area into the title/prompt chrome.
+    # Let the shell's content_area height govern.
     "#fgui-content{font-family:'IBM Plex Mono','Inter',system-ui,sans-serif;"
     "font-size:14px;line-height:1.6;padding:12px;box-sizing:border-box;"
-    "overflow:hidden;height:100%}"
+    "overflow:hidden}"
     # Typography.
     "#fgui-content h1,#fgui-content h2,#fgui-content h3{color:#F59E0B;margin-bottom:12px}"
     "#fgui-content p{margin-bottom:10px}"
