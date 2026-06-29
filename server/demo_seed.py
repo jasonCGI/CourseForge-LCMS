@@ -325,8 +325,8 @@ in this course comes back to dialing it in.</p>''',
         # autoplay). The caption rides over the bottom of the video as a scrim
         # overlay (white text, readable over any frame) — it never pushes content
         # below the fold. Mirrors the cover Image Block above.
-        _video(label='Pulling a shot', fill=True, dock='bottom',
-               caption='A shot pulling in real time. Muted, looped, and compressed for fast load.'),
+        _video(label='Roasted coffee beans pouring onto a scale', fill=True, dock='bottom',
+               caption='Fresh-roasted beans cascade onto the scale. Muted, looped, and compressed for fast load.'),
     ]},
     {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
         _text(body='<h2>Listen as you work</h2><p>Audio carries what a still cannot: the rhythm of the grind, '
@@ -543,11 +543,14 @@ def _wire_demo_assets(project):
         db.session.add(a)
         return a
 
-    webm   = reg('sample_video.webm', 'video', 'video/webm')
-    poster = reg('sample_poster.jpg', 'image', 'image/jpeg')
+    # Video Block clip — coffee-beans b-roll (1920x900 = the content-area aspect, so
+    # cover-fit fills it exactly, no crop/letterbox). The interactive-video block
+    # keeps its OWN sample_video.mp4 below (its clip.json markers are tuned to it).
+    webm   = reg('coffee_beans.webm', 'video', 'video/webm')
+    poster = reg('coffee_beans_poster.jpg', 'image', 'image/jpeg')
     vtt    = reg('sample_captions.vtt', 'caption', 'text/vtt')
     db.session.flush()
-    mp4 = reg('sample_video.mp4', 'video', 'video/mp4', companions={
+    mp4 = reg('coffee_beans.mp4', 'video', 'video/mp4', companions={
         'webm_asset_id': webm.id, 'poster_asset_id': poster.id,
         'vtt_asset_id': vtt.id, 'has_audio': False})
     espresso = reg('CF_German_Espresso.jpg', 'image', 'image/jpeg')
@@ -630,7 +633,7 @@ def _wire_demo_assets(project):
                 # dock='bottom' keeps the playbar snapped to the content-area
                 # bottom once the real cover clip replaces the placeholder.
                 d.update(asset_id=mp4.id, serve_url=f'/api/media/serve/{mp4.id}',
-                         original_name='sample_video.mp4', use_videojs=True,
+                         original_name='coffee_beans.mp4', use_videojs=True,
                          dock='bottom', asset_meta=mp4_meta); changed = True
             elif fr.name == 'Audio Block' and t == 'media' and d.get('kind') == 'audio':
                 d.update(asset_id=aud.id, serve_url=f'/api/media/serve/{aud.id}',
