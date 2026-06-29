@@ -659,15 +659,15 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
         // bottom-up gradient scrim (white text) instead of below it.
         if (isCover && d.caption)
           return `<div style="position:relative;${b ? 'width:100%;height:100%' : 'display:block;margin:8px 0;line-height:0'}">`
-            + `<img src="${src}" alt="${d.alt_text || ''}" `
+            + `<img class="cf-swap-target" src="${src}" alt="${d.alt_text || ''}" `
             + `style="width:100%;height:${b ? '100%' : 'auto'};object-fit:cover;display:block">`
             + `<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;`
             + `color:#fff;font-size:13px;line-height:1.45;`
             + `text-shadow:0 1px 3px rgba(0,0,0,.85);background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5) 50%,rgba(0,0,0,0))">${d.caption}</div></div>`
         return b
-          ? `<img src="${src}" alt="${d.alt_text || ''}" `
+          ? `<img class="cf-swap-target" src="${src}" alt="${d.alt_text || ''}" `
             + `style="width:100%;height:100%;object-fit:${d.fit === 'contain' ? 'contain' : 'cover'};display:block">`
-          : `<img src="${src}" alt="${d.alt_text || ''}" `
+          : `<img class="cf-swap-target" src="${src}" alt="${d.alt_text || ''}" `
             + `style="max-width:100%;height:auto;display:block;margin:8px 0">`
       }
       if (k === 'video' && src) {

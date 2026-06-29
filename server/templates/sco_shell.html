@@ -508,7 +508,13 @@
   // reflecting which variant is showing) and is keyboard-operable (Enter / Space,
   // Space preventDefault'd to stop page scroll). One visually-hidden aria-live
   // region announces the current view; the target img's alt is updated to match.
-  (function(){
+  // Exposed as a global so the GUI-shell SCO runtime (scorm12._patch_shell) can
+  // RE-invoke it after it injects FRAME_HTML — under a GUI shell the swap triggers
+  // and the .cf-swap-target image don't exist in #fgui-content at parse time. The
+  // body re-queries triggers each call and the per-anchor __cfSwapWired guard makes
+  // re-invocation idempotent. The immediate call at the bottom wires the default
+  // (non-shell) SCO page, where the content is already server-rendered in the DOM.
+  window.cfWireSwaps = function(){
     try {
       var host = document.querySelector('.cf-content')
               || document.querySelector('.cf-preview-main')
@@ -603,7 +609,8 @@
         })(triggers[i]);
       }
     } catch (e) { /* never let image-swap wiring abort the page runtime */ }
-  })();
+  };
+  try { window.cfWireSwaps(); } catch (e) {}
   </script>
 
   <script>

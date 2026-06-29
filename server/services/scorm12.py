@@ -2629,6 +2629,31 @@ def _ivideo_runtime_block() -> str:
     return _IVIDEO_RUNTIME_CACHE
 
 
+_SWAP_RUNTIME_CACHE = None
+
+
+def _swap_runtime_block() -> str:
+    """The self-contained image-swap runtime <script> lifted from sco_shell.html, for
+    injecting into GUI-shell SCOs — which render the UPLOADED shell (not sco_shell.html)
+    and so otherwise never define window.cfWireSwaps to wire the swap-click listener for
+    an injected image-swap trigger. The shell's GUI runtime re-invokes window.cfWireSwaps
+    AFTER it injects the frame HTML (the triggers/.cf-swap-target image don't exist at
+    parse time under a shell). Cached; '' if unavailable."""
+    global _SWAP_RUNTIME_CACHE
+    if _SWAP_RUNTIME_CACHE is not None:
+        return _SWAP_RUNTIME_CACHE
+    try:
+        src = (Path(__file__).resolve().parent.parent / 'templates' / 'sco_shell.html').read_text(encoding='utf-8')
+    except OSError:
+        _SWAP_RUNTIME_CACHE = ''
+        return ''
+    m = src.find('Image-swap runtime')
+    start = src.rfind('<script>', 0, m) if m != -1 else -1
+    end = src.find('</script>', m) if m != -1 else -1
+    _SWAP_RUNTIME_CACHE = src[start:end + len('</script>')] if (start != -1 and end != -1) else ''
+    return _SWAP_RUNTIME_CACHE
+
+
 def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frames,
                  lesson_name, section_name, frame_map, cf_version, disp_index=None, disp_total=None,
                  content_bg=None, shell_text_mode='auto', project_text_mode='auto', content_h=None):
@@ -2722,6 +2747,10 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     if (!window.fgui) {{ setTimeout(inject, 100); return; }}
     window.fgui.injectContent(FRAME_HTML);
     runInjectedScripts();
+    // Wire image-swap triggers in the freshly injected content. The swap runtime's
+    // own parse-time call ran while #fgui-content was still empty, so re-invoke it
+    // now that FRAME_HTML (triggers + .cf-swap-target image) is in the DOM.
+    try {{ if (window.cfWireSwaps) window.cfWireSwaps(); }} catch(e) {{}}
     window.fgui.setFrameData(FRAME_DATA);
     // Shells built before the setFrameData key-map fix read state.currentFrame,
     // which their old setFrameData never set (it merged 'frameIndex' verbatim) —
@@ -2795,10 +2824,13 @@ def _patch_shell(shell_html, ns_id, injected_html, frame, frame_idx, total_frame
     # Define the iVideo runtime BEFORE cf_runtime so iVideoInit exists when the GUI
     # runtime's inject()/runInjectedScripts re-runs an ivideo block's boot() call.
     iv_runtime = _ivideo_runtime_block()
+    # Define window.cfWireSwaps BEFORE cf_runtime so its inject() can re-wire the
+    # image-swap triggers after it injects FRAME_HTML (parse-time #fgui-content is empty).
+    swap_runtime = _swap_runtime_block()
     if '</body>' in shell_html:
-        shell_html = shell_html.replace('</body>', iv_runtime + cf_runtime + '\n</body>')
+        shell_html = shell_html.replace('</body>', swap_runtime + iv_runtime + cf_runtime + '\n</body>')
     else:
-        shell_html += iv_runtime + cf_runtime
+        shell_html += swap_runtime + iv_runtime + cf_runtime
 
     return shell_html
 
