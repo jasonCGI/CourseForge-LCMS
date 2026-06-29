@@ -1,4 +1,4 @@
-import React, { useCallback, useState, lazy, Suspense } from 'react'
+import React, { useCallback, useState, useRef, lazy, Suspense } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './TextBlock'
@@ -43,6 +43,10 @@ export default function MediaBlock({ block }) {
   const [uploadError, setUploadError] = useState(null)
   const [useVideoJs, setUseVideoJs] = useState(block.data.use_videojs !== false)
   const activeProject = useProjectStore(s => s.activeProject)
+  // Hidden file input behind the chip's "Replace" button — lets an author swap the
+  // file IN PLACE (reusing handleUpload, which only rewrites the asset fields) so
+  // caption / alt text / bounds / fit / dock all survive, instead of Remove + re-add.
+  const replaceInputRef = useRef(null)
 
   const handleUpload = async (file) => {
     if (!activeProject?.id) { setUploadError('No project selected.'); return }
@@ -258,14 +262,32 @@ export default function MediaBlock({ block }) {
               display: 'flex', alignItems: 'center', gap: 10,
             }}>
               <span style={{ fontSize: 20 }}>{KIND_ICON[kind]}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: 'var(--cf-text-primary)', fontWeight: 500 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--cf-text-primary)', fontWeight: 500,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {block.data.original_name || block.data.placeholder_label}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--cf-text-tertiary)' }}>
-                  {block.data.asset_id}
+                <div style={{ fontSize: 11, color: uploadError ? '#E24B4A' : 'var(--cf-text-tertiary)' }}>
+                  {uploading ? 'Replacing…' : (uploadError || block.data.asset_id)}
                 </div>
               </div>
+              {/* Hidden picker driving the in-place Replace (keeps caption/alt/bounds). */}
+              <input
+                ref={replaceInputRef}
+                type="file"
+                accept={kind === 'image' ? 'image/*' : kind === 'video' ? 'video/*' : 'audio/*'}
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files && e.target.files[0]; if (f) handleUpload(f); e.target.value = '' }}
+              />
+              <button
+                onClick={() => replaceInputRef.current && replaceInputRef.current.click()}
+                disabled={uploading}
+                aria-label={`Replace ${kind} (keeps caption, alt text, and bounds)`}
+                title="Replace the file in place — keeps caption, alt text, bounds & fit"
+                style={{ background:'none', border:'1px solid var(--cf-border-secondary)',
+                  color:'var(--cf-text-secondary)', cursor: uploading ? 'wait' : 'pointer',
+                  fontSize:12, padding:'4px 10px', borderRadius:4, fontFamily:'var(--font-sans)', whiteSpace:'nowrap' }}
+              >⤢ Replace</button>
               <button
                 onClick={() => { update('asset_id', null); update('serve_url', null); update('asset_meta', null) }}
                 aria-label="Remove media asset"
