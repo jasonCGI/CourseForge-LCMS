@@ -159,15 +159,16 @@
 .cf-btn--on { border-color: var(--forge-amber) !important; color: var(--forge-amber) !important; }
 
 /* ── Amber toggles on the navy preview header (Edit⇄Published, GUI on/off) ──
-   The resting (off) state is ghost-like — transparent fill, amber text, a faint
-   amber hairline; hover adds an amber tint; the on state fills amber. ~1:3 padding. */
+   The resting (off) state is ghost-like — transparent fill + transparent border
+   (alpha 0, no outline; the 1px is kept only so the box doesn't shift when the
+   on state fills), amber text; hover adds an amber tint; on fills amber. ~1:3 pad. */
 .cf-seg { display: inline-flex; flex-shrink: 0; }
 .cf-seg__btn, .cf-toggle {
   font-family: var(--forge-font, 'IBM Plex Mono', monospace);
   font-size: 10px; font-weight: 600; letter-spacing: 0.06em; line-height: 1;
   padding: 4px 12px; cursor: pointer; background: transparent;
   color: var(--forge-amber, #D4820A);
-  border: 1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent);
+  border: 1px solid transparent;
   transition: background .12s, color .12s, box-shadow .12s, transform .06s;
 }
 .cf-seg__btn:first-child { border-radius: 5px 0 0 5px; border-right-width: 0; }
