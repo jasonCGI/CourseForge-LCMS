@@ -230,8 +230,10 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
-  // Add a new block
-  addBlock: (type) => {
+  // Add a new block. `index` (optional) inserts the block at that position in the
+  // blocks array — used by the drag-to-add quick-block path to drop at a spot.
+  // Omitted/out-of-range → append (the + Add block popover and paste path).
+  addBlock: (type, index) => {
     const { activeFrame } = get()
     if (!activeFrame) return
 
@@ -243,12 +245,15 @@ const useEditorStore = create((set, get) => ({
     if (isBlockTypeBlocked(activeFrame, type)) return
 
     const newBlock = _makeBlock(type)
+    const blocks = [...activeFrame.content.blocks]
+    if (Number.isInteger(index) && index >= 0 && index <= blocks.length) {
+      blocks.splice(index, 0, newBlock)
+    } else {
+      blocks.push(newBlock)
+    }
     const updatedFrame = {
       ...activeFrame,
-      content: {
-        ...activeFrame.content,
-        blocks: [...activeFrame.content.blocks, newBlock]
-      }
+      content: { ...activeFrame.content, blocks }
     }
     set({ activeFrame: updatedFrame, isDirty: true })
     get()._scheduleAutosave()
@@ -445,6 +450,14 @@ const useEditorStore = create((set, get) => ({
     if (j < 0 || j >= items.length) return
     ;[items[i], items[j]] = [items[j], items[i]]
     get()._setMenu({ ...m, items })
+  },
+  // Replace the menu items array wholesale (drag-to-reorder writes the dnd-kit
+  // arrayMove result here). Order is data-driven, so editor + in-canvas preview +
+  // server render_menu_html all reflect this new order with no markup change.
+  reorderMenuItems: (newItems) => {
+    if (!Array.isArray(newItems)) return
+    const m = get()._menu()
+    get()._setMenu({ ...m, items: newItems })
   },
 
   // Manual save

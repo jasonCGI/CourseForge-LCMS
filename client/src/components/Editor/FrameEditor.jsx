@@ -1,15 +1,16 @@
-import React, { useMemo, lazy, Suspense } from 'react'
+import React, { useMemo, useState, lazy, Suspense } from 'react'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
-  useSensor, useSensors,
+  useSensor, useSensors, useDraggable, useDroppable, MeasuringStrategy,
 } from '@dnd-kit/core'
 import {
   SortableContext, sortableKeyboardCoordinates,
   verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import useEditorStore from '../../store/editorStore'
+import useEditorStore, { PRIMARY_TYPES, MEDIA_TYPES, resolveExclusivity } from '../../store/editorStore'
 import useClipboardStore from '../../store/clipboardStore'
+import { BLOCK_TYPES } from './BlockToolbar'
 import { countWords, formatTime } from '../../utils/wordCount'
 import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
@@ -115,6 +116,102 @@ function SortableBlock({ block }) {
   )
 }
 
+// ── Drag-to-add quick-block ────────────────────────────────────────────────
+// A draggable chip per block type (reuses BLOCK_TYPES icon/label/color). Dragging
+// a chip onto a gap in the block list inserts that block at that position; a plain
+// click appends (keyboard parity — native button Enter/Space). Blocked types
+// (layout exclusivity) are greyed and non-draggable, mirroring the + Add block
+// popover. Lives inside FrameEditor's DndContext so chips + gaps share it.
+function BlockChip({ chip }) {
+  const addBlock = useEditorStore(s => s.addBlock)
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `chip-${chip.type}`,
+    data: { kind: 'chip', type: chip.type },
+    disabled: !chip.enabled,
+  })
+  // Keep pointer-drag listeners but route keyboard to a plain append (so a focused
+  // chip is operable from the keyboard without fighting the dnd keyboard sensor;
+  // the fully keyboard-accessible path remains the + Add block popover).
+  const onKeyDown = (e) => {
+    if (!chip.enabled) return
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addBlock(chip.type) }
+  }
+  const Icon = chip.Icon
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      onKeyDown={onKeyDown}
+      onClick={() => chip.enabled && addBlock(chip.type)}
+      disabled={!chip.enabled}
+      aria-label={chip.enabled ? `Add ${chip.label} block (drag to position, or click to append)` : `${chip.label} — ${chip.reason}`}
+      title={chip.enabled ? `Drag onto the frame to add a ${chip.label} block (click = append)` : chip.reason || ''}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+        padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+        fontFamily: 'var(--cf-font)', whiteSpace: 'nowrap',
+        background: chip.enabled ? 'var(--cf-block-bg, #0d1017)' : 'transparent',
+        border: `1px solid ${chip.enabled ? 'var(--cf-border-secondary, #3a3a5a)' : 'var(--cf-border-tertiary, rgba(255,255,255,0.08))'}`,
+        color: chip.enabled ? 'var(--cf-text-primary, #E0E8F0)' : 'var(--cf-text-tertiary, #5a6a80)',
+        cursor: chip.enabled ? (isDragging ? 'grabbing' : 'grab') : 'not-allowed',
+        opacity: isDragging ? 0.4 : (chip.enabled ? 1 : 0.5),
+        transform: transform ? CSS.Translate.toString(transform) : undefined,
+        userSelect: 'none', touchAction: 'none',
+      }}
+    >
+      {Icon && (
+        <span aria-hidden="true" style={{ color: chip.enabled ? chip.color : 'inherit', display: 'inline-flex', flexShrink: 0 }}>
+          <Icon width={13} height={13} />
+        </span>
+      )}
+      <span>{chip.label}</span>
+    </button>
+  )
+}
+
+// The horizontal "Drag to add" chip rail shown above the toolbar. Resolves each
+// chip's enabled state from the frame's layout exclusivity (same rule the popover
+// uses) so blocked types can't be dragged in.
+function QuickAddRail({ frame }) {
+  const ex = resolveExclusivity(frame)
+  const chips = BLOCK_TYPES.map(b => {
+    const isPrimary = PRIMARY_TYPES.includes(b.type)
+    const isMedia   = MEDIA_TYPES.includes(b.type)
+    const blocked   = (isPrimary && ex.primaryBlocked) || (isMedia && ex.mediaBlocked)
+    const enabled   = b.available && !blocked
+    const reason    = !b.available ? 'Available in Sprint 4'
+      : blocked ? (ex.reason || (isPrimary ? ex.primaryReason : ex.mediaReason)) : null
+    return { ...b, enabled, reason }
+  })
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px',
+      borderTop: '1px solid var(--color-border-tertiary)',
+      background: 'var(--color-background-secondary)', overflowX: 'auto',
+    }}>
+      <span aria-hidden="true" style={{
+        flexShrink: 0, fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
+        textTransform: 'uppercase', color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+      }}>⠿ Drag to add</span>
+      {chips.map(c => <BlockChip key={c.type} chip={c} />)}
+    </div>
+  )
+}
+
+// A drop slot between blocks (insertion point) for the chip drag. Only rendered
+// while a chip is being dragged; shows an amber insertion line when hovered.
+function GapDrop({ index }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `gap-${index}`, data: { kind: 'gap', index } })
+  return (
+    <div ref={setNodeRef} style={{
+      height: isOver ? 22 : 10, margin: '1px 0', borderRadius: 5,
+      border: `2px dashed ${isOver ? 'var(--forge-amber)' : 'transparent'}`,
+      background: isOver ? 'color-mix(in srgb, var(--forge-amber) 14%, transparent)' : 'transparent',
+      transition: 'height 0.1s, background 0.1s',
+    }} />
+  )
+}
+
 function FrameTotals({ blocks }) {
   const { body, script } = useMemo(() => {
     const texts = (blocks || []).filter(b => b.type === 'text')
@@ -141,9 +238,15 @@ export default function FrameEditor() {
   const previewOpen   = useEditorStore(s => s.previewOpen)
   const setPreviewOpen = useEditorStore(s => s.setPreviewOpen)
   const reorderBlocks = useEditorStore(s => s.reorderBlocks)
+  const addBlock      = useEditorStore(s => s.addBlock)
   const pasteBlock    = useEditorStore(s => s.pasteBlock)
   const copiedBlock   = useClipboardStore(s => s.copiedBlock)
   const clearClipboard = useClipboardStore(s => s.clearClipboard)
+
+  // Non-null while a quick-add chip is being dragged (holds the block type). Drives
+  // the insertion-gap dropzones, which only exist during a chip drag so they never
+  // interfere with block-reorder collision detection.
+  const [draggingChip, setDraggingChip] = useState(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -170,8 +273,27 @@ export default function FrameEditor() {
 
   const blocks = activeFrame.content?.blocks || []
 
+  const handleDragStart = ({ active }) => {
+    if (active.data.current?.kind === 'chip') setDraggingChip(active.data.current.type)
+  }
+
   const handleDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return
+    setDraggingChip(null)
+    if (!over) return
+    // Quick-add chip → insert a new block at the resolved position.
+    if (active.data.current?.kind === 'chip') {
+      const type = active.data.current.type
+      let index
+      if (over.data.current?.kind === 'gap') index = over.data.current.index
+      else {
+        const bi = blocks.findIndex(b => b.id === over.id)
+        index = bi < 0 ? blocks.length : bi   // over a block → insert before it
+      }
+      addBlock(type, index)   // store re-checks exclusivity as a guard
+      return
+    }
+    // Otherwise a block reorder.
+    if (active.id === over.id) return
     const oldIdx = blocks.findIndex(b => b.id === active.id)
     const newIdx = blocks.findIndex(b => b.id === over.id)
     if (oldIdx < 0 || newIdx < 0) return
@@ -179,6 +301,14 @@ export default function FrameEditor() {
   }
 
   return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setDraggingChip(null)}
+    >
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         <FrameLayout frame={activeFrame} />
@@ -202,22 +332,32 @@ export default function FrameEditor() {
           </div>
         )}
         {blocks.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
-            No blocks yet — use the toolbar below to add content.
-          </div>
+          draggingChip ? (
+            <GapDrop index={0} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+              No blocks yet — use the toolbar below to add content, or drag a block from the rail.
+            </div>
+          )
         )}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-            {blocks.map(block => <SortableBlock key={block.id} block={block} />)}
-          </SortableContext>
-        </DndContext>
+        <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+          {draggingChip && blocks.length > 0 && <GapDrop index={0} />}
+          {blocks.map((block, i) => (
+            <React.Fragment key={block.id}>
+              <SortableBlock block={block} />
+              {draggingChip && <GapDrop index={i + 1} />}
+            </React.Fragment>
+          ))}
+        </SortableContext>
 
         <FrameTotals blocks={blocks} />
       </div>
 
+      <QuickAddRail frame={activeFrame} />
       <BlockToolbar />
 
       {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)} />}
     </div>
+    </DndContext>
   )
 }
