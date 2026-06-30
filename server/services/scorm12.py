@@ -11,6 +11,7 @@ import re
 import uuid
 import zipfile
 import json
+import random
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -1081,6 +1082,312 @@ def _callout_overlay_html(data):
     )
 
 
+# ════════════════════════════════════════════════════════════════════════
+#  Interactive quiz types (drag_drop / sequencing / fill_blank)
+#
+#  These are PUBLISHED, server-rendered quizzes whose behavior is fully self-
+#  contained (HTML + one guarded global <script>), so the SAME output works in
+#  the SCORM 1.2 / 2004 SCO, the server live preview, and the web export — and
+#  it stays a renderer-twin with the React live preview (FramePreview.jsx
+#  PreviewQuiz*). No React, no framework: HTML5 drag-and-drop for pointer users,
+#  plus a full keyboard path (select/place, pick-up/arrow-move) and ARIA. Score
+#  is reported to the SCORM API exactly like the MC quiz: 100 when fully correct,
+#  else 0 (cmi.core.score.raw / cmi.score.raw), found by walking the frame tree.
+#
+#  multiple_choice is unchanged (it uses the shell's cfSubmitQuiz/cfSelectChoice).
+# ════════════════════════════════════════════════════════════════════════
+
+_QUIZ_CSS = """<style id="cf-iq-css">
+.cf-iq{margin:8px 0 20px}
+.cf-iq-prompt{font-size:15px;font-weight:600;color:#042C53;margin:0 0 6px}
+.cf-iq-hint{font-size:12px;color:#666;margin:0 0 12px}
+.cf-iq-bank{display:flex;flex-wrap:wrap;gap:8px;min-height:46px;border:2px dashed #ccc;border-radius:8px;padding:10px;background:#fff;margin-bottom:12px}
+.cf-iq-bank.cf-over{border-color:#185FA5;background:#EAF1FB}
+.cf-iq-item{padding:7px 11px;border:2px solid #185FA5;border-radius:6px;background:#fff;color:#042C53;font:600 13px/1 inherit;cursor:grab}
+.cf-iq-item[aria-pressed=true]{border-color:#D4820A;background:#FFF6E6}
+.cf-iq-item:focus-visible,.cf-iq-target:focus-visible,.cf-iq-row button:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
+.cf-iq-targets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px}
+.cf-iq-target{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;border:2px dashed #bcd;border-radius:8px;padding:10px;min-height:60px;background:#fff;color:#042C53;cursor:pointer;font:inherit}
+.cf-iq-target.cf-over{border-color:#185FA5;background:#EAF1FB}
+.cf-iq-tlabel{font-size:12px;font-weight:700;color:#185FA5}
+.cf-iq-occ{font-size:13px;font-weight:600}
+.cf-iq-occ.cf-empty{color:#aaa;font-weight:400}
+.cf-iq-target.cf-ok{border-style:solid;border-color:#3B8A4A;background:#EAF6EC}
+.cf-iq-target.cf-bad{border-style:solid;border-color:#C0392B;background:#FDECEA}
+.cf-iq-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.cf-iq-num{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px/1 inherit}
+.cf-iq-row>button{flex:1;display:flex;align-items:center;gap:8px;text-align:left;padding:10px 14px;border:2px solid #cdd6e0;border-radius:6px;background:#fff;color:#042C53;font:500 14px/1.3 inherit;cursor:grab}
+.cf-iq-row>button[aria-grabbed=true]{border-color:#D4820A;background:#FFF6E6;box-shadow:0 2px 8px rgba(212,130,10,.3)}
+.cf-iq-row>button.cf-ok{border-color:#3B8A4A;background:#EAF6EC}
+.cf-iq-row>button.cf-bad{border-color:#C0392B;background:#FDECEA}
+.cf-iq-grip{color:#9aa7b4;font-size:16px}
+.cf-fbq-text{font-size:15px;line-height:2;color:#042C53;margin:0 0 14px}
+.cf-fbq-blank{margin:0 4px;padding:3px 6px;border:2px solid #185FA5;border-radius:5px;font:14px inherit;color:#042C53;background:#fff}
+.cf-fbq-blank.cf-ok{border-color:#3B8A4A}
+.cf-fbq-blank.cf-bad{border-color:#C0392B}
+.cf-iq-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.cf-iq-btn{padding:8px 20px;border-radius:4px;font:600 13px/1 inherit;cursor:pointer;border:1px solid #185FA5}
+.cf-iq-btn.cf-primary{background:#185FA5;color:#fff}
+.cf-iq-btn.cf-ghost{background:transparent;color:#185FA5}
+.cf-iq-btn:disabled{opacity:.5;cursor:default}
+.cf-iq-btn:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
+.cf-iq-attempts{font-size:12px;color:#7a5b00}
+.cf-iq-feedback{display:none;margin-top:14px;padding:10px 14px;border-radius:6px;font:500 13px/1.4 inherit}
+.cf-iq-feedback.cf-ok{display:block;background:#EAF6EC;color:#1E7E34;border:1px solid #3B8A4A}
+.cf-iq-feedback.cf-bad{display:block;background:#FDECEA;color:#C0392B;border:1px solid #C0392B}
+</style>"""
+
+_QUIZ_RUNTIME_JS = r"""<script>
+if(!window.cfQuizInit){
+window.cfQuizReport=function(score){
+  function find(n){var w=window;for(var i=0;i<8&&w;i++){try{if(w[n])return w[n];}catch(e){}if(w===w.parent)break;w=w.parent;}try{if(window.opener&&window.opener[n])return window.opener[n];}catch(e){}return null;}
+  var a12=find('API'),a04=find('API_1484_11');
+  try{if(a12)a12.LMSSetValue('cmi.core.score.raw',String(score));}catch(e){}
+  try{if(a04)a04.SetValue('cmi.score.raw',String(score));}catch(e){}
+};
+window.cfQuizShuffle=function(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;};
+function cfqAttempts(cfg,state,root){
+  var span=root.querySelector('.cf-iq-attempts');
+  var left=cfg.attempts-state.used;
+  if(state.done||left>=cfg.attempts){span.textContent='';}
+  else{span.textContent=left+(left===1?' attempt left':' attempts left');}
+}
+function cfqFeedback(cfg,root,ok){
+  var fb=root.querySelector('.cf-iq-feedback');
+  fb.className='cf-iq-feedback '+(ok?'cf-ok':'cf-bad');
+  fb.textContent=ok?cfg.fbCorrect:cfg.fbWrong;
+}
+function cfqFinish(cfg,state,root,ok){
+  if(ok){window.cfQuizReport(100);state.done=true;}
+  else{state.used++;window.cfQuizReport(0);if(state.used>=cfg.attempts)state.done=true;}
+  cfqFeedback(cfg,root,ok);cfqAttempts(cfg,state,root);
+}
+
+// ── drag_drop (match item → target) ─────────────────────────────
+function cfqInitDnd(root,cfg){
+  var bank=root.querySelector('.cf-iq-bank');
+  var targets=root.querySelectorAll('.cf-iq-target');
+  var check=root.querySelector('.cf-iq-check');
+  var state={place:{},sel:null,used:0,done:false};
+  var order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();
+  function occupant(tid){for(var k in state.place){if(state.place[k]===tid)return k;}return null;}
+  function mkItem(id){
+    var b=document.createElement('button');b.type='button';b.className='cf-iq-item';
+    b.setAttribute('data-id',id);b.setAttribute('draggable','true');b.setAttribute('aria-pressed','false');
+    b.textContent=cfg.items[id];
+    b.addEventListener('click',function(){if(state.done)return;state.sel=(state.sel===id?null:id);render();});
+    b.addEventListener('dragstart',function(e){if(state.done){e.preventDefault();return;}e.dataTransfer.setData('text/plain',id);});
+    return b;
+  }
+  function place(id,tid){var occ=occupant(tid);if(occ)delete state.place[occ];state.place[id]=tid;state.sel=null;}
+  function render(){
+    bank.innerHTML='';
+    order.forEach(function(id){if(state.place[id])return;var b=mkItem(id);if(state.sel===id)b.setAttribute('aria-pressed','true');bank.appendChild(b);});
+    targets.forEach(function(t){
+      var tid=t.getAttribute('data-id');var occ=occupant(tid);
+      var occEl=t.querySelector('.cf-iq-occ');
+      occEl.textContent=occ?cfg.items[occ]:'— empty —';
+      occEl.className='cf-iq-occ'+(occ?'':' cf-empty');
+      t.classList.remove('cf-ok','cf-bad');
+      if(state.done&&occ!=null)t.classList.add(cfg.correct[occ]===tid?'cf-ok':'cf-bad');
+    });
+    var all=order.every(function(id){return state.place[id];});
+    check.disabled=!all||state.done;
+  }
+  targets.forEach(function(t){
+    var tid=t.getAttribute('data-id');
+    t.addEventListener('click',function(){
+      if(state.done)return;
+      if(state.sel){place(state.sel,tid);}
+      else{var occ=occupant(tid);if(occ){delete state.place[occ];state.sel=occ;}}
+      render();
+    });
+    t.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();t.classList.add('cf-over');});
+    t.addEventListener('dragleave',function(){t.classList.remove('cf-over');});
+    t.addEventListener('drop',function(e){e.preventDefault();t.classList.remove('cf-over');if(state.done)return;var id=e.dataTransfer.getData('text/plain');if(id){place(id,tid);render();}});
+  });
+  bank.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();bank.classList.add('cf-over');});
+  bank.addEventListener('dragleave',function(){bank.classList.remove('cf-over');});
+  bank.addEventListener('drop',function(e){e.preventDefault();bank.classList.remove('cf-over');if(state.done)return;var id=e.dataTransfer.getData('text/plain');if(id){delete state.place[id];render();}});
+  check.addEventListener('click',function(){
+    if(state.done)return;
+    var ok=order.every(function(id){return state.place[id]===cfg.correct[id];});
+    cfqFinish(cfg,state,root,ok);render();
+  });
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.place={};state.sel=null;state.used=0;state.done=false;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
+  render();
+}
+
+// ── sequencing (order the rows) ─────────────────────────────────
+function cfqInitSeq(root,cfg){
+  var list=root.querySelector('.cf-iq-list');
+  var state={order:cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice(),used:0,done:false,grabbed:null};
+  function move(id,dir){var i=state.order.indexOf(id);var j=i+dir;if(j<0||j>=state.order.length)return;var a=state.order;var t=a[i];a[i]=a[j];a[j]=t;}
+  function render(){
+    list.innerHTML='';
+    state.order.forEach(function(id,idx){
+      var row=document.createElement('div');row.className='cf-iq-row';
+      var num=document.createElement('span');num.className='cf-iq-num';num.setAttribute('aria-hidden','true');num.textContent=(idx+1);
+      var b=document.createElement('button');b.type='button';b.setAttribute('data-id',id);b.setAttribute('draggable','true');b.setAttribute('aria-grabbed','false');
+      b.setAttribute('aria-label','Position '+(idx+1)+': '+cfg.items[id]+'. Press Enter to pick up, arrow keys to move, Enter to drop.');
+      var grip=document.createElement('span');grip.className='cf-iq-grip';grip.setAttribute('aria-hidden','true');grip.textContent='⠿';
+      b.appendChild(grip);b.appendChild(document.createTextNode(cfg.items[id]));
+      if(state.done){/* coloring applied after check below */}
+      if(state.grabbed===id)b.setAttribute('aria-grabbed','true');
+      b.addEventListener('click',function(){if(state.done)return;state.grabbed=(state.grabbed===id?null:id);render();focusId(id);});
+      b.addEventListener('keydown',function(e){
+        if(state.done)return;
+        if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+          if(state.grabbed!==id)return;e.preventDefault();move(id,e.key==='ArrowUp'?-1:1);render();focusId(id);
+        }
+      });
+      b.addEventListener('dragstart',function(e){if(state.done){e.preventDefault();return;}e.dataTransfer.setData('text/plain',id);});
+      b.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();});
+      b.addEventListener('drop',function(e){e.preventDefault();if(state.done)return;var src=e.dataTransfer.getData('text/plain');if(!src||src===id)return;var a=state.order;a.splice(a.indexOf(src),1);a.splice(a.indexOf(id),0,src);render();});
+      row.appendChild(num);row.appendChild(b);list.appendChild(row);
+    });
+  }
+  function focusId(id){var el=list.querySelector('button[data-id="'+id+'"]');if(el)el.focus();}
+  root.querySelector('.cf-iq-check').addEventListener('click',function(){
+    if(state.done)return;
+    var ok=state.order.every(function(id,i){return id===cfg.correct[i];});
+    var btns=list.querySelectorAll('button');
+    state.order.forEach(function(id,i){btns[i].classList.add(id===cfg.correct[i]?'cf-ok':'cf-bad');});
+    cfqFinish(cfg,state,root,ok);
+  });
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();state.used=0;state.done=false;state.grabbed=null;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
+  render();
+}
+
+// ── fill_blank (inline selects) ─────────────────────────────────
+function cfqInitFb(root,cfg){
+  var selects=root.querySelectorAll('.cf-fbq-blank');
+  var check=root.querySelector('.cf-iq-check');
+  var state={used:0,done:false};
+  function allAnswered(){for(var i=0;i<selects.length;i++){if(!selects[i].value)return false;}return true;}
+  function sync(){check.disabled=!allAnswered()||state.done;}
+  selects.forEach(function(s){s.addEventListener('change',function(){s.classList.remove('cf-ok','cf-bad');sync();});});
+  check.addEventListener('click',function(){
+    if(state.done)return;var ok=true;
+    selects.forEach(function(s){var good=s.value===s.getAttribute('data-correct');s.classList.add(good?'cf-ok':'cf-bad');if(!good)ok=false;});
+    cfqFinish(cfg,state,root,ok);if(state.done)selects.forEach(function(s){s.disabled=true;});
+  });
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.used=0;state.done=false;selects.forEach(function(s){s.value='';s.disabled=false;s.classList.remove('cf-ok','cf-bad');});root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';sync();});
+  sync();
+}
+
+window.cfQuizInit=function(bid){
+  var root=document.getElementById('iq-'+bid);if(!root||root.__cfInit)return;root.__cfInit=1;
+  var cfgEl=document.getElementById('cfq-cfg-'+bid);if(!cfgEl)return;
+  var cfg;try{cfg=JSON.parse(cfgEl.textContent);}catch(e){return;}
+  if(cfg.qtype==='drag_drop')cfqInitDnd(root,cfg);
+  else if(cfg.qtype==='sequencing')cfqInitSeq(root,cfg);
+  else if(cfg.qtype==='fill_blank')cfqInitFb(root,cfg);
+};
+}
+</script>"""
+
+
+def _quiz_cfg_json(cfg):
+    """JSON for a quiz config, < escaped so it can't break out of the JSON
+    <script> tag (json.dumps is ensure_ascii, so U+2028/2029 are escaped too)."""
+    return json.dumps(cfg).replace('<', '\\u003c')
+
+
+def _render_quiz_interactive(data, safe_bid):
+    """Build the published HTML (+ guarded runtime) for a drag_drop / sequencing /
+    fill_blank quiz. Returns the HTML string. qtype is taken from data."""
+    qtype = data.get('qtype', 'multiple_choice')
+    attempts = data.get('attempts_allowed', 2)
+    try:
+        attempts = max(1, int(attempts))
+    except (TypeError, ValueError):
+        attempts = 2
+    fb_correct = data.get('feedback_correct', 'Correct!')
+    fb_wrong   = data.get('feedback_incorrect', 'Incorrect — please review.')
+    randomize  = bool(data.get('randomize', False))
+    prompt = esc(data.get('prompt', data.get('question', '')))
+
+    actions = (
+        '<div class="cf-iq-actions">'
+        '<button type="button" class="cf-iq-btn cf-primary cf-iq-check">Check</button>'
+        '<button type="button" class="cf-iq-btn cf-ghost cf-iq-reset">Reset</button>'
+        '<span class="cf-iq-attempts" aria-live="polite"></span></div>'
+        '<div class="cf-iq-feedback" role="status" aria-live="polite"></div>'
+    )
+
+    if qtype == 'drag_drop':
+        items   = data.get('items', [])
+        targets = data.get('targets', [])
+        correct = data.get('correct', {})
+        item_map = {str(i.get('id')): i.get('label', '') for i in items}
+        order = [str(i.get('id')) for i in items]
+        cfg = {'qtype': 'drag_drop', 'items': item_map, 'order': order,
+               'correct': {str(k): str(v) for k, v in correct.items()},
+               'randomize': randomize, 'attempts': attempts,
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+        targets_html = ''.join(
+            f'<button type="button" class="cf-iq-target" data-id="{esc(str(t.get("id")))}">'
+            f'<span class="cf-iq-tlabel">{esc(t.get("label",""))}</span>'
+            f'<span class="cf-iq-occ cf-empty">— empty —</span></button>'
+            for t in targets
+        )
+        body = (
+            f'<p class="cf-iq-hint">Drag an item onto a target — or select an item, then choose a '
+            f'target. Fully keyboard operable.</p>'
+            f'<div class="cf-iq-bank" role="list" aria-label="Item bank"></div>'
+            f'<div class="cf-iq-targets">{targets_html}</div>'
+        )
+    elif qtype == 'sequencing':
+        items = data.get('items', [])
+        correct_order = data.get('correct_order') or [str(i.get('id')) for i in items]
+        item_map = {str(i.get('id')): i.get('label', '') for i in items}
+        order = [str(i.get('id')) for i in items]
+        cfg = {'qtype': 'sequencing', 'items': item_map, 'order': order,
+               'correct': [str(x) for x in correct_order],
+               'randomize': randomize, 'attempts': attempts,
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+        body = (
+            f'<p class="cf-iq-hint">Drag the rows into order — or focus a row, press Enter to pick it '
+            f'up, move with the arrow keys, and Enter to drop.</p>'
+            f'<div class="cf-iq-list"></div>'
+        )
+    else:  # fill_blank
+        segments = data.get('segments', [])
+        n = 0
+        runs = []
+        for seg in segments:
+            if seg.get('type') == 'blank':
+                n += 1
+                opts = list(seg.get('options', []))
+                if randomize:
+                    random.shuffle(opts)
+                correct_val = seg.get('correct', '')
+                opt_html = '<option value="">— choose —</option>' + ''.join(
+                    f'<option value="{esc(o)}">{esc(o)}</option>' for o in opts
+                )
+                runs.append(
+                    f'<select class="cf-fbq-blank" aria-label="Blank {n}" '
+                    f'data-correct="{esc(correct_val)}">{opt_html}</select>'
+                )
+            else:
+                runs.append(esc(seg.get('text', '')))
+        cfg = {'qtype': 'fill_blank', 'randomize': randomize, 'attempts': attempts,
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+        body = f'<p class="cf-fbq-text">{"".join(runs)}</p>'
+
+    prompt_html = f'<p class="cf-iq-prompt">{prompt}</p>' if prompt else ''
+    return (
+        _QUIZ_CSS
+        + f'<div class="cf-iq" id="iq-{safe_bid}">'
+        + prompt_html + body + actions
+        + '</div>'
+        + f'<script type="application/json" id="cfq-cfg-{safe_bid}">{_quiz_cfg_json(cfg)}</script>'
+        + _QUIZ_RUNTIME_JS
+        + f'<script>cfQuizInit("{safe_bid}");</script>'
+    )
+
+
 def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None, shelled=False,
                    preview=False, layout=None, branch_resolve=None, content_h=None):
     """Convert block list to HTML string.
@@ -1462,8 +1769,18 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif btype == 'quiz':
             safe_bid = esc(bid)
+            qtype = data.get('qtype', 'multiple_choice')
+            if qtype in ('drag_drop', 'sequencing', 'fill_blank'):
+                parts.append(_render_quiz_interactive(data, safe_bid))
+                continue
+            # ── multiple_choice (default) ──
+            # Optionally shuffle the DISPLAY order; data-index stays the ORIGINAL
+            # index so the shell's cfSubmitQuiz(correctIndex) still scores correctly.
+            choice_order = list(enumerate(data.get('choices', [])))
+            if data.get('randomize'):
+                random.shuffle(choice_order)
             choices_html = ''
-            for i, choice in enumerate(data.get('choices', [])):
+            for i, choice in choice_order:
                 choices_html += (
                     f'<button class="cf-choice" data-index="{i}" '
                     f'onclick="cfSelectChoice(\'{safe_bid}\', this)">'

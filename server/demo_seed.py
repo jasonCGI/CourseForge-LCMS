@@ -140,11 +140,71 @@ def _callout(text='Callout', box=None, target=None, padding=10, anchor='auto'):
         'target': target or {'x': 32, 'y': 32}, 'padding': padding, 'anchor': anchor}}
 
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
-          feedback_incorrect='Not quite — review and try again.'):
+          feedback_incorrect='Not quite — review and try again.', randomize=False):
     return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
+        'qtype': 'multiple_choice',
         'question': question, 'choices': choices, 'correct_index': correct_index,
+        'randomize': randomize,
         'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
         'attempts_allowed': 2}}
+
+def _quiz_dd(prompt, pairs, feedback_correct='Correct! Every match is right.',
+             feedback_incorrect='Not quite — review the matches and try again.',
+             randomize=True, attempts_allowed=2):
+    # Drag-and-drop "match each item to its target/bucket" interaction.
+    # `pairs` is a list of (item_label, target_label) tuples; each item must land
+    # in its paired target. Items and targets are addressed by stable ids so the
+    # correct mapping survives any presentation-order shuffle (randomize).
+    items, targets, correct = [], [], {}
+    for item_label, target_label in pairs:
+        iid = str(uuid.uuid4()); tid = str(uuid.uuid4())
+        items.append({'id': iid, 'label': item_label})
+        targets.append({'id': tid, 'label': target_label})
+        correct[iid] = tid
+    return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
+        'qtype': 'drag_drop',
+        'prompt': prompt, 'items': items, 'targets': targets, 'correct': correct,
+        'randomize': randomize,
+        'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
+        'attempts_allowed': attempts_allowed}}
+
+def _quiz_seq(prompt, ordered_labels, feedback_correct='Correct! That is the right order.',
+              feedback_incorrect='Not quite — reorder the steps and try again.',
+              randomize=True, attempts_allowed=2):
+    # Sequencing interaction: drag rows up/down into the correct order.
+    # `ordered_labels` is the list of step labels in their CORRECT order; the
+    # correct_order list of item ids preserves that answer independent of the
+    # shuffled presentation order.
+    items = [{'id': str(uuid.uuid4()), 'label': lbl} for lbl in ordered_labels]
+    return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
+        'qtype': 'sequencing',
+        'prompt': prompt, 'items': items,
+        'correct_order': [it['id'] for it in items],
+        'randomize': randomize,
+        'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
+        'attempts_allowed': attempts_allowed}}
+
+def _quiz_fb(segments, feedback_correct='Correct! Every blank is filled in right.',
+             feedback_incorrect='Not quite — review the blanks and try again.',
+             randomize=False, attempts_allowed=2):
+    # Fill-in-the-blank via inline dropdowns. `segments` is an ordered list mixing
+    # text and blank dicts:
+    #   {'text': '...'}                                   -> a literal text run
+    #   {'options': [...], 'correct': '...'}              -> an inline <select> blank
+    # Each blank is scored against the multiple_choice path: correct = the chosen
+    # option value equals the blank's `correct` value. Blank ids are assigned here.
+    out = []
+    for seg in segments:
+        if 'options' in seg:
+            out.append({'type': 'blank', 'id': str(uuid.uuid4()),
+                        'options': list(seg['options']), 'correct': seg['correct']})
+        else:
+            out.append({'type': 'text', 'text': seg.get('text', '')})
+    return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
+        'qtype': 'fill_blank',
+        'segments': out, 'randomize': randomize,
+        'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
+        'attempts_allowed': attempts_allowed}}
 
 def _hotspot(regions=None):
     return {'id': str(uuid.uuid4()), 'type': 'hotspot', 'data': {
@@ -346,9 +406,9 @@ in this course comes back to dialing it in.</p>''',
     ]},
 
     # ── Assessment Blocks ──
-    {'name': 'Quiz Block', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
-        _text(body='<h2>Quiz Block</h2><p>Test your understanding of espresso fundamentals. Select the '
-                   'best answer and click Submit. You have two attempts.</p>',
+    {'name': 'Quiz Block — Multiple Choice', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
+        _text(body='<h2>Quiz Block — Multiple Choice</h2><p>Test your understanding of espresso fundamentals. '
+                   'Select the best answer and click Submit. You have two attempts.</p>',
               narration='Test your understanding with this knowledge check. Select the best answer and '
                         'click Submit. You have two attempts.'),
         _quiz(
@@ -367,6 +427,69 @@ in this course comes back to dialing it in.</p>''',
             feedback_incorrect='Not quite. A fast, sour shot is under-extracted. The fix is a finer grind to '
                                'slow the flow toward 25–30 seconds — hotter water or a longer pull won\'t '
                                'correct a grind that is letting water race through.'),
+    ]},
+    {'name': 'Quiz Block — Drag and Drop', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
+        _text(body='<h2>Quiz Block — Drag and Drop</h2><p>Match each brew method to its standard '
+                   'water-to-coffee ratio. Drag a method onto the correct ratio — or, using only the '
+                   'keyboard, select a method with Enter then choose a ratio with Enter. Click Check when '
+                   'every method is placed.</p>',
+              narration='Match each brew method to its standard water-to-coffee ratio. Drag a method onto the '
+                        'correct ratio, then click Check.'),
+        _quiz_dd(
+            prompt='Match each brew method to its standard water-to-coffee ratio.',
+            pairs=[
+                ('Espresso',     '1:2 — concentrated shot'),
+                ('Pour-over',    '1:16 — bright filter cup'),
+                ('French press', '1:12 — full-bodied immersion'),
+                ('Cold brew',    '1:8 — steeped concentrate'),
+            ],
+            feedback_correct='Correct! Espresso runs tight at about 1:2, pour-over opens up around 1:16, the '
+                             'French press sits near 1:12, and cold brew is brewed strong at roughly 1:8 to be '
+                             'diluted later.',
+            feedback_incorrect='Not quite. Tighter ratios (more coffee per gram of water) make stronger, more '
+                               'concentrated drinks — espresso at ~1:2 is the most concentrated, pour-over at '
+                               '~1:16 the most dilute. Reassign the methods and check again.'),
+    ]},
+    {'name': 'Quiz Block — Sequencing', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
+        _text(body='<h2>Quiz Block — Sequencing</h2><p>Put the steps of pulling an espresso shot in the right '
+                   'order. Drag the rows up or down — or, using the keyboard, focus a row, press Enter to pick '
+                   'it up, move it with the Up/Down arrows, and press Enter to drop it. Click Check when the '
+                   'order looks right.</p>',
+              narration='Put the steps of pulling an espresso shot in the correct order, then click Check.'),
+        _quiz_seq(
+            prompt='Order the steps of pulling an espresso shot, first to last.',
+            ordered_labels=[
+                'Grind and dose ~18 g of fresh beans',
+                'Distribute the grounds evenly in the basket',
+                'Tamp level with firm, consistent pressure',
+                'Lock the portafilter into the group head',
+                'Pull the shot — aim for 25–30 seconds',
+            ],
+            feedback_correct='Correct! Dose, distribute, tamp, lock in, then pull — each step sets up an even '
+                             'puck so the water extracts evenly toward a balanced 25–30 second shot.',
+            feedback_incorrect='Not quite. The puck has to be built before the water hits it: dose, then '
+                               'distribute, then tamp, then lock the portafilter in, and only then pull the '
+                               'shot. Reorder the steps and check again.'),
+    ]},
+    {'name': 'Quiz Block — Fill-in-the-Blank', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
+        _text(body='<h2>Quiz Block — Fill-in-the-Blank</h2><p>Complete the sentence by choosing the right '
+                   'value in each dropdown, then click Check. Each blank is a standard keyboard-accessible '
+                   'menu — Tab to it and use the arrow keys.</p>',
+              narration='Complete the sentence by choosing the right value in each dropdown, then click Check.'),
+        _quiz_fb(
+            segments=[
+                {'text': 'A balanced double espresso pulls in '},
+                {'options': ['15–20 s', '25–30 s', '40–45 s'], 'correct': '25–30 s'},
+                {'text': ' at about a '},
+                {'options': ['1:2', '1:8', '1:16'], 'correct': '1:2'},
+                {'text': ' brew ratio, yielding roughly '},
+                {'options': ['18 g', '36 g', '60 g'], 'correct': '36 g'},
+                {'text': ' in the cup from an 18 g dose.'},
+            ],
+            feedback_correct='Correct! A double pulls in about 25–30 seconds at a ~1:2 ratio, so an 18 g dose '
+                             'yields roughly 36 g of espresso.',
+            feedback_incorrect='Not quite. Aim for a 25–30 second pull at a 1:2 ratio — an 18 g dose at 1:2 '
+                               'gives about 36 g in the cup. Adjust the dropdowns and check again.'),
     ]},
     {'name': 'Hotspot Block', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
         _text(body='<h2>Know your setup</h2><p>Before you pull a shot, recognize the four things in front of '
