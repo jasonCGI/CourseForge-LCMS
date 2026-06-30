@@ -52,8 +52,9 @@ export default function PersistentPreviewPane() {
 
   // Preview zoom for the GUI-shell view: 'fit' contain-fits the whole stage in the
   // pane; a number renders the stage at that exact scale (pane scrolls if it
-  // overflows). Default 1 = true 1:1, so the 1080p stage previews pixel-for-pixel
-  // on a 1440p+ display. Fit + 25/50/75/100 buttons live in the preview corner.
+  // overflows). Default 'fit' — the most elegant first impression: the entire GUI
+  // shows contained in the pane with no clipping or scroll, and stays responsive as
+  // the pane resizes. Fit + 25/50/75/100 buttons live in the preview corner.
   // Persisted to localStorage so the chosen scale carries across frames + reloads
   // until the author changes it (resetting it per frame was noise).
   const [zoom, setZoomState] = useState(() => {
@@ -61,8 +62,8 @@ export default function PersistentPreviewPane() {
       const v = localStorage.getItem('cf-preview-zoom')
       if (v === 'fit') return 'fit'
       const n = parseFloat(v)
-      return [0.25, 0.5, 0.75, 1].includes(n) ? n : 1
-    } catch { return 1 }
+      return [0.25, 0.5, 0.75, 1].includes(n) ? n : 'fit'
+    } catch { return 'fit' }
   })
   const setZoom = (v) => {
     setZoomState(v)
