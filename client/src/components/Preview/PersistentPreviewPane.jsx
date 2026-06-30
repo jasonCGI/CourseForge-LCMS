@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId, frameExistsInProject, parseFguiContentBg, parseOpaqueRgb } from './FramePreview'
+import FramePreview, { buildShelledLayoutHTML, frameExistsInProject, parseFguiContentBg, parseOpaqueRgb } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
 import FrameAuditBadge from './FrameAuditBadge'
@@ -134,19 +134,18 @@ export default function PersistentPreviewPane() {
   )
   const frameHtml = useMemo(
     () => {
-      if (needsOverlay) return ''
-      // Menu frame: inject the branded nav buttons (resolving each target the same
-      // way MenuFramePreview does) instead of the empty block layout.
-      if (isMenuFrame) {
-        return buildMenuHTML(activeFrame?.content?.menu, (it) => resolveMenuTargetFrameId(it, activeProject))
-      }
+      // Menu frames now render through the React overlay (MenuFramePreview), the same
+      // path interactive blocks use — so the draggable, reorderable menu shows WITH the
+      // GUI shell on, not only off. (Static buildMenuHTML injection is retired for the
+      // shell preview; the overlay's own click handlers drive nav.)
+      if (needsOverlay || isMenuFrame) return ''
       // Two-level text cascade (mirror of the server): per-shell text_mode wins;
       // else project text_mode (activeProject.text_mode); else the contentBg
       // luminance pick.
       return buildShelledLayoutHTML(activeFrame?.content?.blocks || [], activeFrame?.content?.layout,
                                     contentBg, shellTextMode, activeProject?.text_mode || 'auto')
     },
-    [needsOverlay, isMenuFrame, activeFrame?.content?.menu, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject, contentBg, shellTextMode],
+    [needsOverlay, isMenuFrame, activeFrame?.content?.blocks, activeFrame?.content?.layout, activeProject, contentBg, shellTextMode],
   )
 
   // Shell-injected menu buttons (no React in the iframe) post an fgui_nav message
@@ -241,8 +240,8 @@ export default function PersistentPreviewPane() {
         <ShellFit
           stage={stage}
           zoom={zoom} onZoom={setZoom}
-          contentArea={needsOverlay ? contentArea : null}
-          overlay={needsOverlay ? (
+          contentArea={(needsOverlay || isMenuFrame) ? contentArea : null}
+          overlay={(needsOverlay || isMenuFrame) ? (
             <PreviewErrorBoundary resetKey={activeFrame.id}>
               <FramePreview frame={activeFrame} ignoreGui hideTitle contentArea={contentArea}
                 activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
