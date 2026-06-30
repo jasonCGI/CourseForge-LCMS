@@ -40,12 +40,32 @@ export function getFrameIssues(frame) {
         if (!data.regions || data.regions.length === 0)
           issues.push({ block_type: 'hotspot', issue: 'Hotspot has no regions defined' })
         break
-      case 'quiz':
-        if (!data.question || !data.question.trim())
-          issues.push({ block_type: 'quiz', issue: 'Quiz missing question' })
-        if (!data.choices || data.choices.length < 2)
-          issues.push({ block_type: 'quiz', issue: 'Quiz needs at least 2 choices' })
+      case 'quiz': {
+        const qtype = data.qtype || 'multiple_choice'
+        if (qtype === 'drag_drop') {
+          if (!data.items || data.items.length < 2)
+            issues.push({ block_type: 'quiz', issue: 'Drag & drop needs at least 2 items' })
+          if (!data.targets || data.targets.length < 2)
+            issues.push({ block_type: 'quiz', issue: 'Drag & drop needs at least 2 targets' })
+          if (data.items && data.items.some(i => !(data.correct || {})[i.id]))
+            issues.push({ block_type: 'quiz', issue: 'Every item needs a correct target' })
+        } else if (qtype === 'sequencing') {
+          if (!data.items || data.items.length < 2)
+            issues.push({ block_type: 'quiz', issue: 'Sequencing needs at least 2 steps' })
+        } else if (qtype === 'fill_blank') {
+          const blanks = (data.segments || []).filter(s => s.type === 'blank')
+          if (blanks.length < 1)
+            issues.push({ block_type: 'quiz', issue: 'Fill-in-the-blank needs at least 1 blank' })
+          if (blanks.some(b => !b.correct))
+            issues.push({ block_type: 'quiz', issue: 'Every blank needs a correct option' })
+        } else {
+          if (!data.question || !data.question.trim())
+            issues.push({ block_type: 'quiz', issue: 'Quiz missing question' })
+          if (!data.choices || data.choices.length < 2)
+            issues.push({ block_type: 'quiz', issue: 'Quiz needs at least 2 choices' })
+        }
         break
+      }
       case 'branch':
         if (!data.condition || !data.condition.trim())
           issues.push({ block_type: 'branch', issue: 'Branch missing condition' })

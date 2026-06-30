@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable,
 } from '@dnd-kit/core'
 import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
@@ -783,9 +784,27 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
       return injectedNote(`${k || 'media'} block`)
     }
     case 'quiz': {
+      const qt = d.qtype || 'multiple_choice'
+      const head = t => `<p style="font-weight:600;margin-bottom:6px">${t}</p>`
+      if (qt === 'drag_drop') {
+        const li = (d.items || []).map(i => `<li style="margin:3px 0">${i.label || ''}</li>`).join('')
+        const tg = (d.targets || []).map(t => `<span style="display:inline-block;margin:2px 4px 0 0;padding:3px 8px;border:1px dashed #185FA5;border-radius:6px;font-size:12px">${t.label || ''}</span>`).join('')
+        return `<div style="margin:8px 0">${head(d.prompt || 'Match each item to its target')}`
+             + `<ul style="margin:0 0 6px 20px;padding:0">${li}</ul>${tg}</div>`
+      }
+      if (qt === 'sequencing') {
+        const li = (d.items || []).map(i => `<li style="margin:3px 0">${i.label || ''}</li>`).join('')
+        return `<div style="margin:8px 0">${head(d.prompt || 'Put the steps in order')}`
+             + `<ol style="margin:0 0 0 20px;padding:0">${li}</ol></div>`
+      }
+      if (qt === 'fill_blank') {
+        const txt = (d.segments || []).map(s => s.type === 'blank'
+          ? `<span style="display:inline-block;border-bottom:2px solid #185FA5;min-width:60px;text-align:center;color:#185FA5">▾</span>`
+          : (s.text || '')).join('')
+        return `<div style="margin:8px 0"><p style="margin:0">${txt}</p></div>`
+      }
       const choices = (d.choices || []).map(c => `<li style="margin:3px 0">${c}</li>`).join('')
-      return `<div style="margin:8px 0">`
-           + `<p style="font-weight:600;margin-bottom:6px">${d.question || 'Knowledge check'}</p>`
+      return `<div style="margin:8px 0">${head(d.question || 'Knowledge check')}`
            + `<ol style="margin:0 0 0 20px;padding:0">${choices}</ol></div>`
     }
     case 'wcn': {
@@ -1725,86 +1744,422 @@ function PreviewMedia({ block, fill = false }) {
   )
 }
 
+// ── Quiz preview (React) — dispatches by qtype. Behavior + scoring mirror the
+// server-published render in scorm12.py (_render_blocks quiz branch) so the live
+// preview and the SCORM SCO stay renderer-twins. Absent qtype → multiple_choice.
 function PreviewQuiz({ block }) {
-  const [selected, setSelected]   = useState(null)
-  const [submitted, setSubmitted] = useState(false)
+  const qtype = block.data.qtype || 'multiple_choice'
+  if (qtype === 'drag_drop')  return <PreviewQuizDragDrop  block={block} />
+  if (qtype === 'sequencing') return <PreviewQuizSequencing block={block} />
+  if (qtype === 'fill_blank') return <PreviewQuizFillBlank  block={block} />
+  return <PreviewQuizMC block={block} />
+}
 
+// Fisher-Yates shuffle (returns a new array; does not mutate input).
+function _shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+const QUIZ_WRAP = { background: '#FAFAFA', border: '1px solid #E0E0E0', borderRadius: 8, padding: 20 }
+const QUIZ_PROMPT = { fontSize: 15, fontWeight: 600, color: '#042C53', marginBottom: 16 }
+const QUIZ_BTN = {
+  padding: '8px 20px', background: '#185FA5', color: '#fff', border: 'none',
+  borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+}
+const QUIZ_BTN_GHOST = { ...QUIZ_BTN, background: 'transparent', color: '#185FA5', border: '1px solid #185FA5' }
+
+function QuizFeedback({ ok, block }) {
+  return (
+    <div role="status" aria-live="polite" style={{
+      padding: '10px 14px', marginTop: 14,
+      background: ok ? '#EAF6EC' : '#FDECEA',
+      border: `1px solid ${ok ? '#3B8A4A' : '#C0392B'}`,
+      borderRadius: 6, fontSize: 13, color: ok ? '#1E7E34' : '#C0392B', fontWeight: 500,
+    }}>
+      {ok ? (block.data.feedback_correct || 'Correct!') : (block.data.feedback_incorrect || 'Incorrect — please review.')}
+    </div>
+  )
+}
+
+// Shared attempts gate: returns { attemptsLeft, exhausted, registerWrong, reset }
+function useAttempts(block) {
+  const max = Math.max(1, parseInt(block.data.attempts_allowed) || 2)
+  const [used, setUsed] = useState(0)
+  return {
+    max, used,
+    attemptsLeft: max - used,
+    exhausted: used >= max,
+    bump: () => setUsed(u => u + 1),
+    reset: () => setUsed(0),
+  }
+}
+
+/* ── Multiple Choice ─────────────────────────────────────────────── */
+function PreviewQuizMC({ block }) {
   const choices = block.data.choices || []
   const correct = block.data.correct_index ?? 0
+  const randomize = !!block.data.randomize
+  // Shuffle display order but keep the original index so scoring stays correct.
+  const order = useMemo(
+    () => randomize ? _shuffle(choices.map((_, i) => i)) : choices.map((_, i) => i),
+    [block.id, randomize, choices.length]
+  )
+  const [selected, setSelected] = useState(null)   // original index
+  const [submitted, setSubmitted] = useState(false)
+  const att = useAttempts(block)
   const isRight = selected === correct
+  const locked = submitted && (isRight || att.exhausted)
+
+  const submit = () => {
+    if (selected === null) return
+    setSubmitted(true)
+    if (selected !== correct) att.bump()
+  }
+  const retry = () => { setSubmitted(false); setSelected(null) }
 
   return (
-    <div style={{ ...previewBlockWrap, background: '#FAFAFA', border: '1px solid #E0E0E0', borderRadius: 8, padding: 20 }}>
-      <p style={{ fontSize: 15, fontWeight: 600, color: '#042C53', marginBottom: 16 }}>
-        {block.data.question || 'Question not set'}
-      </p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-        {choices.map((choice, idx) => {
+    <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
+      <p style={QUIZ_PROMPT}>{block.data.question || 'Question not set'}</p>
+      <div role="radiogroup" aria-label="Answer choices" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {order.map((idx) => {
           let bg = '#fff', border = '#ddd', color = '#1a1a1a'
           if (submitted) {
             if (idx === correct) { bg = '#EAF6EC'; border = '#3B8A4A'; color = '#1E7E34' }
             else if (idx === selected) { bg = '#FDECEA'; border = '#C0392B'; color = '#C0392B' }
-          } else if (idx === selected) {
-            border = '#185FA5'; bg = '#F0F6FF'
-          }
+          } else if (idx === selected) { border = '#185FA5'; bg = '#F0F6FF' }
           return (
             <button
               key={idx}
-              onClick={() => !submitted && setSelected(idx)}
+              role="radio" aria-checked={selected === idx}
+              onClick={() => !locked && setSelected(idx)}
+              disabled={locked}
               style={{
-                padding: '10px 14px',
-                border: `2px solid ${border}`,
-                borderRadius: 6,
-                background: bg,
-                color,
-                fontSize: 14,
-                textAlign: 'left',
-                cursor: 'default',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s',
+                padding: '10px 14px', border: `2px solid ${border}`, borderRadius: 6,
+                background: bg, color, fontSize: 14, textAlign: 'left',
+                cursor: locked ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
               }}
             >
-              {choice}
+              {choices[idx]}
             </button>
           )
         })}
       </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {!locked && <button onClick={submit} disabled={selected === null} style={QUIZ_BTN}>Submit</button>}
+        {submitted && !isRight && !att.exhausted && <button onClick={retry} style={QUIZ_BTN_GHOST}>Try again</button>}
+        {submitted && !isRight && !att.exhausted && (
+          <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
+        )}
+      </div>
+      {submitted && <QuizFeedback ok={isRight} block={block} />}
+    </div>
+  )
+}
 
-      {!submitted && selected !== null && (
-        <button
-          onClick={() => setSubmitted(true)}
-          style={{
-            padding: '8px 20px',
-            background: '#185FA5',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'default',
-            fontFamily: 'inherit',
-          }}
-        >
-          Submit
-        </button>
-      )}
+/* ── Drag & Drop (match item → target) ───────────────────────────── */
+function DDTarget({ id, label, children, onActivate, selecting }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      role="button" tabIndex={0}
+      aria-label={`Drop zone: ${label}`}
+      onClick={() => selecting && onActivate(id)}
+      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && selecting) { e.preventDefault(); onActivate(id) } }}
+      style={{
+        border: `2px dashed ${isOver || selecting ? '#185FA5' : '#bcd'}`,
+        borderRadius: 8, padding: 10, minHeight: 56,
+        background: isOver ? '#EAF1FB' : (selecting ? '#F0F6FF' : '#fff'),
+        outline: 'none', transition: 'all .12s',
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#185FA5', marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 24 }}>{children}</div>
+    </div>
+  )
+}
 
-      {submitted && (
-        <div style={{
-          padding: '10px 14px',
-          background: isRight ? '#EAF6EC' : '#FDECEA',
-          border: `1px solid ${isRight ? '#3B8A4A' : '#C0392B'}`,
-          borderRadius: 6,
-          fontSize: 13,
-          color: isRight ? '#1E7E34' : '#C0392B',
-          fontWeight: 500,
-        }}>
-          {isRight
-            ? block.data.feedback_correct || 'Correct!'
-            : block.data.feedback_incorrect || 'Incorrect — please review.'}
+function PreviewQuizDragDrop({ block }) {
+  const items   = block.data.items   || []
+  const targets = block.data.targets || []
+  const correct = block.data.correct || {}
+  const randomize = !!block.data.randomize
+  const order = useMemo(
+    () => randomize ? _shuffle(items.map(i => i.id)) : items.map(i => i.id),
+    [block.id, randomize, items.length]
+  )
+  const itemById = useMemo(() => Object.fromEntries(items.map(i => [i.id, i])), [items])
+
+  // placement: { itemId: targetId|null }
+  const [placement, setPlacement] = useState({})
+  const [selectedItem, setSelectedItem] = useState(null)  // keyboard/click select
+  const [submitted, setSubmitted] = useState(false)
+  const att = useAttempts(block)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  const allPlaced = items.length > 0 && items.every(i => placement[i.id])
+  const isRight = allPlaced && items.every(i => placement[i.id] === correct[i.id])
+  const locked = submitted && (isRight || att.exhausted)
+
+  const onDragEnd = (e) => {
+    if (locked) return
+    const itemId = e.active?.id
+    const overId = e.over?.id
+    if (!itemId) return
+    if (!overId || overId === 'dd-tray') setPlacement(p => ({ ...p, [itemId]: null }))
+    else setPlacement(p => ({ ...p, [itemId]: overId }))
+    setSubmitted(false)
+  }
+  const placeSelected = (targetId) => {
+    if (locked || !selectedItem) return
+    setPlacement(p => ({ ...p, [selectedItem]: targetId }))
+    setSelectedItem(null); setSubmitted(false)
+  }
+  const toggleSelect = (itemId) => { if (!locked) setSelectedItem(s => s === itemId ? null : itemId) }
+  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
+  const reset = () => { setPlacement({}); setSelectedItem(null); setSubmitted(false); att.reset() }
+
+  const tray = order.filter(id => !placement[id])
+  const TrayDroppable = () => {
+    const { setNodeRef, isOver } = useDroppable({ id: 'dd-tray' })
+    return (
+      <div ref={setNodeRef} aria-label="Unplaced items" style={{
+        border: `2px dashed ${isOver ? '#185FA5' : '#ccc'}`, borderRadius: 8, padding: 10,
+        marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 50, background: '#fff',
+      }}>
+        {tray.length === 0 && <span style={{ fontSize: 12, color: '#999' }}>All items placed</span>}
+        {tray.map(id => (
+          <DDItemSelectable key={id} id={id} label={itemById[id]?.label} placed={false}
+            selected={selectedItem === id} onSelect={toggleSelect} disabled={locked} />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
+      <p style={QUIZ_PROMPT}>{block.data.prompt || 'Match each item to its target.'}</p>
+      <p style={{ fontSize: 12, color: '#666', marginTop: -8, marginBottom: 14 }}>
+        Drag an item onto a target — or select an item, then choose a target (keyboard friendly).
+      </p>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <TrayDroppable />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 8 }}>
+          {targets.map(t => (
+            <DDTarget key={t.id} id={t.id} label={t.label} onActivate={placeSelected} selecting={!!selectedItem && !locked}>
+              {order.filter(id => placement[id] === t.id).map(id => {
+                const ok = submitted ? (correct[id] === t.id) : null
+                return (
+                  <DDItemSelectable key={id} id={id} label={itemById[id]?.label} placed
+                    selected={selectedItem === id} onSelect={toggleSelect} disabled={locked} result={ok} />
+                )
+              })}
+            </DDTarget>
+          ))}
         </div>
-      )}
+      </DndContext>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        {!locked && <button onClick={submit} disabled={!allPlaced} style={QUIZ_BTN}>Check</button>}
+        <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
+        {submitted && !isRight && !att.exhausted && (
+          <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
+        )}
+      </div>
+      {submitted && <QuizFeedback ok={isRight} block={block} />}
+    </div>
+  )
+}
+
+// An item that is both dnd-kit draggable AND a click/keyboard-selectable button.
+// Selection (click/Enter) drives the keyboard path; dnd-kit drives pointer drag.
+function DDItemSelectable({ id, label, placed, selected, onSelect, disabled, result }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, disabled })
+  let border = '#185FA5', bg = placed ? '#EAF1FB' : '#fff'
+  if (result === true) { border = '#3B8A4A'; bg = '#EAF6EC' }
+  else if (result === false) { border = '#C0392B'; bg = '#FDECEA' }
+  else if (selected) { border = '#D4820A'; bg = '#FFF6E6' }
+  return (
+    <button
+      ref={setNodeRef} {...listeners} {...attributes}
+      type="button"
+      aria-pressed={selected}
+      aria-label={`${label}${placed ? ' (placed)' : ''}${selected ? ' (selected)' : ''}`}
+      onClick={() => !disabled && onSelect(id)}
+      disabled={disabled}
+      style={{
+        padding: '7px 11px', border: `2px solid ${border}`, borderRadius: 6, background: bg,
+        color: '#042C53', fontSize: 13, fontWeight: 600, cursor: disabled ? 'default' : 'grab',
+        opacity: isDragging ? 0.5 : 1, userSelect: 'none', touchAction: 'none', fontFamily: 'inherit',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+/* ── Sequencing (drag rows into order) ───────────────────────────── */
+function SeqRow({ id, index, label, disabled, result }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled })
+  let border = '#cdd6e0', bg = '#fff'
+  if (result === true) { border = '#3B8A4A'; bg = '#EAF6EC' }
+  else if (result === false) { border = '#C0392B'; bg = '#FDECEA' }
+  return (
+    <div ref={setNodeRef} style={{
+      transform: CSS.Transform.toString(transform), transition,
+      display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
+      opacity: isDragging ? 0.6 : 1,
+    }}>
+      <span aria-hidden="true" style={{
+        width: 26, height: 26, flexShrink: 0, borderRadius: '50%', background: '#185FA5', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+      }}>{index + 1}</span>
+      <button
+        type="button" {...listeners} {...attributes}
+        disabled={disabled}
+        aria-label={`Position ${index + 1}: ${label}. Press Space or Enter to pick up, then use arrow keys to reorder.`}
+        style={{
+          flex: 1, textAlign: 'left', padding: '10px 14px', border: `2px solid ${border}`,
+          borderRadius: 6, background: bg, color: '#042C53', fontSize: 14, fontWeight: 500,
+          cursor: disabled ? 'default' : 'grab', fontFamily: 'inherit', display: 'flex',
+          alignItems: 'center', gap: 8,
+        }}
+      >
+        <span aria-hidden="true" style={{ color: '#9aa7b4', fontSize: 16, lineHeight: 1 }}>⠿</span>
+        {label}
+      </button>
+    </div>
+  )
+}
+
+function PreviewQuizSequencing({ block }) {
+  const items = block.data.items || []
+  const correctOrder = block.data.correct_order || items.map(i => i.id)
+  const randomize = !!block.data.randomize
+  const itemById = useMemo(() => Object.fromEntries(items.map(i => [i.id, i])), [items])
+
+  // Initial presentation: shuffled if randomize; otherwise the authored items
+  // array order (kept distinct from correct_order so there's something to solve).
+  const initial = useMemo(() => {
+    const ids = items.map(i => i.id)
+    if (randomize) {
+      let s = _shuffle(ids)
+      // avoid accidentally presenting the already-correct order
+      if (ids.length > 1 && s.every((id, i) => id === correctOrder[i])) s = _shuffle(ids)
+      return s
+    }
+    return ids
+  }, [block.id, randomize, items.length])
+
+  const [order, setOrder] = useState(initial)
+  useEffect(() => { setOrder(initial) }, [initial])
+  const [submitted, setSubmitted] = useState(false)
+  const att = useAttempts(block)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const isRight = order.length === correctOrder.length && order.every((id, i) => id === correctOrder[i])
+  const locked = submitted && (isRight || att.exhausted)
+
+  const onDragEnd = (e) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    setOrder(o => arrayMove(o, o.indexOf(active.id), o.indexOf(over.id)))
+    setSubmitted(false)
+  }
+  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
+  const reset = () => { setOrder(initial); setSubmitted(false); att.reset() }
+
+  return (
+    <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
+      <p style={QUIZ_PROMPT}>{block.data.prompt || 'Put the steps in the correct order.'}</p>
+      <p style={{ fontSize: 12, color: '#666', marginTop: -8, marginBottom: 14 }}>
+        Drag the rows into order — or focus a row, press Space to pick it up, move with the arrow keys, and Space to drop.
+      </p>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          {order.map((id, idx) => (
+            <SeqRow key={id} id={id} index={idx} label={itemById[id]?.label || ''}
+              disabled={locked} result={submitted ? (id === correctOrder[idx]) : null} />
+          ))}
+        </SortableContext>
+      </DndContext>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+        {!locked && <button onClick={submit} style={QUIZ_BTN}>Check</button>}
+        <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
+        {submitted && !isRight && !att.exhausted && (
+          <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
+        )}
+      </div>
+      {submitted && <QuizFeedback ok={isRight} block={block} />}
+    </div>
+  )
+}
+
+/* ── Fill in the Blank (inline dropdowns) ────────────────────────── */
+function PreviewQuizFillBlank({ block }) {
+  const segments = block.data.segments || []
+  const randomize = !!block.data.randomize
+  const blanks = useMemo(() => segments.filter(s => s.type === 'blank'), [segments])
+  // Per-blank shuffled option order (stable per mount).
+  const optionOrder = useMemo(() => {
+    const m = {}
+    blanks.forEach(b => { m[b.id] = randomize ? _shuffle(b.options || []) : (b.options || []) })
+    return m
+  }, [block.id, randomize, blanks.length])
+
+  const [answers, setAnswers] = useState({})  // { blankId: value }
+  const [submitted, setSubmitted] = useState(false)
+  const att = useAttempts(block)
+
+  const allAnswered = blanks.length > 0 && blanks.every(b => answers[b.id])
+  const isRight = allAnswered && blanks.every(b => answers[b.id] === b.correct)
+  const locked = submitted && (isRight || att.exhausted)
+
+  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
+  const reset = () => { setAnswers({}); setSubmitted(false); att.reset() }
+
+  let blankCount = 0
+  return (
+    <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
+      <p style={{ fontSize: 15, color: '#042C53', lineHeight: 2, marginBottom: 16 }}>
+        {segments.map((seg, idx) => {
+          if (seg.type === 'text') return <span key={idx}>{seg.text}</span>
+          blankCount += 1
+          const n = blankCount
+          const val = answers[seg.id] || ''
+          let bdr = '#185FA5'
+          if (submitted) bdr = (val === seg.correct) ? '#3B8A4A' : '#C0392B'
+          return (
+            <select
+              key={idx}
+              aria-label={`Blank ${n}`}
+              value={val}
+              disabled={locked}
+              onChange={e => { setAnswers(a => ({ ...a, [seg.id]: e.target.value })); setSubmitted(false) }}
+              style={{
+                margin: '0 4px', padding: '3px 6px', border: `2px solid ${bdr}`, borderRadius: 5,
+                fontSize: 14, fontFamily: 'inherit', color: '#042C53', background: '#fff',
+              }}
+            >
+              <option value="">— choose —</option>
+              {(optionOrder[seg.id] || []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+            </select>
+          )
+        })}
+      </p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {!locked && <button onClick={submit} disabled={!allAnswered} style={QUIZ_BTN}>Check</button>}
+        <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
+        {submitted && !isRight && !att.exhausted && (
+          <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
+        )}
+      </div>
+      {submitted && <QuizFeedback ok={isRight} block={block} />}
     </div>
   )
 }
