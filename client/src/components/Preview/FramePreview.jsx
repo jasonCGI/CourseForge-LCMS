@@ -406,31 +406,44 @@ function MenuFramePreview({ frame, hideTitle = false }) {
 // drag wiring is AUTHORING-only — the published render_menu_html paints no handles.
 // A target-less item is NOT natively disabled here (so it can still be reordered);
 // its click is guarded and it's styled/labelled as having no target.
+// Dispatcher: a non-editable (read-only / non-active-frame) menu preview renders the
+// plain nav button WITHOUT calling useSortable — that branch has no DndContext
+// ancestor (MenuFramePreview only wraps the list in a DndContext when editable). The
+// hook now lives only in SortableMenuNavButton, rendered inside that DndContext.
 function MenuNavButton({ it, editable, targetId, onGo }) {
-  const sortable = useSortable({ id: it.id, disabled: !editable })
+  if (!editable) return <PlainNavButton it={it} targetId={targetId} onGo={onGo} />
+  return <SortableMenuNavButton it={it} targetId={targetId} onGo={onGo} />
+}
+
+function PlainNavButton({ it, targetId, onGo }) {
   const disabledNav = !targetId
+  return (
+    <button
+      onClick={() => { if (targetId) onGo(targetId) }}
+      disabled={disabledNav}
+      title={disabledNav ? 'No target set' : 'Go to target'}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
+        fontFamily: 'inherit', textAlign: 'left',
+        background: disabledNav ? '#9aa7b6' : '#042C53',
+        color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
+        cursor: disabledNav ? 'not-allowed' : 'pointer', opacity: disabledNav ? 0.7 : 1,
+      }}
+    >
+      <span>{it.label || 'Untitled'}</span>
+      <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
+    </button>
+  )
+}
 
-  if (!editable) {
-    return (
-      <button
-        onClick={() => { if (targetId) onGo(targetId) }}
-        disabled={disabledNav}
-        title={disabledNav ? 'No target set' : 'Go to target'}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
-          fontFamily: 'inherit', textAlign: 'left',
-          background: disabledNav ? '#9aa7b6' : '#042C53',
-          color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
-          cursor: disabledNav ? 'not-allowed' : 'pointer', opacity: disabledNav ? 0.7 : 1,
-        }}
-      >
-        <span>{it.label || 'Untitled'}</span>
-        <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
-      </button>
-    )
-  }
-
+// Sortable variant — calls useSortable. Rendered ONLY inside MenuFramePreview's
+// editable DndContext, so the hook always has its SortableContext / DndContext
+// ancestor. The whole button is the drag target (no separate grip); the parent
+// PointerSensor's activation distance lets a plain click still navigate.
+function SortableMenuNavButton({ it, targetId, onGo }) {
+  const sortable = useSortable({ id: it.id })
+  const disabledNav = !targetId
   return (
     <button
       ref={sortable.setNodeRef}
@@ -507,12 +520,25 @@ function MenuBackPill({ currentFrameId }) {
 // hotspot/quiz/branch), and a whole-surface drag would hijack those. When not
 // sortable it falls straight through to SelectableBlock (no DnD machinery, no grip),
 // so read-only / Published / non-active-frame renders are untouched.
+// Dispatcher: when not draggable, return the plain selectable block WITHOUT calling
+// useSortable. The non-sortable preview paths (read-only / Published / non-active
+// frame / single-flow-block frames) have NO DndContext ancestor, so calling
+// useSortable there is fragile (a context-less dnd hook). The hook now lives only in
+// DraggablePreviewBlock, rendered exclusively inside the flowRegion DndContext
+// (sortableFlow === true).
 function SortablePreviewBlock({ block, fill = false, sortable = false, active, onSelect, updateBlock = null }) {
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
-    useSortable({ id: block.id, disabled: !sortable })
   if (!sortable) {
     return <SelectableBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
   }
+  return <DraggablePreviewBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
+}
+
+// Draggable variant — calls useSortable. Rendered ONLY inside the flowRegion
+// DndContext (FramePreview's sortableFlow branch), so the hook always has its
+// SortableContext / DndContext ancestor.
+function DraggablePreviewBlock({ block, fill = false, active, onSelect, updateBlock = null }) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
+    useSortable({ id: block.id })
   return (
     <div ref={setNodeRef} style={{
       position: 'relative',

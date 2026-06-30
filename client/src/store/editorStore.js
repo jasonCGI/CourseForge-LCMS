@@ -189,7 +189,15 @@ const useEditorStore = create((set, get) => ({
     set({ activeFrame: null, isDirty: false, saveError: null, selectedNode: { type: 'frame', id: frameId } })
     try {
       const { data } = await getFrame(frameId)
-      set({ activeFrame: data, originalFrame: data, isDirty: false })
+      // Drop any null/undefined block element from stored content before it reaches
+      // the inspector / preview render. A malformed block (bad import, hand-edit,
+      // lossy round-trip) would otherwise throw in the many `blocks.map(b => b.id)`
+      // / `block.type` / `block.data` paths — and the inspector is NOT wrapped in an
+      // error boundary, so that throw white-screens the app. Re-saving then heals
+      // the stored content. (The content tree is hardened separately in
+      // utils/frameCompletion.js.)
+      const frame = _sanitizeFrameBlocks(data)
+      set({ activeFrame: frame, originalFrame: frame, isDirty: false })
     } catch (e) {
       set({ saveError: e.message })
     }
@@ -495,6 +503,16 @@ const useEditorStore = create((set, get) => ({
 }))
 
 // Block factory
+// Defensively drop any falsy (null/undefined) entry from a frame's content.blocks.
+// Stored content can carry a malformed block element (bad import / hand-edit / lossy
+// round-trip); every downstream consumer assumes blocks are objects, so strip them
+// once at the load boundary instead of guarding every `.map`/`.type`/`.data` site.
+function _sanitizeFrameBlocks(frame) {
+  const blocks = frame?.content?.blocks
+  if (!Array.isArray(blocks) || blocks.every(Boolean)) return frame
+  return { ...frame, content: { ...frame.content, blocks: blocks.filter(Boolean) } }
+}
+
 function _makeBlock(type) {
   const id = crypto.randomUUID()
   // The Audio palette button adds a media block pre-set to the docked audio bar
