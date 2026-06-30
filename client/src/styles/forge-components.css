@@ -155,8 +155,11 @@
 /* icon-only — square (the 1:1 carve-out from the 3:1 rule) */
 .cf-btn--icon { padding: var(--cf-btn-pad-y); border-radius: 5px; }
 
-/* "on" / selected (e.g. a shell is applied) — amber border + text */
-.cf-btn--on { border-color: var(--forge-amber) !important; color: var(--forge-amber) !important; }
+/* "on" / selected (e.g. a shell is applied) — amber text + a 2px amber stroke.
+   The 1px border + a 1px inset ring read as 2px without changing the box size, so
+   toggling selected on/off never nudges neighboring buttons. */
+.cf-btn--on { border-color: var(--forge-amber) !important; color: var(--forge-amber) !important;
+  box-shadow: inset 0 0 0 1px var(--forge-amber); }
 
 /* ── Amber toggles on the navy preview header (Edit⇄Published, GUI on/off) ──
    The resting (off) state is ghost-like — transparent fill + transparent border
