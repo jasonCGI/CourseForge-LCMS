@@ -50,7 +50,7 @@ export default function MenuEditor() {
           lessons.push({ id: lesson.id, label: `${course.name} › ${mod.name} › ${lesson.name}` })
           for (const frame of lesson.frames || []) {
             if (frame.id === activeFrame?.id) continue   // a menu can't point at itself
-            frames.push({ id: frame.id, label: `${lesson.name} › ${frame.name}` })
+            frames.push({ id: frame.id, label: frame.name })   // frame title only — no lesson breadcrumb
           }
         }
       }
