@@ -41,12 +41,14 @@ export default function PersistentPreviewPane() {
   const shellId = activeProject?.gui_shell_id || null
   // Live-preview GUI toggle: ON = render inside the shell (learner view),
   // OFF = clean block stack (author/content view). Only meaningful with a shell.
-  const [guiOn, setGuiOn] = useState(true)
+  const [guiOn, setGuiOn] = useState(() => readPreviewPref('cf-preview-gui', true))
 
   // Preview source toggle: 'edit' = the interactive React FramePreview (default,
   // unchanged); 'published' = the server-rendered truth in an iframe (the same
   // /preview-html the old popup Preview button opened, now shown in-pane).
-  const [source, setSource] = useState('edit')
+  // Both this and guiOn are persisted (below) so the chosen preview mode stays
+  // sticky across frames / reloads — quicker than re-flipping it on every frame.
+  const [source, setSource] = useState(() => readPreviewPref('cf-preview-source', 'edit'))
 
   // Preview zoom for the GUI-shell view: 'fit' contain-fits the whole stage in the
   // pane; a number renders the stage at that exact scale (pane scrolls if it
@@ -194,6 +196,11 @@ export default function PersistentPreviewPane() {
   useEffect(() => {
     if (source === 'published' && isDirty) save()
   }, [source, isDirty, save])
+
+  // Persist the preview source + GUI toggle so the chosen mode is sticky across
+  // frame navigation and reloads (test one mode by clicking around, no re-flipping).
+  useEffect(() => { try { localStorage.setItem('cf-preview-source', source) } catch { /* private mode */ } }, [source])
+  useEffect(() => { try { localStorage.setItem('cf-preview-gui', guiOn ? '1' : '0') } catch { /* private mode */ } }, [guiOn])
 
   // The current preview is shell-rendered when Published-with-shell or GUI-ON edit;
   // GUI-OFF edit shows the clean content on white. The audit uses the shell's
@@ -450,6 +457,17 @@ export function frameContext(project, frameId) {
 }
 
 // Flat in-order frame-id list across the whole project (project→course→…→frame).
+// Read a persisted preview preference (source / GUI toggle) from localStorage.
+// 'cf-preview-source' → 'edit'|'published' (validated); 'cf-preview-gui' → boolean.
+function readPreviewPref(key, fallback) {
+  try {
+    const v = localStorage.getItem(key)
+    if (v == null) return fallback
+    if (key === 'cf-preview-gui') return v === '1'
+    return v === 'published' ? 'published' : 'edit'
+  } catch { return fallback }
+}
+
 export function flatFrameOrder(project) {
   const ids = []
   if (!project) return ids
