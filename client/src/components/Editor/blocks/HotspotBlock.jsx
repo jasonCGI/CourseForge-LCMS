@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import useEditorStore from '../../../store/editorStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 import { blockWrap, fieldLabel, inputStyle, helpText, btnDanger } from './blockStyles'
 import { hotspotStyle, shapeRadius, HOTSPOT_AMBER } from '../../../utils/hotspotStyle'
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import useEditorStore from '../../../store/editorStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 import { blockWrap, fieldLabel, inputStyle, helpText } from './blockStyles'
 
 // Callout block editor — CONTENT + SHAPE only.

@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 import { blockWrap, fieldLabel, inputStyle, textareaStyle, selectStyle } from './blockStyles'
 
 export default function BranchBlock({ block }) {

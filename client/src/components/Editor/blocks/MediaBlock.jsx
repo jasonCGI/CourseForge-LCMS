@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, lazy, Suspense } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 import MediaUploader from './MediaUploader'
 import { uploadMedia } from '../../../api/client'
 import BoundsControl from './BoundsControl'

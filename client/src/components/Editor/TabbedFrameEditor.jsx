@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors,
@@ -15,17 +15,19 @@ import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
 import FrameLayout from './FrameLayout'
 import BlockToolbar from './BlockToolbar'
-import TextBlock from './blocks/TextBlock'
 import MediaBlock from './blocks/MediaBlock'
 import QuizBlock from './blocks/QuizBlock'
 import HotspotBlock from './blocks/HotspotBlock'
 import BranchBlock from './blocks/BranchBlock'
-import OamBlock from './blocks/OamBlock'
 import WCNBlock from './blocks/WCNBlock'
-import IVideoBlock from './blocks/IVideoBlock'
-import Model3DBlock from './blocks/Model3DBlock'
-import GUIBlock from './blocks/GUIBlock'
 import CalloutBlock from './blocks/CalloutBlock'
+// Heavy / less-common block editors, code-split (see FrameEditor) so first paint
+// stays light — TextBlock pulls @tiptap; 3D/iVideo/OAM/GUI are bulky.
+const TextBlock    = lazy(() => import('./blocks/TextBlock'))
+const OamBlock     = lazy(() => import('./blocks/OamBlock'))
+const IVideoBlock  = lazy(() => import('./blocks/IVideoBlock'))
+const Model3DBlock = lazy(() => import('./blocks/Model3DBlock'))
+const GUIBlock     = lazy(() => import('./blocks/GUIBlock'))
 import PreviewModal from '../Preview/PreviewModal'
 
 const BLOCK_COMPONENTS = {
@@ -177,8 +179,11 @@ export default function TabbedFrameEditor() {
                 ✕ Remove
               </button>
             </div>
-            {Block ? <Block block={activeBlock} />
-              : <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+            {Block ? (
+                <Suspense fallback={<div style={{ padding: '16px', fontSize: 12, color: 'var(--color-text-secondary)' }}>Loading block…</div>}>
+                  <Block block={activeBlock} />
+                </Suspense>
+              ) : <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   No editor for block type <strong>{activeBlock.type}</strong>.
                 </div>}
           </div>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, lazy, Suspense } from 'react'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors,
@@ -15,16 +15,19 @@ import FrameNotes from './FrameNotes'
 import FramePrompt from './FramePrompt'
 import FrameLayout from './FrameLayout'
 import BlockToolbar from './BlockToolbar'
-import TextBlock from './blocks/TextBlock'
 import MediaBlock from './blocks/MediaBlock'
 import QuizBlock from './blocks/QuizBlock'
 import HotspotBlock from './blocks/HotspotBlock'
 import BranchBlock from './blocks/BranchBlock'
-import OamBlock from './blocks/OamBlock'
 import WCNBlock from './blocks/WCNBlock'
-import IVideoBlock from './blocks/IVideoBlock'
-import Model3DBlock from './blocks/Model3DBlock'
-import GUIBlock from './blocks/GUIBlock'
+// Heavy / less-common block editors, code-split so they don't weigh down first
+// paint: TextBlock pulls @tiptap (the ~396KB editor chunk); 3D/iVideo/OAM/GUI are
+// bulky and rarely the first frame opened. Rendered inside <Suspense> below.
+const TextBlock    = lazy(() => import('./blocks/TextBlock'))
+const OamBlock     = lazy(() => import('./blocks/OamBlock'))
+const IVideoBlock  = lazy(() => import('./blocks/IVideoBlock'))
+const Model3DBlock = lazy(() => import('./blocks/Model3DBlock'))
+const GUIBlock     = lazy(() => import('./blocks/GUIBlock'))
 import MenuEditor from './MenuEditor'
 import PreviewModal from '../Preview/PreviewModal'
 
@@ -105,7 +108,9 @@ function SortableBlock({ block }) {
           color: 'var(--cf-text-tertiary, #3A5A7A)', fontSize: 13, padding: 2, lineHeight: 1,
         }}
       >⧉</button>
-      <Block block={block} />
+      <Suspense fallback={<div style={{ padding: '16px', fontSize: 12, color: 'var(--color-text-secondary)' }}>Loading block…</div>}>
+        <Block block={block} />
+      </Suspense>
     </div>
   )
 }

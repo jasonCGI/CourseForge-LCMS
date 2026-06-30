@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import useEditorStore from '../../../store/editorStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 import { blockWrap, fieldLabel, inputStyle, textareaStyle, helpText } from './blockStyles'
 
 export default function QuizBlock({ block }) {

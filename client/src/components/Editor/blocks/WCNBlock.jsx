@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import useEditorStore from '../../../store/editorStore'
-import { BlockHeader } from './TextBlock'
+import { BlockHeader } from './BlockHeader'
 
 const WCN_CONFIG = {
   warning: {

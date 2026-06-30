@@ -8,6 +8,7 @@ import useProjectStore from '../../../store/projectStore'
 import { countWords, formatTime } from '../../../utils/wordCount'
 import { uploadMedia, listProjectMedia } from '../../../api/client'
 import MediaUploader from './MediaUploader'
+import { BlockHeader } from './BlockHeader'
 
 // Inline frame-link / image-swap: ONE Link mark carrying BOTH data-cf-frame
 // (branch to another frame) AND data-cf-swap (swap the frame's media image to an
@@ -349,43 +350,8 @@ function WordCount({ body, script }) {
 }
 
 // Shared block header component — used by all block types
-export function BlockHeader({ label, color, blockId, onRemove, onMove }) {
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      padding: '8px 12px',
-      background: 'var(--color-background-secondary)',
-      borderBottom: '1px solid var(--color-border-tertiary)',
-    }}>
-      <span style={{
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: color || '#185FA5',
-        flex: 1,
-      }}>
-        {label}
-      </span>
-      <button onClick={() => onMove(blockId, 'up')}   aria-label="Move block up"   title="Move up"   style={btnStyle}>↑</button>
-      <button onClick={() => onMove(blockId, 'down')} aria-label="Move block down" title="Move down" style={btnStyle}>↓</button>
-      <button onClick={() => onRemove(blockId)}       aria-label="Remove block"    title="Remove"    style={{ ...btnStyle, color: '#E24B4A' }}>✕</button>
-    </div>
-  )
-}
-
-const btnStyle = {
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 13,
-  color: 'var(--color-text-secondary)',
-  padding: '2px 6px',
-  borderRadius: 3,
-  fontFamily: 'var(--font-sans)',
-}
+// BlockHeader moved to ./BlockHeader (dependency-light) so non-text blocks that
+// use it don't drag this file's @tiptap editor into the eager bundle.
 
 const toolbarBtn = {
   background: 'var(--color-background-primary)',
