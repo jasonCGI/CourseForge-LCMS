@@ -202,16 +202,18 @@ function TreeRow({
             {isFrame ? '' : isOpen ? '▾' : '▸'}
           </span>
 
-          {/* OPT chip — sits LEFT of the status dot. "optional" is an orthogonal
-              axis from completion, so it gets its own channel and the dot below
-              keeps showing the real authoring status. */}
-          {isFrame && optional && (
-            <span aria-hidden="true" title={COMPLETION_DOT.optional.title}
-              style={{ flexShrink: 0, fontFamily: 'var(--cf-mono, ui-monospace, monospace)',
-                fontSize: 8, fontWeight: 700, lineHeight: 1, letterSpacing: '0.04em',
+          {/* OPT marker — a FIXED-WIDTH gutter slot present on every frame row (left
+              of the status dot), so the dot + label column stays aligned whether or
+              not the frame is optional. Optional frames show "OPT"; others reserve
+              the same width (visibility:hidden) so the line never shifts/jumps right.
+              Plain small-caps, no box — "optional" is metadata, a quiet margin flag. */}
+          {isFrame && (
+            <span aria-hidden="true" title={optional ? COMPLETION_DOT.optional.title : undefined}
+              style={{ flexShrink: 0, width: 21, textAlign: 'center',
+                fontFamily: 'var(--cf-mono, ui-monospace, monospace)',
+                fontSize: 8, fontWeight: 700, lineHeight: 1, letterSpacing: '0.06em',
                 color: COMPLETION_DOT.optional.color,
-                border: `1px solid ${COMPLETION_DOT.optional.color}`,
-                borderRadius: 3, padding: '1.5px 3px', background: 'transparent' }}>OPT</span>
+                visibility: optional ? 'visible' : 'hidden' }}>OPT</span>
           )}
 
           {/* Completion dot (frames only) — always the real status, even when optional */}
