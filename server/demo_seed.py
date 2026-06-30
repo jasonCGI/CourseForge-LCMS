@@ -328,21 +328,21 @@ in this course comes back to dialing it in.</p>''',
         _video(label='Roasted coffee beans pouring onto a scale', fill=True, dock='bottom',
                caption='Fresh-roasted beans cascade onto the scale. Muted, looped, and compressed for fast load.'),
     ]},
-    {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'blocks': [
+    {'name': 'Audio Block', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'text-left', 'blocks': [
         _text(body='<h2>Listen as you work</h2><p>Audio carries what a still cannot: the rhythm of the grind, '
                    'the hiss of the steam wand, a narrator talking you through the pull. This cue plays in a '
-                   'branded slim player you can leave docked at the bottom of the frame, so it stays reachable '
-                   'while you read.</p><p>Source audio runs through ForgePack Audio first, normalized to the '
+                   'branded slim player set beside the text, so it stays reachable while you read.</p>'
+                   '<p>Source audio runs through ForgePack Audio first, normalized to the '
                    'broadcast standard (−16 LUFS, EBU R128) and output as MP3, OGG, and M4A, auto-paired in '
                    'CourseForge.</p>',
               narration='Audio carries what a still cannot: the grind, the steam wand, a narrator talking you '
-                        'through the pull. Leave the player docked at the bottom so it stays reachable while you '
+                        'through the pull. The player sits beside the text so it stays reachable while you '
                         'read. The cue is normalized to negative sixteen LUFS.'),
-        # Single docked example — pinned full-width to the bottom of the content
-        # area (the demo uses only the docked player to avoid two media elements).
+        # Inline player (a media zone-filler) so the text-left split renders text on
+        # the left and the audio player on the right — audio styled alongside text.
         _audio(label='Narration — Lesson Intro',
-               caption='Docked placement (this caption is hidden on the docked bar)',
-               dock='bottom'),
+               caption='Inline placement — sits in the right column beside the text',
+               dock='inline'),
     ]},
 
     # ── Assessment Blocks ──
