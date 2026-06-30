@@ -9,6 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
+import { flatFrameOrder } from '../Preview/PersistentPreviewPane'
 
 /**
  * MenuEditor — the authoring UI for a Menu Frame (frame_type 'menu').
@@ -43,6 +44,9 @@ export default function MenuEditor() {
   // plus lesson/module "topic" targets (resolve to the section's first frame).
   const targets = useMemo(() => {
     const frames = [], lessons = [], modules = []
+    // Global frame number (same flat order as the preview's "Frame N of M") so a
+    // long course is easy to scan — option reads e.g. "5. Image Block".
+    const numById = new Map(flatFrameOrder(activeProject).map((id, i) => [id, i + 1]))
     for (const course of activeProject?.courses || []) {
       for (const mod of course.modules || []) {
         modules.push({ id: mod.id, label: `${course.name} › ${mod.name}` })
@@ -50,7 +54,8 @@ export default function MenuEditor() {
           lessons.push({ id: lesson.id, label: `${course.name} › ${mod.name} › ${lesson.name}` })
           for (const frame of lesson.frames || []) {
             if (frame.id === activeFrame?.id) continue   // a menu can't point at itself
-            frames.push({ id: frame.id, label: frame.name })   // frame title only — no lesson breadcrumb
+            const n = numById.get(frame.id)              // frame number + title, no breadcrumb
+            frames.push({ id: frame.id, label: n ? `${n}. ${frame.name}` : frame.name })
           }
         }
       }
