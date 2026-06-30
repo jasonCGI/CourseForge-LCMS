@@ -2215,10 +2215,16 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
                 h = max(1, min(h, content_h - y))
             seg = '\n'.join(parts[start:]); del parts[start:]
             fit = 'cover' if data.get('fit') == 'cover' else 'contain'
-            # #fgui-content carries 12px padding; offset by it so the box anchors to
-            # the content-area top-left (matching the unpadded editor preview).
+            # #fgui-content carries 12px padding, but it's position:absolute, so that
+            # padding does NOT offset its absolutely-positioned children — their
+            # containing block is the padding box (= the element's visual box). So
+            # anchor the bounds box at the content-area top-left (x, y) directly, which
+            # fills the visual box edge-to-edge exactly like the editor preview. (A
+            # prior `x-12 / y-12` offset shifted the box up-left by the padding, so
+            # full-bleed media bled over the top-left but left a 12px gap on the
+            # bottom-right — the Edit-vs-Published video gap.)
             parts.append(
-                f'<div class="cf-bounds cf-fit-{fit}" style="position:absolute;left:{x - 12}px;top:{y - 12}px;'
+                f'<div class="cf-bounds cf-fit-{fit}" style="position:absolute;left:{x}px;top:{y}px;'
                 f'width:{w}px;height:{h}px;overflow:hidden;z-index:1">{seg}</div>'
             )
 
