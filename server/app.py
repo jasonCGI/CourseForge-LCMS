@@ -1,5 +1,6 @@
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from flask_compress import Compress
 from .config import config
 from .extensions import db, migrate, cors
 
@@ -9,6 +10,32 @@ def create_app(config_name=None):
 
     app = Flask(__name__, static_folder='../client/dist', static_url_path='')
     app.config.from_object(config.get(config_name, config['default']))
+
+    # Response compression (brotli, gzip fallback) for text payloads: the served
+    # JS/CSS bundles + API JSON + the preview-html / SCO HTML. The built assets ship
+    # ~1.6MB uncompressed; brotli cuts that to ~340KB over the wire. Static files are
+    # served via send_static_file (direct_passthrough), which Flask-Compress skips —
+    # serve_spa clears that flag for text assets so they get compressed too.
+    app.config.setdefault('COMPRESS_MIMETYPES', [
+        'text/html', 'text/css', 'text/javascript', 'application/javascript',
+        'application/json', 'image/svg+xml', 'application/manifest+json',
+    ])
+    app.config.setdefault('COMPRESS_MIN_SIZE', 1024)
+    Compress(app)
+
+    # Cache content-hashed build assets hard. /assets/<name>-<hash>.<ext> is served
+    # by Flask's built-in static route (static_url_path=''), which defaults to
+    # no-cache — so the browser re-downloads immutable bundles every visit. The
+    # hash changes on every deploy, so caching for a year is safe. Applied as an
+    # after_request so it covers BOTH the static route and the serve_spa fallback.
+    @app.after_request
+    def _immutable_asset_cache(resp):
+        if (request.path or '').startswith('/assets/'):
+            resp.cache_control.no_cache = False
+            resp.cache_control.public = True
+            resp.cache_control.max_age = 31536000
+            resp.cache_control.immutable = True
+        return resp
 
     # Extensions
     db.init_app(app)
@@ -100,15 +127,32 @@ def create_app(config_name=None):
             print(f'[template_seed] Warning: {e}')
 
     # Serve React SPA for all non-API routes (production)
+    _COMPRESSIBLE = ('.js', '.css', '.html', '.json', '.svg', '.map', '.txt', '.xml', '.webmanifest')
+
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_spa(path):
         dist = app.static_folder
-        if path and os.path.exists(os.path.join(dist, path)):
-            return app.send_static_file(path)
+        if path and os.path.isfile(os.path.join(dist, path)):
+            resp = app.send_static_file(path)
+            # Vite emits content-hashed assets under /assets/<name>-<hash>.<ext>;
+            # they're immutable, so cache them for a year. (index.html below stays
+            # no-cache so a new deploy's hashes are always picked up.)
+            if path.startswith('assets/'):
+                resp.cache_control.public = True
+                resp.cache_control.max_age = 31536000
+                resp.cache_control.immutable = True
+            # Clear direct_passthrough on text assets so Flask-Compress compresses
+            # them (binary assets — images/glb/hdr/wasm — stay passthrough).
+            if path.endswith(_COMPRESSIBLE):
+                resp.direct_passthrough = False
+            return resp
         index_path = os.path.join(dist, 'index.html')
-        if os.path.exists(index_path):
-            return app.send_static_file('index.html')
+        if os.path.isfile(index_path):
+            resp = app.send_static_file('index.html')
+            resp.direct_passthrough = False      # let Compress gzip/br the shell HTML
+            resp.cache_control.no_cache = True    # always revalidate the entry document
+            return resp
         # client/dist wasn't built — make the cause obvious instead of a bare 404.
         return jsonify({
             'status': 'error',
