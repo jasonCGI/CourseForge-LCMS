@@ -5,7 +5,7 @@ import {
 } from '@dnd-kit/core'
 import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
-  useSortable, arrayMove,
+  rectSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
@@ -44,6 +44,16 @@ const CF_PAUSE_SVG =
 
 export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false, contentArea = null }) {
   const updateBlock = useEditorStore(s => s.updateBlock)   // for drag/resize of bounded blocks
+  // In-preview block reorder writes to the SAME content.blocks order the inspector
+  // list uses (reuses reorderBlocks) — reorder in either surface updates the other.
+  const reorderBlocks = useEditorStore(s => s.reorderBlocks)
+  const activeFrameId = useEditorStore(s => s.activeFrame?.id)
+  // Sensors for the rendered-block drag (pointer w/ a small activation distance so a
+  // click-to-select never triggers a reorder; keyboard Space/arrows for 508).
+  const blockSortSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
   if (!frame) return null
 
   // Menu frame: render the nav-button list (mirrors server render_menu_html).
@@ -99,10 +109,36 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // text 40px padding), 'text-left'/'text-right' = 50/50 split. Mirrors
   // scorm12._render_blocks so the live preview and the SCO reflow identically.
   const layout = frame?.content?.layout || 'text-left'
+
+  // Preview reorder gate (mirrors MenuFramePreview.editable): only when this IS the
+  // edited frame AND we're in an interactive (Edit-source) preview — onBlockSelect is
+  // present only there, never in read-only/Published renders. Needs >1 flow block.
+  const sortableFlow = !!onBlockSelect && !!activeFrameId && activeFrameId === frame.id && flow.length > 1
+
+  // Drag-end: permute ONLY the flow blocks within the full content.blocks array
+  // (gui/callout/docked-audio/bounded blocks keep their absolute slots), then write
+  // the new order via the shared reorderBlocks action — the same store the inspector
+  // list mutates, so both surfaces stay in sync. Split layouts re-derive zones by
+  // type, so a cross-type drag reorders the array but only moves a block visually
+  // when its target shares its zone (documented behavior).
+  const handleFlowDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const flowIds = flow.map(b => b.id)
+    const oldIdx = flowIds.indexOf(active.id)
+    const newIdx = flowIds.indexOf(over.id)
+    if (oldIdx < 0 || newIdx < 0) return
+    const newFlowIds = arrayMove(flowIds, oldIdx, newIdx)
+    const source = frame.content?.blocks || []
+    let fi = 0
+    const next = source.map(b => flowIds.includes(b.id)
+      ? source.find(x => x.id === newFlowIds[fi++]) : b)
+    reorderBlocks(next)
+  }
+
   // fill = render this block to fill its zone (full height, no flow gap) — used in
   // overlay mode so media/3D/image/video fill their layout zone.
   const renderBlock = (block, fill = false) => (
-    <SelectableBlock key={block.id} block={block} fill={fill}
+    <SortablePreviewBlock key={block.id} block={block} fill={fill} sortable={sortableFlow}
       active={block.id === activeBlockId} onSelect={onBlockSelect} updateBlock={updateBlock} />
   )
 
@@ -149,44 +185,65 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       {/* Layout preset (frame.content.layout). 'full' = single column with
           full-bleed media and 40px-padded text; 'text-left'/'text-right' = two
           50% zones (text + media), 40px padding each, ordered by the preset. In
-          overlay mode each zone fills the content-area height (media/3D fill). */}
-      {flow.length > 0 && layout === 'full' && (
-        <div style={overlayFill && fullSingle ? { height: '100%' } : undefined}>
-          {flow.map(b => (
-            <div key={b.id} style={{
-              padding: b.type === 'text' ? 40 : 0,
-              height: overlayFill && fullSingle ? '100%' : undefined,
-              boxSizing: 'border-box',
-            }}>
-              {renderBlock(b, overlayFill && fullSingle && b.type !== 'text')}
-            </div>
-          ))}
-        </div>
-      )}
-      {flow.length > 0 && layout !== 'full' && (
-        <div style={{ display: 'flex', flexWrap: 'wrap',
-          alignItems: overlayFill ? 'stretch' : 'flex-start',
-          height: overlayFill ? '100%' : undefined }}>
-          {(() => {
-            const zone = (blocks2, isMedia) => (
-              <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box',
-                padding: isMedia && overlayFill ? 0 : 40,
-                height: overlayFill ? '100%' : undefined,
-                overflow: overlayFill ? 'hidden' : undefined }}>
-                {blocks2.map(b => renderBlock(b, isMedia && overlayFill))}
+          overlay mode each zone fills the content-area height (media/3D fill).
+          When this IS the edited frame the rendered blocks become drag-reorderable
+          (sortableFlow): the whole flow region is wrapped in a DndContext whose
+          SortableContext carries the flow ids, so a per-block grip can drag-reorder
+          them — writing the new order back through reorderBlocks (the inspector's
+          store action). Wrapped only when editable so read-only/Published renders
+          carry no DnD machinery or grips. */}
+      {(() => {
+        const flowRegion = (
+          <>
+            {flow.length > 0 && layout === 'full' && (
+              <div style={overlayFill && fullSingle ? { height: '100%' } : undefined}>
+                {flow.map(b => (
+                  <div key={b.id} style={{
+                    padding: b.type === 'text' ? 40 : 0,
+                    height: overlayFill && fullSingle ? '100%' : undefined,
+                    boxSizing: 'border-box',
+                  }}>
+                    {renderBlock(b, overlayFill && fullSingle && b.type !== 'text')}
+                  </div>
+                ))}
               </div>
-            )
-            const textZone = zone(textBlocks, false)
-            // No media to fill the other half (e.g. only an auxiliary docked audio
-            // bar) — render the text full-width instead of a half-empty split.
-            if (otherBlocks.length === 0) return textZone
-            const mediaZone = zone(otherBlocks, true)
-            return layout === 'text-right'
-              ? <>{mediaZone}{textZone}</>
-              : <>{textZone}{mediaZone}</>
-          })()}
-        </div>
-      )}
+            )}
+            {flow.length > 0 && layout !== 'full' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap',
+                alignItems: overlayFill ? 'stretch' : 'flex-start',
+                height: overlayFill ? '100%' : undefined }}>
+                {(() => {
+                  const zone = (blocks2, isMedia) => (
+                    <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box',
+                      padding: isMedia && overlayFill ? 0 : 40,
+                      height: overlayFill ? '100%' : undefined,
+                      overflow: overlayFill ? 'hidden' : undefined }}>
+                      {blocks2.map(b => renderBlock(b, isMedia && overlayFill))}
+                    </div>
+                  )
+                  const textZone = zone(textBlocks, false)
+                  // No media to fill the other half (e.g. only an auxiliary docked
+                  // audio bar) — render the text full-width instead of a half-empty split.
+                  if (otherBlocks.length === 0) return textZone
+                  const mediaZone = zone(otherBlocks, true)
+                  return layout === 'text-right'
+                    ? <>{mediaZone}{textZone}</>
+                    : <>{textZone}{mediaZone}</>
+                })()}
+              </div>
+            )}
+          </>
+        )
+        if (!sortableFlow) return flowRegion
+        return (
+          <DndContext sensors={blockSortSensors} collisionDetection={closestCenter} onDragEnd={handleFlowDragEnd}>
+            <SortableContext items={flow.map(b => b.id)}
+              strategy={layout === 'full' ? verticalListSortingStrategy : rectSortingStrategy}>
+              {flowRegion}
+            </SortableContext>
+          </DndContext>
+        )
+      })()}
       {/* Custom-bounds blocks: absolute boxes in content-area pixels (anchor to the
           scaled shell overlay). */}
       {bounded.map(b => (
@@ -340,60 +397,70 @@ function MenuFramePreview({ frame, hideTitle = false }) {
   )
 }
 
-// A single menu nav button. When `editable`, it gains a left grab handle wired to
-// dnd-kit sortable (pointer drag + Space/arrow keyboard reorder) that writes the
-// new order back to the store; the button itself still navigates on click. The
-// handle is an AUTHORING affordance only — the published render_menu_html paints
-// no handle (the live preview mirrors published order, not this edit chrome).
+// A single menu nav button. When `editable`, the WHOLE button is the drag target
+// (Feature B) — no separate grip. The parent MenuFramePreview's PointerSensor has an
+// activation distance, so a plain click still navigates (click ≠ drag) while a
+// press-and-move reorders. Keyboard stays accessible: the button is focusable, Space
+// lifts it into a dnd-kit keyboard drag (arrow keys move, Space drops) and Enter
+// navigates. A small ⠿ glyph (aria-hidden) is kept purely as a "draggable" cue. The
+// drag wiring is AUTHORING-only — the published render_menu_html paints no handles.
+// A target-less item is NOT natively disabled here (so it can still be reordered);
+// its click is guarded and it's styled/labelled as having no target.
 function MenuNavButton({ it, editable, targetId, onGo }) {
   const sortable = useSortable({ id: it.id, disabled: !editable })
   const disabledNav = !targetId
-  const wrapStyle = editable ? {
-    display: 'flex', alignItems: 'stretch', gap: 8,
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.6 : 1,
-    position: 'relative', zIndex: sortable.isDragging ? 10 : 'auto',
-  } : null
 
-  const button = (
-    <button
-      onClick={() => onGo(targetId)}
-      disabled={disabledNav}
-      title={disabledNav ? 'No target set' : 'Go to target'}
-      style={{
-        flex: 1,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
-        fontFamily: 'inherit', textAlign: 'left',
-        background: disabledNav ? '#9aa7b6' : '#042C53',
-        color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
-        cursor: disabledNav ? 'not-allowed' : 'pointer', opacity: disabledNav ? 0.7 : 1,
-      }}
-    >
-      <span>{it.label || 'Untitled'}</span>
-      <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
-    </button>
-  )
-
-  if (!editable) return button
+  if (!editable) {
+    return (
+      <button
+        onClick={() => { if (targetId) onGo(targetId) }}
+        disabled={disabledNav}
+        title={disabledNav ? 'No target set' : 'Go to target'}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
+          fontFamily: 'inherit', textAlign: 'left',
+          background: disabledNav ? '#9aa7b6' : '#042C53',
+          color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
+          cursor: disabledNav ? 'not-allowed' : 'pointer', opacity: disabledNav ? 0.7 : 1,
+        }}
+      >
+        <span>{it.label || 'Untitled'}</span>
+        <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
+      </button>
+    )
+  }
 
   return (
-    <div ref={sortable.setNodeRef} style={wrapStyle}>
-      <button
-        {...sortable.attributes}
-        {...sortable.listeners}
-        aria-label={`Drag to reorder ${it.label || 'menu item'} (or press Space, then use arrow keys)`}
-        title="Drag to reorder"
-        style={{
-          flexShrink: 0, width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#eef2f7', border: '1px solid #cdd6e2', borderRadius: 8,
-          color: '#5a6a80', fontSize: 16, lineHeight: 1,
-          cursor: sortable.isDragging ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none',
-        }}
-      >⠿</button>
-      {button}
-    </div>
+    <button
+      ref={sortable.setNodeRef}
+      {...sortable.attributes}
+      {...sortable.listeners}
+      onClick={() => { if (targetId) onGo(targetId) }}
+      aria-label={disabledNav
+        ? `${it.label || 'Untitled'} — no target set. Press Space then the arrow keys to reorder.`
+        : `${it.label || 'Untitled'} — Enter to go to target. Press Space then the arrow keys to reorder.`}
+      title="Drag to reorder · click to open"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
+        fontFamily: 'inherit', textAlign: 'left', width: '100%', boxSizing: 'border-box',
+        background: disabledNav ? '#9aa7b6' : '#042C53',
+        color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
+        opacity: sortable.isDragging ? 0.6 : (disabledNav ? 0.85 : 1),
+        cursor: sortable.isDragging ? 'grabbing' : 'grab',
+        userSelect: 'none', touchAction: 'none',
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+        position: 'relative', zIndex: sortable.isDragging ? 10 : 'auto',
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span aria-hidden="true" style={{ color: '#F59E0B', opacity: 0.7, fontSize: 14, lineHeight: 1, flex: 'none' }}>⠿</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label || 'Untitled'}</span>
+      </span>
+      <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16, flex: 'none' }} aria-hidden="true">›</span>
+    </button>
   )
 }
 
@@ -428,6 +495,54 @@ function MenuBackPill({ currentFrameId }) {
       <span aria-hidden="true" style={{ color: '#F59E0B', flex: 'none' }}>←</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
     </button>
+  )
+}
+
+// Makes a rendered preview block drag-reorderable IN the live preview (Feature A).
+// When `sortable`, the block gets a dedicated ⠿ grip (top-left overlay) wired to
+// dnd-kit's useSortable: pointer-drag the grip OR focus it and press Space then
+// arrow keys (508). A dedicated grip — rather than making the whole block the drag
+// surface — is the cleaner option here because preview blocks carry their own
+// interactions (click-to-select via SelectableBlock; draggable callouts; clickable
+// hotspot/quiz/branch), and a whole-surface drag would hijack those. When not
+// sortable it falls straight through to SelectableBlock (no DnD machinery, no grip),
+// so read-only / Published / non-active-frame renders are untouched.
+function SortablePreviewBlock({ block, fill = false, sortable = false, active, onSelect, updateBlock = null }) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
+    useSortable({ id: block.id, disabled: !sortable })
+  if (!sortable) {
+    return <SelectableBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
+  }
+  return (
+    <div ref={setNodeRef} style={{
+      position: 'relative',
+      height: fill ? '100%' : undefined,
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 20 : undefined,
+    }}>
+      <SelectableBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
+      <button
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        type="button"
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Drag to reorder this ${block.type} block (or press Space, then use the arrow keys)`}
+        title="Drag to reorder"
+        style={{
+          position: 'absolute', top: 6, left: 6, zIndex: 6,
+          width: 26, height: 22, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(4,44,83,0.82)', color: '#F59E0B',
+          border: '1px solid rgba(245,158,11,0.55)', borderRadius: 6,
+          fontSize: 14, lineHeight: 1, userSelect: 'none', touchAction: 'none',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        }}
+      >⠿</button>
+    </div>
   )
 }
 
