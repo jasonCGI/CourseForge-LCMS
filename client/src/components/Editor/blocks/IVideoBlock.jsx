@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import MediaUploader   from './MediaUploader'
+import ReplaceAssetButton from './ReplaceAssetButton'
 import { uploadMedia, uploadClip, getMediaAsset, uploadIVideoPackage } from '../../../api/client'
 import BoundsControl from './BoundsControl'
 import useContentArea from '../../../hooks/useContentArea'
@@ -154,6 +155,8 @@ export default function IVideoBlock({ block }) {
           ) : (
             <AssetCard icon="🎬" name={block.data.video_filename || 'Video file'}
               meta={block.data.video_serve_url ? '✓ Uploaded' : ''}
+              onReplace={handleVideoUpload} accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
+              uploading={uploadingVideo} replaceTitle="Replace the video file (keeps the linked clip)"
               onRemove={() => { updateBlock(block.id, { video_asset_id: null, video_filename: null }); setVideoMeta(null) }} />
           )}
           {videoId && videoMeta?.has_clip && !clipId && (
@@ -187,6 +190,8 @@ export default function IVideoBlock({ block }) {
               meta={block.data.interaction_count != null
                 ? `${block.data.interaction_count} interactions · ${(block.data.video_duration || 0).toFixed(1)}s`
                 : '✓ Linked'}
+              onReplace={handleClipUpload} accept=".json,.clip.json"
+              uploading={uploadingClip} replaceTitle="Replace the .clip.json (keeps the video)"
               onRemove={() => updateBlock(block.id, { clip_asset_id: null, interaction_count: null })} />
           )}
         </div>
@@ -352,7 +357,7 @@ function InteractionList({ block, updateBlock }) {
   )
 }
 
-function AssetCard({ icon, name, meta, onRemove }) {
+function AssetCard({ icon, name, meta, onRemove, onReplace, accept, uploading, replaceTitle }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
@@ -363,6 +368,7 @@ function AssetCard({ icon, name, meta, onRemove }) {
         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--cf-text-primary)' }}>{name}</div>
         {meta && <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{meta}</div>}
       </div>
+      {onReplace && <ReplaceAssetButton accept={accept} onPick={onReplace} uploading={uploading} title={replaceTitle} />}
       <button onClick={onRemove} aria-label="Remove asset"
         style={{ background: 'none', border: 'none', color: '#E87070', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
     </div>

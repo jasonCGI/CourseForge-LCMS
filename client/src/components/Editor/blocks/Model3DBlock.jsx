@@ -4,6 +4,7 @@ import useProjectStore from '../../../store/projectStore'
 import Model3DViewer   from '../../Preview/Model3DViewer'
 import BoundsControl    from './BoundsControl'
 import { uploadModel } from '../../../api/client'
+import ReplaceAssetButton from './ReplaceAssetButton'
 
 const DOT_COLOR = '#F59E0B'  // concrete forge amber — stored + used in SCORM
 
@@ -198,6 +199,8 @@ export default function Model3DBlock({ block }) {
               <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--cf-text-primary)' }}>{block.data.model_filename}</div>
               <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{block.data.file_size_mb ? `${block.data.file_size_mb} MB` : 'GLB model'} · Three.js r136</div>
             </div>
+            <ReplaceAssetButton accept=".glb,.gltf" onPick={handleUpload} uploading={uploading}
+              title="Replace the model — keeps caption, attribution & viewer settings (annotations reset, they're model-specific)" />
             <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [], thumb_url: null, thumb_sig: null }); setPlacing(false); setPinMode(false) }}
               aria-label="Remove model" style={{ background: 'none', border: 'none', color: '#E87070', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
           </div>

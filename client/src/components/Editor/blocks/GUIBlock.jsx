@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import useEditorStore  from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { uploadGUI } from '../../../api/client'
+import ReplaceAssetButton from './ReplaceAssetButton'
 
 export default function GUIBlock({ block }) {
   const updateBlock   = useEditorStore(s => s.updateBlock)
@@ -164,6 +165,8 @@ export default function GUIBlock({ block }) {
                   · {block.data.zone_count} zone{block.data.zone_count !== 1 ? 's' : ''}
                 </div>
               </div>
+              <ReplaceAssetButton accept=".zip" onPick={handleUpload} uploading={uploading}
+                title="Replace the shell .zip — keeps the block in place" />
               <button
                 onClick={() => updateBlock(block.id, {
                   gui_asset_id: null, shell_name: null,

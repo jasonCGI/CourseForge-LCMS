@@ -4,6 +4,7 @@ import useProjectStore from '../../../store/projectStore'
 import { BlockHeader }  from './TextBlock'
 import MediaUploader    from './MediaUploader'
 import { uploadOam, getOamAsset } from '../../../api/client'
+import ReplaceAssetButton from './ReplaceAssetButton'
 import OamMediaBar from '../../Preview/OamMediaBar'
 import useForgeConfigStore, { DEFAULT_HS } from '../../../store/forgeConfigStore'
 import BoundsControl from './BoundsControl'
@@ -142,7 +143,9 @@ export default function OamBlock({ block }) {
                   {oamMeta.has_scorm_calls && <MetaBadge label="SCORM bridge" color="#185FA5"/>}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                <ReplaceAssetButton accept=".oam" onPick={handleUpload} uploading={uploading}
+                  title="Replace the .oam — keeps caption, bounds & viewer settings" />
                 <button
                   onClick={() => setShowPreview(true)}
                   aria-label="Preview OAM content"
