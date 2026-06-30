@@ -25,6 +25,27 @@ export default function FrameLayout({ frame }) {
   const setOptional = useEditorStore(s => s.setOptional)
   const value = frame?.content?.layout || DEFAULT_FRAME_LAYOUT
 
+  // A split layout (text-left/right) needs a MEDIA zone-filler to fill the other
+  // half. Docked audio + callouts are auxiliary (not zone-fillers), so a text-only /
+  // aux-only frame can't split — it renders full-width regardless. Disable the split
+  // options there so the no-op is obvious instead of confusing. Separately, a
+  // full-bleed COVER media gets cropped into the half column on a split — that DOES
+  // apply, so it's a soft heads-up, not a block.
+  const blocks = frame?.content?.blocks || []
+  // A "media zone-filler" matches the RENDERER's split logic (FramePreview
+  // buildShelledLayoutHTML): a non-text block that isn't auxiliary. Docked audio
+  // (dock:'bottom'), callouts and GUI blocks are aux; an INLINE audio player IS a
+  // zone-filler (fills the media half) — which is why the demo Audio Block, set to
+  // inline, splits text-left while a docked-audio frame collapses to full. (Note:
+  // editorStore.isZoneMedia is stricter — it excludes ALL audio — so don't use it here.)
+  const isAuxBlock = (b) => (b.type === 'media' && b.data?.kind === 'audio' && b.data?.dock === 'bottom')
+    || b.type === 'callout' || b.type === 'gui'
+  const hasMediaZone = blocks.some(b => b.type !== 'text' && !isAuxBlock(b))
+  const coverMedia = blocks.some(b => b.type !== 'text' && !isAuxBlock(b) && b.data?.fit === 'cover')
+  const isSplit = value === 'text-left' || value === 'text-right'
+  // Show 'full' as selected when a split can't apply (matches what actually renders).
+  const displayValue = hasMediaZone ? value : 'full'
+
   return (
     <div style={{ marginBottom: 12 }}>
       <label htmlFor="cf-frame-layout" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5,
@@ -34,16 +55,26 @@ export default function FrameLayout({ frame }) {
       </label>
       <select
         id="cf-frame-layout"
-        value={value}
+        value={displayValue}
         onChange={e => setFrameLayout(e.target.value)}
         aria-label="Frame layout preset"
         style={{ width: '100%', background: 'var(--cf-input-bg)', border: '1px solid var(--cf-border-secondary)',
           borderRadius: 4, padding: '8px 10px', fontSize: 13, color: 'var(--cf-text-primary, #E0E8F0)',
           fontFamily: 'var(--cf-font)', boxSizing: 'border-box' }}>
-        {FRAME_LAYOUTS.map(o => (<option key={o.value} value={o.value}>{o.label}</option>))}
+        {FRAME_LAYOUTS.map(o => (
+          <option key={o.value} value={o.value} disabled={o.value !== 'full' && !hasMediaZone}>{o.label}</option>
+        ))}
       </select>
-      <div style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
-        marginTop: 4, letterSpacing: '0.06em' }}>// reflows the live preview · full-bleed media vs 50/50 split</div>
+      {!hasMediaZone ? (
+        <div style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+          marginTop: 4, letterSpacing: '0.06em' }}>// add a media block (image / video / 3D) to use a split layout — text-only frames render full width</div>
+      ) : (coverMedia && isSplit) ? (
+        <div style={{ fontSize: 9, color: 'var(--forge-amber)', fontFamily: 'var(--forge-font)',
+          marginTop: 4, letterSpacing: '0.06em', lineHeight: 1.5 }}>// heads up: full-screen (cover) media crops into the half column — set its fit to “contain” for a clean fit</div>
+      ) : (
+        <div style={{ fontSize: 9, color: 'var(--cf-text-tertiary)', fontFamily: 'var(--forge-font)',
+          marginTop: 4, letterSpacing: '0.06em' }}>// reflows the live preview · full-bleed media vs 50/50 split</div>
+      )}
 
       {/* Optional frame — relocated here from the inspector action bar. Wired to
           the same store state (activeFrame.optional / setOptional). */}
