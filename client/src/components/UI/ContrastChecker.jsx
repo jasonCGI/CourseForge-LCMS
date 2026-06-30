@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { normHex, contrast, floor2, nudgeToPass, TESTS } from '../../utils/contrast'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // In-editor, draggable WCAG contrast checker.
@@ -15,98 +16,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 // result to send back to an artist.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ---------- color math (mirrors the standalone tool) ----------
-function normHex(s) {
-  if (typeof s !== 'string') return null
-  s = s.trim().replace(/^#/, '')
-  if (/^[0-9a-fA-F]{3}$/.test(s)) s = s.split('').map(c => c + c).join('')
-  if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s.toUpperCase()
-  return null
-}
-function hexToRgb(hex) {
-  const h = hex.replace('#', '')
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
-}
-function rgbToHex(r, g, b) {
-  const p = n => ('0' + Math.round(n).toString(16)).slice(-2)
-  return '#' + (p(r) + p(g) + p(b)).toUpperCase()
-}
-function relLum(rgb) {
-  const c = rgb.map(v => {
-    v = v / 255
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
-  })
-  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-}
-function contrast(hexA, hexB) {
-  const l1 = relLum(hexToRgb(hexA)), l2 = relLum(hexToRgb(hexB))
-  const hi = Math.max(l1, l2), lo = Math.min(l1, l2)
-  return (hi + 0.05) / (lo + 0.05)
-}
-// round DOWN to 2 decimals so a borderline value never reads as a false pass
-function floor2(n) { return Math.floor(n * 100) / 100 }
-
-function rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  let h, s, l = (max + min) / 2
-  if (max === min) { h = s = 0 }
-  else {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break
-      case g: h = (b - r) / d + 2; break
-      default: h = (r - g) / d + 4
-    }
-    h /= 6
-  }
-  return [h, s, l]
-}
-function hslToRgb(h, s, l) {
-  let r, g, b
-  if (s === 0) { r = g = b = l }
-  else {
-    const hue = (p, q, t) => {
-      if (t < 0) t += 1; if (t > 1) t -= 1
-      if (t < 1 / 6) return p + (q - p) * 6 * t
-      if (t < 1 / 2) return q
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
-      return p
-    }
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q
-    r = hue(p, q, h + 1 / 3); g = hue(p, q, h); b = hue(p, q, h - 1 / 3)
-  }
-  return [r * 255, g * 255, b * 255]
-}
-
-const TESTS = [
-  { key: 'aa-normal',  label: 'AA normal text',         min: 4.5, req: 'needs 4.5 : 1' },
-  { key: 'aa-large',   label: 'AA large text',          min: 3,   req: 'needs 3 : 1' },
-  { key: 'aaa-normal', label: 'AAA normal text',        min: 7,   req: 'needs 7 : 1' },
-  { key: 'aaa-large',  label: 'AAA large text',         min: 4.5, req: 'needs 4.5 : 1' },
-  { key: 'nontext',    label: 'Non-text / UI (1.4.11)', min: 3,   req: 'needs 3 : 1' },
-]
-
-// nudge: darken (light bg) or lighten (dark bg) the fg lightness until AA clears
-function nudgeToPass(fg, bg, TARGET = 4.5) {
-  if (floor2(contrast(fg, bg)) >= TARGET) return { already: true }
-  const hsl = rgbToHsl(...hexToRgb(fg))
-  const h = hsl[0], s = hsl[1]
-  const bgLum = relLum(hexToRgb(bg))
-  const goDark = bgLum > 0.5
-  let best = null, bestRatio = 0
-  for (let i = 0; i <= 100; i++) {
-    const l = goDark ? Math.max(0, hsl[2] - i / 100) : Math.min(1, hsl[2] + i / 100)
-    const rgb = hslToRgb(h, s, l)
-    const hex = rgbToHex(rgb[0], rgb[1], rgb[2])
-    const c = floor2(contrast(hex, bg))
-    if (c > bestRatio) bestRatio = c
-    if (c >= TARGET) { best = { hex, ratio: c }; break }
-    if ((goDark && l <= 0) || (!goDark && l >= 1)) break
-  }
-  return best ? { best } : { failed: true, bestRatio }
-}
+// Color math + thresholds + nudge now live in ../../utils/contrast (imported
+// above) so the standalone checker and the in-preview audit badge share one
+// implementation and can never drift.
 
 const HAS_EYE = typeof window !== 'undefined' && ('EyeDropper' in window)
 

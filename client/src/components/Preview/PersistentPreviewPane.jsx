@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react'
 import FramePreview, { buildShelledLayoutHTML, buildMenuHTML, resolveMenuTargetFrameId, frameExistsInProject, parseFguiContentBg, parseOpaqueRgb } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
+import FrameAuditBadge from './FrameAuditBadge'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 
@@ -109,6 +110,7 @@ export default function PersistentPreviewPane() {
   // Memoized so a non-content re-render (e.g. the shell.json fetch resolving)
   // doesn't recompute the tree walk or hand GUIShellRenderer fresh prop
   // references — which would re-inject into the iframe needlessly.
+  const paneRef = useRef(null)   // the preview pane element (FrameAuditBadge reads its rendered DOM)
   const order = useMemo(() => flatFrameOrder(activeProject), [activeProject])
   const idx   = activeFrame ? order.indexOf(activeFrame.id) : -1
   const total = order.length || 1
@@ -193,13 +195,26 @@ export default function PersistentPreviewPane() {
     if (source === 'published' && isDirty) save()
   }, [source, isDirty, save])
 
+  // The current preview is shell-rendered when Published-with-shell or GUI-ON edit;
+  // GUI-OFF edit shows the clean content on white. The audit uses the shell's
+  // content-area bg as the fallback backdrop for text whose own DOM bg is unresolved
+  // (the shell paints its backdrop behind #fgui-content, not as a CSS bg) so navy-on-
+  // light doesn't false-fail as navy-on-black, and a real bad pair is still caught.
+  const shellRendered = source === 'published' ? !!shellId : (!!shellId && guiOn)
+  const auditFallbackBg = shellRendered ? contentBg : null
+  // Re-audit signal: changes when the previewed frame, mode, GUI toggle, last save,
+  // frame content, or fallback bg changes — FrameAuditBadge debounces a re-audit on it.
+  const auditSig = [activeFrame?.id, source, guiOn, lastSaved ? lastSaved.getTime() : 0,
+    JSON.stringify(activeFrame?.content || {}).length, auditFallbackBg || ''].join('|')
+
   if (!activeFrame) return null
 
   return (
-    <div className="cf-preview-pane">
+    <div className="cf-preview-pane" ref={paneRef}>
       <PreviewHeader human={human} total={total} shell={!!shellId}
         guiOn={guiOn} onToggleGui={shellId ? () => setGuiOn(v => !v) : null}
-        source={source} onSource={setSource} />
+        source={source} onSource={setSource}
+        paneRef={paneRef} frameId={activeFrame.id} auditSig={auditSig} auditFallbackBg={auditFallbackBg} />
       {source === 'published' ? (
         // Server-rendered truth: the same /preview-html the old popup opened,
         // now filling the pane. Replaces the removed FrameHeader Preview button.
@@ -236,7 +251,7 @@ export default function PersistentPreviewPane() {
           />
         </ShellFit>
       ) : (
-        <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
+        <div className="cf-preview-surface" style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
           <PreviewErrorBoundary resetKey={activeFrame.id}>
             <FramePreview frame={activeFrame} ignoreGui={!!shellId}
               activeBlockId={activeBlockId} onBlockSelect={setActiveBlock} />
@@ -343,7 +358,7 @@ function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom }) {
   )
 }
 
-function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSource }) {
+function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSource, paneRef, frameId, auditSig, auditFallbackBg }) {
   return (
     <div style={{
       background: 'var(--cf-navy, #042C53)',
@@ -389,6 +404,11 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSour
           GUI {guiOn ? 'ON' : 'OFF'}
         </button>
       )}
+
+      {/* WCAG / 508 contrast traffic-light for the current frame's rendered DOM. */}
+      <div style={{ marginLeft: onToggleGui ? 0 : 'auto', flexShrink: 0 }}>
+        <FrameAuditBadge paneRef={paneRef} frameId={frameId} signature={auditSig} fallbackBg={auditFallbackBg} />
+      </div>
     </div>
   )
 }

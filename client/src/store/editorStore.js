@@ -130,6 +130,16 @@ const useEditorStore = create((set, get) => ({
   setLastMenuFrame: (frameId, title) =>
     set({ lastMenuFrame: frameId ? { frameId, title: title || '' } : null }),
 
+  // ── Per-frame a11y (contrast / 508) audit cache ──────────────────────────
+  // Populated lazily by the in-preview FrameAuditBadge as each frame is visited
+  // (auditing the rendered preview DOM). The project tree reads it to show a
+  // red/green dot. { [frameId]: { status:'pass'|'fail'|'manual', fails, manual } }.
+  a11yByFrame: {},
+  setFrameA11y: (frameId, result) => {
+    if (!frameId) return
+    set(s => ({ a11yByFrame: { ...s.a11yByFrame, [frameId]: result } }))
+  },
+
   // ── Inspector display mode (stack / tabs) ───────────────────────────────
   inspectorMode: _readMode(),
   setInspectorMode: (mode) => {

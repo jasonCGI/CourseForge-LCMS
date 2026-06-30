@@ -44,6 +44,15 @@ const COMPLETION_DOT = {
   optional:   { color: '#5A7AA8', glyph: '○', title: 'Optional — excluded from completion count' },
 }
 
+// In-preview contrast (508) status, populated lazily as frames are visited (see
+// editorStore.a11yByFrame / FrameAuditBadge). Distinct SHAPE per status so it's
+// never color-only. Absent until a frame has been previewed at least once.
+const A11Y_DOT = {
+  pass:   { color: '#4CAF50', glyph: '●', title: 'Contrast: all text passes' },
+  fail:   { color: '#E24B4A', glyph: '▲', title: 'Contrast: failing text' },
+  manual: { color: '#D9920A', glyph: '◓', title: 'Contrast: needs manual check (text over image/gradient)' },
+}
+
 // ── SVG helpers ──────────────────────────────────────────────────
 
 function FolderIcon({ f1, f2, open, size = 14 }) {
@@ -122,6 +131,9 @@ function TreeRow({
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
+  // This frame's cached contrast-audit status (null for non-frames / unvisited
+  // frames). Selecting the single entry keeps unaffected rows from re-rendering.
+  const a11y = useEditorStore(s => (isFrame && itemId) ? s.a11yByFrame[itemId] : null)
 
   const tabColor = isCurrent
     ? cssVar('--cf-level-frame-active-tab')
@@ -156,7 +168,7 @@ function TreeRow({
         aria-expanded={!isFrame ? isOpen : undefined}
         aria-selected={isFrame ? (isCurrent ? 'true' : 'false') : undefined}
         aria-current={isCurrent ? 'true' : undefined}
-        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isFrame && dotStatus ? `, ${dotStatus}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
+        aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isFrame && dotStatus ? `, ${dotStatus}` : ''}${isFrame && a11y ? `, contrast ${a11y.status === 'fail' ? `${a11y.fails} failing` : a11y.status}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
         tabIndex={tabIndex != null ? tabIndex : 0}
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -209,6 +221,17 @@ function TreeRow({
                 fontSize: 11, lineHeight: 1, fontWeight: 700,
                 color: COMPLETION_DOT[dotStatus].color }}>
               {COMPLETION_DOT[dotStatus].glyph}
+            </span>
+          )}
+
+          {/* Contrast (508) dot — appears once a frame has been previewed; red ▲
+              fail / amber ◓ manual / green ● pass, shape-coded (not color-only). */}
+          {isFrame && a11y && A11Y_DOT[a11y.status] && (
+            <span title={a11y.status === 'fail' ? `Contrast: ${a11y.fails} failing` : A11Y_DOT[a11y.status].title}
+              aria-hidden="true"
+              style={{ flexShrink: 0, display: 'inline-block', width: 10, textAlign: 'center',
+                fontSize: 9, lineHeight: 1, fontWeight: 700, color: A11Y_DOT[a11y.status].color }}>
+              {A11Y_DOT[a11y.status].glyph}
             </span>
           )}
 
