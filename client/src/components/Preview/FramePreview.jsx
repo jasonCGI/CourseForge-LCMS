@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
 import IVideoEditor from '../Editor/blocks/IVideoEditor'
 import OamMediaBar from './OamMediaBar'
@@ -254,10 +262,23 @@ export function resolveMenuTargetFrameId(item, project) {
 function MenuFramePreview({ frame, hideTitle = false }) {
   const loadFrame        = useEditorStore(s => s.loadFrame)
   const setLastMenuFrame = useEditorStore(s => s.setLastMenuFrame)
+  const reorderMenuItems = useEditorStore(s => s.reorderMenuItems)
+  const activeFrameId    = useEditorStore(s => s.activeFrame?.id)
   const activeProject    = useProjectStore(s => s.activeProject)
 
   const menu  = frame.content?.menu || {}
   const items = Array.isArray(menu.items) ? menu.items : []
+
+  // Drag-to-reorder writes to activeFrame.content.menu via the store, so only
+  // enable it when the previewed frame IS the frame being edited (otherwise the
+  // reorder would land on the wrong frame). In published/runtime preview of a
+  // non-active frame, buttons stay plain nav buttons.
+  const editable = !!activeFrameId && activeFrameId === frame.id
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   // We are ON a menu frame → it gets no pill. Clear any stale source so the menu
   // itself never shows a back-pill (parity with the SCO `href === here` check).
@@ -272,6 +293,24 @@ function MenuFramePreview({ frame, hideTitle = false }) {
     setLastMenuFrame(frame.id, menu.title || '')
     loadFrame(targetId)
   }
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIdx = items.findIndex(it => it.id === active.id)
+    const newIdx = items.findIndex(it => it.id === over.id)
+    if (oldIdx < 0 || newIdx < 0) return
+    reorderMenuItems(arrayMove(items, oldIdx, newIdx))
+  }
+
+  const list = items.map(it => (
+    <MenuNavButton
+      key={it.id}
+      it={it}
+      editable={editable}
+      targetId={resolveTargetFrameId(it)}
+      onGo={goTo}
+    />
+  ))
 
   return (
     <div style={{
@@ -288,30 +327,71 @@ function MenuFramePreview({ frame, hideTitle = false }) {
         {items.length === 0 && (
           <p style={{ color: '#6a7686', fontStyle: 'italic' }}>No menu items yet.</p>
         )}
-        {items.map(it => {
-          const targetId = resolveTargetFrameId(it)
-          const disabled = !targetId
-          return (
-            <button
-              key={it.id}
-              onClick={() => goTo(targetId)}
-              disabled={disabled}
-              title={disabled ? 'No target set' : 'Go to target'}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
-                fontFamily: 'inherit', textAlign: 'left',
-                background: disabled ? '#9aa7b6' : '#042C53',
-                color: '#fff', border: `1px solid ${disabled ? '#9aa7b6' : '#042C53'}`,
-                cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.7 : 1,
-              }}
-            >
-              <span>{it.label || 'Untitled'}</span>
-              <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
-            </button>
-          )
-        })}
+        {editable && items.length > 0 ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items.map(it => it.id)} strategy={verticalListSortingStrategy}>
+              {list}
+            </SortableContext>
+          </DndContext>
+        ) : list}
       </div>
+    </div>
+  )
+}
+
+// A single menu nav button. When `editable`, it gains a left grab handle wired to
+// dnd-kit sortable (pointer drag + Space/arrow keyboard reorder) that writes the
+// new order back to the store; the button itself still navigates on click. The
+// handle is an AUTHORING affordance only — the published render_menu_html paints
+// no handle (the live preview mirrors published order, not this edit chrome).
+function MenuNavButton({ it, editable, targetId, onGo }) {
+  const sortable = useSortable({ id: it.id, disabled: !editable })
+  const disabledNav = !targetId
+  const wrapStyle = editable ? {
+    display: 'flex', alignItems: 'stretch', gap: 8,
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0.6 : 1,
+    position: 'relative', zIndex: sortable.isDragging ? 10 : 'auto',
+  } : null
+
+  const button = (
+    <button
+      onClick={() => onGo(targetId)}
+      disabled={disabledNav}
+      title={disabledNav ? 'No target set' : 'Go to target'}
+      style={{
+        flex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 20px', borderRadius: 8, fontSize: 16, fontWeight: 600,
+        fontFamily: 'inherit', textAlign: 'left',
+        background: disabledNav ? '#9aa7b6' : '#042C53',
+        color: '#fff', border: `1px solid ${disabledNav ? '#9aa7b6' : '#042C53'}`,
+        cursor: disabledNav ? 'not-allowed' : 'pointer', opacity: disabledNav ? 0.7 : 1,
+      }}
+    >
+      <span>{it.label || 'Untitled'}</span>
+      <span style={{ color: '#F59E0B', fontSize: 22, marginLeft: 16 }} aria-hidden="true">›</span>
+    </button>
+  )
+
+  if (!editable) return button
+
+  return (
+    <div ref={sortable.setNodeRef} style={wrapStyle}>
+      <button
+        {...sortable.attributes}
+        {...sortable.listeners}
+        aria-label={`Drag to reorder ${it.label || 'menu item'} (or press Space, then use arrow keys)`}
+        title="Drag to reorder"
+        style={{
+          flexShrink: 0, width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#eef2f7', border: '1px solid #cdd6e2', borderRadius: 8,
+          color: '#5a6a80', fontSize: 16, lineHeight: 1,
+          cursor: sortable.isDragging ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none',
+        }}
+      >⠿</button>
+      {button}
     </div>
   )
 }

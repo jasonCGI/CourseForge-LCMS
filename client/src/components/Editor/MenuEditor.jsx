@@ -1,4 +1,12 @@
 import React, { useMemo } from 'react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import useEditorStore from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 
@@ -15,13 +23,21 @@ import useProjectStore from '../../store/projectStore'
  * autosave — no schema change).
  */
 export default function MenuEditor() {
-  const activeFrame    = useEditorStore(s => s.activeFrame)
-  const setMenuTitle   = useEditorStore(s => s.setMenuTitle)
-  const addMenuItem    = useEditorStore(s => s.addMenuItem)
-  const updateMenuItem = useEditorStore(s => s.updateMenuItem)
-  const removeMenuItem = useEditorStore(s => s.removeMenuItem)
-  const moveMenuItem   = useEditorStore(s => s.moveMenuItem)
-  const activeProject  = useProjectStore(s => s.activeProject)
+  const activeFrame       = useEditorStore(s => s.activeFrame)
+  const setMenuTitle      = useEditorStore(s => s.setMenuTitle)
+  const addMenuItem       = useEditorStore(s => s.addMenuItem)
+  const updateMenuItem    = useEditorStore(s => s.updateMenuItem)
+  const removeMenuItem    = useEditorStore(s => s.removeMenuItem)
+  const reorderMenuItems  = useEditorStore(s => s.reorderMenuItems)
+  const activeProject     = useProjectStore(s => s.activeProject)
+
+  // Pointer drag to reorder, plus the dnd-kit keyboard sensor so a focused grab
+  // handle can be operated with Space + arrow keys (508 / keyboard parity with
+  // the content tree and block list).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   // Build the grouped target picker options from the project tree: frames,
   // plus lesson/module "topic" targets (resolve to the section's first frame).
@@ -52,6 +68,14 @@ export default function MenuEditor() {
     updateMenuItem(itemId, { target_kind: kind, target_id: id })
   }
 
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIdx = items.findIndex(it => it.id === active.id)
+    const newIdx = items.findIndex(it => it.id === over.id)
+    if (oldIdx < 0 || newIdx < 0) return
+    reorderMenuItems(arrayMove(items, oldIdx, newIdx))
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
@@ -79,48 +103,20 @@ export default function MenuEditor() {
               No menu items yet — add one below.
             </div>
           )}
-          {items.map((it, i) => {
-            const value = it.target_id ? `${it.target_kind || 'frame'}:${it.target_id}` : ''
-            return (
-              <div key={it.id} style={itemCard}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
-                  <button onClick={() => moveMenuItem(it.id, 'up')}   disabled={i === 0}
-                    aria-label="Move item up" style={iconBtn(i === 0)}>▲</button>
-                  <button onClick={() => moveMenuItem(it.id, 'down')} disabled={i === items.length - 1}
-                    aria-label="Move item down" style={iconBtn(i === items.length - 1)}>▼</button>
-                </div>
-                <div style={{ flex: 1, display: 'grid', gap: 8 }}>
-                  <div>
-                    <label htmlFor={`menu-item-label-${it.id}`} style={fieldLabel}>Label</label>
-                    <input
-                      id={`menu-item-label-${it.id}`}
-                      value={it.label || ''}
-                      onChange={e => updateMenuItem(it.id, { label: e.target.value })}
-                      placeholder="Button label"
-                      style={inputStyle}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor={`menu-item-target-${it.id}`} style={fieldLabel}>Target</label>
-                    <select id={`menu-item-target-${it.id}`} value={value} onChange={e => onTargetChange(it.id, e.target.value)} style={selectStyle}>
-                      <option value="">— select target —</option>
-                      <optgroup label="Frames">
-                        {targets.frames.map(f => <option key={f.id} value={`frame:${f.id}`}>{f.label}</option>)}
-                      </optgroup>
-                      <optgroup label="Lessons (topic → first frame)">
-                        {targets.lessons.map(l => <option key={l.id} value={`lesson:${l.id}`}>{l.label}</option>)}
-                      </optgroup>
-                      <optgroup label="Modules (topic → first frame)">
-                        {targets.modules.map(m => <option key={m.id} value={`module:${m.id}`}>{m.label}</option>)}
-                      </optgroup>
-                    </select>
-                  </div>
-                </div>
-                <button onClick={() => removeMenuItem(it.id)} aria-label="Remove item"
-                  style={{ ...iconBtn(false), color: '#E87070', alignSelf: 'flex-start' }}>✕</button>
-              </div>
-            )
-          })}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items.map(it => it.id)} strategy={verticalListSortingStrategy}>
+              {items.map(it => (
+                <SortableMenuItem
+                  key={it.id}
+                  it={it}
+                  targets={targets}
+                  updateMenuItem={updateMenuItem}
+                  removeMenuItem={removeMenuItem}
+                  onTargetChange={onTargetChange}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       </div>
 
@@ -130,6 +126,70 @@ export default function MenuEditor() {
     </div>
   )
 }
+
+// One reorderable menu-item row. The grab handle carries the dnd-kit sortable
+// listeners/attributes (pointer drag + Space/arrow keyboard reorder); the form
+// fields stay fully interactive (handle is the only drag origin).
+function SortableMenuItem({ it, targets, updateMenuItem, removeMenuItem, onTargetChange }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: it.id })
+  const value = it.target_id ? `${it.target_kind || 'frame'}:${it.target_id}` : ''
+  const style = {
+    ...itemCard,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+    zIndex: isDragging ? 10 : 'auto',
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`Drag to reorder ${it.label || 'menu item'} (or press Space, then use arrow keys)`}
+        title="Drag to reorder"
+        style={dragHandle(isDragging)}
+      >⠿</button>
+      <div style={{ flex: 1, display: 'grid', gap: 8 }}>
+        <div>
+          <label htmlFor={`menu-item-label-${it.id}`} style={fieldLabel}>Label</label>
+          <input
+            id={`menu-item-label-${it.id}`}
+            value={it.label || ''}
+            onChange={e => updateMenuItem(it.id, { label: e.target.value })}
+            placeholder="Button label"
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label htmlFor={`menu-item-target-${it.id}`} style={fieldLabel}>Target</label>
+          <select id={`menu-item-target-${it.id}`} value={value} onChange={e => onTargetChange(it.id, e.target.value)} style={selectStyle}>
+            <option value="">— select target —</option>
+            <optgroup label="Frames">
+              {targets.frames.map(f => <option key={f.id} value={`frame:${f.id}`}>{f.label}</option>)}
+            </optgroup>
+            <optgroup label="Lessons (topic → first frame)">
+              {targets.lessons.map(l => <option key={l.id} value={`lesson:${l.id}`}>{l.label}</option>)}
+            </optgroup>
+            <optgroup label="Modules (topic → first frame)">
+              {targets.modules.map(m => <option key={m.id} value={`module:${m.id}`}>{m.label}</option>)}
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      <button onClick={() => removeMenuItem(it.id)} aria-label="Remove item"
+        style={{ ...iconBtn(false), color: '#E87070', alignSelf: 'flex-start' }}>✕</button>
+    </div>
+  )
+}
+
+const dragHandle = (isDragging) => ({
+  alignSelf: 'flex-start', marginTop: 2,
+  background: 'none', border: '1px solid var(--cf-border-secondary, #3a3a5a)', borderRadius: 4,
+  color: 'var(--cf-text-secondary, #9aa7b6)', fontSize: 14, lineHeight: 1,
+  cursor: isDragging ? 'grabbing' : 'grab', padding: '4px 6px', userSelect: 'none', touchAction: 'none',
+})
 
 const badge = {
   display: 'inline-block', fontFamily: 'var(--forge-font)', fontSize: 9, fontWeight: 600,
