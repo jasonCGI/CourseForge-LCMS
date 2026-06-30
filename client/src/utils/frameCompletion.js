@@ -10,7 +10,12 @@
 // status dot even for optional frames (optional is surfaced as a separate OPT
 // chip), so a optional-but-unfinished frame still reads as incomplete/empty.
 export function getFrameBaseStatus(frame) {
-  const blocks = frame?.content?.blocks || []
+  // Tolerate malformed stored content: a null/undefined entry in blocks (from a
+  // bad import / hand-edit / lossy round-trip) must NOT throw — this runs inside
+  // the content tree's per-frame completion useMemo, so an unguarded throw here
+  // white-screens the whole app on load (the DndContext in the minified stack is
+  // just where React.useMemo got bundled; the throwing code is this util).
+  const blocks = (frame?.content?.blocks || []).filter(Boolean)
   if (blocks.length === 0) return 'empty'
   return getFrameIssues(frame).some(i => i.severity !== 'warning') ? 'incomplete' : 'complete'
 }
@@ -21,7 +26,10 @@ export function getFrameCompletion(frame) {
 }
 
 export function getFrameIssues(frame) {
-  const blocks = frame?.content?.blocks || []
+  // filter(Boolean): never dereference a null/undefined block element (see
+  // getFrameBaseStatus) — block.data on a null block is the exact crash that
+  // blanked the authoring app on load.
+  const blocks = (frame?.content?.blocks || []).filter(Boolean)
   const issues = []
   for (const block of blocks) {
     const data = block.data || {}
