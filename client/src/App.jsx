@@ -9,6 +9,7 @@ import { ThemeProvider } from './theme/ThemeContext'
 import ModeToggle from './components/UI/ModeToggle'
 import EcosystemTray from './components/UI/EcosystemTray'
 import ContrastChecker from './components/UI/ContrastChecker'
+import Button from './components/UI/Button'
 import useProjectStore from './store/projectStore'
 import useEditorStore from './store/editorStore'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -269,60 +270,30 @@ export default function App() {
 
           {/* Theme editor — header trigger hidden for now (feature kept; see ThemeEditorModal) */}
 
+          {/* Top-bar actions — shared Button system (3:1 padding + hover/pressed/focus). */}
           {/* Search frames (Ctrl/Cmd+F) */}
-          <button
-            onClick={() => activeProject && setShowSearch(true)}
-            disabled={!activeProject}
-            aria-label="Search frames"
-            title="Search frames (Ctrl+F)"
-            style={{ marginLeft: 10, padding: '5px 10px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
-              color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
-              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>🔍<span className="cf-hide-mobile"> Search</span></button>
+          <Button variant="secondary" onClick={() => activeProject && setShowSearch(true)} disabled={!activeProject}
+            aria-label="Search frames" title="Search frames (Ctrl+F)" style={{ marginLeft: 10 }}>
+            🔍<span className="cf-hide-mobile"> Search</span></Button>
 
           {/* Publish history */}
-          <button
-            onClick={() => activeProject && setShowHistory(true)}
-            disabled={!activeProject}
-            aria-label="Publish history"
-            title="Publish history"
-            style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
-              color: 'var(--cf-text-secondary)', fontSize: 11, cursor: activeProject ? 'pointer' : 'not-allowed',
-              opacity: activeProject ? 1 : 0.5, fontFamily: 'var(--forge-font)' }}>⟳<span className="cf-hide-mobile"> History</span></button>
+          <Button variant="secondary" onClick={() => activeProject && setShowHistory(true)} disabled={!activeProject}
+            aria-label="Publish history" title="Publish history" style={{ marginLeft: 8 }}>
+            ⟳<span className="cf-hide-mobile"> History</span></Button>
 
-          {/* Course shell (per-project GUI skin) */}
-          <button
-            onClick={() => setShowShell(true)}
-            disabled={!activeProject}
-            aria-label="Course shell"
-            title="Course shell — apply a ForgeGUI skin to the whole project"
-            style={{
-              marginLeft: 10, padding: '5px 12px', background: 'transparent',
-              border: `1px solid ${activeProject?.gui_shell_id ? 'var(--forge-amber)' : 'rgba(255,255,255,0.15)'}`,
-              borderRadius: 4, color: activeProject?.gui_shell_id ? 'var(--forge-amber)' : 'var(--cf-text-secondary)',
-              fontSize: 12, cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
-              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
-            }}
-          >▣<span className="cf-hide-mobile"> Shell</span></button>
+          {/* Course shell (per-project GUI skin) — amber "on" when a shell is applied */}
+          <Button variant="secondary" on={!!activeProject?.gui_shell_id} onClick={() => setShowShell(true)} disabled={!activeProject}
+            aria-label="Course shell" title="Course shell — apply a ForgeGUI skin to the whole project" style={{ marginLeft: 10 }}>
+            ▣<span className="cf-hide-mobile"> Shell</span></Button>
 
           {/* Full-course preview — walk the whole course like a learner */}
-          <button
+          <Button variant="secondary" disabled={!activeProject}
             onClick={() => activeProject && window.open(`/api/projects/${activeProject.id}/preview-course`, '_blank', 'noopener')}
-            disabled={!activeProject}
-            aria-label="Preview course"
-            title="Preview the whole course — walk it with Prev/Next or arrow keys"
-            style={{
-              marginLeft: 10, padding: '5px 12px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
-              color: 'var(--cf-text-secondary)', fontSize: 12,
-              cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
-              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
-            }}
-          >▶<span className="cf-hide-mobile"> Course</span></button>
+            aria-label="Preview course" title="Preview the whole course — walk it with Prev/Next or arrow keys" style={{ marginLeft: 10 }}>
+            ▶<span className="cf-hide-mobile"> Course</span></Button>
 
           {/* Export the whole course build as a JSON file (backup / inspect / move) */}
-          <button
+          <Button variant="secondary" disabled={!activeProject}
             onClick={() => {
               if (!activeProject) return
               const a = document.createElement('a')
@@ -330,37 +301,13 @@ export default function App() {
               a.download = ''
               document.body.appendChild(a); a.click(); a.remove()
             }}
-            disabled={!activeProject}
             aria-label="Export course as JSON"
-            title="Export the whole course build as a .json file (backup / inspect / move between environments)"
-            style={{
-              marginLeft: 10, padding: '5px 12px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
-              color: 'var(--cf-text-secondary)', fontSize: 12,
-              cursor: activeProject ? 'pointer' : 'not-allowed', opacity: activeProject ? 1 : 0.5,
-              fontFamily: 'var(--forge-font)', letterSpacing: '0.04em',
-            }}
-          >⭳<span className="cf-hide-mobile"> JSON</span></button>
+            title="Export the whole course build as a .json file (backup / inspect / move between environments)" style={{ marginLeft: 10 }}>
+            ⭳<span className="cf-hide-mobile"> JSON</span></Button>
 
           {/* Publish */}
-          <button
-            onClick={() => setShowPublish(true)}
-            style={{
-              marginLeft: 12,
-              padding: '5px 14px',
-              background: 'var(--cf-accent)',
-              color: '#042C53',
-              border: 'none',
-              borderRadius: 4,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: "var(--forge-font)",
-              letterSpacing: '0.04em',
-            }}
-          >
-            ⬇ <span className="cf-hide-mobile">Publish</span>
-          </button>
+          <Button variant="primary" onClick={() => setShowPublish(true)} style={{ marginLeft: 12 }}>
+            ⬇ <span className="cf-hide-mobile">Publish</span></Button>
         </div>
 
         {/* Main split pane */}
