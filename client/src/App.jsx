@@ -34,6 +34,16 @@ const DEMO_AUTOLOAD = true
 // line up on an even grid and the gaps read equidistant.
 const TOPBAR_BTN = { minWidth: 104, justifyContent: 'center' }
 
+// Hairline separator that splits the right cluster into readable zones —
+// display · utilities · course-actions. With the buttons now borderless (ghost),
+// grouping has to come from whitespace + these dividers rather than outlines.
+function TopBarDivider() {
+  return <div aria-hidden="true" style={{
+    width: 1, height: 18, flexShrink: 0, alignSelf: 'center',
+    background: 'rgba(255,255,255,0.12)', margin: '0 10px',
+  }} />
+}
+
 export default function App() {
   // Individual selectors (not a full-store destructure) so App — the root —
   // only re-renders when these specific fields change, not on every store write.
@@ -270,15 +280,17 @@ export default function App() {
             }}>loading…</span>
           )}
 
-          {/* Mode toggle */}
+          {/* Display zone — appearance / mode */}
           <ModeToggle />
 
           {/* Theme editor — header trigger hidden for now (feature kept; see ThemeEditorModal) */}
 
-          {/* Top-bar actions — shared Button system (3:1 padding + hover/pressed/focus). */}
+          <TopBarDivider />
+
+          {/* ── Utilities zone — find / track. Ghost buttons; zones split by dividers. ── */}
           {/* Search frames (Ctrl/Cmd+F) */}
           <Button variant="ghost" onClick={() => activeProject && setShowSearch(true)} disabled={!activeProject}
-            aria-label="Search frames" title="Search frames (Ctrl+F)" style={{ marginLeft: 12, ...TOPBAR_BTN }}>
+            aria-label="Search frames" title="Search frames (Ctrl+F)" style={{ marginLeft: 0, ...TOPBAR_BTN }}>
             🔍<span className="cf-hide-mobile"> Search</span></Button>
 
           {/* Publish history */}
@@ -286,9 +298,12 @@ export default function App() {
             aria-label="Publish history" title="Publish history" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ⟳<span className="cf-hide-mobile"> History</span></Button>
 
+          <TopBarDivider />
+
+          {/* ── Course-actions zone — build → ship (Publish is the terminal amber anchor) ── */}
           {/* Course shell (per-project GUI skin) — amber "on" when a shell is applied */}
           <Button variant="ghost" on={!!activeProject?.gui_shell_id} onClick={() => setShowShell(true)} disabled={!activeProject}
-            aria-label="Course shell" title="Course shell — apply a ForgeGUI skin to the whole project" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
+            aria-label="Course shell" title="Course shell — apply a ForgeGUI skin to the whole project" style={{ marginLeft: 0, ...TOPBAR_BTN }}>
             ▣<span className="cf-hide-mobile"> Shell</span></Button>
 
           {/* Full-course preview — walk the whole course like a learner */}
