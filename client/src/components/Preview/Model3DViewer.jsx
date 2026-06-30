@@ -1,10 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from 'react'
 import { projectToScreen, isOccluded } from '../../utils/project3d'
 
-const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
-const GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'
-const DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js'
-const RGBE_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js'
+// three r136 = the last release shipping examples/js UMD globals (so the
+// load-as-script mechanism below still works) AND the first line with the
+// transmission render target (added r129). r128 lacked it, so KHR_materials_
+// transmission glass rendered as its opaque white base instead of see-through —
+// the Forge3D-vs-CF parity bug. ColorManagement still defaults off at r136, so
+// colors/tone mapping are unchanged.
+const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js'
+const GLTF_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/GLTFLoader.js'
+const DRACO_CDN = 'https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/DRACOLoader.js'
+const RGBE_CDN  = 'https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/RGBELoader.js'
 const DRACO_DECODER = 'https://www.gstatic.com/draco/v1/decoders/'   // Draco WASM decoder (for compressed GLBs)
 
 // Bundled equirectangular HDRIs (served from client/public/hdri). 'studio' is

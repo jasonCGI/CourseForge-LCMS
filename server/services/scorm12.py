@@ -1910,10 +1910,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 (function() {{
   // Local-first (bundled under assets/three for fully-offline packages) with a
   // CDN fallback so formats that don't bundle still work online.
-  var THREE_LOCAL='assets/three/three.min.js',  THREE_CDN='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-  var GLTF_LOCAL ='assets/three/GLTFLoader.js', GLTF_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  var DRACO_LOCAL='assets/three/DRACOLoader.js',DRACO_CDN='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js';
-  var RGBE_LOCAL ='assets/three/RGBELoader.js', RGBE_CDN ='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js';
+  var THREE_LOCAL='assets/three/three.min.js',  THREE_CDN='https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js';
+  var GLTF_LOCAL ='assets/three/GLTFLoader.js', GLTF_CDN ='https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/GLTFLoader.js';
+  var DRACO_LOCAL='assets/three/DRACOLoader.js',DRACO_CDN='https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/DRACOLoader.js';
+  var RGBE_LOCAL ='assets/three/RGBELoader.js', RGBE_CDN ='https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/loaders/RGBELoader.js';
   var DRACO_DECODER = 'assets/three/draco/';  // -> gstatic if we fell back to CDN scripts
   var ANNOTATIONS = {ann_json};
   var PARTS_CFG = {parts_json}, PART_HL = {part_hl_js};   // per-mesh part highlighting config

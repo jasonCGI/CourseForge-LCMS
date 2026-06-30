@@ -196,7 +196,7 @@ export default function Model3DBlock({ block }) {
             <span style={{ fontSize: 20 }}>⬡</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--cf-text-primary)' }}>{block.data.model_filename}</div>
-              <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{block.data.file_size_mb ? `${block.data.file_size_mb} MB` : 'GLB model'} · Three.js r128</div>
+              <div style={{ fontSize: 10, color: 'var(--cf-text-tertiary)', marginTop: 2 }}>{block.data.file_size_mb ? `${block.data.file_size_mb} MB` : 'GLB model'} · Three.js r136</div>
             </div>
             <button onClick={() => { updateBlock(block.id, { model_asset_id: null, model_filename: null, model_serve_url: null, annotations: [], thumb_url: null, thumb_sig: null }); setPlacing(false); setPinMode(false) }}
               aria-label="Remove model" style={{ background: 'none', border: 'none', color: '#E87070', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
