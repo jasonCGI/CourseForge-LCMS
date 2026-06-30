@@ -157,3 +157,24 @@
 
 /* "on" / selected (e.g. a shell is applied) — amber border + text */
 .cf-btn--on { border-color: var(--forge-amber) !important; color: var(--forge-amber) !important; }
+
+/* ── Amber toggles on the navy preview header (Edit⇄Published, GUI on/off) ──
+   The resting (off) state is ghost-like — transparent fill, amber text, a faint
+   amber hairline; hover adds an amber tint; the on state fills amber. ~1:3 padding. */
+.cf-seg { display: inline-flex; flex-shrink: 0; }
+.cf-seg__btn, .cf-toggle {
+  font-family: var(--forge-font, 'IBM Plex Mono', monospace);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; line-height: 1;
+  padding: 4px 12px; cursor: pointer; background: transparent;
+  color: var(--forge-amber, #D4820A);
+  border: 1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent);
+  transition: background .12s, color .12s, box-shadow .12s, transform .06s;
+}
+.cf-seg__btn:first-child { border-radius: 5px 0 0 5px; border-right-width: 0; }
+.cf-seg__btn:last-child  { border-radius: 0 5px 5px 0; }
+.cf-toggle { border-radius: 5px; }
+.cf-seg__btn:hover:not(.cf-seg__btn--on),
+.cf-toggle:hover:not(.cf-toggle--on) { background: color-mix(in srgb, var(--forge-amber) 14%, transparent); }
+.cf-seg__btn:active, .cf-toggle:active { transform: translateY(1px); }
+.cf-seg__btn:focus-visible, .cf-toggle:focus-visible { outline: 2px solid var(--forge-amber); outline-offset: 1px; position: relative; z-index: 1; }
+.cf-seg__btn--on, .cf-toggle--on { background: var(--forge-amber, #D4820A); color: #042C53; }

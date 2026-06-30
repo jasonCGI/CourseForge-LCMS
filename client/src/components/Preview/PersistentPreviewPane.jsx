@@ -386,28 +386,22 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSour
       {/* Edit ⇄ Published — Edit = interactive React preview; Published = the
           server-rendered /preview-html truth in an iframe. Replaces the old
           popup Preview button that lived in the inspector action bar. */}
-      <div role="group" aria-label="Preview source" style={{ marginLeft: 'auto', display: 'flex', gap: 0, flexShrink: 0 }}>
-        <SourceBtn active={source === 'edit'} onClick={() => onSource('edit')} side="left"
+      <div className="cf-seg" role="group" aria-label="Preview source" style={{ marginLeft: 'auto' }}>
+        <SourceBtn active={source === 'edit'} onClick={() => onSource('edit')}
           title="Edit — the interactive in-editor preview">Edit</SourceBtn>
-        <SourceBtn active={source === 'published'} onClick={() => onSource('published')} side="right"
+        <SourceBtn active={source === 'published'} onClick={() => onSource('published')}
           title="Published — the server-rendered frame (the real SCO output)">Published</SourceBtn>
       </div>
 
       {onToggleGui && (
         <button
           type="button"
+          className={`cf-toggle${guiOn ? ' cf-toggle--on' : ''}`}
           onClick={onToggleGui}
           aria-pressed={guiOn}
           title={guiOn ? 'GUI shell ON — showing the learner view. Click for the clean content view.'
                        : 'GUI shell OFF — showing the clean content view. Click to wrap in the shell.'}
-          style={{
-            marginLeft: 'auto', flexShrink: 0,
-            fontFamily: 'inherit', fontSize: 10, letterSpacing: '0.06em', fontWeight: 600,
-            cursor: 'pointer', padding: '3px 9px', borderRadius: 5,
-            border: '1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent)',
-            background: guiOn ? 'var(--forge-amber, #D4820A)' : 'transparent',
-            color: guiOn ? '#042C53' : 'var(--forge-amber, #D4820A)',
-          }}
+          style={{ marginLeft: 'auto', flexShrink: 0 }}
         >
           GUI {guiOn ? 'ON' : 'OFF'}
         </button>
@@ -421,24 +415,17 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSour
   )
 }
 
-// One half of the Edit ⇄ Published segmented toggle.
-function SourceBtn({ active, onClick, side, title, children }) {
+// One half of the Edit ⇄ Published segmented toggle. Styling (segment radius,
+// ghost-off / amber-on, hover/press/focus) lives in .cf-seg__btn in
+// forge-components.css; first/last-child handle the joined corners.
+function SourceBtn({ active, onClick, title, children }) {
   return (
     <button
       type="button"
+      className={`cf-seg__btn${active ? ' cf-seg__btn--on' : ''}`}
       onClick={onClick}
       aria-pressed={active}
       title={title}
-      style={{
-        flexShrink: 0,
-        fontFamily: 'inherit', fontSize: 10, letterSpacing: '0.06em', fontWeight: 600,
-        cursor: 'pointer', padding: '3px 9px',
-        borderRadius: side === 'left' ? '5px 0 0 5px' : '0 5px 5px 0',
-        border: '1px solid color-mix(in srgb, var(--forge-amber) 45%, transparent)',
-        borderRightWidth: side === 'left' ? 0 : 1,
-        background: active ? 'var(--forge-amber, #D4820A)' : 'transparent',
-        color: active ? '#042C53' : 'var(--forge-amber, #D4820A)',
-      }}
     >
       {children}
     </button>
