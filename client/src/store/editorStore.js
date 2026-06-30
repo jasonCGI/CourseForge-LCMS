@@ -140,6 +140,14 @@ const useEditorStore = create((set, get) => ({
     set(s => ({ a11yByFrame: { ...s.a11yByFrame, [frameId]: result } }))
   },
 
+  // ── Floating WCAG contrast checker ───────────────────────────────────────
+  // Shared open-state so the in-preview a11y audit panel can launch the same
+  // draggable checker the toolbar used to, optionally PRE-FILLED with a finding's
+  // fg/bg (the auto-audit → manual-check handoff). { open, fg, bg }.
+  contrast: { open: false, fg: null, bg: null },
+  openContrast: (init) => set({ contrast: { open: true, fg: (init && init.fg) || null, bg: (init && init.bg) || null } }),
+  closeContrast: () => set(s => ({ contrast: { ...s.contrast, open: false } })),
+
   // ── Inspector display mode (stack / tabs) ───────────────────────────────
   inspectorMode: _readMode(),
   setInspectorMode: (mode) => {

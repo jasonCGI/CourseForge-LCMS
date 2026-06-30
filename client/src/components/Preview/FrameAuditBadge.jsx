@@ -48,6 +48,7 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
   const [open, setOpen] = useState(false)
   const [aaa, setAaa] = useState(false)
   const setFrameA11y = useEditorStore(s => s.setFrameA11y)
+  const openContrast = useEditorStore(s => s.openContrast)   // launch the manual checker
   const debounce = useRef(null)
   const retry = useRef(null)
 
@@ -174,6 +175,9 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
                     <Swatch hex={f.fg} label="text" />
                     <Swatch hex={f.bg} label="bg" />
                     <span style={{ flex: 1 }} />
+                    <button onClick={() => openContrast({ fg: f.fg, bg: f.bg })} title="Open this pair in the contrast checker"
+                      style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
+                        background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>🎨 Check</button>
                     <button onClick={() => locate(f.el)} title="Scroll to + outline in the preview"
                       style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
                         background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>◎ Locate</button>
@@ -202,12 +206,24 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Swatch hex={m.fg} label="text" />
                   <span style={{ flex: 1, fontSize: 10, color: C.text3 }}>{m.reason}</span>
+                  <button onClick={() => openContrast({ fg: m.fg })} title="Open this text color in the contrast checker"
+                    style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
+                      background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>🎨 Check</button>
                   <button onClick={() => locate(m.el)} title="Scroll to + outline in the preview"
                     style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
                       background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>◎ Locate</button>
                 </div>
               </div>
             ))}
+
+            {/* Manual color-pair check — the standalone WCAG checker, now launched
+                from here (the toolbar button was removed: one accessibility home). */}
+            <button onClick={() => openContrast()}
+              style={{ width: '100%', marginTop: 4, padding: '7px', border: `1px solid ${C.border}`,
+                borderRadius: 6, background: C.head, color: C.text, cursor: 'pointer',
+                fontFamily: C.font, fontSize: 11 }}>
+              🎨 Check a color pair…
+            </button>
           </div>
         </div>
       )}

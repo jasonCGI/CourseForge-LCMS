@@ -40,7 +40,7 @@ const C = {
   failBg:  'rgba(255,138,155,0.12)',
 }
 
-export default function ContrastChecker({ open, onClose }) {
+export default function ContrastChecker({ open, onClose, initialFg = null, initialBg = null }) {
   const [fg, setFg] = useState('#2A2A2A')
   const [bg, setBg] = useState('#E8E8E8')
   const [hexFgText, setHexFgText] = useState('#2A2A2A')
@@ -63,6 +63,16 @@ export default function ContrastChecker({ open, onClose }) {
     clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 1800)
   }, [])
+
+  // Pre-fill from a launch payload (e.g. an audit finding's fg/bg) whenever it opens
+  // with one — the auto-audit → manual-check handoff.
+  useEffect(() => {
+    if (!open) return
+    const f = normHex(initialFg), b = normHex(initialBg)
+    if (f) { setFg(f); setHexFgText(f) }
+    if (b) { setBg(b); setHexBgText(b) }
+    if (f || b) setNudge(null)
+  }, [open, initialFg, initialBg])
 
   // focus the panel on open, restore on close; Escape closes
   useEffect(() => {
