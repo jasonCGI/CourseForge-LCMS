@@ -29,6 +29,11 @@ import { VERSION } from './version'
 // Set to false to return to the blank-start behavior.
 const DEMO_AUTOLOAD = true
 
+// Shared sizing for the right-cluster top-bar buttons (Search/History/Shell/Course/
+// JSON): one fixed min-width + centered content so the differently-lengthed labels
+// line up on an even grid and the gaps read equidistant.
+const TOPBAR_BTN = { minWidth: 104, justifyContent: 'center' }
+
 export default function App() {
   // Individual selectors (not a full-store destructure) so App — the root —
   // only re-renders when these specific fields change, not on every store write.
@@ -272,28 +277,28 @@ export default function App() {
 
           {/* Top-bar actions — shared Button system (3:1 padding + hover/pressed/focus). */}
           {/* Search frames (Ctrl/Cmd+F) */}
-          <Button variant="secondary" onClick={() => activeProject && setShowSearch(true)} disabled={!activeProject}
-            aria-label="Search frames" title="Search frames (Ctrl+F)" style={{ marginLeft: 10 }}>
+          <Button variant="ghost" onClick={() => activeProject && setShowSearch(true)} disabled={!activeProject}
+            aria-label="Search frames" title="Search frames (Ctrl+F)" style={{ marginLeft: 12, ...TOPBAR_BTN }}>
             🔍<span className="cf-hide-mobile"> Search</span></Button>
 
           {/* Publish history */}
-          <Button variant="secondary" onClick={() => activeProject && setShowHistory(true)} disabled={!activeProject}
-            aria-label="Publish history" title="Publish history" style={{ marginLeft: 8 }}>
+          <Button variant="ghost" onClick={() => activeProject && setShowHistory(true)} disabled={!activeProject}
+            aria-label="Publish history" title="Publish history" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ⟳<span className="cf-hide-mobile"> History</span></Button>
 
           {/* Course shell (per-project GUI skin) — amber "on" when a shell is applied */}
-          <Button variant="secondary" on={!!activeProject?.gui_shell_id} onClick={() => setShowShell(true)} disabled={!activeProject}
-            aria-label="Course shell" title="Course shell — apply a ForgeGUI skin to the whole project" style={{ marginLeft: 10 }}>
+          <Button variant="ghost" on={!!activeProject?.gui_shell_id} onClick={() => setShowShell(true)} disabled={!activeProject}
+            aria-label="Course shell" title="Course shell — apply a ForgeGUI skin to the whole project" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ▣<span className="cf-hide-mobile"> Shell</span></Button>
 
           {/* Full-course preview — walk the whole course like a learner */}
-          <Button variant="secondary" disabled={!activeProject}
+          <Button variant="ghost" disabled={!activeProject}
             onClick={() => activeProject && window.open(`/api/projects/${activeProject.id}/preview-course`, '_blank', 'noopener')}
-            aria-label="Preview course" title="Preview the whole course — walk it with Prev/Next or arrow keys" style={{ marginLeft: 10 }}>
+            aria-label="Preview course" title="Preview the whole course — walk it with Prev/Next or arrow keys" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ▶<span className="cf-hide-mobile"> Course</span></Button>
 
           {/* Export the whole course build as a JSON file (backup / inspect / move) */}
-          <Button variant="secondary" disabled={!activeProject}
+          <Button variant="ghost" disabled={!activeProject}
             onClick={() => {
               if (!activeProject) return
               const a = document.createElement('a')
@@ -302,7 +307,7 @@ export default function App() {
               document.body.appendChild(a); a.click(); a.remove()
             }}
             aria-label="Export course as JSON"
-            title="Export the whole course build as a .json file (backup / inspect / move between environments)" style={{ marginLeft: 10 }}>
+            title="Export the whole course build as a .json file (backup / inspect / move between environments)" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ⭳<span className="cf-hide-mobile"> JSON</span></Button>
 
           {/* Publish */}
