@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import useEditorStore from '../../store/editorStore'
 
+// Where the inspector panel sits, drawn as a half-filled square so the control
+// shows its CURRENT state at a glance (you can read + predict it without opening).
+const DOCK_GLYPH = { left: '◧', right: '◨', top: '⬒', bottom: '⬓' }
+
 /**
  * InspectorViewControls — the ⚙ "View" popover.
  *
@@ -45,7 +49,7 @@ export default function InspectorViewControls() {
         aria-label="Inspector view options"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title="Inspector view — layout & dock position"
+        title={`Inspector panel — layout & where it docks (currently: ${dock})`}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: '2px 8px', borderRadius: 20, cursor: 'pointer',
@@ -56,7 +60,7 @@ export default function InspectorViewControls() {
           color: open ? 'var(--forge-amber)' : 'var(--cf-text-tertiary)',
         }}
       >
-        <span aria-hidden="true">⚙</span><span>View</span>
+        <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>{DOCK_GLYPH[dock] || '▥'}</span><span>Panel</span>
       </button>
 
       {open && (
@@ -82,13 +86,13 @@ export default function InspectorViewControls() {
           <Section label="Dock position">
             <div role="group" aria-label="Inspector dock position" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <SegBtn active={dock === 'left'} onClick={() => setInspectorDock('left')}
-                title="Dock the block editor to the left of the preview">▯ Left</SegBtn>
+                title="Dock the block editor to the left of the preview">{DOCK_GLYPH.left} Left</SegBtn>
               <SegBtn active={dock === 'right'} onClick={() => setInspectorDock('right')}
-                title="Dock the block editor to the right of the preview">▯ Right</SegBtn>
+                title="Dock the block editor to the right of the preview">{DOCK_GLYPH.right} Right</SegBtn>
               <SegBtn active={dock === 'top'} onClick={() => setInspectorDock('top')}
-                title="Dock the block editor above the preview">▭ Top</SegBtn>
+                title="Dock the block editor above the preview">{DOCK_GLYPH.top} Top</SegBtn>
               <SegBtn active={dock === 'bottom'} onClick={() => setInspectorDock('bottom')}
-                title="Dock the block editor below the preview">▭ Bottom</SegBtn>
+                title="Dock the block editor below the preview">{DOCK_GLYPH.bottom} Bottom</SegBtn>
             </div>
           </Section>
         </div>
