@@ -103,15 +103,6 @@ export default function BlockToolbar() {
       alignItems: 'center',
       gap: 10,
     }}>
-      <span style={{
-        fontSize: 11,
-        color: 'var(--color-text-secondary)',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-      }}>
-        Add block
-      </span>
-
       <button
         className="cf-btn cf-btn--primary cf-btn--sm"
         onClick={() => setOpen(o => !o)}
