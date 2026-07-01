@@ -23,6 +23,18 @@ export default function QuizBlock({ block }) {
 
   const qtype = block.data.qtype || 'multiple_choice'
 
+  // Switching to an order-based qtype (drag_drop / sequencing) defaults Randomize
+  // ON, because for those the authored order IS the correct answer — without a
+  // shuffle a new block would present a pre-solved board (see #4's reshuffle guard
+  // and the twin's default). MC / fill_blank keep their existing randomize value.
+  const changeQtype = useCallback((value) => {
+    const patch = { qtype: value }
+    if ((value === 'drag_drop' || value === 'sequencing') && !block.data.randomize) {
+      patch.randomize = true
+    }
+    updateBlock(block.id, patch)
+  }, [block.id, block.data.randomize, updateBlock])
+
   return (
     <div style={blockWrap}>
       <BlockHeader
@@ -40,7 +52,7 @@ export default function QuizBlock({ block }) {
           <select
             id={`quiz-qtype-${block.id}`}
             value={qtype}
-            onChange={e => update('qtype', e.target.value)}
+            onChange={e => changeQtype(e.target.value)}
             style={selectStyle}
           >
             {QTYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -295,29 +307,47 @@ function SequencingEditor({ block, update, updateBlock }) {
 }
 
 /* ── Fill in the Blank (inline dropdowns) ────────────────────────── */
+// The correct answer is tracked by option INDEX (`correct_index`), never by the
+// option's text — so duplicate option strings can't corrupt it. Legacy blanks
+// (that stored `correct` as a string value) are resolved to their index on the
+// first edit; `resolveCI` also drives the "which circle is filled" display.
+function resolveCI(seg) {
+  if (Number.isInteger(seg?.correct_index)) return seg.correct_index
+  return (seg?.options || []).indexOf(seg?.correct)  // legacy string → index (-1 if absent)
+}
 function FillBlankEditor({ block, update, updateBlock }) {
   const segments = block.data.segments || []
   const commit = (next) => updateBlock(block.id, { segments: next })
 
   const addText  = () => commit([...segments, { type: 'text', text: '' }])
-  const addBlank = () => commit([...segments, { type: 'blank', id: uid(), options: ['', ''], correct: '' }])
+  const addBlank = () => commit([...segments, { type: 'blank', id: uid(), options: ['', ''], correct_index: 0 }])
   const removeSeg = (idx) => commit(segments.filter((_, i) => i !== idx))
   const moveSeg = (idx, dir) => {
     const j = idx + dir
     if (j < 0 || j >= segments.length) return
     const next = [...segments];[next[idx], next[j]] = [next[j], next[idx]]; commit(next)
   }
-  const editSeg = (idx, patch) => commit(segments.map((s, i) => i === idx ? { ...s, ...patch } : s))
+  // Writing correct_index also drops any legacy `correct` string so the two can't
+  // drift out of sync.
+  const editSeg = (idx, patch) => commit(segments.map((s, i) => {
+    if (i !== idx) return s
+    const next = { ...s, ...patch }
+    if ('correct_index' in patch) delete next.correct
+    return next
+  }))
   const editOption = (idx, oi, value) => {
     const seg = segments[idx]; const options = [...(seg.options || [])]; options[oi] = value
-    const correct = seg.correct === seg.options[oi] ? value : seg.correct
-    editSeg(idx, { options, correct })
+    // Resolve BEFORE the text change (a legacy string correct is matched by text).
+    const ci = resolveCI(seg)
+    editSeg(idx, { options, correct_index: ci < 0 ? 0 : ci })
   }
+  const markCorrect = (idx, oi) => editSeg(idx, { correct_index: oi })
   const addOption = (idx) => editSeg(idx, { options: [...(segments[idx].options || []), ''] })
   const removeOption = (idx, oi) => {
     const seg = segments[idx]; const options = (seg.options || []).filter((_, i) => i !== oi)
-    const correct = seg.correct === seg.options[oi] ? '' : seg.correct
-    editSeg(idx, { options, correct })
+    let ci = resolveCI(seg); if (ci < 0) ci = 0
+    if (oi === ci) ci = 0; else if (oi < ci) ci = ci - 1
+    editSeg(idx, { options, correct_index: ci })
   }
 
   return (
@@ -341,26 +371,28 @@ function FillBlankEditor({ block, update, updateBlock }) {
               placeholder="Literal text…" style={inputStyle} />
           ) : (
             <div>
-              {(seg.options || []).map((opt, oi) => (
+              {(seg.options || []).map((opt, oi) => {
+                const isCorrect = resolveCI(seg) === oi
+                return (
                 <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <button
-                    onClick={() => editSeg(idx, { correct: opt })}
+                    onClick={() => markCorrect(idx, oi)}
                     title="Mark as correct" aria-label={`Mark option ${oi + 1} correct`}
                     style={{
                       width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                      border: `2px solid ${seg.correct === opt && opt !== '' ? '#3B8A4A' : 'var(--color-border-tertiary)'}`,
-                      background: seg.correct === opt && opt !== '' ? '#3B8A4A' : 'transparent',
+                      border: `2px solid ${isCorrect ? '#3B8A4A' : 'var(--color-border-tertiary)'}`,
+                      background: isCorrect ? '#3B8A4A' : 'transparent',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    {seg.correct === opt && opt !== '' && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                    {isCorrect && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
                   </button>
                   <input value={opt} onChange={e => editOption(idx, oi, e.target.value)}
                     placeholder={`Option ${oi + 1}`} style={inputStyle} />
                   <button onClick={() => removeOption(idx, oi)} disabled={(seg.options || []).length <= 2}
                     title="Remove option" aria-label={`Remove option ${oi + 1}`} style={btnDanger}>✕</button>
                 </div>
-              ))}
+              )})}
               <button className="cf-btn cf-btn--secondary cf-btn--sm" onClick={() => addOption(idx)}>+ Add option</button>
             </div>
           )}

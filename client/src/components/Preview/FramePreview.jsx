@@ -284,7 +284,7 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
 // a topic target (lesson/module) resolves to that section's first frame (lowest
 // order_index); a 'frame' target resolves to itself if present. Returns null when
 // the target can't be resolved. Shared by MenuFramePreview (React click-nav) and
-// the shell-injection path (buildMenuHTML / PersistentPreviewPane postMessage nav).
+// the shell-injection path (PersistentPreviewPane postMessage nav).
 export function resolveMenuTargetFrameId(item, project) {
   if (!item?.target_id) return null
   const kind = item.target_kind || 'frame'
@@ -1211,68 +1211,6 @@ export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
     + `width:100%;height:100%;overflow:hidden">${zones.join('\n')}</div>` + auxHTML
 }
 
-// Build the menu-frame nav HTML for injection into the GUI shell iframe — the
-// HTML-string mirror of <MenuFramePreview> and the server's render_menu_html. A
-// menu frame has no content.blocks (its data is content.menu), so the shell path
-// can't use buildShelledLayoutHTML; this renders one branded button per item.
-//
-// `resolve(item) -> targetFrameId | null` resolves each item's target the same way
-// MenuFramePreview does (topic → first frame). Resolvable buttons carry
-// data-cf-nav-target="<frameId>"; unresolvable ones render disabled (no target).
-// Clicks are wired by wireMenuNav() in the host (the iframe has no React), which
-// reads the attribute and posts an fgui_nav message the host turns into loadFrame.
-// Uses INLINE styles (the live shell iframe runs the stored shell's CSS, not the
-// server's _MENU_CSS) so it matches MenuFramePreview without depending on shell CSS.
-export function buildMenuHTML(menu, resolve) {
-  const esc = (s) => String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  const m = menu || {}
-  const items = Array.isArray(m.items) ? m.items : []
-  const title = m.title || ''
-
-  const titleHTML = title
-    ? `<h2 style="font-size:22px;font-weight:700;color:#042C53;margin:0 0 20px;`
-      + `padding-bottom:10px;border-bottom:2px solid #F59E0B;max-width:640px;`
-      + `margin-left:auto;margin-right:auto;font-family:Inter,system-ui,sans-serif">${esc(title)}</h2>`
-    : ''
-
-  const btnBase = 'display:flex;align-items:center;justify-content:space-between;'
-    + 'padding:16px 20px;border-radius:8px;font-size:16px;font-weight:600;'
-    + 'font-family:Inter,system-ui,sans-serif;text-align:left;color:#fff;width:100%;'
-    + 'box-sizing:border-box;text-decoration:none'
-  const arrow = '<span style="color:#F59E0B;font-size:22px;margin-left:16px;flex:none" aria-hidden="true">&#8250;</span>'
-
-  let btns
-  if (items.length === 0) {
-    btns = '<p style="color:#6a7686;font-style:italic">No menu items yet.</p>'
-  } else {
-    btns = items.map((it) => {
-      const label = esc((it && it.label) || 'Untitled')
-      const targetId = resolve ? resolve(it) : null
-      if (targetId) {
-        return `<button type="button" data-cf-nav-target="${esc(targetId)}" title="Go to target" `
-          + `style="${btnBase};background:#042C53;border:1px solid #042C53;cursor:pointer">`
-          + `<span>${label}</span>${arrow}</button>`
-      }
-      return `<span role="link" aria-disabled="true" title="No target set" `
-        + `style="${btnBase};background:#9aa7b6;border:1px solid #9aa7b6;cursor:not-allowed;opacity:.7">`
-        + `<span>${label}</span>${arrow}</span>`
-    }).join('')
-  }
-
-  // No opaque background/color: this is injected into the GUI shell's content area,
-  // so let the shell's real content-area bg (+ luminance-aware body text) show
-  // through — faithful to the published render_menu_html (which paints neither).
-  // Previously forced background:#fff, which covered the shell's gray and was the
-  // sole Edit-vs-Published menu drift.
-  return `<div style="font-family:Inter,system-ui,sans-serif;`
-    + `min-height:100%;padding:32px 24px;box-sizing:border-box">`
-    + titleHTML
-    + `<div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px">`
-    + btns
-    + `</div></div>`
-}
-
 // Wire every [data-cf-nav-target] menu button in a given iframe document so a click
 // posts an fgui_nav message (with the resolved target frame id) up to the host,
 // which calls loadFrame(targetId). The iframe has no React, mirroring how the audio
@@ -1896,6 +1834,15 @@ function PreviewQuiz({ block }) {
   return <PreviewQuizMC block={block} />
 }
 
+// Resolve a fill-blank blank's correct option INDEX. Prefers the stable
+// `correct_index` int; falls back (back-compat) to the legacy `correct` string
+// value's position in options. Returns -1 when unresolvable.
+function _fbCorrectIndex(seg) {
+  if (Number.isInteger(seg?.correct_index)) return seg.correct_index
+  const opts = seg?.options || []
+  return opts.indexOf(seg?.correct)
+}
+
 // Fisher-Yates shuffle (returns a new array; does not mutate input).
 function _shuffle(arr) {
   const a = [...arr]
@@ -2024,6 +1971,26 @@ function DDTarget({ id, label, children, onActivate, selecting }) {
   )
 }
 
+// Return-to-bank drop zone. Hoisted to a top-level component (stable identity) so
+// it isn't recreated every render of PreviewQuizDragDrop — an inline component
+// remounts each render, which made useDroppable's isOver flicker, dropped
+// return-to-bank drags, and lost keyboard focus.
+function DDTray({ tray, itemById, selectedItem, onSelect, locked }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'dd-tray' })
+  return (
+    <div ref={setNodeRef} aria-label="Unplaced items" style={{
+      border: `2px dashed ${isOver ? '#185FA5' : '#ccc'}`, borderRadius: 8, padding: 10,
+      marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 50, background: '#fff',
+    }}>
+      {tray.length === 0 && <span style={{ fontSize: 12, color: '#999' }}>All items placed</span>}
+      {tray.map(id => (
+        <DDItemSelectable key={id} id={id} label={itemById[id]?.label} placed={false}
+          selected={selectedItem === id} onSelect={onSelect} disabled={locked} />
+      ))}
+    </div>
+  )
+}
+
 function PreviewQuizDragDrop({ block }) {
   const items   = block.data.items   || []
   const targets = block.data.targets || []
@@ -2065,21 +2032,6 @@ function PreviewQuizDragDrop({ block }) {
   const reset = () => { setPlacement({}); setSelectedItem(null); setSubmitted(false); att.reset() }
 
   const tray = order.filter(id => !placement[id])
-  const TrayDroppable = () => {
-    const { setNodeRef, isOver } = useDroppable({ id: 'dd-tray' })
-    return (
-      <div ref={setNodeRef} aria-label="Unplaced items" style={{
-        border: `2px dashed ${isOver ? '#185FA5' : '#ccc'}`, borderRadius: 8, padding: 10,
-        marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 50, background: '#fff',
-      }}>
-        {tray.length === 0 && <span style={{ fontSize: 12, color: '#999' }}>All items placed</span>}
-        {tray.map(id => (
-          <DDItemSelectable key={id} id={id} label={itemById[id]?.label} placed={false}
-            selected={selectedItem === id} onSelect={toggleSelect} disabled={locked} />
-        ))}
-      </div>
-    )
-  }
 
   return (
     <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
@@ -2088,7 +2040,8 @@ function PreviewQuizDragDrop({ block }) {
         Drag an item onto a target — or select an item, then choose a target (keyboard friendly).
       </p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <TrayDroppable />
+        <DDTray tray={tray} itemById={itemById} selectedItem={selectedItem}
+          onSelect={toggleSelect} locked={locked} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 8 }}>
           {targets.map(t => (
             <DDTarget key={t.id} id={t.id} label={t.label} onActivate={placeSelected} selecting={!!selectedItem && !locked}>
@@ -2246,19 +2199,24 @@ function PreviewQuizFillBlank({ block }) {
   const segments = block.data.segments || []
   const randomize = !!block.data.randomize
   const blanks = useMemo(() => segments.filter(s => s.type === 'blank'), [segments])
-  // Per-blank shuffled option order (stable per mount).
+  // Per-blank shuffled option order, stored as ORIGINAL indices (stable per mount)
+  // so correctness is tracked by index, not by text — duplicate option strings
+  // can no longer collide.
   const optionOrder = useMemo(() => {
     const m = {}
-    blanks.forEach(b => { m[b.id] = randomize ? _shuffle(b.options || []) : (b.options || []) })
+    blanks.forEach(b => {
+      const idxs = (b.options || []).map((_, i) => i)
+      m[b.id] = randomize ? _shuffle(idxs) : idxs
+    })
     return m
   }, [block.id, randomize, blanks.length])
 
-  const [answers, setAnswers] = useState({})  // { blankId: value }
+  const [answers, setAnswers] = useState({})  // { blankId: originalIndex (string) }
   const [submitted, setSubmitted] = useState(false)
   const att = useAttempts(block)
 
-  const allAnswered = blanks.length > 0 && blanks.every(b => answers[b.id])
-  const isRight = allAnswered && blanks.every(b => answers[b.id] === b.correct)
+  const allAnswered = blanks.length > 0 && blanks.every(b => answers[b.id] !== undefined && answers[b.id] !== '')
+  const isRight = allAnswered && blanks.every(b => Number(answers[b.id]) === _fbCorrectIndex(b))
   const locked = submitted && (isRight || att.exhausted)
 
   const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
@@ -2272,9 +2230,9 @@ function PreviewQuizFillBlank({ block }) {
           if (seg.type === 'text') return <span key={idx}>{seg.text}</span>
           blankCount += 1
           const n = blankCount
-          const val = answers[seg.id] || ''
+          const val = answers[seg.id] ?? ''
           let bdr = '#185FA5'
-          if (submitted) bdr = (val === seg.correct) ? '#3B8A4A' : '#C0392B'
+          if (submitted) bdr = (val !== '' && Number(val) === _fbCorrectIndex(seg)) ? '#3B8A4A' : '#C0392B'
           return (
             <select
               key={idx}
@@ -2288,7 +2246,9 @@ function PreviewQuizFillBlank({ block }) {
               }}
             >
               <option value="">— choose —</option>
-              {(optionOrder[seg.id] || []).map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+              {(optionOrder[seg.id] || []).map((origIdx) => (
+                <option key={origIdx} value={origIdx}>{(seg.options || [])[origIdx]}</option>
+              ))}
             </select>
           )
         })}
