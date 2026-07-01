@@ -1,13 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
-import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor,
-  useSensor, useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext, sortableKeyboardCoordinates,
-  horizontalListSortingStrategy, useSortable, arrayMove,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import useEditorStore from '../../store/editorStore'
 import { BLOCK_TYPES } from './BlockToolbar'
 import MenuEditor from './MenuEditor'
@@ -38,22 +29,17 @@ const BLOCK_COMPONENTS = {
 const META = Object.fromEntries(BLOCK_TYPES.map(b => [b.type, b]))
 const FRAME_TAB = '__frame__'
 
-// A single draggable block tab. Click selects (dnd-kit's 8px activation
-// constraint lets a click through without starting a drag); drag reorders.
+// A single block tab. Click selects that block; blocks are NOT drag-reorderable
+// (their placement is driven by the frame layout preset — reorder via the block-
+// header ↑↓ arrows). Only the Course menu stays drag-reorderable.
 function BlockTab({ block, idx, active, onSelect }) {
   const meta = META[block.type] || { Icon: null, label: block.type, color: '#888' }
   const TabIcon = meta.Icon
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.id })
-  const style = {
-    transform: CSS.Transform.toString(transform), transition,
-    opacity: isDragging ? 0.4 : 1, zIndex: isDragging ? 10 : 'auto',
-  }
   return (
     <button
-      ref={setNodeRef} style={{ ...tabStyle(active, meta.color), ...style }}
-      onClick={() => onSelect(block.id)} {...attributes} {...listeners}
-      title={`${meta.label} block (drag to reorder)`}
+      style={tabStyle(active, meta.color)}
+      onClick={() => onSelect(block.id)}
+      title={`${meta.label} block`}
       aria-label={`${meta.label} block ${idx + 1}`} aria-pressed={active}
     >
       {TabIcon && <span style={{ opacity: 0.85, display: 'inline-flex' }}><TabIcon width={14} height={14} /></span>}
@@ -67,7 +53,6 @@ export default function TabbedFrameEditor() {
   const activeFrame    = useEditorStore(s => s.activeFrame)
   const activeBlockId  = useEditorStore(s => s.activeBlockId)
   const setActiveBlock = useEditorStore(s => s.setActiveBlock)
-  const reorderBlocks  = useEditorStore(s => s.reorderBlocks)
   const removeBlock    = useEditorStore(s => s.removeBlock)
   const previewOpen    = useEditorStore(s => s.previewOpen)
   const setPreviewOpen = useEditorStore(s => s.setPreviewOpen)
@@ -75,11 +60,6 @@ export default function TabbedFrameEditor() {
   const blocks = activeFrame?.content?.blocks || []
   const [tab, setTab] = useState(FRAME_TAB)
   const prevRef = useRef({ frameId: null, count: 0 })
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
 
   // Preview → tab: when a block is selected elsewhere (clicking it in the live
   // preview), surface its tab here.
@@ -119,13 +99,6 @@ export default function TabbedFrameEditor() {
   }
 
   const selectBlock = (id) => { setTab(id); setActiveBlock(id) }
-  const handleDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return
-    const oldIdx = blocks.findIndex(b => b.id === active.id)
-    const newIdx = blocks.findIndex(b => b.id === over.id)
-    if (oldIdx < 0 || newIdx < 0) return
-    reorderBlocks(arrayMove(blocks, oldIdx, newIdx))
-  }
 
   const activeBlock = blocks.find(b => b.id === tab)
   const Block = activeBlock ? BLOCK_COMPONENTS[activeBlock.type] : null
@@ -142,13 +115,9 @@ export default function TabbedFrameEditor() {
           <span>⚙</span><span>Frame</span>
         </button>
         <span style={{ width: 1, height: 18, background: 'var(--cf-border-primary)', margin: '0 2px', flexShrink: 0 }} />
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={blocks.map(b => b.id)} strategy={horizontalListSortingStrategy}>
-            {blocks.map((b, i) => (
-              <BlockTab key={b.id} block={b} idx={i} active={tab === b.id} onSelect={selectBlock} />
-            ))}
-          </SortableContext>
-        </DndContext>
+        {blocks.map((b, i) => (
+          <BlockTab key={b.id} block={b} idx={i} active={tab === b.id} onSelect={selectBlock} />
+        ))}
         {blocks.length === 0 && (
           <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontStyle: 'italic', marginLeft: 4 }}>
             no blocks — add one below

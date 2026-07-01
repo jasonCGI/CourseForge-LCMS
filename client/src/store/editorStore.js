@@ -344,17 +344,6 @@ const useEditorStore = create((set, get) => ({
     get()._scheduleAutosave()
   },
 
-  reorderBlocks: (newBlocks) => {
-    const { activeFrame } = get()
-    if (!activeFrame) return
-    get()._pushUndo()
-    set({
-      activeFrame: { ...activeFrame, content: { ...activeFrame.content, blocks: newBlocks } },
-      isDirty: true,
-    })
-    get()._scheduleAutosave()
-  },
-
   // Paste a copied block ({type, data}) to the end of the active frame
   pasteBlock: (payload) => {
     const { activeFrame } = get()
