@@ -374,7 +374,25 @@ export default function App() {
         </Suspense>
 
         <ContrastChecker open={contrast.open} initialFg={contrast.fg} initialBg={contrast.bg} onClose={closeContrast} />
+
+        <FrameToast />
       </div>
     </ThemeProvider>
+  )
+}
+
+// Transient bottom-center toast for frame copy/paste/delete feedback.
+function FrameToast() {
+  const toast = useEditorStore(s => s.toast)
+  if (!toast) return null
+  return (
+    <div role="status" aria-live="polite" style={{
+      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+      background: 'var(--cf-navy, #042C53)', color: '#E0E8F0',
+      border: '1px solid color-mix(in srgb, var(--forge-amber) 40%, transparent)',
+      padding: '9px 18px', borderRadius: 999, zIndex: 5000, pointerEvents: 'none',
+      fontFamily: 'var(--forge-font, "IBM Plex Mono", monospace)', fontSize: 12, letterSpacing: '0.04em',
+      boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+    }}>{toast}</div>
   )
 }

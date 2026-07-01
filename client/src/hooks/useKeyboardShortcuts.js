@@ -54,9 +54,24 @@ export function useKeyboardShortcuts({ onSave, onPreview, onCloseModal, onShowHe
         case 'z':
           if (!isTyping) { e.preventDefault(); st.undo() }
           break
+        case 'c': {
+          // Frame copy. Skip when typing or when a real text selection exists
+          // (let the browser copy the selected text instead of the frame).
+          if (isTyping) break
+          const sel = typeof window !== 'undefined' && window.getSelection ? String(window.getSelection()) : ''
+          if (sel) break
+          if (st.activeFrame) { e.preventDefault(); st.copyFrame() }
+          break
+        }
         case 'v': {
+          if (isTyping) break
+          // Paste the most-recently-copied of {frame, block}. Ctrl+C copies a
+          // frame (timestamped); the block clipboard is set by the editor's
+          // copy button (its own copiedAt). Newer wins; tie → frame.
+          const fc = st.frameClipboard
           const cb = useClipboardStore.getState().copiedBlock
-          if (!isTyping && cb) { e.preventDefault(); st.pasteBlock(cb) }
+          if (fc?.id && (!cb || fc.copiedAt >= cb.copiedAt)) { e.preventDefault(); st.pasteFrame() }
+          else if (cb) { e.preventDefault(); st.pasteBlock(cb) }
           break
         }
         case 'f':

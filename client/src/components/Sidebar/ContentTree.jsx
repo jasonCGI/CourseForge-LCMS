@@ -294,6 +294,7 @@ export default function ContentTree() {
   const fetchProjects = useProjectStore(s => s.fetchProjects)
   const fetchProject  = useProjectStore(s => s.fetchProject)
   const loadFrame        = useEditorStore(s => s.loadFrame)
+  const deleteFrameFromStore = useEditorStore(s => s.deleteFrame)
   const selectConfigNode = useEditorStore(s => s.selectConfigNode)
   const activeFrameId    = useEditorStore(s => s.activeFrame?.id)
   const selectedNode     = useEditorStore(s => s.selectedNode)
@@ -494,7 +495,7 @@ export default function ContentTree() {
 
   const doDuplicate = async (frameId, targetLessonId = null) => {
     try {
-      await duplicateFrame(frameId, targetLessonId)
+      await duplicateFrame(frameId, { targetLessonId })
       await refreshProject()
     } catch (e) {
       alert('Could not duplicate frame: ' + (e.response?.data?.error || e.message))
@@ -775,17 +776,21 @@ export default function ContentTree() {
           {[
             { label: '⧉ Duplicate frame', action: async () => { await doDuplicate(contextMenu.frameId); setContextMenu(null) } },
             { label: '→ Copy to lesson…',  action: () => { setCopyToLessonFrameId(contextMenu.frameId); setContextMenu(null) } },
-          ].map((item, i) => (
+            { label: '🗑 Delete frame', danger: true, action: () => {
+                const fid = contextMenu.frameId; setContextMenu(null)
+                if (window.confirm("Delete this frame? This can't be undone.")) deleteFrameFromStore(fid)
+              } },
+          ].map((item, i, arr) => (
             <button key={i} onClick={item.action}
               style={{
                 display: 'block', width: '100%', padding: '9px 14px',
                 background: 'none', border: 'none', textAlign: 'left',
-                fontSize: 12, color: 'var(--cf-text-secondary)', cursor: 'pointer',
+                fontSize: 12, color: item.danger ? '#E24B4A' : 'var(--cf-text-secondary)', cursor: 'pointer',
                 fontFamily: 'var(--cf-font)',
-                borderBottom: i < 1 ? '1px solid var(--cf-border-tertiary)' : 'none',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--cf-border-tertiary)' : 'none',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--cf-input-bg)'; e.currentTarget.style.color = 'var(--cf-text-primary)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--cf-text-secondary)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(226,75,74,0.12)' : 'var(--cf-input-bg)'; if (!item.danger) e.currentTarget.style.color = 'var(--cf-text-primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = item.danger ? '#E24B4A' : 'var(--cf-text-secondary)' }}
             >{item.label}</button>
           ))}
         </div>

@@ -42,9 +42,13 @@ export const updateFrame = (id, data) => api.patch(`/frames/${id}`, data)
 export const createFrame = (lessonId, data) =>
   api.post(`/lessons/${lessonId}/frames`, data)
 export const deleteFrame = (id) => api.delete(`/frames/${id}`)
-export const duplicateFrame = (frameId, targetLessonId = null) =>
-  api.post(`/frames/${frameId}/duplicate`,
-    targetLessonId ? { target_lesson_id: targetLessonId } : {})
+// duplicate a frame: append to targetLessonId's end, OR (paste) drop it into the
+// slot right after `afterFrameId` in that frame's lesson.
+export const duplicateFrame = (frameId, { targetLessonId = null, afterFrameId = null } = {}) =>
+  api.post(`/frames/${frameId}/duplicate`, {
+    ...(targetLessonId ? { target_lesson_id: targetLessonId } : {}),
+    ...(afterFrameId ? { after_frame_id: afterFrameId } : {}),
+  })
 
 // ── Reorder ──────────────────────────────────────────────────────────────────
 export const reorder = (type, items) => api.post('/reorder', { type, items })
