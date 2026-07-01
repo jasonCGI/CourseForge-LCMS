@@ -397,16 +397,17 @@
     <p>Upload a raw video file — ForgePack outputs an optimized MP4, WebM fallback, poster image, and caption placeholder, ready to drop into CourseForge.</p>
   </div>
 
-  <!-- ── Step 1: Preset ── -->
+  <!-- ── Step 1: Resolution × Quality ── -->
   <div class="section" id="step-preset">
     <div class="section-header">
       <span style="color:var(--amber);font-family:var(--mono);font-size:12px">01</span>
-      Select quality preset
+      Resolution &amp; quality
     </div>
     <div class="section-body">
-      <div class="preset-grid" id="preset-grid">
-        <!-- Populated by JS -->
-      </div>
+      <div style="font-size:11px;color:var(--text2);margin:0 0 6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">Resolution</div>
+      <div class="preset-grid" id="resolution-grid" role="radiogroup" aria-label="Output resolution"><!-- JS --></div>
+      <div style="font-size:11px;color:var(--text2);margin:16px 0 6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">Quality</div>
+      <div class="preset-grid" id="quality-grid" role="radiogroup" aria-label="Encode quality"><!-- JS --></div>
     </div>
   </div>
 
@@ -929,7 +930,8 @@ function resetImage() {
 
 // ── State ──────────────────────────────────────────────────────
 var selectedFile   = null;
-var selectedPreset = 'training_standard';
+var selectedResolution = '1080';   // overwritten by the presets fetch defaults
+var selectedQuality    = 'standard';
 var currentJobId   = null;
 var pollInterval   = null;
 
@@ -942,56 +944,50 @@ fetch('/api/version')
   })
   .catch(function() {}); // silent — version display is non-critical
 
-// ── Init: load presets ─────────────────────────────────────────
-fetch('/api/video/presets')
-  .then(r => r.json())
-  .then(presets => {
-    var grid = document.getElementById('preset-grid');
-    presets.forEach(function(p) {
-      var card = document.createElement('div');
-      card.className = 'preset-card' + (p.key === selectedPreset ? ' selected' : '');
-      card.setAttribute('role', 'radio');
-      card.setAttribute('aria-checked', p.key === selectedPreset ? 'true' : 'false');
-      card.setAttribute('tabindex', '0');
-      card.setAttribute('aria-label', p.label + ' — ' + p.description);
-      card.innerHTML = `
-        <div class="preset-radio"></div>
-        <div>
-          <div class="preset-label">${p.label}</div>
-          <div class="preset-desc">${p.description}</div>
-        </div>`;
-      card.onclick = function() { selectPreset(p.key); };
-      card.onkeydown = function(e) { if(e.key==='Enter'||e.key===' ') selectPreset(p.key); };
-      grid.appendChild(card);
-    });
-  })
-  .catch(function() {
-    document.getElementById('preset-grid').innerHTML =
-      '<p style="color:var(--text3);font-size:13px">Could not load presets.</p>';
-  });
-
-function selectPreset(key) {
-  selectedPreset = key;
-  document.querySelectorAll('.preset-card').forEach(function(c) {
-    var isSelected = c.querySelector('.preset-label').textContent.toLowerCase().includes(key.replace('_',' ').split(' ')[0].toLowerCase());
-    // Better: use data-key attribute
-  });
-  // Re-render
-  document.querySelectorAll('.preset-card').forEach(function(c, i) {
-    // Compare by order
-  });
-  // Simplest approach: reload
-  fetch('/api/video/presets').then(r=>r.json()).then(function(presets) {
-    presets.forEach(function(p, i) {
-      var cards = document.querySelectorAll('.preset-card');
-      if (!cards[i]) return;
-      var isSelected = p.key === key;
-      cards[i].className = 'preset-card' + (isSelected ? ' selected' : '');
-      cards[i].setAttribute('aria-checked', isSelected ? 'true' : 'false');
-    });
-    selectedPreset = key;
+// ── Init: load the two preset axes (resolution × quality) ──────────
+function _renderAxis(gridId, items, getSel, onPick) {
+  var grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  items.forEach(function(p) {
+    var card = document.createElement('div');
+    var sel = p.key === getSel();
+    card.className = 'preset-card' + (sel ? ' selected' : '');
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', sel ? 'true' : 'false');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', p.label + ' — ' + p.description);
+    card.dataset.key = p.key;
+    card.innerHTML =
+      '<div class="preset-radio"></div><div><div class="preset-label">' +
+      p.label + '</div><div class="preset-desc">' + p.description + '</div></div>';
+    card.onclick = function() { onPick(p.key); };
+    card.onkeydown = function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(p.key); } };
+    grid.appendChild(card);
   });
 }
+function _markSel(gridId, key) {
+  document.querySelectorAll('#' + gridId + ' .preset-card').forEach(function(c) {
+    var s = c.dataset.key === key;
+    c.className = 'preset-card' + (s ? ' selected' : '');
+    c.setAttribute('aria-checked', s ? 'true' : 'false');
+  });
+}
+function selectResolution(k) { selectedResolution = k; _markSel('resolution-grid', k); }
+function selectQuality(k)    { selectedQuality = k;    _markSel('quality-grid', k); }
+
+fetch('/api/video/presets')
+  .then(r => r.json())
+  .then(function(d) {
+    selectedResolution = d.default_resolution || selectedResolution;
+    selectedQuality    = d.default_quality    || selectedQuality;
+    _renderAxis('resolution-grid', d.resolutions, function() { return selectedResolution; }, selectResolution);
+    _renderAxis('quality-grid',    d.qualities,   function() { return selectedQuality; },    selectQuality);
+  })
+  .catch(function() {
+    var g = document.getElementById('resolution-grid');
+    if (g) g.innerHTML = '<p style="color:var(--text3);font-size:13px">Could not load presets.</p>';
+  });
 
 // ── Drag and drop ──────────────────────────────────────────────
 function handleDragOver(e) {
@@ -1035,8 +1031,9 @@ function startProcessing() {
   if (!selectedFile) return;
 
   var form = new FormData();
-  form.append('file',   selectedFile);
-  form.append('preset', selectedPreset);
+  form.append('file',       selectedFile);
+  form.append('resolution', selectedResolution);
+  form.append('quality',    selectedQuality);
 
   document.getElementById('step-progress').style.display = 'block';
   document.getElementById('btn-process').disabled = true;
