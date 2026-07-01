@@ -5,7 +5,7 @@ import {
 } from '@dnd-kit/core'
 import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
-  rectSortingStrategy, useSortable, arrayMove,
+  useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import IVideoRuntime from '../Editor/blocks/IVideoRuntime'
@@ -44,16 +44,10 @@ const CF_PAUSE_SVG =
 
 export default function FramePreview({ frame, activeBlockId = null, onBlockSelect = null, ignoreGui = false, hideTitle = false, contentArea = null }) {
   const updateBlock = useEditorStore(s => s.updateBlock)   // for drag/resize of bounded blocks
-  // In-preview block reorder writes to the SAME content.blocks order the inspector
-  // list uses (reuses reorderBlocks) — reorder in either surface updates the other.
-  const reorderBlocks = useEditorStore(s => s.reorderBlocks)
+  // Retained: the menu-frame branch (MenuFramePreview) gates its editable menu DnD on
+  // the active frame; content-block reorder DnD was removed (blocks are placed by the
+  // frame layout preset now — only the course menu stays drag-reorderable).
   const activeFrameId = useEditorStore(s => s.activeFrame?.id)
-  // Sensors for the rendered-block drag (pointer w/ a small activation distance so a
-  // click-to-select never triggers a reorder; keyboard Space/arrows for 508).
-  const blockSortSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
   if (!frame) return null
 
   // Menu frame: render the nav-button list (mirrors server render_menu_html).
@@ -110,35 +104,12 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // scorm12._render_blocks so the live preview and the SCO reflow identically.
   const layout = frame?.content?.layout || 'text-left'
 
-  // Preview reorder gate (mirrors MenuFramePreview.editable): only when this IS the
-  // edited frame AND we're in an interactive (Edit-source) preview — onBlockSelect is
-  // present only there, never in read-only/Published renders. Needs >1 flow block.
-  const sortableFlow = !!onBlockSelect && !!activeFrameId && activeFrameId === frame.id && flow.length > 1
-
-  // Drag-end: permute ONLY the flow blocks within the full content.blocks array
-  // (gui/callout/docked-audio/bounded blocks keep their absolute slots), then write
-  // the new order via the shared reorderBlocks action — the same store the inspector
-  // list mutates, so both surfaces stay in sync. Split layouts re-derive zones by
-  // type, so a cross-type drag reorders the array but only moves a block visually
-  // when its target shares its zone (documented behavior).
-  const handleFlowDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return
-    const flowIds = flow.map(b => b.id)
-    const oldIdx = flowIds.indexOf(active.id)
-    const newIdx = flowIds.indexOf(over.id)
-    if (oldIdx < 0 || newIdx < 0) return
-    const newFlowIds = arrayMove(flowIds, oldIdx, newIdx)
-    const source = frame.content?.blocks || []
-    let fi = 0
-    const next = source.map(b => flowIds.includes(b.id)
-      ? source.find(x => x.id === newFlowIds[fi++]) : b)
-    reorderBlocks(next)
-  }
-
   // fill = render this block to fill its zone (full height, no flow gap) — used in
-  // overlay mode so media/3D/image/video fill their layout zone.
+  // overlay mode so media/3D/image/video fill their layout zone. Blocks render via
+  // SelectableBlock (click-to-select in the inspector) — content blocks are NOT
+  // drag-reorderable; their position is set by the frame layout preset.
   const renderBlock = (block, fill = false) => (
-    <SortablePreviewBlock key={block.id} block={block} fill={fill} sortable={sortableFlow}
+    <SelectableBlock key={block.id} block={block} fill={fill}
       active={block.id === activeBlockId} onSelect={onBlockSelect} updateBlock={updateBlock} />
   )
 
@@ -186,12 +157,8 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           full-bleed media and 40px-padded text; 'text-left'/'text-right' = two
           50% zones (text + media), 40px padding each, ordered by the preset. In
           overlay mode each zone fills the content-area height (media/3D fill).
-          When this IS the edited frame the rendered blocks become drag-reorderable
-          (sortableFlow): the whole flow region is wrapped in a DndContext whose
-          SortableContext carries the flow ids, so a per-block grip can drag-reorder
-          them — writing the new order back through reorderBlocks (the inspector's
-          store action). Wrapped only when editable so read-only/Published renders
-          carry no DnD machinery or grips. */}
+          Content blocks are NOT drag-reorderable — their placement is driven by the
+          layout preset (and reordered via the inspector's ↑↓ arrows). */}
       {(() => {
         const flowRegion = (
           <>
@@ -234,15 +201,7 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
             )}
           </>
         )
-        if (!sortableFlow) return flowRegion
-        return (
-          <DndContext sensors={blockSortSensors} collisionDetection={closestCenter} onDragEnd={handleFlowDragEnd}>
-            <SortableContext items={flow.map(b => b.id)}
-              strategy={layout === 'full' ? verticalListSortingStrategy : rectSortingStrategy}>
-              {flowRegion}
-            </SortableContext>
-          </DndContext>
-        )
+        return flowRegion
       })()}
       {/* Custom-bounds blocks: absolute boxes in content-area pixels (anchor to the
           scaled shell overlay). */}
@@ -508,67 +467,6 @@ function MenuBackPill({ currentFrameId }) {
       <span aria-hidden="true" style={{ color: '#F59E0B', flex: 'none' }}>←</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
     </button>
-  )
-}
-
-// Makes a rendered preview block drag-reorderable IN the live preview (Feature A).
-// When `sortable`, the block gets a dedicated ⠿ grip (top-left overlay) wired to
-// dnd-kit's useSortable: pointer-drag the grip OR focus it and press Space then
-// arrow keys (508). A dedicated grip — rather than making the whole block the drag
-// surface — is the cleaner option here because preview blocks carry their own
-// interactions (click-to-select via SelectableBlock; draggable callouts; clickable
-// hotspot/quiz/branch), and a whole-surface drag would hijack those. When not
-// sortable it falls straight through to SelectableBlock (no DnD machinery, no grip),
-// so read-only / Published / non-active-frame renders are untouched.
-// Dispatcher: when not draggable, return the plain selectable block WITHOUT calling
-// useSortable. The non-sortable preview paths (read-only / Published / non-active
-// frame / single-flow-block frames) have NO DndContext ancestor, so calling
-// useSortable there is fragile (a context-less dnd hook). The hook now lives only in
-// DraggablePreviewBlock, rendered exclusively inside the flowRegion DndContext
-// (sortableFlow === true).
-function SortablePreviewBlock({ block, fill = false, sortable = false, active, onSelect, updateBlock = null }) {
-  if (!sortable) {
-    return <SelectableBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
-  }
-  return <DraggablePreviewBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
-}
-
-// Draggable variant — calls useSortable. Rendered ONLY inside the flowRegion
-// DndContext (FramePreview's sortableFlow branch), so the hook always has its
-// SortableContext / DndContext ancestor.
-function DraggablePreviewBlock({ block, fill = false, active, onSelect, updateBlock = null }) {
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
-    useSortable({ id: block.id })
-  return (
-    <div ref={setNodeRef} style={{
-      position: 'relative',
-      height: fill ? '100%' : undefined,
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      zIndex: isDragging ? 20 : undefined,
-    }}>
-      <SelectableBlock block={block} fill={fill} active={active} onSelect={onSelect} updateBlock={updateBlock} />
-      <button
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        type="button"
-        onClick={(e) => e.stopPropagation()}
-        aria-label={`Drag to reorder this ${block.type} block (or press Space, then use the arrow keys)`}
-        title="Drag to reorder"
-        style={{
-          position: 'absolute', top: 6, left: 6, zIndex: 6,
-          width: 26, height: 22, padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(4,44,83,0.82)', color: '#F59E0B',
-          border: '1px solid rgba(245,158,11,0.55)', borderRadius: 6,
-          fontSize: 14, lineHeight: 1, userSelect: 'none', touchAction: 'none',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-        }}
-      >⠿</button>
-    </div>
   )
 }
 
@@ -2311,6 +2209,9 @@ function PreviewQuizFillBlank({ block }) {
               style={{
                 margin: '0 4px', padding: '3px 6px', border: `2px solid ${bdr}`, borderRadius: 5,
                 fontSize: 14, fontFamily: 'inherit', color: '#042C53', background: '#fff',
+                // Size to THIS blank's longest option (native select intrinsic width),
+                // never a fixed/uniform width — a short-distractor blank stays short.
+                width: 'auto', maxWidth: '100%', boxSizing: 'border-box',
               }}
             >
               <option value="">— choose —</option>

@@ -1159,7 +1159,7 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-row>button.cf-bad{border-color:#C0392B;background:#FDECEA}
 .cf-iq-grip{color:#9aa7b4;font-size:16px}
 .cf-fbq-text{font-size:15px;line-height:2;color:#042C53;margin:0 0 14px}
-.cf-fbq-blank{margin:0 4px;padding:3px 6px;border:2px solid #185FA5;border-radius:5px;font:14px inherit;color:#042C53;background:#fff}
+.cf-fbq-blank{margin:0 4px;padding:3px 6px;border:2px solid #185FA5;border-radius:5px;font:14px inherit;color:#042C53;background:#fff;width:auto;max-width:100%;box-sizing:border-box}
 .cf-fbq-blank.cf-ok{border-color:#3B8A4A}
 .cf-fbq-blank.cf-bad{border-color:#C0392B}
 .cf-iq-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
