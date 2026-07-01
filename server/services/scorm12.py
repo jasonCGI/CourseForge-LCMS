@@ -540,7 +540,7 @@ def _cf_audio_bar(src, caption='', placement='inline', anchor=None, bid=None):
     if is_mini:
         pill = (
             f'<div class="cf-audio cf-audio--mini" data-cf-audio data-rates="{rates}" '
-            f'style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;'
+            f'style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px 0 7px;'
             f'box-sizing:border-box;border-radius:999px;background:rgba(4,44,83,0.72);'
             f'-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#E8EEF6;'
             f"font-family:'IBM Plex Mono',ui-monospace,monospace;"

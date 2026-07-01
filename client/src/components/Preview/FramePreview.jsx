@@ -698,7 +698,7 @@ function audioBarHTML(src, caption = '', placement = 'inline', anchor = null) {
   // Mini pill — compact transport (play, thin scrubber, `0:00 / 0:00`, no rate).
   if (isMini) {
     const pill = `<div class="cf-audio cf-audio--mini" data-cf-audio data-rates="${rates}" `
-      + `style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;`
+      + `style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px 0 7px;`
       + `box-sizing:border-box;border-radius:999px;background:rgba(4,44,83,0.72);`
       + `-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#E8EEF6;`
       + `font-family:'IBM Plex Mono',ui-monospace,monospace;box-shadow:0 6px 24px rgba(0,0,0,0.28);max-width:320px">`
@@ -1565,7 +1565,7 @@ function AudioBar({ src, caption = '', placement = 'inline', anchor = null }) {
       <div style={{ position: 'absolute', zIndex: 40, ...(MINI_CORNER[anchor] || MINI_CORNER['bottom-right']) }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, height: 44,
-          padding: '0 14px', boxSizing: 'border-box', borderRadius: 999,
+          padding: '0 14px 0 7px', boxSizing: 'border-box', borderRadius: 999,
           background: 'rgba(4,44,83,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
           color: '#E8EEF6', fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
           boxShadow: '0 6px 24px rgba(0,0,0,0.28)', maxWidth: 320,

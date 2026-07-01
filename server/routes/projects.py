@@ -357,12 +357,26 @@ def duplicate_frame(frame_id):
 
     frame = Frame.query.get_or_404(frame_id)
     data  = request.get_json(silent=True) or {}
-    target_lesson_id = data.get('target_lesson_id') or frame.lesson_id
-    Lesson.query.get_or_404(target_lesson_id)
 
-    last = (Frame.query.filter_by(lesson_id=target_lesson_id)
-            .order_by(Frame.order_index.desc()).first())
-    next_order = (last.order_index + 1) if last else 0
+    # after_frame_id (paste): drop the copy into the slot RIGHT AFTER that frame,
+    # in that frame's lesson — pushing the following frames down one. Otherwise
+    # append to the end of target_lesson_id (or the source's own lesson).
+    after_frame_id = data.get('after_frame_id')
+    after = Frame.query.get(after_frame_id) if after_frame_id else None
+    if after is not None:
+        target_lesson_id = after.lesson_id
+        next_order = after.order_index + 1
+        # Bump every frame at/after the insertion point down one to open the slot.
+        for f in Frame.query.filter(
+                Frame.lesson_id == target_lesson_id,
+                Frame.order_index >= next_order).all():
+            f.order_index = f.order_index + 1
+    else:
+        target_lesson_id = data.get('target_lesson_id') or frame.lesson_id
+        Lesson.query.get_or_404(target_lesson_id)
+        last = (Frame.query.filter_by(lesson_id=target_lesson_id)
+                .order_by(Frame.order_index.desc()).first())
+        next_order = (last.order_index + 1) if last else 0
 
     content = _copy.deepcopy(frame.content or {'blocks': []})
     for block in content.get('blocks', []):

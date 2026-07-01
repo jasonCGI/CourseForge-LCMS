@@ -122,12 +122,40 @@ const LEVELS = {
 // clearer visual frame-type indicator later. frameType is still threaded
 // through TreeRow for that future use.
 
+// Inline rename input. A `done` guard ensures Escape cancels cleanly without the
+// unmount's blur firing a spurious commit (and Enter can't double-commit via blur).
+function RenameInput({ initial, onCommit, onCancel }) {
+  const done = React.useRef(false)
+  return (
+    <input
+      autoFocus
+      defaultValue={initial}
+      aria-label="Rename frame"
+      onClick={e => e.stopPropagation()}
+      onFocus={e => e.currentTarget.select()}
+      onKeyDown={e => {
+        e.stopPropagation()
+        if (e.key === 'Enter') { e.preventDefault(); if (!done.current) { done.current = true; onCommit?.(e.currentTarget.value) } }
+        else if (e.key === 'Escape') { e.preventDefault(); done.current = true; onCancel?.() }
+      }}
+      onBlur={e => { if (!done.current) { done.current = true; onCommit?.(e.currentTarget.value) } }}
+      style={{
+        flex: 1, minWidth: 0, fontSize: 12, padding: '2px 6px',
+        fontFamily: 'var(--cf-font, Inter, system-ui, sans-serif)',
+        background: 'var(--cf-input-bg, #060810)', color: 'var(--cf-text-primary, #E0E8F0)',
+        border: '1px solid var(--forge-amber, #D4820A)', borderRadius: 3, outline: 'none',
+      }}
+    />
+  )
+}
+
 // ── Tree row component ────────────────────────────────────────────
 
 function TreeRow({
   level, depth, label, count, isOpen, isActive, isCurrent,
   frameType, note, optional, dotStatus, itemId, tabIndex, onKeyDown,
-  onClick, onContextMenu, children, rowIndex = 0
+  onClick, onContextMenu, onDoubleClick, renaming, onRenameCommit, onRenameCancel,
+  children, rowIndex = 0
 }) {
   const lv = LEVELS[level]
   const isFrame = level === 'frame'
@@ -171,6 +199,7 @@ function TreeRow({
         aria-label={`${level}: ${label}${count ? `, ${count}` : ''}${isFrame && dotStatus ? `, ${dotStatus}` : ''}${isFrame && a11y ? `, contrast ${a11y.status === 'fail' ? `${a11y.fails} failing` : a11y.status}` : ''}${optional ? ', optional' : ''}${isCurrent ? ', currently selected' : ''}${!isFrame && !isOpen ? ', collapsed' : ''}`}
         tabIndex={tabIndex != null ? tabIndex : 0}
         onClick={onClick}
+        onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown || (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } })}
         title={label}
@@ -251,16 +280,21 @@ function TreeRow({
             />
           )}
 
-          {/* Label */}
-          <span title={label} style={{
-            fontSize: 12, color: textColor, fontWeight,
-            flex: 1, whiteSpace: 'nowrap',
-            overflow: 'hidden', textOverflow: 'ellipsis',
-            fontFamily: 'var(--cf-font, Inter, system-ui, sans-serif)',
-            minWidth: 0,
-          }}>
-            {label}
-          </span>
+          {/* Label — swaps to an inline rename input while renaming (Enter commits,
+              Escape cancels, blur commits). Frame rows only. */}
+          {renaming ? (
+            <RenameInput initial={label} onCommit={onRenameCommit} onCancel={onRenameCancel} />
+          ) : (
+            <span title={label} style={{
+              fontSize: 12, color: textColor, fontWeight,
+              flex: 1, whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              fontFamily: 'var(--cf-font, Inter, system-ui, sans-serif)',
+              minWidth: 0,
+            }}>
+              {label}
+            </span>
+          )}
 
           {/* Author-notes indicator */}
           {note && (
@@ -294,6 +328,7 @@ export default function ContentTree() {
   const fetchProjects = useProjectStore(s => s.fetchProjects)
   const fetchProject  = useProjectStore(s => s.fetchProject)
   const loadFrame        = useEditorStore(s => s.loadFrame)
+  const deleteFrameFromStore = useEditorStore(s => s.deleteFrame)
   const selectConfigNode = useEditorStore(s => s.selectConfigNode)
   const activeFrameId    = useEditorStore(s => s.activeFrame?.id)
   const selectedNode     = useEditorStore(s => s.selectedNode)
@@ -385,6 +420,9 @@ export default function ContentTree() {
   // ── Sprint A: frame context menu + copy-to-lesson ──────────────────
   const [contextMenu,        setContextMenu]        = useState(null) // {frameId, x, y}
   const [copyToLessonFrameId, setCopyToLessonFrameId] = useState(null)
+  const [renamingFrameId,    setRenamingFrameId]    = useState(null) // frame id being inline-renamed
+  const renameFrame          = useEditorStore(s => s.renameFrame)
+  const commitRename = (frameId, name) => { setRenamingFrameId(null); renameFrame(frameId, name) }
 
   // ── Sprint B: template library for new frames ──────────────────────
   const [templateLibOpen,     setTemplateLibOpen]     = useState(false)
@@ -494,7 +532,7 @@ export default function ContentTree() {
 
   const doDuplicate = async (frameId, targetLessonId = null) => {
     try {
-      await duplicateFrame(frameId, targetLessonId)
+      await duplicateFrame(frameId, { targetLessonId })
       await refreshProject()
     } catch (e) {
       alert('Could not duplicate frame: ' + (e.response?.data?.error || e.message))
@@ -718,10 +756,14 @@ export default function ContentTree() {
                                     tabIndex={rovingTab(frame.id)}
                                     onKeyDown={e => handleTreeKeyDown(e, { id: frame.id, type: 'frame', parentId: lesson.id })}
                                     onClick={() => loadFrame(frame.id)}
+                                    onDoubleClick={() => setRenamingFrameId(frame.id)}
                                     onContextMenu={(e) => {
                                       e.preventDefault()
                                       setContextMenu({ frameId: frame.id, x: e.clientX, y: e.clientY })
                                     }}
+                                    renaming={renamingFrameId === frame.id}
+                                    onRenameCommit={(name) => commitRename(frame.id, name)}
+                                    onRenameCancel={() => setRenamingFrameId(null)}
                                   />
                                 </SortableFrameRow>
                               ))}
@@ -773,19 +815,24 @@ export default function ContentTree() {
           onClick={e => e.stopPropagation()}
         >
           {[
+            { label: '✎ Rename frame', action: () => { const fid = contextMenu.frameId; setContextMenu(null); setRenamingFrameId(fid) } },
             { label: '⧉ Duplicate frame', action: async () => { await doDuplicate(contextMenu.frameId); setContextMenu(null) } },
             { label: '→ Copy to lesson…',  action: () => { setCopyToLessonFrameId(contextMenu.frameId); setContextMenu(null) } },
-          ].map((item, i) => (
+            { label: '🗑 Delete frame', danger: true, action: () => {
+                const fid = contextMenu.frameId; setContextMenu(null)
+                if (window.confirm("Delete this frame? This can't be undone.")) deleteFrameFromStore(fid)
+              } },
+          ].map((item, i, arr) => (
             <button key={i} onClick={item.action}
               style={{
                 display: 'block', width: '100%', padding: '9px 14px',
                 background: 'none', border: 'none', textAlign: 'left',
-                fontSize: 12, color: 'var(--cf-text-secondary)', cursor: 'pointer',
+                fontSize: 12, color: item.danger ? '#E24B4A' : 'var(--cf-text-secondary)', cursor: 'pointer',
                 fontFamily: 'var(--cf-font)',
-                borderBottom: i < 1 ? '1px solid var(--cf-border-tertiary)' : 'none',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--cf-border-tertiary)' : 'none',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--cf-input-bg)'; e.currentTarget.style.color = 'var(--cf-text-primary)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--cf-text-secondary)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = item.danger ? 'rgba(226,75,74,0.12)' : 'var(--cf-input-bg)'; if (!item.danger) e.currentTarget.style.color = 'var(--cf-text-primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = item.danger ? '#E24B4A' : 'var(--cf-text-secondary)' }}
             >{item.label}</button>
           ))}
         </div>

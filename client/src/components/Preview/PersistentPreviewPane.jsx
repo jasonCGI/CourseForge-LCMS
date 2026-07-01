@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react'
 import FramePreview, { buildShelledLayoutHTML, frameExistsInProject, parseFguiContentBg, parseOpaqueRgb } from './FramePreview'
 import GUIShellRenderer from './GUIShellRenderer'
 import PreviewErrorBoundary from './PreviewErrorBoundary'
@@ -223,16 +223,34 @@ export default function PersistentPreviewPane() {
         source={source} onSource={setSource}
         paneRef={paneRef} frameId={activeFrame.id} auditSig={auditSig} auditFallbackBg={auditFallbackBg} />
       {source === 'published' ? (
-        // Server-rendered truth: the same /preview-html the old popup opened,
-        // now filling the pane. Replaces the removed FrameHeader Preview button.
-        <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
-          <iframe
-            key={activeFrame.id}
-            src={`/api/frames/${activeFrame.id}/preview-html?embed=1&_v=${lastSaved ? lastSaved.getTime() : 0}`}
-            title="Published frame preview"
-            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-          />
-        </div>
+        shellId ? (
+          // Published WITH a shell: same contain-fit + zoom controls as the Edit
+          // shell view, sharing the pane-level `zoom` so the scale stays consistent
+          // across Edit⇄Published. The published iframe renders the shell internally
+          // and rescales its stage to fill whatever pixel size we give it, so we size
+          // it to ShellFit's computed box (box.w × box.h). No overlay/contentArea
+          // here — the iframe already renders interactive blocks server-side, so
+          // Published needs no React overlay.
+          <ShellFit stage={stage} zoom={zoom} onZoom={setZoom}>
+            <iframe
+              key={activeFrame.id}
+              src={`/api/frames/${activeFrame.id}/preview-html?embed=1&_v=${lastSaved ? lastSaved.getTime() : 0}`}
+              title="Published frame preview"
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            />
+          </ShellFit>
+        ) : (
+          // Published, NO shell: plain full-bleed iframe (matches Edit's no-shell
+          // plain FramePreview — no zoom there either).
+          <div style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
+            <iframe
+              key={activeFrame.id}
+              src={`/api/frames/${activeFrame.id}/preview-html?embed=1&_v=${lastSaved ? lastSaved.getTime() : 0}`}
+              title="Published frame preview"
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            />
+          </div>
+        )
       ) : shellId && guiOn ? (
         // Always show the WHOLE GUI: contain-fit the stage within the pane (both
         // width AND height), scaled down (or up) so nothing is clipped and there's
@@ -279,7 +297,11 @@ function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom, ove
   const sw = stage?.w || 1024, sh = stage?.h || 768
   const fitMode = zoom === 'fit'
   // Contain-fit measurement only runs in Fit mode; fixed zooms are a direct multiply.
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the first synchronous measure lands BEFORE the
+  // browser paints — this kills the null→box "slide/snap" flash on mount/remount
+  // (e.g. flipping source back to Edit, which remounts ShellFit). The child would
+  // otherwise paint once at 100%/100% then jump to the contained box.
+  useLayoutEffect(() => {
     if (!fitMode) return
     const el = ref.current
     if (!el) return

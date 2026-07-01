@@ -23,7 +23,14 @@ export const DEFAULT_FRAME_LAYOUT = 'text-left'
 export default function FrameLayout({ frame }) {
   const setFrameLayout = useEditorStore(s => s.setFrameLayout)
   const setOptional = useEditorStore(s => s.setOptional)
+  const deleteFrame = useEditorStore(s => s.deleteFrame)
   const value = frame?.content?.layout || DEFAULT_FRAME_LAYOUT
+
+  const onDelete = () => {
+    if (!frame?.id) return
+    if (!window.confirm(`Delete frame “${frame.name || 'Untitled'}”? This can't be undone.`)) return
+    deleteFrame(frame.id)
+  }
 
   // A split layout (text-left/right) needs a MEDIA zone-filler to fill the other
   // half. Docked audio + callouts are auxiliary (not zone-fillers), so a text-only /
@@ -95,6 +102,22 @@ export default function FrameLayout({ frame }) {
             letterSpacing: '0.06em' }}>// excluded from the completion count</span>
         </span>
       </label>
+
+      {/* Delete this frame — quick access from the Frame section (also on the
+          left tree's right-click menu). Confirms first; can't be undone. */}
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete this frame"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14,
+          padding: '7px 12px', background: 'transparent', border: '1px solid #C0392B',
+          color: '#E24B4A', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+          fontFamily: 'var(--cf-font)', fontWeight: 500 }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(226,75,74,0.12)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <span aria-hidden="true">🗑</span> Delete frame
+      </button>
     </div>
   )
 }

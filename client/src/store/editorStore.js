@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import { getFrame, updateFrame } from '../api/client'
+import { getFrame, updateFrame, deleteFrame as apiDeleteFrame, duplicateFrame as apiDuplicateFrame } from '../api/client'
 import useProjectStore from './projectStore'
 
 let autosaveTimer = null
 let saveStatusTimer = null
+let toastTimer = null
 const AUTOSAVE_DELAY = 1200
 
 // Inspector dock orientation — global default persisted in localStorage
@@ -141,6 +142,8 @@ const useEditorStore = create((set, get) => ({
   lastSaved: null,
   saveError: null,
   activeBlockId: null,        // last-focused/clicked block (for keyboard shortcuts)
+  frameClipboard: null,       // id of a frame copied via Ctrl+C, for Ctrl+V paste
+  toast: null,                // transient bottom-center message (copy/paste/delete feedback)
   activeRegionId: null,       // selected hotspot region — syncs the live-preview
                               // editor with the inspector region list (highlight)
   activeInteractionId: null,  // selected iVideo interaction — syncs the live-preview
@@ -253,6 +256,75 @@ const useEditorStore = create((set, get) => ({
   // project store (avoids a circular import).
   _projectFrameOrder: null,
   setProjectFrameOrder: (fn) => set({ _projectFrameOrder: fn }),
+
+  // Transient bottom-center toast (auto-clears). Used for copy/paste/delete feedback.
+  flashToast: (msg) => {
+    clearTimeout(toastTimer)
+    set({ toast: msg })
+    toastTimer = setTimeout(() => set({ toast: null }), 1900)
+  },
+
+  // ── Frame copy / paste / delete ──────────────────────────────────
+  // Copy: remember a frame id for a later paste (Ctrl+C). Defaults to the active
+  // frame. Purely client-side — the paste does the server-side duplicate.
+  copyFrame: (frameId) => {
+    const id = frameId || get().activeFrame?.id
+    if (!id) return
+    // Timestamped so Ctrl+V can pick the most-recently-copied of {frame, block}
+    // (block copy lives in clipboardStore with its own copiedAt).
+    set({ frameClipboard: { id, copiedAt: Date.now() } })
+    get().flashToast('Frame copied — Ctrl+V to paste')
+  },
+  // Paste: duplicate the copied frame into the slot right AFTER the active frame
+  // (server inserts + reflows order). Falls back to appending when no active frame.
+  pasteFrame: async () => {
+    const clip = get().frameClipboard
+    if (!clip?.id) return
+    const afterId = get().activeFrame?.id || null
+    try {
+      const { data: nf } = await apiDuplicateFrame(clip.id, afterId ? { afterFrameId: afterId } : {})
+      const proj = useProjectStore.getState()
+      if (proj.activeProject?.id) await proj.fetchProject(proj.activeProject.id)
+      if (nf?.id) await get().loadFrame(nf.id)
+      get().flashToast('Frame pasted')
+    } catch (e) { set({ saveError: e.message }); get().flashToast('Paste failed') }
+  },
+  // Delete a frame (defaults to the active one). If it was active, navigate to the
+  // next frame (or previous, or clear). Refreshes the project tree.
+  deleteFrame: async (frameId) => {
+    const id = frameId || get().activeFrame?.id
+    if (!id) return
+    const order = get()._projectFrameOrder?.() || []
+    const i = order.indexOf(id)
+    const neighbor = i >= 0 ? (order[i + 1] || order[i - 1] || null) : null
+    const wasActive = get().activeFrame?.id === id
+    try {
+      await apiDeleteFrame(id)
+      const proj = useProjectStore.getState()
+      if (proj.activeProject?.id) await proj.fetchProject(proj.activeProject.id)
+      if (wasActive) {
+        if (neighbor) await get().loadFrame(neighbor)
+        else set({ activeFrame: null, originalFrame: null, isDirty: false, selectedNode: null })
+      }
+      get().flashToast('Frame deleted')
+    } catch (e) { set({ saveError: e.message }); get().flashToast('Delete failed') }
+  },
+  // Rename a frame (PATCH name only). Refreshes the tree and, if it's the active
+  // frame, updates the in-editor name too.
+  renameFrame: async (frameId, name) => {
+    const nm = (name || '').trim()
+    if (!frameId || !nm) return
+    try {
+      await updateFrame(frameId, { name: nm })
+      const proj = useProjectStore.getState()
+      if (proj.activeProject?.id) await proj.fetchProject(proj.activeProject.id)
+      if (get().activeFrame?.id === frameId) {
+        set({ activeFrame: { ...get().activeFrame, name: nm },
+              originalFrame: get().originalFrame ? { ...get().originalFrame, name: nm } : get().originalFrame })
+      }
+      get().flashToast('Frame renamed')
+    } catch (e) { set({ saveError: e.message }); get().flashToast('Rename failed') }
+  },
 
   // Update a single block inside the active frame content
   updateBlock: (blockId, newData) => {
