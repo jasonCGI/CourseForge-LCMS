@@ -309,6 +309,22 @@ const useEditorStore = create((set, get) => ({
       get().flashToast('Frame deleted')
     } catch (e) { set({ saveError: e.message }); get().flashToast('Delete failed') }
   },
+  // Rename a frame (PATCH name only). Refreshes the tree and, if it's the active
+  // frame, updates the in-editor name too.
+  renameFrame: async (frameId, name) => {
+    const nm = (name || '').trim()
+    if (!frameId || !nm) return
+    try {
+      await updateFrame(frameId, { name: nm })
+      const proj = useProjectStore.getState()
+      if (proj.activeProject?.id) await proj.fetchProject(proj.activeProject.id)
+      if (get().activeFrame?.id === frameId) {
+        set({ activeFrame: { ...get().activeFrame, name: nm },
+              originalFrame: get().originalFrame ? { ...get().originalFrame, name: nm } : get().originalFrame })
+      }
+      get().flashToast('Frame renamed')
+    } catch (e) { set({ saveError: e.message }); get().flashToast('Rename failed') }
+  },
 
   // Update a single block inside the active frame content
   updateBlock: (blockId, newData) => {
