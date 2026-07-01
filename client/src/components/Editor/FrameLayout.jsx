@@ -1,5 +1,5 @@
 import React from 'react'
-import useEditorStore from '../../store/editorStore'
+import useEditorStore, { isAuxAudio } from '../../store/editorStore'
 
 /**
  * FrameLayout — per-frame layout preset that drives how the live preview (and the
@@ -33,12 +33,14 @@ export default function FrameLayout({ frame }) {
   // apply, so it's a soft heads-up, not a block.
   const blocks = frame?.content?.blocks || []
   // A "media zone-filler" matches the RENDERER's split logic (FramePreview
-  // buildShelledLayoutHTML): a non-text block that isn't auxiliary. Docked audio
-  // (dock:'bottom'), callouts and GUI blocks are aux; an INLINE audio player IS a
-  // zone-filler (fills the media half) — which is why the demo Audio Block, set to
-  // inline, splits text-left while a docked-audio frame collapses to full. (Note:
-  // editorStore.isZoneMedia is stricter — it excludes ALL audio — so don't use it here.)
-  const isAuxBlock = (b) => (b.type === 'media' && b.data?.kind === 'audio' && b.data?.dock === 'bottom')
+  // buildShelledLayoutHTML): a non-text block that isn't auxiliary. Bar/mini audio
+  // (companion players — resolved via isAuxAudio, covering both new
+  // placement:'bar'|'mini' and legacy dock:'bottom'), callouts and GUI blocks are
+  // aux; an INLINE audio player IS a zone-filler (fills the media half) — which is
+  // why the demo Audio Block, set to inline, splits text-left while a bar/mini-audio
+  // frame collapses to full. (Note: editorStore.isZoneMedia is stricter — it excludes
+  // ALL audio — so don't use it here.)
+  const isAuxBlock = (b) => isAuxAudio(b)
     || b.type === 'callout' || b.type === 'gui'
   const hasMediaZone = blocks.some(b => b.type !== 'text' && !isAuxBlock(b))
   const coverMedia = blocks.some(b => b.type !== 'text' && !isAuxBlock(b) && b.data?.fit === 'cover')

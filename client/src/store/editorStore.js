@@ -61,6 +61,38 @@ export function isZoneMedia(block) {
   return MEDIA_TYPES.includes(block.type)
 }
 
+// ── Audio placement model (additive / back-compat) ──────────────────────────
+// An audio block sits in one of three placements. This is the single source of
+// truth the editor + all three renderers resolve through so they stay in lock-step.
+//   inline — current in-flow player (default). Rides a layout zone.
+//   bar    — full-width strip along an edge (anchor: 'bottom'|'top').
+//   mini   — compact rounded pill anchored to a corner (anchor: 'bottom-right' |
+//            'bottom-left' | 'top-right' | 'top-left').
+// Legacy mapping: absent `placement` derives from the old `dock` field
+// (`dock:'bottom'` → bar/bottom; else inline). `placement` always wins over `dock`.
+export const AUDIO_PLACEMENTS = ['inline', 'bar', 'mini']
+export const MINI_ANCHORS = ['bottom-right', 'bottom-left', 'top-right', 'top-left']
+export const BAR_ANCHORS = ['bottom', 'top']
+export function resolveAudioPlacement(data) {
+  const d = data || {}
+  let placement = d.placement
+  if (!AUDIO_PLACEMENTS.includes(placement)) {
+    placement = d.dock === 'bottom' ? 'bar' : 'inline'   // legacy dock → placement
+  }
+  let anchor = null
+  if (placement === 'bar')  anchor = d.anchor === 'top' ? 'top' : 'bottom'
+  else if (placement === 'mini') anchor = MINI_ANCHORS.includes(d.anchor) ? d.anchor : 'bottom-right'
+  return { placement, anchor }
+}
+// AUX audio = a companion player (bar/mini) that never consumes a layout zone, so
+// it coexists with an image/video media block on one frame. Inline audio still
+// flows in a zone. Mirrored by FramePreview.jsx render + scorm12._render_blocks.
+export function isAuxAudio(block) {
+  if (!block || block.type !== 'media' || (block.data?.kind) !== 'audio') return false
+  const { placement } = resolveAudioPlacement(block.data)
+  return placement === 'bar' || placement === 'mini'
+}
+
 // Resolve which add-block category, if any, a frame can no longer accept. Returns
 // { primaryBlocked, mediaBlocked, reason } given the frame's blocks + layout. The
 // palette uses this to disable buttons (with `reason` as the tooltip) and the store
@@ -508,7 +540,7 @@ function _makeBlock(type) {
   // (kind 'audio'). Audio is auxiliary (it docks, not a zone filler), so it's exempt
   // from media exclusivity — see isZoneMedia / MEDIA_TYPES.
   if (type === 'audio') {
-    return { id, type: 'media', data: { kind: 'audio', placeholder_label: '', asset_id: null, caption: '', dock: 'inline', bounds: null } }
+    return { id, type: 'media', data: { kind: 'audio', placeholder_label: '', asset_id: null, caption: '', placement: 'inline', anchor: 'bottom', bounds: null } }
   }
   const defaults = {
     text:  { body: '', narrator_script: '' },

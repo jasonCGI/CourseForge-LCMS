@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef, lazy, Suspense } from 'react'
-import useEditorStore from '../../../store/editorStore'
+import useEditorStore, { resolveAudioPlacement } from '../../../store/editorStore'
 import useProjectStore from '../../../store/projectStore'
 import { BlockHeader } from './BlockHeader'
 import MediaUploader from './MediaUploader'
@@ -12,6 +12,15 @@ import useContentArea from '../../../hooks/useContentArea'
 const VideoPlayer = lazy(() => import('./VideoPlayer'))
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'oam']
+
+// Audio placement anchor options (labels for the editor pickers).
+const BAR_ANCHORS = ['bottom', 'top']
+const MINI_ANCHORS = [
+  { val: 'bottom-right', lbl: 'Bottom-right' },
+  { val: 'bottom-left',  lbl: 'Bottom-left' },
+  { val: 'top-right',    lbl: 'Top-right' },
+  { val: 'top-left',     lbl: 'Top-left' },
+]
 
 const KIND_ICON = {
   image: '🖼',
@@ -31,6 +40,7 @@ export default function MediaBlock({ block }) {
   const updateBlock = useEditorStore(s => s.updateBlock)
   const removeBlock = useEditorStore(s => s.removeBlock)
   const moveBlock   = useEditorStore(s => s.moveBlock)
+  const activeFrame = useEditorStore(s => s.activeFrame)
 
   const update = useCallback((field, value) => {
     updateBlock(block.id, { [field]: value })
@@ -134,37 +144,94 @@ export default function MediaBlock({ block }) {
           />
         </div>
 
-        {/* Placement (audio only) — inline in the content flow, or docked as a
-            persistent slim bar pinned to the bottom of the content area. */}
-        {kind === 'audio' && (
-          <div style={{ marginTop: 12 }}>
-            <span style={fieldLabel}>Placement</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[['inline', 'Inline'], ['bottom', 'Docked (bottom)']].map(([val, lbl]) => {
-                const active = (block.data.dock || 'inline') === val
-                return (
-                  <button
-                    key={val}
-                    onClick={() => update('dock', val)}
-                    aria-pressed={active}
-                    style={{
-                      padding: '6px 14px', borderRadius: 4,
-                      border: `1px solid ${active ? KIND_COLOR.audio : 'var(--color-border-tertiary)'}`,
-                      background: active ? KIND_COLOR.audio : 'transparent',
-                      color: active ? '#fff' : 'var(--color-text-secondary)',
-                      fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                    }}
-                  >
-                    {lbl}
-                  </button>
-                )
-              })}
+        {/* Placement (audio only) — a companion player over any image:
+            Inline (in-flow), Bar (full-width edge strip), or Mini (corner pill).
+            Bar/Mini are auxiliary, so an image + audio coexist on one frame. */}
+        {kind === 'audio' && (() => {
+          const { placement, anchor } = resolveAudioPlacement(block.data)
+          // Set placement + a coherent default anchor in one write.
+          const setPlacement = (p) => {
+            const next = { placement: p }
+            if (p === 'bar')  next.anchor = BAR_ANCHORS.includes(anchor) ? anchor : 'bottom'
+            if (p === 'mini') next.anchor = MINI_ANCHORS.some(a => a.val === anchor) ? anchor : 'bottom-right'
+            updateBlock(block.id, next)
+          }
+          // Overlap guard: a mini floats over the content area — warn if the frame
+          // already holds other content it could cover.
+          const otherContent = (activeFrame?.content?.blocks || []).some(b =>
+            b.id !== block.id && b.type !== 'gui' && b.type !== 'wcn' &&
+            !(b.type === 'media' && (b.data?.kind) === 'audio'))
+          const styleBtn = (val, lbl, active) => (
+            <button key={val} onClick={() => setPlacement(val)} aria-pressed={active}
+              style={{
+                padding: '6px 14px', borderRadius: 4,
+                border: `1px solid ${active ? KIND_COLOR.audio : 'var(--color-border-tertiary)'}`,
+                background: active ? KIND_COLOR.audio : 'transparent',
+                color: active ? '#fff' : 'var(--color-text-secondary)',
+                fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              }}>{lbl}</button>
+          )
+          const anchorBtn = (val, lbl) => {
+            const active = anchor === val
+            return (
+              <button key={val} onClick={() => update('anchor', val)} aria-pressed={active}
+                title={lbl}
+                style={{
+                  padding: '6px 12px', borderRadius: 4,
+                  border: `1px solid ${active ? KIND_COLOR.audio : 'var(--color-border-tertiary)'}`,
+                  background: active ? KIND_COLOR.audio : 'transparent',
+                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                }}>{lbl}</button>
+            )
+          }
+          return (
+            <div style={{ marginTop: 12 }}>
+              <span style={fieldLabel}>Style</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {styleBtn('inline', 'Inline', placement === 'inline')}
+                {styleBtn('bar', 'Bar', placement === 'bar')}
+                {styleBtn('mini', 'Mini', placement === 'mini')}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
+                {placement === 'inline' && 'Inline sits in the content flow beside the text.'}
+                {placement === 'bar' && 'Bar pins a full-width narration strip to an edge — it floats over any image.'}
+                {placement === 'mini' && 'Mini is a compact rounded player anchored to a corner over your content.'}
+              </p>
+
+              {/* Anchor picker — edges for a bar, corners for a mini. */}
+              {placement === 'bar' && (
+                <div style={{ marginTop: 10 }}>
+                  <span style={fieldLabel}>Anchor</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {anchorBtn('bottom', 'Bottom')}
+                    {anchorBtn('top', 'Top')}
+                  </div>
+                </div>
+              )}
+              {placement === 'mini' && (
+                <div style={{ marginTop: 10 }}>
+                  <span style={fieldLabel}>Anchor</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 260 }}>
+                    {MINI_ANCHORS.map(a => anchorBtn(a.val, a.lbl))}
+                  </div>
+                </div>
+              )}
+
+              {/* Overlap guard (508 + authoring): a mini floats over the content. */}
+              {placement === 'mini' && otherContent && (
+                <p role="status" style={{
+                  fontSize: 11, lineHeight: 1.4, margin: '10px 0 0', padding: '8px 10px',
+                  borderRadius: 4, border: '1px solid var(--cf-amber, #D4820A)',
+                  background: 'rgba(212,130,10,0.10)', color: 'var(--cf-amber, #D4820A)',
+                }}>
+                  ⚠ This mini player floats over the content area. Keep it clear of essential
+                  text or imagery — it anchors to a corner and never covers the whole frame.
+                </p>
+              )}
             </div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
-              Docked pins the player to the bottom of the content area so narration stays reachable.
-            </p>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Playbar (video only) — for a full-bleed (cover) video, choose where the
             control bar / playbar sits: inline (flows with a gap underneath the

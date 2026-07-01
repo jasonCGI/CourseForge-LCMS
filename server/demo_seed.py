@@ -120,13 +120,18 @@ def _silent_wav_datauri(seconds=8, sr=8000):
            + b'data' + struct.pack('<I', n))
     return 'data:audio/wav;base64,' + base64.b64encode(hdr + body).decode()
 
-def _audio(label='Course Audio', caption='', dock='inline'):
-    # dock: 'inline' (renders in flow) | 'bottom' (pinned to the content area).
-    # serve_url carries a silent WAV so the branded bar is interactive in the demo.
-    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': {
+def _audio(label='Course Audio', caption='', placement='inline', anchor=None):
+    # placement: 'inline' (in flow) | 'bar' (full-width edge strip) | 'mini'
+    # (compact corner pill over the content). anchor: bar→'bottom'/'top',
+    # mini→'bottom-right'/'bottom-left'/'top-right'/'top-left'.
+    # serve_url carries a silent WAV so the branded player is interactive in the demo.
+    data = {
         'kind': 'audio', 'placeholder_label': label, 'caption': caption, 'asset_id': None,
-        'dock': dock, 'serve_url': _silent_wav_datauri(),
-        'original_name': label.lower().replace(' ', '_') + '.mp3'}}
+        'placement': placement, 'serve_url': _silent_wav_datauri(),
+        'original_name': label.lower().replace(' ', '_') + '.mp3'}
+    if anchor:
+        data['anchor'] = anchor
+    return {'id': str(uuid.uuid4()), 'type': 'media', 'data': data}
 
 def _callout(text='Callout', box=None, target=None, padding=10, anchor='auto'):
     # Free-floating annotation overlay: rounded box (center text, uniform padding,
@@ -425,11 +430,22 @@ in this course comes back to dialing it in.</p>''',
               narration='Audio carries what a still cannot: the grind, the steam wand, a narrator talking you '
                         'through the pull. The player sits beside the text so it stays reachable while you '
                         'read. The cue is normalized to negative sixteen LUFS.'),
-        # Inline player (a media zone-filler) so the text-left split renders text on
-        # the left and the audio player on the right — audio styled alongside text.
+        # Inline player so the text-left split renders text on the left and the
+        # audio player on the right — audio styled alongside the text.
         _audio(label='Narration — Lesson Intro',
                caption='Inline placement — sits in the right column beside the text',
-               dock='inline'),
+               placement='inline'),
+    ]},
+    {'name': 'Audio Companion — Mini Player', 'frame_type': 'content', 'lesson': 'Content Blocks', 'layout': 'full', 'blocks': [
+        # A cover image fills the whole content area, and a MINI audio player floats
+        # as a compact rounded pill in the bottom-right corner — a companion layer.
+        # Audio is auxiliary (bar/mini never consume the media zone), so the image
+        # and the player coexist on one frame. This is the placement the design
+        # review liked: soft shadow, backdrop blur, thin scrubber, 0:00 / 0:00.
+        _image(label='Steaming pour-over on a cafe counter', color='#1A7A5E', icon='☕', fill=True),
+        _audio(label='Narration — Pour-Over Walkthrough',
+               caption='Mini placement — floats over the image, bottom-right',
+               placement='mini', anchor='bottom-right'),
     ]},
 
     # ── Assessment Blocks ──

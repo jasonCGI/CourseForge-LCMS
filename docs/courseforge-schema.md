@@ -242,12 +242,14 @@ A single media slot. `data.kind` selects the sub-type. `MEDIA_KINDS = ['image','
 | `bounds`            | object\|null | optional | `null`      | Per-block absolute box within the content area (set via BoundsControl). |
 | `alt_text`          | string  | required for `image` (508) | (unset) | Screen-reader text. **Required for images**; video uses it as accessible description. |
 | `fit`               | string  | optional | (unset)          | e.g. `"cover"` — fill behavior for image/video. |
-| `dock`              | enum    | optional | `"inline"` (audio default in `_makeBlock('audio')`) | `inline` \| `bottom`. For audio: inline vs docked bar. For video: inline vs "snap to bottom" playbar. |
+| `placement`         | enum    | optional (audio) | `"inline"` | **Audio placement model.** `inline` \| `bar` \| `mini`. `inline` = in-flow player (rides a layout zone). `bar` = full-width strip along an edge (auxiliary). `mini` = compact rounded corner pill over the content (auxiliary). `bar`/`mini` never consume the media zone, so an **image + a bar/mini audio coexist** on one frame. Legacy: absent `placement` derives from `dock` (`dock:'bottom'` → `bar`/`bottom`). Resolved by `resolveAudioPlacement` (client) / `_audio_placement` (server). |
+| `anchor`            | enum    | optional (audio) | `bar`→`"bottom"`, `mini`→`"bottom-right"` | Edge/corner for a `bar`/`mini` audio player. `bar`: `bottom` \| `top`. `mini`: `bottom-right` \| `bottom-left` \| `top-right` \| `top-left`. Ignored for `inline`. |
+| `dock`              | enum    | optional | `"inline"` | **Video** playbar: `inline` vs `bottom` ("snap to bottom"). **Legacy for audio** — superseded by `placement` (`dock:'bottom'` maps to `placement:'bar'`, anchor `bottom`); still read for back-compat. |
 | `use_videojs`       | bool    | optional | `true` (effective) | Video only. `false` → plain `<video>`. |
 | `serve_url`, `original_name`, `asset_meta` | — | runtime | — | Populated on upload; not authored. |
 
 `_makeBlock('media')` default: `{ kind: 'image', placeholder_label: '', asset_id: null, caption: '', bounds: null }`.
-`_makeBlock('audio')` (Audio button) default: `{ kind: 'audio', placeholder_label: '', asset_id: null, caption: '', dock: 'inline', bounds: null }` — stored as `type: 'media'`.
+`_makeBlock('audio')` (Audio button) default: `{ kind: 'audio', placeholder_label: '', asset_id: null, caption: '', placement: 'inline', anchor: 'bottom', bounds: null }` — stored as `type: 'media'`. **Bar/mini audio is a companion layer** (auxiliary): it never occupies the media zone, so an image media block + a bar/mini audio block coexist on one frame.
 
 ### 4.3 `quiz` — PRIMARY
 
