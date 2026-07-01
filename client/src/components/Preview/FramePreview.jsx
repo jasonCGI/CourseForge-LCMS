@@ -13,7 +13,7 @@ import IVideoEditor from '../Editor/blocks/IVideoEditor'
 import OamMediaBar from './OamMediaBar'
 import Model3DViewer from './Model3DViewer'
 import GUIShellRenderer from './GUIShellRenderer'
-import useEditorStore from '../../store/editorStore'
+import useEditorStore, { resolveAudioPlacement, isAuxAudio } from '../../store/editorStore'
 import useProjectStore from '../../store/projectStore'
 import { flatFrameOrder } from './PersistentPreviewPane'
 import { hotspotStyle, shapeRadius, rgba, HOTSPOT_AMBER } from '../../utils/hotspotStyle'
@@ -86,17 +86,22 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   // break out of the stack and render as absolute boxes positioned in content-area
   // pixels; the rest keep flowing. Without a contentArea, bounds are ignored.
   const bounded = contentArea ? blocks.filter(b => b.data?.bounds) : []
-  // Docked audio bars pin to the bottom of the frame container — pull them out of
-  // the normal flow so they don't anchor to a per-block wrapper.
-  const isDockedAudio = b => b.type === 'media' && b.data?.kind === 'audio' && b.data?.dock === 'bottom'
-  const dockedAudio = blocks.filter(isDockedAudio)
+  // Companion audio players (bar/mini placement) are AUXILIARY — they pin to an
+  // edge/corner of the frame container, never consume a layout zone, and coexist
+  // with an image/video. Pull them out of the normal flow so they anchor to the
+  // outer position:relative container below. (Inline audio stays in flow.)
+  const auxAudio = blocks.filter(isAuxAudio)
+  // Reserve room so an edge-anchored BAR never covers the last line of content.
+  // Mini is a small corner pill and needs no reservation.
+  const barBottom = auxAudio.some(b => { const p = resolveAudioPlacement(b.data); return p.placement === 'bar' && p.anchor === 'bottom' })
+  const barTop    = auxAudio.some(b => { const p = resolveAudioPlacement(b.data); return p.placement === 'bar' && p.anchor === 'top' })
   // Callouts are AUXILIARY overlays over the content area — pulled out of the flow
   // (like docked audio) so they never consume a layout zone; rendered as absolute
   // overlay layers anchored to the outer position:relative container below. Parity
   // with scorm12._render_blocks (callout -> kind_tag 'aux', rendered outside zones).
   const callouts = blocks.filter(b => b.type === 'callout')
   const flow    = (contentArea ? blocks.filter(b => !b.data?.bounds) : blocks)
-    .filter(b => !isDockedAudio(b) && b.type !== 'callout')
+    .filter(b => !isAuxAudio(b) && b.type !== 'callout')
   const textBlocks  = flow.filter(b => b.type === 'text')
   const otherBlocks = flow.filter(b => b.type !== 'text')
   // Frame layout preset (content.layout): 'full' = single column (media full-bleed,
@@ -128,9 +133,9 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
       fontFamily: 'Inter, system-ui, sans-serif',
       minHeight: '100%',
       height: overlayFill ? '100%' : undefined,
-      padding: overlayFill ? 0 : (dockedAudio.length ? '28px 0 88px' : '28px 0 40px'),
+      padding: overlayFill ? 0 : `${barTop ? 88 : 28}px 0 ${barBottom ? 88 : 40}px`,
       boxSizing: 'border-box',
-      position: 'relative',   // anchor for docked audio bars + the menu back-pill
+      position: 'relative',   // anchor for companion audio (bar/mini) + the menu back-pill
     }}>
       {/* Menu back-pill: shown when this frame was reached via a menu (React
           parity with the SCO sessionStorage runtime). Top-left of the content area. */}
@@ -213,14 +218,15 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
           <PreviewBlock block={b} fill />
         </BoundsBox>
       ))}
-      {/* Docked audio bars — pinned to the bottom of the frame container. Derived
-          purely from the CURRENT block state above, and keyed by id+dock so a
-          dock toggle ('bottom'→'inline') unmounts this bar entirely (its <audio>
-          stops + cleans up) instead of leaving a duplicate playing alongside the
-          new inline bar. */}
-      {dockedAudio.map(b => {
+      {/* Companion audio players (bar/mini) — pinned to an edge/corner of the frame
+          container. Derived purely from the CURRENT block state above, and keyed by
+          id+placement+anchor so a Style/Anchor change unmounts the old player
+          entirely (its <audio> stops + cleans up) instead of leaving a duplicate
+          playing alongside the new one. */}
+      {auxAudio.map(b => {
         const src = b.data.serve_url || (b.data.asset_id ? `/api/media/serve/${b.data.asset_id}` : null)
-        return src ? <AudioBar key={`${b.id}-bottom`} src={src} caption={b.data.caption} dock="bottom" /> : null
+        const { placement, anchor } = resolveAudioPlacement(b.data)
+        return src ? <AudioBar key={`${b.id}-${placement}-${anchor}`} src={src} caption={b.data.caption} placement={placement} anchor={anchor} /> : null
       })}
       {/* Callout overlays — free-floating annotation boxes + connector lines over
           the content area. Auxiliary (never a zone-filler); the target circle is an
@@ -655,28 +661,52 @@ function injectedNote(label) {
        + `margin:8px 0;text-align:center">${label} — interactive in the published course</div>`
 }
 
-// Branded slim audio bar as an HTML string + a guarded, self-contained vanilla
+// Branded audio player as an HTML string + a guarded, self-contained vanilla
 // controller (the GUI shell injects HTML; there is no React there). Mirrors the
 // React <AudioBar> and the server's _cf_audio_bar so all three renderers match.
-function audioBarHTML(src, caption = '', dock = 'inline') {
+// placement: 'inline' | 'bar' | 'mini'; anchor: bar→'bottom'/'top', mini→corner.
+const MINI_CORNER_CSS = {
+  'bottom-right': 'bottom:16px;right:16px',
+  'bottom-left':  'bottom:16px;left:16px',
+  'top-right':    'top:16px;right:16px',
+  'top-left':     'top:16px;left:16px',
+}
+function audioBarHTML(src, caption = '', placement = 'inline', anchor = null) {
   const NAVY = '#042C53', AMBER = '#F59E0B'
   const rates = [0.5, 0.75, 1, 1.25, 1.5, 2].join(',')
-  const docked = dock === 'bottom'
-  const cap = caption && !docked
+  const isMini = placement === 'mini'
+  const isBar  = placement === 'bar'
+  const cap = caption && placement === 'inline'
     ? `<div style="font-size:12px;color:#888;margin-top:6px">${caption}</div>` : ''
-  const wrapStyle = docked
-    ? 'position:absolute;left:0;right:0;bottom:0;z-index:40;padding:8px 12px;box-sizing:border-box;background:rgba(4,44,83,0.96);box-shadow:0 -2px 12px rgba(0,0,0,0.18)'
-    : 'margin:8px 0'
-  const dockAttr = docked ? ' data-cf-dock="bottom"' : ''
+  const audioEl = `<audio data-cf-src preload="metadata" src="${src}"></audio>`
+  const playBtn = (sz) => `<button type="button" data-cf-play aria-label="Play" `
+    + `style="flex:0 0 auto;width:${sz}px;height:${sz}px;border:none;border-radius:50%;`
+    + `background:${AMBER};color:${NAVY};cursor:pointer;display:flex;align-items:center;`
+    + `justify-content:center;font-size:14px;line-height:1;padding:0">${CF_PLAY_SVG}</button>`
+
+  // Mini pill — compact transport (play, thin scrubber, `0:00 / 0:00`, no rate).
+  if (isMini) {
+    const pill = `<div class="cf-audio cf-audio--mini" data-cf-audio data-rates="${rates}" `
+      + `style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;`
+      + `box-sizing:border-box;border-radius:999px;background:rgba(4,44,83,0.72);`
+      + `-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#E8EEF6;`
+      + `font-family:'IBM Plex Mono',ui-monospace,monospace;box-shadow:0 6px 24px rgba(0,0,0,0.28);max-width:320px">`
+      + audioEl + playBtn(30)
+      + `<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" `
+      + `style="flex:1 1 auto;height:4px;accent-color:${AMBER};cursor:pointer;min-width:80px;max-width:150px">`
+      + `<span style="flex:0 0 auto;font-size:11px;letter-spacing:.02em;white-space:nowrap">`
+      + `<span data-cf-cur>0:00</span> <span style="opacity:.55">/</span> <span data-cf-dur style="color:#9FB4CC">0:00</span></span>`
+      + `</div>`
+    const wrapStyle = `position:absolute;z-index:40;${MINI_CORNER_CSS[anchor] || MINI_CORNER_CSS['bottom-right']}`
+    return `<div data-cf-placement="mini" data-cf-anchor="${anchor || 'bottom-right'}" style="${wrapStyle}">${pill}</div>${audioBarScriptHTML()}`
+  }
+
+  // Full bar (inline flow + edge-anchored strip).
   const bar = `<div class="cf-audio" data-cf-audio data-rates="${rates}" `
     + `style="display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;`
     + `box-sizing:border-box;background:${NAVY};color:#E8EEF6;`
     + `font-family:'IBM Plex Mono',ui-monospace,monospace">`
-    + `<audio data-cf-src preload="metadata" src="${src}"></audio>`
-    + `<button type="button" data-cf-play aria-label="Play" `
-    + `style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;`
-    + `background:${AMBER};color:${NAVY};cursor:pointer;display:flex;align-items:center;`
-    + `justify-content:center;font-size:14px;line-height:1;padding:0">${CF_PLAY_SVG}</button>`
+    + audioEl + playBtn(32)
     + `<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>`
     + `<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" `
     + `style="flex:1 1 auto;height:4px;accent-color:${AMBER};cursor:pointer;min-width:60px">`
@@ -686,7 +716,14 @@ function audioBarHTML(src, caption = '', dock = 'inline') {
     + `border-radius:6px;background:transparent;color:${AMBER};cursor:pointer;`
     + `font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px">1x</button>`
     + `</div>`
-  return `<div${dockAttr} style="${wrapStyle}">${bar}${cap}</div>${audioBarScriptHTML()}`
+  if (isBar) {
+    const edge = anchor === 'top' ? 'top:0' : 'bottom:0'
+    const shadow = anchor === 'top' ? '0 2px 12px' : '0 -2px 12px'
+    const wrapStyle = `position:absolute;left:0;right:0;${edge};z-index:40;padding:8px 12px;`
+      + `box-sizing:border-box;background:rgba(4,44,83,0.96);box-shadow:${shadow} rgba(0,0,0,0.18)`
+    return `<div data-cf-placement="bar" data-cf-anchor="${anchor || 'bottom'}" style="${wrapStyle}">${bar}</div>${audioBarScriptHTML()}`
+  }
+  return `<div style="margin:8px 0">${bar}${cap}</div>${audioBarScriptHTML()}`
 }
 
 // Wire every [data-cf-audio] bar in a given document (used by the GUI shell
@@ -707,7 +744,7 @@ export function wireAudioBars(doc) {
     const seek = bar.querySelector('[data-cf-seek]')
     const cur = bar.querySelector('[data-cf-cur]')
     const dur = bar.querySelector('[data-cf-dur]')
-    const rateBtn = bar.querySelector('[data-cf-rate]')
+    const rateBtn = bar.querySelector('[data-cf-rate]')   // absent on the mini pill
     const rates = (bar.getAttribute('data-rates') || '1').split(',').map(parseFloat)
     let ri = rates.indexOf(1); if (ri < 0) ri = 0
     let seeking = false
@@ -723,7 +760,7 @@ export function wireAudioBars(doc) {
     a.addEventListener('ended', () => { ico(false); seek.value = '0'; cur.textContent = '0:00' })
     seek.addEventListener('input', () => { seeking = true; if (a.duration) cur.textContent = fmt(seek.value / 1000 * a.duration) })
     seek.addEventListener('change', () => { if (a.duration) a.currentTime = seek.value / 1000 * a.duration; seeking = false })
-    rateBtn.addEventListener('click', () => { ri = (ri + 1) % rates.length; a.playbackRate = rates[ri]; rateBtn.textContent = rates[ri] + 'x' })
+    if (rateBtn) rateBtn.addEventListener('click', () => { ri = (ri + 1) % rates.length; a.playbackRate = rates[ri]; rateBtn.textContent = rates[ri] + 'x' })
   })
 }
 
@@ -736,6 +773,7 @@ function audioBarScriptHTML() {
     + 'seek=bar.querySelector("[data-cf-seek]"),cur=bar.querySelector("[data-cf-cur]"),'
     + 'dur=bar.querySelector("[data-cf-dur]"),rateBtn=bar.querySelector("[data-cf-rate]");'
     + 'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);if(ri<0)ri=0;var seeking=false;'
+    // rateBtn is absent on the mini pill; guard its wiring below.
     + 'function ico(p){play.innerHTML=p?"' + CF_PAUSE_SVG.replace(/"/g, '\\"') + '":"' + CF_PLAY_SVG.replace(/"/g, '\\"') + '";play.setAttribute("aria-label",p?"Pause":"Play");}'
     + 'play.addEventListener("click",function(){a.paused?a.play():a.pause();});'
     + 'a.addEventListener("play",function(){ico(true);});a.addEventListener("pause",function(){ico(false);});'
@@ -745,7 +783,7 @@ function audioBarScriptHTML() {
     + 'a.addEventListener("ended",function(){ico(false);seek.value="0";cur.textContent="0:00";});'
     + 'seek.addEventListener("input",function(){seeking=true;if(a.duration)cur.textContent=fmt(seek.value/1000*a.duration);});'
     + 'seek.addEventListener("change",function(){if(a.duration)a.currentTime=seek.value/1000*a.duration;seeking=false;});'
-    + 'rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;a.playbackRate=rates[ri];rateBtn.textContent=rates[ri]+"x";});}'
+    + 'if(rateBtn)rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;a.playbackRate=rates[ri];rateBtn.textContent=rates[ri]+"x";});}'
     + 'function scan(){var bars=document.querySelectorAll("[data-cf-audio]");for(var i=0;i<bars.length;i++)wire(bars[i]);}'
     + 'if(document.readyState!=="loading")scan();else document.addEventListener("DOMContentLoaded",scan);'
     + '})();' + '</scr' + 'ipt>'
@@ -818,7 +856,8 @@ export function renderBlockToHTML(block, { fill = false } = {}) {
       }
       if (k === 'audio' && (src || d.asset_id)) {
         const asrc = src || `/api/media/serve/${d.asset_id}`
-        return audioBarHTML(asrc, d.caption || '', d.dock || 'inline')
+        const { placement, anchor } = resolveAudioPlacement(d)
+        return audioBarHTML(asrc, d.caption || '', placement, anchor)
       }
       return injectedNote(`${k || 'media'} block`)
     }
@@ -1055,8 +1094,7 @@ export function buildShelledLayoutHTML(contentBlocks, layout, bgColor = null,
   // and renders a half split with an empty media zone, diverging from the published
   // render (which collapses to a full-width text box). They're still emitted
   // (appended after the zones) so their own absolute positioning places them.
-  const isAux = (b) => (b.type === 'media' && b.data && b.data.kind === 'audio' && b.data.dock === 'bottom')
-    || b.type === 'callout'
+  const isAux = (b) => isAuxAudio(b) || b.type === 'callout'
   const auxBlocks  = blocks.filter(isAux)
   const zoneBlocks = blocks.filter(b => !isAux(b))
   const auxHTML    = auxBlocks.map(b => renderBlockToHTML(b)).join('\n')
@@ -1422,9 +1460,13 @@ function PreviewText({ block }) {
   )
 }
 
-// Branded slim audio player — navy surface, amber accent, IBM Plex Mono time,
-// video-matched playback rates. dock='bottom' pins it full-width to the bottom
-// of the nearest positioned ancestor (the content area); 'inline' flows.
+// Branded audio player — navy surface, amber accent, IBM Plex Mono time,
+// video-matched playback rates. Three placements (kept in lock-step with the
+// audioBarHTML string twin and scorm12._cf_audio_bar):
+//   inline — flows in the content, full bar + caption below.
+//   bar    — full-width strip along an edge (anchor 'bottom'|'top').
+//   mini   — compact rounded pill anchored to a corner (soft shadow + blur),
+//            transport = play/pause, thin scrubber, `0:00 / 0:00`.
 const CF_AUDIO_NAVY  = '#042C53'
 const CF_AUDIO_AMBER = '#F59E0B'
 const CF_AUDIO_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -1433,19 +1475,27 @@ const fmtTime = (s) => {
   const m = Math.floor(s / 60), x = Math.floor(s % 60)
   return `${m}:${x < 10 ? '0' : ''}${x}`
 }
+// Corner inset styles for a mini pill (16px from the anchored corner).
+const MINI_CORNER = {
+  'bottom-right': { bottom: 16, right: 16 },
+  'bottom-left':  { bottom: 16, left: 16 },
+  'top-right':    { top: 16, right: 16 },
+  'top-left':     { top: 16, left: 16 },
+}
 
-function AudioBar({ src, caption = '', dock = 'inline' }) {
+function AudioBar({ src, caption = '', placement = 'inline', anchor = null }) {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [cur, setCur] = useState(0)
   const [dur, setDur] = useState(0)
   const [rateIdx, setRateIdx] = useState(CF_AUDIO_RATES.indexOf(1))
-  const docked = dock === 'bottom'
+  const isMini = placement === 'mini'
+  const isBar  = placement === 'bar'
 
-  // Stop + release the underlying <audio> when this bar unmounts (e.g. an
-  // inline⇄docked toggle swaps which bar renders). Without this, a playing
-  // docked bar would keep its audio going after React swaps it out, producing a
-  // phantom "duplicate" that plays alongside the new bar.
+  // Stop + release the underlying <audio> when this player unmounts (e.g. a
+  // Style/Anchor change swaps which player renders). Without this, a playing
+  // player would keep its audio going after React swaps it out, producing a
+  // phantom "duplicate" that plays alongside the new one.
   useEffect(() => () => {
     const a = audioRef.current
     if (a) { try { a.pause() } catch (e) { /* noop */ } a.removeAttribute('src'); a.load() }
@@ -1465,40 +1515,73 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
     if (audioRef.current) audioRef.current.playbackRate = CF_AUDIO_RATES[next]
   }
 
+  const audioEl = (
+    /* eslint-disable-next-line jsx-a11y/media-has-caption -- audio narration element; a captions <track> is not applicable, transcript/caption text is surfaced separately */
+    <audio
+      ref={audioRef}
+      src={src}
+      preload="metadata"
+      onPlay={() => setPlaying(true)}
+      onPause={() => setPlaying(false)}
+      onEnded={() => { setPlaying(false); setCur(0) }}
+      onLoadedMetadata={e => setDur(e.target.duration || 0)}
+      onTimeUpdate={e => setCur(e.target.currentTime || 0)}
+    />
+  )
+  const playBtn = (sz) => (
+    <button type="button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}
+      style={{
+        flex: '0 0 auto', width: sz, height: sz, border: 'none', borderRadius: '50%',
+        background: CF_AUDIO_AMBER, color: CF_AUDIO_NAVY, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, lineHeight: 1, padding: 0,
+      }}>
+      {playing
+        ? <Pause width={sz - 14} height={sz - 14} color={CF_AUDIO_NAVY} />
+        : <Play width={sz - 14} height={sz - 14} color={CF_AUDIO_NAVY} />}
+    </button>
+  )
+  const seekInput = (extra) => (
+    <input type="range" min={0} max={1000} step={1} aria-label="Seek"
+      value={dur ? Math.round((cur / dur) * 1000) : 0}
+      onChange={seek}
+      style={{ flex: '1 1 auto', height: 4, accentColor: CF_AUDIO_AMBER, cursor: 'pointer', ...extra }} />
+  )
+
+  // Mini pill — compact transport in a rounded, blurred, shadowed capsule.
+  if (isMini) {
+    return (
+      <div style={{ position: 'absolute', zIndex: 40, ...(MINI_CORNER[anchor] || MINI_CORNER['bottom-right']) }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, height: 44,
+          padding: '0 14px', boxSizing: 'border-box', borderRadius: 999,
+          background: 'rgba(4,44,83,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+          color: '#E8EEF6', fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+          boxShadow: '0 6px 24px rgba(0,0,0,0.28)', maxWidth: 320,
+        }}>
+          {audioEl}
+          {playBtn(30)}
+          {seekInput({ minWidth: 80, maxWidth: 150 })}
+          <span style={{ flex: '0 0 auto', fontSize: 11, letterSpacing: '.02em', whiteSpace: 'nowrap' }}>
+            {fmtTime(cur)} <span style={{ opacity: 0.55 }}>/</span> <span style={{ color: '#9FB4CC' }}>{fmtTime(dur)}</span>
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Full bar (inline flow + edge-anchored bar strip).
   const bar = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, height: 48,
       padding: '0 12px', boxSizing: 'border-box',
-      background: docked ? 'rgba(4,44,83,0.96)' : CF_AUDIO_NAVY, color: '#E8EEF6',
+      background: isBar ? 'rgba(4,44,83,0.96)' : CF_AUDIO_NAVY, color: '#E8EEF6',
       fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
     }}>
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- audio narration element; a captions <track> is not applicable, transcript/caption text is surfaced separately */}
-      <audio
-        ref={audioRef}
-        src={src}
-        preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => { setPlaying(false); setCur(0) }}
-        onLoadedMetadata={e => setDur(e.target.duration || 0)}
-        onTimeUpdate={e => setCur(e.target.currentTime || 0)}
-      />
-      <button type="button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}
-        style={{
-          flex: '0 0 auto', width: 32, height: 32, border: 'none', borderRadius: '50%',
-          background: CF_AUDIO_AMBER, color: CF_AUDIO_NAVY, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, lineHeight: 1, padding: 0,
-        }}>
-        {playing
-          ? <Pause width={18} height={18} color={CF_AUDIO_NAVY} />
-          : <Play width={18} height={18} color={CF_AUDIO_NAVY} />}
-      </button>
+      {audioEl}
+      {playBtn(32)}
       <span style={{ flex: '0 0 auto', fontSize: 12, letterSpacing: '.02em' }}>{fmtTime(cur)}</span>
-      <input type="range" min={0} max={1000} step={1} aria-label="Seek"
-        value={dur ? Math.round((cur / dur) * 1000) : 0}
-        onChange={seek}
-        style={{ flex: '1 1 auto', height: 4, accentColor: CF_AUDIO_AMBER, cursor: 'pointer', minWidth: 60 }} />
+      {seekInput({ minWidth: 60 })}
       <span style={{ flex: '0 0 auto', fontSize: 12, letterSpacing: '.02em', color: '#9FB4CC' }}>{fmtTime(dur)}</span>
       <button type="button" onClick={cycleRate} aria-label="Playback speed"
         style={{
@@ -1512,12 +1595,14 @@ function AudioBar({ src, caption = '', dock = 'inline' }) {
     </div>
   )
 
-  if (docked) {
+  if (isBar) {
+    const edge = anchor === 'top' ? { top: 0 } : { bottom: 0 }
     return (
       <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 40,
+        position: 'absolute', left: 0, right: 0, ...edge, zIndex: 40,
         padding: '8px 12px', boxSizing: 'border-box',
-        background: 'rgba(4,44,83,0.96)', boxShadow: '0 -2px 12px rgba(0,0,0,0.18)',
+        background: 'rgba(4,44,83,0.96)',
+        boxShadow: anchor === 'top' ? '0 2px 12px rgba(0,0,0,0.18)' : '0 -2px 12px rgba(0,0,0,0.18)',
       }}>{bar}</div>
     )
   }
@@ -1557,10 +1642,13 @@ function PreviewMedia({ block, fill = false }) {
   }
 
   // Live audio: branded slim bar (real asset, or a seeded placeholder serve_url —
-  // e.g. the demo audio block). Respects d.dock ('inline' | 'bottom').
+  // e.g. the demo audio block). Only INLINE audio reaches PreviewMedia (bar/mini
+  // are pulled out of flow and rendered as companion overlays); resolve anyway so
+  // a legacy dock-mapped block is handled consistently.
   if (kind === 'audio' && (d.asset_id || d.serve_url)) {
     const src = d.serve_url || `/api/media/serve/${d.asset_id}`
-    return <AudioBar src={src} caption={d.caption} dock={d.dock || 'inline'} />
+    const { placement, anchor } = resolveAudioPlacement(d)
+    return <AudioBar src={src} caption={d.caption} placement={placement} anchor={anchor} />
   }
 
   // Live cover video: a real uploaded asset that fills its content area. Plays

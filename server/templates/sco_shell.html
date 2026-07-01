@@ -86,12 +86,16 @@
       max-width: 900px;
       margin: 0 auto;
       width: 100%;
-      position: relative;   /* anchor for docked (bottom) audio bars */
+      position: relative;   /* anchor for companion (bar/mini) audio players */
     }
-    /* When a docked audio bar is present, reserve space so it never covers
-       content. The bar is slim (48px) and pinned inside .cf-content. */
-    .cf-content:has([data-cf-dock="bottom"]) {
+    /* When an edge-anchored audio BAR is present, reserve space on that edge so it
+       never covers content. The bar is slim (48px) and pinned inside .cf-content.
+       A mini pill is a small corner overlay and needs no reservation. */
+    .cf-content:has([data-cf-placement="bar"][data-cf-anchor="bottom"]) {
       padding-bottom: 80px;
+    }
+    .cf-content:has([data-cf-placement="bar"][data-cf-anchor="top"]) {
+      padding-top: 80px;
     }
 
     .cf-frame-title {

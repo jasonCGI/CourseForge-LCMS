@@ -472,40 +472,102 @@ CF_AUDIO_NAVY  = '#042C53'   # matches the GUI/preview chrome navy
 CF_AUDIO_AMBER = '#F59E0B'   # play/pause + progress fill accent
 CF_AUDIO_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]   # mirrors the video playbackRates
 
+# Audio placement model (additive / back-compat). The single source of truth the
+# server resolves through so it stays in lock-step with the client
+# (editorStore.resolveAudioPlacement / FramePreview.jsx AudioBar):
+#   inline — in-flow player (default). bar — full-width edge strip (anchor
+#   'bottom'|'top'). mini — corner pill (anchor 'bottom-right'|'bottom-left'|
+#   'top-right'|'top-left'). Legacy: absent placement derives from dock:'bottom'.
+_AUDIO_PLACEMENTS = ('inline', 'bar', 'mini')
+_MINI_ANCHORS = ('bottom-right', 'bottom-left', 'top-right', 'top-left')
+_MINI_CORNER_CSS = {
+    'bottom-right': 'bottom:16px;right:16px',
+    'bottom-left':  'bottom:16px;left:16px',
+    'top-right':    'top:16px;right:16px',
+    'top-left':     'top:16px;left:16px',
+}
 
-def _cf_audio_bar(src, caption='', dock='inline', bid=None):
-    """Emit the branded slim audio bar markup (no <script>).
 
-    dock='inline'  -> renders in content flow.
-    dock='bottom'  -> pinned full-width to the bottom of the content/frame
-                      container (position:absolute; the container is relative).
+def _audio_placement(data):
+    """Resolve (placement, anchor) for an audio block's data (back-compat)."""
+    d = data or {}
+    placement = d.get('placement')
+    if placement not in _AUDIO_PLACEMENTS:
+        placement = 'bar' if d.get('dock') == 'bottom' else 'inline'
+    if placement == 'bar':
+        anchor = 'top' if d.get('anchor') == 'top' else 'bottom'
+    elif placement == 'mini':
+        anchor = d.get('anchor') if d.get('anchor') in _MINI_ANCHORS else 'bottom-right'
+    else:
+        anchor = None
+    return placement, anchor
+
+
+def _is_aux_audio(btype, data):
+    """A companion audio player (bar/mini) — auxiliary, never a zone-filler."""
+    if btype != 'media' or (data or {}).get('kind') != 'audio':
+        return False
+    placement, _ = _audio_placement(data)
+    return placement in ('bar', 'mini')
+
+
+def _cf_audio_bar(src, caption='', placement='inline', anchor=None, bid=None):
+    """Emit the branded audio player markup (no <script>).
+
+    placement='inline' -> renders in content flow (full bar + caption below).
+    placement='bar'    -> full-width strip pinned to an edge (anchor 'bottom'|'top')
+                          of the content/frame container (position:absolute).
+    placement='mini'   -> compact rounded pill anchored to a corner (soft shadow +
+                          backdrop blur); transport = play, thin scrubber, 0:00/0:00.
+    The container is made position:relative so absolute children anchor to it.
     """
     bid = bid or uuid.uuid4().hex[:8]
-    cap = (f'<div style="font-size:12px;color:#888;margin-top:6px">{esc(caption)}</div>'
-           if caption and dock != 'bottom' else '')
-    docked = dock == 'bottom'
-    # Outer wrapper: inline flows; bottom pins to the bottom of the nearest
-    # positioned ancestor (the content/frame container, made relative below).
-    wrap_style = (
-        'position:absolute;left:0;right:0;bottom:0;z-index:40;padding:8px 12px;'
-        'box-sizing:border-box;background:rgba(4,44,83,0.96);'
-        'box-shadow:0 -2px 12px rgba(0,0,0,0.18)'
-        if docked else 'margin:8px 0'
-    )
-    dock_attr = ' data-cf-dock="bottom"' if docked else ''
     rates = ','.join(str(r) for r in CF_AUDIO_RATES)
+    is_mini = placement == 'mini'
+    is_bar  = placement == 'bar'
+    audio_el = f'<audio data-cf-src preload="metadata" src="{esc(src)}"></audio>'
+
+    def _play_btn(sz):
+        return (
+            f'<button type="button" data-cf-play aria-label="Play" '
+            f'style="flex:0 0 auto;width:{sz}px;height:{sz}px;border:none;border-radius:50%;'
+            f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
+            f'display:flex;align-items:center;justify-content:center;font-size:14px;'
+            f'line-height:1;padding:0">{PLAY_SVG}</button>'
+        )
+
+    # Mini pill — compact transport (play, thin scrubber, "0:00 / 0:00", no rate).
+    if is_mini:
+        pill = (
+            f'<div class="cf-audio cf-audio--mini" data-cf-audio data-rates="{rates}" '
+            f'style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;'
+            f'box-sizing:border-box;border-radius:999px;background:rgba(4,44,83,0.72);'
+            f'-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#E8EEF6;'
+            f"font-family:'IBM Plex Mono',ui-monospace,monospace;"
+            f'box-shadow:0 6px 24px rgba(0,0,0,0.28);max-width:320px">'
+            f'{audio_el}{_play_btn(30)}'
+            f'<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" '
+            f'aria-label="Seek" '
+            f'style="flex:1 1 auto;height:4px;accent-color:{CF_AUDIO_AMBER};cursor:pointer;'
+            f'min-width:80px;max-width:150px">'
+            f'<span style="flex:0 0 auto;font-size:11px;letter-spacing:.02em;white-space:nowrap">'
+            f'<span data-cf-cur>0:00</span> <span style="opacity:.55">/</span> '
+            f'<span data-cf-dur style="color:#9FB4CC">0:00</span></span>'
+            f'</div>'
+        )
+        anchor = anchor if anchor in _MINI_ANCHORS else 'bottom-right'
+        wrap_style = f'position:absolute;z-index:40;{_MINI_CORNER_CSS[anchor]}'
+        return (f'<div data-cf-placement="mini" data-cf-anchor="{anchor}" '
+                f'style="{wrap_style}">{pill}</div>')
+
+    # Full bar (inline flow + edge-anchored strip).
     bar = (
         f'<div class="cf-audio" data-cf-audio data-rates="{rates}" '
         f'style="display:flex;align-items:center;gap:12px;height:48px;'
         f'padding:0 12px;box-sizing:border-box;'
         f'background:{CF_AUDIO_NAVY};color:#E8EEF6;'
         f"font-family:'IBM Plex Mono',ui-monospace,monospace;\">"
-        f'<audio data-cf-src preload="metadata" src="{esc(src)}"></audio>'
-        f'<button type="button" data-cf-play aria-label="Play" '
-        f'style="flex:0 0 auto;width:32px;height:32px;border:none;border-radius:50%;'
-        f'background:{CF_AUDIO_AMBER};color:{CF_AUDIO_NAVY};cursor:pointer;'
-        f'display:flex;align-items:center;justify-content:center;font-size:14px;'
-        f'line-height:1;padding:0">{PLAY_SVG}</button>'
+        f'{audio_el}{_play_btn(32)}'
         f'<span data-cf-cur style="flex:0 0 auto;font-size:12px;letter-spacing:.02em">0:00</span>'
         f'<input data-cf-seek type="range" min="0" max="1000" value="0" step="1" '
         f'aria-label="Seek" '
@@ -517,9 +579,21 @@ def _cf_audio_bar(src, caption='', dock='inline', bid=None):
         f'style="flex:0 0 auto;min-width:42px;height:26px;border:1px solid rgba(245,158,11,.5);'
         f'border-radius:6px;background:transparent;color:{CF_AUDIO_AMBER};cursor:pointer;'
         f"font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px\">1x</button>"
-        f'</div>{cap}'
+        f'</div>'
     )
-    return f'<div{dock_attr} style="{wrap_style}">{bar}</div>'
+    if is_bar:
+        edge = 'top:0' if anchor == 'top' else 'bottom:0'
+        shadow = '0 2px 12px' if anchor == 'top' else '0 -2px 12px'
+        wrap_style = (
+            f'position:absolute;left:0;right:0;{edge};z-index:40;padding:8px 12px;'
+            f'box-sizing:border-box;background:rgba(4,44,83,0.96);'
+            f'box-shadow:{shadow} rgba(0,0,0,0.18)'
+        )
+        return (f'<div data-cf-placement="bar" data-cf-anchor="{anchor or "bottom"}" '
+                f'style="{wrap_style}">{bar}</div>')
+    cap = (f'<div style="font-size:12px;color:#888;margin-top:6px">{esc(caption)}</div>'
+           if caption else '')
+    return f'<div style="margin:8px 0">{bar}{cap}</div>'
 
 
 # One page-wide controller wires every [data-cf-audio] bar. Idempotent: guarded
@@ -538,7 +612,7 @@ def _cf_audio_script():
         'seek=bar.querySelector("[data-cf-seek]"),'
         'cur=bar.querySelector("[data-cf-cur]"),'
         'dur=bar.querySelector("[data-cf-dur]"),'
-        'rateBtn=bar.querySelector("[data-cf-rate]");'
+        'rateBtn=bar.querySelector("[data-cf-rate]");'   # rateBtn absent on the mini pill
         'var rates=(bar.getAttribute("data-rates")||"1").split(",").map(parseFloat),ri=rates.indexOf(1);'
         'if(ri<0)ri=0;var seeking=false;'
         'function ico(p){play.innerHTML=p?"' + PAUSE_SVG_JS + '":"' + PLAY_SVG_JS + '";'
@@ -555,7 +629,7 @@ def _cf_audio_script():
         'if(a.duration)cur.textContent=fmt(seek.value/1000*a.duration);});'
         'seek.addEventListener("change",function(){'
         'if(a.duration)a.currentTime=seek.value/1000*a.duration;seeking=false;});'
-        'rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;'
+        'if(rateBtn)rateBtn.addEventListener("click",function(){ri=(ri+1)%rates.length;'
         'a.playbackRate=rates[ri];rateBtn.textContent=rates[ri]+"x";});'
         '}'
         'function scan(){var bars=document.querySelectorAll("[data-cf-audio]");'
@@ -1722,14 +1796,13 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
         bid   = block.get('id', str(uuid.uuid4()))
         start = len(parts)   # where this block's HTML begins (for bounds-wrapping)
         if btype != 'gui':
-            # A docked audio bar is an AUXILIARY element pinned to the content-area
-            # bottom (position:absolute) — it is NOT a layout zone-filler. Tag it
-            # 'aux' so the layout reflow below ignores it when deciding text vs.
-            # media zones (parity with FramePreview.jsx's isDockedAudio). Without
-            # this, an audio block makes a text+audio 'full' frame look like
-            # text+media and skips the proper full-width 40px-padded text box.
-            if (btype == 'media' and data.get('kind') == 'audio'
-                    and data.get('dock') == 'bottom'):
+            # A companion audio player (bar/mini placement) is an AUXILIARY element
+            # pinned to an edge/corner (position:absolute) — it is NOT a layout
+            # zone-filler. Tag it 'aux' so the layout reflow below ignores it when
+            # deciding text vs. media zones (parity with FramePreview.jsx's
+            # isAuxAudio). Without this, an audio block makes a text+audio 'full'
+            # frame look like text+media and skips the full-width 40px-padded text box.
+            if _is_aux_audio(btype, data):
                 kind_tag = 'aux'
             elif btype == 'callout':
                 # A callout is a free-floating annotation OVERLAY over the content
@@ -1840,13 +1913,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif (preview and btype == 'media' and data.get('kind') == 'audio'
               and (data.get('serve_url') or data.get('asset_id'))):
-            src   = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
-            dock  = data.get('dock', 'inline')
+            src = data.get('serve_url') or f"/api/media/serve/{data['asset_id']}"
+            placement, anchor = _audio_placement(data)
             # caption is escaped inside _cf_audio_bar; src is escaped there too.
-            wrap  = '' if dock == 'bottom' else 'margin-bottom:20px'
+            # bar/mini self-position (absolute); only inline flows with a gap.
+            wrap = 'margin-bottom:20px' if placement == 'inline' else ''
             parts.append(
                 f'<div style="{wrap}">'
-                f'{_cf_audio_bar(src, data.get("caption", ""), dock, bid)}</div>'
+                f'{_cf_audio_bar(src, data.get("caption", ""), placement, anchor, bid)}</div>'
             )
 
         elif btype == 'media' and data.get('kind') == 'video' and data.get('asset_id'):
@@ -2012,11 +2086,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             else:
                 # serve_url is escaped at the <audio src> point inside _cf_audio_bar.
                 src = data['serve_url']
-            dock = data.get('dock', 'inline')
-            wrap = '' if dock == 'bottom' else 'margin-bottom:20px'
+            placement, anchor = _audio_placement(data)
+            wrap = 'margin-bottom:20px' if placement == 'inline' else ''
             parts.append(
                 f'<div style="{wrap}">'
-                f'{_cf_audio_bar(src, data.get("caption", ""), dock, bid)}</div>'
+                f'{_cf_audio_bar(src, data.get("caption", ""), placement, anchor, bid)}</div>'
             )
 
         elif btype == 'media':
