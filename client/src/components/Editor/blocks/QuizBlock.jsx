@@ -110,6 +110,21 @@ export default function QuizBlock({ block }) {
             />
           </div>
         </div>
+
+        {/* Hint (shared) — shown after a wrong attempt, one tier before the answer is
+            revealed on the final attempt. Leave blank to skip the hint tier. */}
+        <div style={{ marginTop: 14 }}>
+          <label htmlFor={`quiz-hint-${block.id}`} style={fieldLabel}>Hint (shown after a wrong attempt)</label>
+          <textarea
+            id={`quiz-hint-${block.id}`}
+            value={block.data.hint || ''}
+            onChange={e => update('hint', e.target.value)}
+            rows={2}
+            placeholder="Optional nudge shown before the answer is revealed on the last attempt…"
+            style={textareaStyle}
+          />
+          <p style={helpText}>Escalation: 1st wrong → incorrect feedback · one attempt left → this hint · final wrong → reveal the answer + lock.</p>
+        </div>
       </div>
     </div>
   )

@@ -140,13 +140,15 @@ def _callout(text='Callout', box=None, target=None, padding=10, anchor='auto'):
         'target': target or {'x': 32, 'y': 32}, 'padding': padding, 'anchor': anchor}}
 
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
-          feedback_incorrect='Not quite — review and try again.', randomize=False):
+          feedback_incorrect='Not quite — review and try again.', randomize=False,
+          hint='', attempts_allowed=2):
     return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
         'qtype': 'multiple_choice',
         'question': question, 'choices': choices, 'correct_index': correct_index,
         'randomize': randomize,
         'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
-        'attempts_allowed': 2}}
+        'hint': hint,
+        'attempts_allowed': attempts_allowed}}
 
 def _quiz_dd(prompt, pairs, feedback_correct='Correct! Every match is right.',
              feedback_incorrect='Not quite — review the matches and try again.',
@@ -221,6 +223,26 @@ def _hotspot(regions=None):
             {'id': str(uuid.uuid4()), 'x': 28, 'y': 49, 'w': 22, 'h': 35, 'label': 'The portafilter', 'description': '18 g dosed and tamped into the portafilter basket, ready to lock into the group head.'},
             {'id': str(uuid.uuid4()), 'x': 52, 'y': 37, 'w': 22, 'h': 45, 'label': 'The finished drink', 'description': 'A balanced shot pulled in 25–30 seconds, topped with steamed milk for a cappuccino.'},
         ]}}
+
+def _hotspot_quiz(prompt, regions, feedback_correct='That is the one!',
+                  feedback_incorrect='Not there — look again.', hint='', attempts_allowed=3,
+                  reveal='subtle'):
+    # Graded hotspot ("visual multiple choice"): clicking a region flagged correct=True
+    # scores right; a wrong region or off-target is a wrong attempt, running the same
+    # tiered feedback->hint->reveal scaffold as the quiz block. `regions` are dicts with
+    # x/y/w/h/label plus an optional correct=True flag.
+    out = []
+    for r in regions:
+        out.append({'id': str(uuid.uuid4()),
+                    'x': r['x'], 'y': r['y'], 'w': r['w'], 'h': r['h'],
+                    'label': r['label'], 'shape': r.get('shape', 'rect'),
+                    'correct': bool(r.get('correct', False))})
+    return {'id': str(uuid.uuid4()), 'type': 'hotspot', 'data': {
+        'mode': 'quiz', 'background_asset_id': None, 'image_id': None,
+        'background_url': _svg('Espresso Station', '#5A2D0C', '☕', sub='click the correct part'),
+        'prompt': prompt, 'reveal': reveal, 'attempts_allowed': attempts_allowed,
+        'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
+        'hint': hint, 'regions': out}}
 
 def _branch(condition, true_label='Yes', false_label='No'):
     return {'id': str(uuid.uuid4()), 'type': 'branch', 'data': {
@@ -431,7 +453,12 @@ in this course comes back to dialing it in.</p>''',
                              'the shot develops the sweetness that balances the sourness.',
             feedback_incorrect='Not quite. A fast, sour shot is under-extracted. The fix is a finer grind to '
                                'slow the flow toward 25–30 seconds — hotter water or a longer pull won\'t '
-                               'correct a grind that is letting water race through.'),
+                               'correct a grind that is letting water race through.',
+            # Three attempts so the full ladder is visible: 1st wrong -> incorrect
+            # feedback, one attempt left -> this hint, final wrong -> reveal + lock.
+            hint='A 12-second shot is TOO FAST — the water is not spending enough time in the puck. '
+                 'Which single change adds resistance and slows the flow?',
+            attempts_allowed=3),
     ]},
     {'name': 'Quiz Block — Drag and Drop', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
         _text(body='<h2>Quiz Block — Drag and Drop</h2><p>Match each brew method to its standard '
@@ -505,6 +532,28 @@ in this course comes back to dialing it in.</p>''',
                         'grounds, the tamper, the loaded portafilter, and the finished drink. Click each '
                         'highlighted region to check yourself.'),
         _hotspot(),
+    ]},
+    {'name': 'Hotspot Quiz — Click the Portafilter', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
+        _text(body='<h2>Spot the portafilter</h2><p>Same espresso station, but now it is graded. Click the '
+                   'one part the prompt asks for. Tab moves between the labelled regions and Enter selects '
+                   'one, so it works without a mouse.</p>',
+              narration='Now a graded hotspot. Click the part the prompt asks for. You can Tab between the '
+                        'labelled regions and press Enter to choose, so it works without a mouse.'),
+        _hotspot_quiz(
+            prompt='Click the portafilter — the handled basket that locks into the group head.',
+            regions=[
+                {'x': 17, 'y': 7,  'w': 24, 'h': 42, 'label': 'Dose of fresh grounds'},
+                {'x': 9,  'y': 55, 'w': 13, 'h': 33, 'label': 'Tamper'},
+                {'x': 28, 'y': 49, 'w': 22, 'h': 35, 'label': 'Portafilter', 'correct': True},
+                {'x': 52, 'y': 37, 'w': 22, 'h': 45, 'label': 'Finished drink'},
+            ],
+            feedback_correct='Correct! That is the portafilter — 18 g dosed and tamped, ready to lock into the '
+                             'group head.',
+            feedback_incorrect='Not that one. The portafilter is the handled basket you tamp the grounds into '
+                               'and twist into the machine.',
+            hint='Look for the handled metal basket in the middle — the one you tamp the grounds into before '
+                 'locking it in.',
+            attempts_allowed=3),
     ]},
     {'name': 'Branch Block', 'frame_type': 'branch', 'lesson': 'Assessment Blocks', 'blocks': [
         _text(body='<h2>Branch Block</h2><p>The Branch block presents a decision point that routes learners '
