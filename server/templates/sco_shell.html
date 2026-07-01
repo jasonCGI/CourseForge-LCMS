@@ -331,8 +331,11 @@
     var fb = document.getElementById('feedback-' + blockId);
     fb.style.display = 'block';
     fb.classList.add(idx === correctIndex ? 'correct' : 'incorrect');
-    // Report score to SCORM
-    scorm.setValue('cmi.core.score.raw', idx === correctIndex ? '100' : '0');
+    // Report score + pass/fail to SCORM 1.2 (100 -> passed, else failed), matching
+    // the shared cfQuizReport runtime the interactive qtypes use.
+    var passed = idx === correctIndex;
+    scorm.setValue('cmi.core.score.raw', passed ? '100' : '0');
+    scorm.setValue('cmi.core.lesson_status', passed ? 'passed' : 'failed');
   }
 
   function cfSelectChoice(blockId, btn) {

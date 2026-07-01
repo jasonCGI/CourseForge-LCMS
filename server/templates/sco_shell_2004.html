@@ -262,11 +262,11 @@
     fb.style.display = 'block';
     fb.classList.add(isCorrect ? 'correct' : 'incorrect');
 
-    // Report score via SCORM 2004
+    // Report score + pass/fail via SCORM 2004 (100 -> passed, else failed), matching
+    // the shared cfQuizReport runtime the interactive qtypes use.
     scorm2004.setScore(isCorrect ? 100 : 0, 0, 100);
-    if (isCorrect) {
-      scorm2004.setValue('cmi.success_status', 'passed');
-    }
+    scorm2004.setValue('cmi.completion_status', 'completed');
+    scorm2004.setValue('cmi.success_status', isCorrect ? 'passed' : 'failed');
   }
 
   function cfSelectChoice(blockId, btn) {

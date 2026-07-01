@@ -1142,8 +1142,12 @@ if(!window.cfQuizInit){
 window.cfQuizReport=function(score){
   function find(n){var w=window;for(var i=0;i<8&&w;i++){try{if(w[n])return w[n];}catch(e){}if(w===w.parent)break;w=w.parent;}try{if(window.opener&&window.opener[n])return window.opener[n];}catch(e){}return null;}
   var a12=find('API'),a04=find('API_1484_11');
-  try{if(a12)a12.LMSSetValue('cmi.core.score.raw',String(score));}catch(e){}
-  try{if(a04)a04.SetValue('cmi.score.raw',String(score));}catch(e){}
+  // Pass/fail signal by score (100 -> passed, else failed). The runtime knows which
+  // SCORM version it's in by WHICH API global is present: a SCORM 1.2 package exposes
+  // only window.API (LMS* verbs); a 2004 package exposes only window.API_1484_11.
+  var pass=(Number(score)>=100)?'passed':'failed';
+  try{if(a12){a12.LMSSetValue('cmi.core.score.raw',String(score));a12.LMSSetValue('cmi.core.lesson_status',pass);a12.LMSCommit('');}}catch(e){}
+  try{if(a04){a04.SetValue('cmi.score.raw',String(score));a04.SetValue('cmi.completion_status','completed');a04.SetValue('cmi.success_status',pass);a04.Commit('');}}catch(e){}
 };
 window.cfQuizShuffle=function(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;};
 function cfqAttempts(cfg,state,root){
