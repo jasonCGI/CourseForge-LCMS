@@ -126,13 +126,24 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
   const overlayFill = !!contentArea
   const hasText = textBlocks.length > 0, hasMedia = otherBlocks.length > 0
   const fullSingle = layout === 'full' && !(hasText && hasMedia)
+  // Companion audio (bar/mini) is absolutely anchored to this frame root. In the
+  // GUI-on overlay the root already fills the content area (overlayFill). In the
+  // direct (shell-off) preview the root otherwise grows to the content's natural
+  // height, so a bottom/corner-anchored player would pin to the grown bottom and
+  // fall BELOW the (overflow-hidden) preview pane. Bound the root to the pane and
+  // let the media fill it, so bar/mini pin to the VISIBLE edge/corner over the
+  // media — matching the overlay + published renders.
+  const hasAuxAudio = auxAudio.length > 0
+  const boundDirect = hasAuxAudio && !overlayFill
+  const fillMedia   = overlayFill || boundDirect
   return (
     <div style={{
       background: FRAME_BG,
       color: '#1a1a1a',
       fontFamily: 'Inter, system-ui, sans-serif',
       minHeight: '100%',
-      height: overlayFill ? '100%' : undefined,
+      height: (overlayFill || boundDirect) ? '100%' : undefined,
+      overflow: boundDirect ? 'hidden' : undefined,
       padding: overlayFill ? 0 : `${barTop ? 88 : 28}px 0 ${barBottom ? 88 : 40}px`,
       boxSizing: 'border-box',
       position: 'relative',   // anchor for companion audio (bar/mini) + the menu back-pill
@@ -168,29 +179,29 @@ export default function FramePreview({ frame, activeBlockId = null, onBlockSelec
         const flowRegion = (
           <>
             {flow.length > 0 && layout === 'full' && (
-              <div style={overlayFill && fullSingle ? { height: '100%' } : undefined}>
+              <div style={fillMedia && fullSingle ? { height: '100%' } : undefined}>
                 {flow.map(b => (
                   <div key={b.id} style={{
                     padding: b.type === 'text' ? 40 : 0,
-                    height: overlayFill && fullSingle ? '100%' : undefined,
+                    height: fillMedia && fullSingle ? '100%' : undefined,
                     boxSizing: 'border-box',
                   }}>
-                    {renderBlock(b, overlayFill && fullSingle && b.type !== 'text')}
+                    {renderBlock(b, fillMedia && fullSingle && b.type !== 'text')}
                   </div>
                 ))}
               </div>
             )}
             {flow.length > 0 && layout !== 'full' && (
               <div style={{ display: 'flex', flexWrap: 'wrap',
-                alignItems: overlayFill ? 'stretch' : 'flex-start',
-                height: overlayFill ? '100%' : undefined }}>
+                alignItems: fillMedia ? 'stretch' : 'flex-start',
+                height: fillMedia ? '100%' : undefined }}>
                 {(() => {
                   const zone = (blocks2, isMedia) => (
                     <div style={{ flex: '1 1 0', minWidth: 0, boxSizing: 'border-box',
-                      padding: isMedia && overlayFill ? 0 : 40,
-                      height: overlayFill ? '100%' : undefined,
-                      overflow: overlayFill ? 'hidden' : undefined }}>
-                      {blocks2.map(b => renderBlock(b, isMedia && overlayFill))}
+                      padding: isMedia && fillMedia ? 0 : 40,
+                      height: fillMedia ? '100%' : undefined,
+                      overflow: fillMedia ? 'hidden' : undefined }}>
+                      {blocks2.map(b => renderBlock(b, isMedia && fillMedia))}
                     </div>
                   )
                   const textZone = zone(textBlocks, false)
