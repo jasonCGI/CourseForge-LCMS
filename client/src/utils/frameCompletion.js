@@ -64,7 +64,13 @@ export function getFrameIssues(frame) {
           const blanks = (data.segments || []).filter(s => s.type === 'blank')
           if (blanks.length < 1)
             issues.push({ block_type: 'quiz', issue: 'Fill-in-the-blank needs at least 1 blank' })
-          if (blanks.some(b => !b.correct))
+          // Correct is tracked by option INDEX (correct_index); resolve a legacy
+          // `correct` string to its index for back-compat. A blank is authored when
+          // it resolves to a real option (index 0..n-1) — note index 0 is valid.
+          const _ci = (b) => Number.isInteger(b.correct_index)
+            ? b.correct_index
+            : (b.options || []).indexOf(b.correct)
+          if (blanks.some(b => { const i = _ci(b); return i < 0 || i >= (b.options || []).length }))
             issues.push({ block_type: 'quiz', issue: 'Every blank needs a correct option' })
         } else {
           if (!data.question || !data.question.trim())

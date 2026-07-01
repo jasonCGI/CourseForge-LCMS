@@ -191,13 +191,18 @@ def _quiz_fb(segments, feedback_correct='Correct! Every blank is filled in right
     # text and blank dicts:
     #   {'text': '...'}                                   -> a literal text run
     #   {'options': [...], 'correct': '...'}              -> an inline <select> blank
-    # Each blank is scored against the multiple_choice path: correct = the chosen
-    # option value equals the blank's `correct` value. Blank ids are assigned here.
+    # Correctness is tracked by option INDEX (`correct_index`), not by text, so
+    # duplicate option strings can't collide. The caller still passes `correct` as
+    # a value for readability; it's resolved to its index here. Blank ids assigned
+    # here.
     out = []
     for seg in segments:
         if 'options' in seg:
+            options = list(seg['options'])
+            correct = seg.get('correct')
+            ci = options.index(correct) if correct in options else 0
             out.append({'type': 'blank', 'id': str(uuid.uuid4()),
-                        'options': list(seg['options']), 'correct': seg['correct']})
+                        'options': options, 'correct_index': ci})
         else:
             out.append({'type': 'text', 'text': seg.get('text', '')})
     return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {

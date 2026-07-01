@@ -1114,6 +1114,16 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-occ.cf-empty{color:#aaa;font-weight:400}
 .cf-iq-target.cf-ok{border-style:solid;border-color:#3B8A4A;background:#EAF6EC}
 .cf-iq-target.cf-bad{border-style:solid;border-color:#C0392B;background:#FDECEA}
+.cf-iq-tzone{display:flex;flex-wrap:wrap;gap:6px;min-height:24px;width:100%}
+.cf-iq-item.cf-ok{border-color:#3B8A4A;background:#EAF6EC;color:#1E7E34}
+.cf-iq-item.cf-bad{border-color:#C0392B;background:#FDECEA;color:#C0392B}
+.cf-iq-choices{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.cf-iq-choice{padding:10px 14px;border:2px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font:14px/1.3 inherit;text-align:left;cursor:pointer;transition:all .15s}
+.cf-iq-choice.cf-sel{border-color:#185FA5;background:#F0F6FF}
+.cf-iq-choice.cf-ok{border-color:#3B8A4A;background:#EAF6EC;color:#1E7E34}
+.cf-iq-choice.cf-bad{border-color:#C0392B;background:#FDECEA;color:#C0392B}
+.cf-iq-choice:disabled{cursor:default}
+.cf-iq-choice:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
 .cf-iq-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .cf-iq-num{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px/1 inherit}
 .cf-iq-row>button{flex:1;display:flex;align-items:center;gap:8px;text-align:left;padding:10px 14px;border:2px solid #cdd6e0;border-radius:6px;background:#fff;color:#042C53;font:500 14px/1.3 inherit;cursor:grab}
@@ -1164,32 +1174,34 @@ function cfqFinish(cfg,state,root,ok){
 }
 
 // ── drag_drop (match item → target) ─────────────────────────────
+// Multiple items may occupy one target (no eviction) — mirrors the React
+// PreviewQuizDragDrop twin. Completion = every ITEM is placed; scoring = every
+// item's placed target === correct[item]. Results are revealed per-item on done.
 function cfqInitDnd(root,cfg){
   var bank=root.querySelector('.cf-iq-bank');
   var targets=root.querySelectorAll('.cf-iq-target');
   var check=root.querySelector('.cf-iq-check');
   var state={place:{},sel:null,used:0,done:false};
   var order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();
-  function occupant(tid){for(var k in state.place){if(state.place[k]===tid)return k;}return null;}
   function mkItem(id){
     var b=document.createElement('button');b.type='button';b.className='cf-iq-item';
-    b.setAttribute('data-id',id);b.setAttribute('draggable','true');b.setAttribute('aria-pressed','false');
+    b.setAttribute('data-id',id);b.setAttribute('draggable',state.done?'false':'true');
+    b.setAttribute('aria-pressed',state.sel===id?'true':'false');
     b.textContent=cfg.items[id];
-    b.addEventListener('click',function(){if(state.done)return;state.sel=(state.sel===id?null:id);render();});
+    if(state.done&&state.place[id]!=null)b.classList.add(cfg.correct[id]===state.place[id]?'cf-ok':'cf-bad');
+    b.addEventListener('click',function(e){e.stopPropagation();if(state.done)return;state.sel=(state.sel===id?null:id);render();});
     b.addEventListener('dragstart',function(e){if(state.done){e.preventDefault();return;}e.dataTransfer.setData('text/plain',id);});
     return b;
   }
-  function place(id,tid){var occ=occupant(tid);if(occ)delete state.place[occ];state.place[id]=tid;state.sel=null;}
+  function place(id,tid){state.place[id]=tid;state.sel=null;}
   function render(){
     bank.innerHTML='';
-    order.forEach(function(id){if(state.place[id])return;var b=mkItem(id);if(state.sel===id)b.setAttribute('aria-pressed','true');bank.appendChild(b);});
+    order.forEach(function(id){if(state.place[id])return;bank.appendChild(mkItem(id));});
     targets.forEach(function(t){
-      var tid=t.getAttribute('data-id');var occ=occupant(tid);
-      var occEl=t.querySelector('.cf-iq-occ');
-      occEl.textContent=occ?cfg.items[occ]:'— empty —';
-      occEl.className='cf-iq-occ'+(occ?'':' cf-empty');
+      var tid=t.getAttribute('data-id');
+      var zone=t.querySelector('.cf-iq-tzone');zone.innerHTML='';
+      order.forEach(function(id){if(state.place[id]===tid)zone.appendChild(mkItem(id));});
       t.classList.remove('cf-ok','cf-bad');
-      if(state.done&&occ!=null)t.classList.add(cfg.correct[occ]===tid?'cf-ok':'cf-bad');
     });
     var all=order.every(function(id){return state.place[id];});
     check.disabled=!all||state.done;
@@ -1198,9 +1210,7 @@ function cfqInitDnd(root,cfg){
     var tid=t.getAttribute('data-id');
     t.addEventListener('click',function(){
       if(state.done)return;
-      if(state.sel){place(state.sel,tid);}
-      else{var occ=occupant(tid);if(occ){delete state.place[occ];state.sel=occ;}}
-      render();
+      if(state.sel){place(state.sel,tid);render();}
     });
     t.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();t.classList.add('cf-over');});
     t.addEventListener('dragleave',function(){t.classList.remove('cf-over');});
@@ -1221,7 +1231,16 @@ function cfqInitDnd(root,cfg){
 // ── sequencing (order the rows) ─────────────────────────────────
 function cfqInitSeq(root,cfg){
   var list=root.querySelector('.cf-iq-list');
-  var state={order:cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice(),used:0,done:false,grabbed:null};
+  // Initial presentation: shuffled when randomize, but reshuffle once if the
+  // shuffle happens to equal the correct order (avoid a pre-solved board) —
+  // mirrors the React PreviewQuizSequencing twin.
+  function seqStart(){
+    if(!cfg.randomize)return cfg.order.slice();
+    var s=window.cfQuizShuffle(cfg.order);
+    if(cfg.order.length>1&&s.every(function(id,i){return id===cfg.correct[i];}))s=window.cfQuizShuffle(cfg.order);
+    return s;
+  }
+  var state={order:seqStart(),used:0,done:false,grabbed:null};
   function move(id,dir){var i=state.order.indexOf(id);var j=i+dir;if(j<0||j>=state.order.length)return;var a=state.order;var t=a[i];a[i]=a[j];a[j]=t;}
   function render(){
     list.innerHTML='';
@@ -1255,7 +1274,7 @@ function cfqInitSeq(root,cfg){
     state.order.forEach(function(id,i){btns[i].classList.add(id===cfg.correct[i]?'cf-ok':'cf-bad');});
     cfqFinish(cfg,state,root,ok);
   });
-  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();state.used=0;state.done=false;state.grabbed=null;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.order=seqStart();state.used=0;state.done=false;state.grabbed=null;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
   render();
 }
 
@@ -1276,6 +1295,56 @@ function cfqInitFb(root,cfg){
   sync();
 }
 
+// ── multiple_choice ─────────────────────────────────────────────
+// Mirrors the React PreviewQuizMC twin: single selection, attempts gate, and the
+// correct answer revealed BY data-index (not DOM position) on every submit.
+function cfqInitMc(root,cfg){
+  var wrap=root.querySelector('.cf-iq-choices');
+  var btns=[].slice.call(wrap.querySelectorAll('.cf-iq-choice'));
+  var submit=root.querySelector('.cf-iq-check');
+  var retry=root.querySelector('.cf-iq-retry');
+  var span=root.querySelector('.cf-iq-attempts');
+  var fb=root.querySelector('.cf-iq-feedback');
+  var state={sel:null,submitted:false,used:0};
+  // Shuffle the DISPLAY order client-side (data-index preserved) — matches React.
+  if(cfg.randomize){window.cfQuizShuffle(btns.map(function(_,i){return i;})).forEach(function(oi){wrap.appendChild(btns[oi]);});}
+  function isRight(){return state.sel===cfg.correct;}
+  function exhausted(){return state.used>=cfg.attempts;}
+  function locked(){return state.submitted&&(isRight()||exhausted());}
+  function render(){
+    btns.forEach(function(b){
+      var di=parseInt(b.getAttribute('data-index'),10);
+      b.classList.remove('cf-sel','cf-ok','cf-bad');
+      b.setAttribute('aria-checked',state.sel===di?'true':'false');
+      if(state.submitted){
+        if(di===cfg.correct)b.classList.add('cf-ok');
+        else if(di===state.sel)b.classList.add('cf-bad');
+      }else if(di===state.sel)b.classList.add('cf-sel');
+      b.disabled=locked();
+    });
+    submit.style.display=locked()?'none':'';
+    submit.disabled=state.sel===null;
+    var showRetry=state.submitted&&!isRight()&&!exhausted();
+    retry.style.display=showRetry?'':'none';
+    span.textContent=showRetry?((cfg.attempts-state.used)+((cfg.attempts-state.used)===1?' attempt left':' attempts left')):'';
+    if(state.submitted){fb.className='cf-iq-feedback '+(isRight()?'cf-ok':'cf-bad');fb.textContent=isRight()?cfg.fbCorrect:cfg.fbWrong;}
+    else fb.className='cf-iq-feedback';
+  }
+  btns.forEach(function(b){
+    var di=parseInt(b.getAttribute('data-index'),10);
+    b.addEventListener('click',function(){if(locked())return;state.sel=di;render();});
+  });
+  submit.addEventListener('click',function(){
+    if(state.sel===null||locked())return;
+    state.submitted=true;
+    if(isRight())window.cfQuizReport(100);
+    else{state.used++;window.cfQuizReport(0);}
+    render();
+  });
+  retry.addEventListener('click',function(){state.submitted=false;state.sel=null;render();});
+  render();
+}
+
 window.cfQuizInit=function(bid){
   var root=document.getElementById('iq-'+bid);if(!root||root.__cfInit)return;root.__cfInit=1;
   var cfgEl=document.getElementById('cfq-cfg-'+bid);if(!cfgEl)return;
@@ -1283,6 +1352,7 @@ window.cfQuizInit=function(bid){
   if(cfg.qtype==='drag_drop')cfqInitDnd(root,cfg);
   else if(cfg.qtype==='sequencing')cfqInitSeq(root,cfg);
   else if(cfg.qtype==='fill_blank')cfqInitFb(root,cfg);
+  else cfqInitMc(root,cfg);
 };
 }
 </script>"""
@@ -1294,9 +1364,25 @@ def _quiz_cfg_json(cfg):
     return json.dumps(cfg).replace('<', '\\u003c')
 
 
-def _render_quiz_interactive(data, safe_bid):
-    """Build the published HTML (+ guarded runtime) for a drag_drop / sequencing /
-    fill_blank quiz. Returns the HTML string. qtype is taken from data."""
+def _fb_correct_index(seg):
+    """Resolve a fill-blank blank's correct option INDEX. Prefers the stable
+    `correct_index` int; falls back (back-compat) to locating the legacy `correct`
+    string value in options. Returns -1 when unresolvable."""
+    ci = seg.get('correct_index')
+    if isinstance(ci, bool):  # bool is an int subclass — reject True/False
+        ci = None
+    if isinstance(ci, int):
+        return ci
+    opts = list(seg.get('options', []))
+    legacy = seg.get('correct', '')
+    return opts.index(legacy) if legacy in opts else -1
+
+
+def _render_quiz_interactive(data, safe_bid, include_assets=True):
+    """Build the published HTML for a quiz block of any qtype (multiple_choice /
+    drag_drop / sequencing / fill_blank). Returns the HTML string. qtype is taken
+    from data. When include_assets is False the shared <style>/<script> runtime is
+    omitted (emit it once per SCO/page — see _render_blocks)."""
     qtype = data.get('qtype', 'multiple_choice')
     attempts = data.get('attempts_allowed', 2)
     try:
@@ -1308,15 +1394,43 @@ def _render_quiz_interactive(data, safe_bid):
     randomize  = bool(data.get('randomize', False))
     prompt = esc(data.get('prompt', data.get('question', '')))
 
-    actions = (
-        '<div class="cf-iq-actions">'
-        '<button type="button" class="cf-iq-btn cf-primary cf-iq-check">Check</button>'
-        '<button type="button" class="cf-iq-btn cf-ghost cf-iq-reset">Reset</button>'
-        '<span class="cf-iq-attempts" aria-live="polite"></span></div>'
-        '<div class="cf-iq-feedback" role="status" aria-live="polite"></div>'
-    )
+    # MC uses Submit + (conditional) Try-again to mirror PreviewQuizMC; the other
+    # qtypes use Check + Reset.
+    if qtype == 'multiple_choice':
+        actions = (
+            '<div class="cf-iq-actions">'
+            '<button type="button" class="cf-iq-btn cf-primary cf-iq-check">Submit</button>'
+            '<button type="button" class="cf-iq-btn cf-ghost cf-iq-retry" style="display:none">Try again</button>'
+            '<span class="cf-iq-attempts" aria-live="polite"></span></div>'
+            '<div class="cf-iq-feedback" role="status" aria-live="polite"></div>'
+        )
+    else:
+        actions = (
+            '<div class="cf-iq-actions">'
+            '<button type="button" class="cf-iq-btn cf-primary cf-iq-check">Check</button>'
+            '<button type="button" class="cf-iq-btn cf-ghost cf-iq-reset">Reset</button>'
+            '<span class="cf-iq-attempts" aria-live="polite"></span></div>'
+            '<div class="cf-iq-feedback" role="status" aria-live="polite"></div>'
+        )
 
-    if qtype == 'drag_drop':
+    if qtype == 'multiple_choice':
+        choices = data.get('choices', [])
+        try:
+            correct_idx = int(data.get('correct_index', data.get('correct_idx', 0)) or 0)
+        except (TypeError, ValueError):
+            correct_idx = 0
+        # data-index stays the ORIGINAL index; cfqInitMc shuffles the DISPLAY order
+        # client-side when randomize (mirrors PreviewQuizMC), so scoring is stable.
+        choices_html = ''.join(
+            f'<button type="button" class="cf-iq-choice" role="radio" aria-checked="false" '
+            f'data-index="{i}">{esc(c)}</button>'
+            for i, c in enumerate(choices)
+        )
+        cfg = {'qtype': 'multiple_choice', 'correct': correct_idx,
+               'randomize': randomize, 'attempts': attempts,
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+        body = f'<div class="cf-iq-choices" role="radiogroup" aria-label="Answer choices">{choices_html}</div>'
+    elif qtype == 'drag_drop':
         items   = data.get('items', [])
         targets = data.get('targets', [])
         correct = data.get('correct', {})
@@ -1329,7 +1443,7 @@ def _render_quiz_interactive(data, safe_bid):
         targets_html = ''.join(
             f'<button type="button" class="cf-iq-target" data-id="{esc(str(t.get("id")))}">'
             f'<span class="cf-iq-tlabel">{esc(t.get("label",""))}</span>'
-            f'<span class="cf-iq-occ cf-empty">— empty —</span></button>'
+            f'<span class="cf-iq-tzone"></span></button>'
             for t in targets
         )
         body = (
@@ -1360,15 +1474,20 @@ def _render_quiz_interactive(data, safe_bid):
             if seg.get('type') == 'blank':
                 n += 1
                 opts = list(seg.get('options', []))
+                # Correctness is tracked by option INDEX (not text) so duplicate
+                # option strings can't collide — the <option value> is the ORIGINAL
+                # index; randomize only shuffles the DISPLAY order. Legacy `correct`
+                # strings are resolved to their index for back-compat.
+                ci = _fb_correct_index(seg)
+                indexed = list(enumerate(opts))
                 if randomize:
-                    random.shuffle(opts)
-                correct_val = seg.get('correct', '')
+                    random.shuffle(indexed)
                 opt_html = '<option value="">— choose —</option>' + ''.join(
-                    f'<option value="{esc(o)}">{esc(o)}</option>' for o in opts
+                    f'<option value="{i}">{esc(o)}</option>' for i, o in indexed
                 )
                 runs.append(
                     f'<select class="cf-fbq-blank" aria-label="Blank {n}" '
-                    f'data-correct="{esc(correct_val)}">{opt_html}</select>'
+                    f'data-correct="{ci}">{opt_html}</select>'
                 )
             else:
                 runs.append(esc(seg.get('text', '')))
@@ -1377,13 +1496,18 @@ def _render_quiz_interactive(data, safe_bid):
         body = f'<p class="cf-fbq-text">{"".join(runs)}</p>'
 
     prompt_html = f'<p class="cf-iq-prompt">{prompt}</p>' if prompt else ''
+    # Emit the shared CSS + runtime only when include_assets (once per SCO/page);
+    # subsequent quizzes ship just their markup + config + init call. The runtime
+    # is also self-guarded (if(!window.cfQuizInit)), so a duplicate is harmless.
+    css = _QUIZ_CSS if include_assets else ''
+    runtime = _QUIZ_RUNTIME_JS if include_assets else ''
     return (
-        _QUIZ_CSS
+        css
         + f'<div class="cf-iq" id="iq-{safe_bid}">'
         + prompt_html + body + actions
         + '</div>'
         + f'<script type="application/json" id="cfq-cfg-{safe_bid}">{_quiz_cfg_json(cfg)}</script>'
-        + _QUIZ_RUNTIME_JS
+        + runtime
         + f'<script>cfQuizInit("{safe_bid}");</script>'
     )
 
@@ -1442,6 +1566,10 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
     # flipped once, so multiple images on a frame don't all become swap targets
     # (the convention is: the first image is the swap surface).
     _swap_target_used = [False]
+    # The interactive-quiz CSS + runtime is shared and identical for every quiz on
+    # a page, so emit it with the FIRST quiz only; later quizzes ship just their
+    # markup/config/init call (see _render_quiz_interactive include_assets).
+    _quiz_assets_emitted = [False]
 
     def _swap_target_cls():
         """Return ' cf-swap-target' for the FIRST image only (then ''). Appended to
@@ -1769,40 +1897,14 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif btype == 'quiz':
             safe_bid = esc(bid)
-            qtype = data.get('qtype', 'multiple_choice')
-            if qtype in ('drag_drop', 'sequencing', 'fill_blank'):
-                parts.append(_render_quiz_interactive(data, safe_bid))
-                continue
-            # ── multiple_choice (default) ──
-            # Optionally shuffle the DISPLAY order; data-index stays the ORIGINAL
-            # index so the shell's cfSubmitQuiz(correctIndex) still scores correctly.
-            choice_order = list(enumerate(data.get('choices', [])))
-            if data.get('randomize'):
-                random.shuffle(choice_order)
-            choices_html = ''
-            for i, choice in choice_order:
-                choices_html += (
-                    f'<button class="cf-choice" data-index="{i}" '
-                    f'onclick="cfSelectChoice(\'{safe_bid}\', this)">'
-                    f'{esc(choice)}</button>'
-                )
-            fb_correct   = esc(data.get('feedback_correct',   'Correct!'))
-            fb_incorrect = esc(data.get('feedback_incorrect', 'Incorrect — please review.'))
-            # correct_index/correct_idx -> int so it can't inject JS into onclick.
-            try:
-                correct_idx = int(data.get('correct_index', data.get('correct_idx', 0)) or 0)
-            except (TypeError, ValueError):
-                correct_idx = 0
-            parts.append(
-                f'<div class="cf-quiz" id="quiz-{safe_bid}">'
-                f'<p class="cf-quiz-question">{esc(data.get("question",""))}</p>'
-                f'{choices_html}'
-                f'<button class="cf-submit" '
-                f'onclick="cfSubmitQuiz(\'{safe_bid}\', {correct_idx})">Submit</button>'
-                f'<div class="cf-feedback correct" id="feedback-{safe_bid}">{fb_correct}</div>'
-                f'<div class="cf-feedback incorrect" id="feedback-{safe_bid}-wrong">{fb_incorrect}</div>'
-                f'</div>'
-            )
+            # All qtypes (multiple_choice / drag_drop / sequencing / fill_blank)
+            # render through the single self-contained interactive runtime so the
+            # published behavior matches the React preview twin (attempts,
+            # correct-by-index reveal, many-to-one drag-drop). The shared CSS +
+            # runtime ships once per page.
+            parts.append(_render_quiz_interactive(
+                data, safe_bid, include_assets=not _quiz_assets_emitted[0]))
+            _quiz_assets_emitted[0] = True
 
         elif btype == 'hotspot':
             regions_html = ''
