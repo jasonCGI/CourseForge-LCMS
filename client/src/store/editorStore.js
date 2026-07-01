@@ -525,7 +525,7 @@ function _makeBlock(type) {
     text:  { body: '', narrator_script: '' },
     media: { kind: 'image', placeholder_label: '', asset_id: null, caption: '', bounds: null },
     quiz:  { qtype: 'multiple_choice', question: '', choices: ['', '', '', ''], correct_index: 0, randomize: false, feedback_correct: '', feedback_incorrect: '', hint: '', attempts_allowed: 2 },
-    hotspot: { image_id: null, regions: [] },
+    hotspot: { image_id: null, regions: [], mode: 'explore', prompt: '', reveal: 'subtle', attempts_allowed: 2, feedback_correct: '', feedback_incorrect: '', hint: '' },
     branch:  { condition: '', true_frame_id: null, false_frame_id: null, true_label: 'Yes', false_label: 'No' },
     oam:   { oam_asset_id: null, width: 800, height: 600, responsive: false, scorm_bridge_enabled: false, caption: '', bounds: null },
     wcn:   { wcn_type: 'note', title: '', text: '', modal: false, ack_label: 'I understand — proceed' },

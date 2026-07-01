@@ -962,6 +962,33 @@ def _hotspot_radius(shape):
     return '50%' if shape in ('circle', 'round') else ('14%' if shape == 'rounded' else '4px')
 
 
+def _rgba(color, a):
+    """hex (#rgb/#rrggbb) -> 'rgba(r,g,b,a)'. Twin of client utils/hotspotStyle rgba()."""
+    import re
+    c = (color or '#F59E0B').strip()
+    m = re.match(r'^#([0-9a-fA-F]{3})$', c)
+    if m:
+        h = m.group(1); rgb = (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))
+    else:
+        m = re.match(r'^#([0-9a-fA-F]{6})$', c)
+        rgb = (int(m.group(1)[0:2], 16), int(m.group(1)[2:4], 16), int(m.group(1)[4:6], 16)) if m else None
+    return f'rgba({rgb[0]},{rgb[1]},{rgb[2]},{a})' if rgb else c
+
+
+def _hotspot_reveal_style(r, block_data):
+    """Pre-answer border+background for a hotspot-quiz region. 'outline' = solid box;
+    'subtle' (default) = faint dashed hint; 'invisible' = no visible box (still
+    Tab-focusable). Region-level `reveal` overrides the block default. Twin of the
+    client hotspotRevealStyle()."""
+    color = r.get('color') or '#F59E0B'
+    reveal = r.get('reveal') or block_data.get('reveal') or 'subtle'
+    if reveal == 'outline':
+        return f'2px solid {color}', _rgba(color, 0.15)
+    if reveal == 'invisible':
+        return '2px solid transparent', 'transparent'
+    return f'1px dashed {_rgba(color, 0.55)}', _rgba(color, 0.06)
+
+
 # Shared Callout overlay styling — the Python twin of client/src/utils/calloutOverlay
 # .js CALLOUT_STYLE. Keep these literals in lock-step so the server (_render_blocks)
 # and the React preview (FramePreview / PreviewCallout) render identical overlays.
@@ -1143,6 +1170,14 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-choice.cf-bad{border-color:#C0392B;background:#FDECEA;color:#C0392B}
 .cf-iq-choice:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
 .cf-iq-choice:disabled{cursor:default}
+.cf-hsq{position:relative;width:100%;padding-bottom:56.25%;background:#E8F0F8;border:1px solid #B5D4F4;border-radius:6px;overflow:hidden;margin-bottom:8px}
+.cf-hsq>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cf-hsq-off{position:absolute;inset:0;background:transparent;border:none;padding:0;cursor:pointer}
+.cf-hsq-region{position:absolute;box-sizing:border-box;padding:0;background:transparent;cursor:pointer;transition:all .15s}
+.cf-hsq-region:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
+.cf-hsq-region.cf-ok{border:3px solid #3B8A4A !important;background:rgba(59,138,74,0.28) !important}
+.cf-hsq-region.cf-bad{border:3px solid #C0392B !important;background:rgba(192,57,43,0.25) !important}
+.cf-hsq-region:disabled{cursor:default}
 </style>"""
 
 _QUIZ_RUNTIME_JS = r"""<script>
@@ -1345,6 +1380,38 @@ function cfqInitMc(root,cfg){
   render();sync();
 }
 
+// ── hotspot (graded visual multiple-choice) ────────────────────
+// Click a correct region => right; a wrong region or off-target => wrong attempt.
+// Same tiered ladder + cfQuizReport scoring; reveal highlights the correct region(s)
+// on the final attempt. Regions are focusable <button>s (Tab + Enter) for 508.
+function cfqInitHotspot(root,cfg){
+  var regions=root.querySelectorAll('.cf-hsq-region');
+  var off=root.querySelector('.cf-hsq-off');
+  var state={used:0,done:false};
+  function lock(){regions.forEach(function(r){r.disabled=true;});if(off)off.disabled=true;}
+  function markCorrect(){regions.forEach(function(r){if(r.getAttribute('data-correct')==='1')r.classList.add('cf-ok');});}
+  function answer(el){
+    if(state.done)return;
+    var ok=!!(el&&el!==off&&el.getAttribute('data-correct')==='1');
+    var phase=cfqFinish(cfg,state,root,ok);
+    if(ok){markCorrect();lock();return;}
+    // Mark only the last-clicked wrong region red (clear any prior red).
+    regions.forEach(function(r){r.classList.remove('cf-bad');});
+    if(el&&el!==off)el.classList.add('cf-bad');
+    if(phase==='reveal'){markCorrect();lock();}
+  }
+  regions.forEach(function(el){el.addEventListener('click',function(e){e.stopPropagation();answer(el);});});
+  if(off)off.addEventListener('click',function(){answer(off);});
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){
+    state.used=0;state.done=false;
+    regions.forEach(function(r){r.classList.remove('cf-ok','cf-bad');r.disabled=false;});
+    if(off)off.disabled=false;
+    root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';
+    cfqAttempts(cfg,state,root);
+  });
+  cfqAttempts(cfg,state,root);
+}
+
 window.cfQuizInit=function(bid){
   var root=document.getElementById('iq-'+bid);if(!root||root.__cfInit)return;root.__cfInit=1;
   var cfgEl=document.getElementById('cfq-cfg-'+bid);if(!cfgEl)return;
@@ -1352,6 +1419,7 @@ window.cfQuizInit=function(bid){
   if(cfg.qtype==='drag_drop')cfqInitDnd(root,cfg);
   else if(cfg.qtype==='sequencing')cfqInitSeq(root,cfg);
   else if(cfg.qtype==='fill_blank')cfqInitFb(root,cfg);
+  else if(cfg.qtype==='hotspot')cfqInitHotspot(root,cfg);
   else cfqInitMc(root,cfg);
 };
 }
@@ -1469,6 +1537,63 @@ def _render_quiz_interactive(data, safe_bid):
         _QUIZ_CSS
         + f'<div class="cf-iq" id="iq-{safe_bid}">'
         + prompt_html + body + actions
+        + '</div>'
+        + f'<script type="application/json" id="cfq-cfg-{safe_bid}">{_quiz_cfg_json(cfg)}</script>'
+        + _QUIZ_RUNTIME_JS
+        + f'<script>cfQuizInit("{safe_bid}");</script>'
+    )
+
+
+def _render_hotspot_quiz(data, safe_bid):
+    """Published HTML (+ shared runtime) for a graded hotspot quiz (data.mode=='quiz').
+    Clicking a correct region scores right; a wrong region or off-target is a wrong
+    attempt. Runs the shared tiered/pass-fail runtime (cfqInitHotspot). Twin of the
+    React HotspotQuiz. 508: each region is a focusable, aria-labelled <button>."""
+    attempts = data.get('attempts_allowed', 2)
+    try:
+        attempts = max(1, int(attempts))
+    except (TypeError, ValueError):
+        attempts = 2
+    cfg = {'qtype': 'hotspot', 'attempts': attempts,
+           'fbCorrect': data.get('feedback_correct', 'Correct!'),
+           'fbWrong': data.get('feedback_incorrect', 'Incorrect — please review.'),
+           'hint': data.get('hint', '') or ''}
+    prompt = esc(data.get('prompt', 'Click the correct area of the image.'))
+
+    img_html = ''
+    if data.get('background_url'):
+        img_html = (f'<img src="{esc(data.get("background_url"))}" '
+                    f'alt="{esc(data.get("alt_text", "Hotspot image"))}">')
+    regions_html = ''
+    for r in data.get('regions', []):
+        border, bg = _hotspot_reveal_style(r, data)
+        rx = _f(r.get('x')); ry = _f(r.get('y'))
+        rw = _f(r.get('w', r.get('width'))); rh = _f(r.get('h', r.get('height')))
+        is_correct = '1' if r.get('correct') else '0'
+        regions_html += (
+            f'<button type="button" class="cf-hsq-region" data-id="{esc(str(r.get("id")))}" '
+            f'data-correct="{is_correct}" aria-label="{esc(r.get("label", "Region"))}" '
+            f'style="left:{rx}%;top:{ry}%;width:{rw}%;height:{rh}%;'
+            f'border-radius:{_hotspot_radius(r.get("shape"))};'
+            f'border:{esc(border)};background:{esc(bg)}"></button>'
+        )
+    board = (
+        f'<div class="cf-hsq" role="group" aria-label="{prompt}">'
+        f'{img_html}'
+        f'<button type="button" class="cf-hsq-off" aria-hidden="true" tabindex="-1"></button>'
+        f'{regions_html}</div>'
+    )
+    # No "Check" button — the click IS the answer; only a Reset + attempts counter.
+    actions = (
+        '<div class="cf-iq-actions">'
+        '<button type="button" class="cf-iq-btn cf-ghost cf-iq-reset">Reset</button>'
+        '<span class="cf-iq-attempts" aria-live="polite"></span></div>'
+        '<div class="cf-iq-feedback" role="status" aria-live="polite"></div>'
+    )
+    return (
+        _QUIZ_CSS
+        + f'<div class="cf-iq" id="iq-{safe_bid}">'
+        + f'<p class="cf-iq-prompt">{prompt}</p>' + board + actions
         + '</div>'
         + f'<script type="application/json" id="cfq-cfg-{safe_bid}">{_quiz_cfg_json(cfg)}</script>'
         + _QUIZ_RUNTIME_JS
@@ -1865,6 +1990,11 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             parts.append(_render_quiz_interactive(data, safe_bid))
 
         elif btype == 'hotspot':
+            # Graded quiz mode → the interactive click-the-region assessment (twin of
+            # React HotspotQuiz). Absent/'explore' → the existing reveal-label render.
+            if data.get('mode') == 'quiz':
+                parts.append(_render_hotspot_quiz(data, esc(bid)))
+                continue
             regions_html = ''
             for r in data.get('regions', []):
                 radius = _hotspot_radius(r.get('shape'))

@@ -2636,7 +2636,101 @@ function PreviewHotspot({ block, interactive = false, active = false, onSelect =
   if (interactive) {
     return <InteractiveHotspot block={block} active={active} onSelect={onSelect} updateBlock={updateBlock} />
   }
+  // Graded quiz mode (mode:'quiz') → the interactive click-the-region assessment.
+  // Absent/​'explore' → the existing click-to-reveal-label render (unchanged).
+  if ((block.data.mode || 'explore') === 'quiz') return <HotspotQuiz block={block} />
   return <StaticHotspot block={block} />
+}
+
+// Reveal-visibility of a hotspot-quiz region BEFORE it's answered. 'outline' = a solid
+// visible box; 'subtle' (default) = a faint dashed hint; 'invisible' = no visible box
+// (still Tab-focusable with a browser focus ring, so it stays keyboard/SR operable).
+// A per-region `reveal` overrides the block-level default. Twin of _hotspot_reveal_style.
+function hotspotRevealStyle(r, blockData) {
+  const st = hotspotStyle(r.color)
+  const reveal = r.reveal || blockData.reveal || 'subtle'
+  if (reveal === 'outline') return { border: `2px solid ${st.border}`, background: st.fill }
+  if (reveal === 'invisible') return { border: '2px solid transparent', background: 'transparent' }
+  return { border: `1px dashed ${rgba(st.stroke, 0.55)}`, background: rgba(st.stroke, 0.06) }
+}
+
+// Graded "visual multiple choice" hotspot. Clicking a region marked correct scores
+// right; clicking a wrong region OR off-target is a wrong attempt. Runs the SAME tiered
+// feedback→hint→reveal scaffold as the quiz block (quizTier/useAttempts/QuizFeedback),
+// scores via the shared model, and on the final attempt highlights the correct
+// region(s). 508: each region is a focusable, aria-labelled <button> (Tab + Enter), so
+// a non-visual learner can pick among the labelled choices without a pixel-hunt.
+// Twin of scorm12._render_hotspot_quiz + cfqInitHotspot.
+function HotspotQuiz({ block }) {
+  const d = block.data
+  const regions = d.regions || []
+  const prompt = d.prompt || 'Click the correct area of the image.'
+  const att = useAttempts(block)
+  const hasHint = hasHintFor(block)
+  const [phase, setPhase] = useState(null)   // null|'correct'|'incorrect'|'hint'|'reveal'
+  const [picked, setPicked] = useState(null) // last-clicked region id (for the red mark), or 'off'
+  const locked = phase === 'correct' || phase === 'reveal'
+  const revealing = locked
+
+  const answer = (rid) => {
+    if (locked) return
+    const r = rid === 'off' ? null : regions.find(x => x.id === rid)
+    const ok = !!(r && r.correct)
+    setPicked(rid)
+    if (ok) { setPhase('correct'); return }
+    const t = quizTier(att.used + 1, att.max, hasHint)
+    att.bump(); setPhase(t)
+  }
+  const reset = () => { setPicked(null); setPhase(null); att.reset() }
+
+  return (
+    <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
+      <p style={QUIZ_PROMPT}>{prompt}</p>
+      <div role="group" aria-label={prompt} style={{
+        position: 'relative', width: '100%', paddingBottom: '56.25%',
+        background: '#E8F0F8', border: '1px solid #B5D4F4', borderRadius: 6, overflow: 'hidden',
+      }}>
+        {d.background_url && (
+          <img src={d.background_url} alt={d.alt_text || 'Hotspot image'}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+        {!d.image_id && !d.background_url && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 13 }}>
+            [Hotspot image — no asset linked]
+          </div>
+        )}
+        {/* Off-target catcher (pointer only; aria-hidden so SR users pick labelled regions). */}
+        <button type="button" aria-hidden="true" tabIndex={-1} disabled={locked} onClick={() => answer('off')}
+          style={{ position: 'absolute', inset: 0, background: 'transparent', border: 'none', padding: 0, cursor: locked ? 'default' : 'pointer' }} />
+        {regions.map(r => {
+          let s = hotspotRevealStyle(r, d)
+          if (revealing && r.correct) s = { border: '3px solid #3B8A4A', background: rgba('#3B8A4A', 0.28) }
+          else if (phase && picked === r.id && !r.correct) s = { border: '3px solid #C0392B', background: rgba('#C0392B', 0.25) }
+          return (
+            <button key={r.id} type="button" disabled={locked}
+              aria-label={r.label || 'Region'}
+              onClick={(e) => { e.stopPropagation(); answer(r.id) }}
+              style={{
+                position: 'absolute', left: `${r.x}%`, top: `${r.y}%`, width: `${r.w}%`, height: `${r.h}%`,
+                borderRadius: shapeRadius(r.shape), boxSizing: 'border-box', padding: 0,
+                cursor: locked ? 'default' : 'pointer', transition: 'all .15s', ...s,
+              }}>
+              {revealing && r.correct && (
+                <span aria-hidden="true" style={{ position: 'absolute', top: 1, right: 3, color: '#1E7E34', fontWeight: 700, fontSize: 13 }}>✓</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+        <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
+        {(phase === 'incorrect' || phase === 'hint') && (
+          <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
+        )}
+      </div>
+      <QuizFeedback phase={phase} block={block} />
+    </div>
+  )
 }
 
 // Editor-only interactive hotspot overlay (see PreviewHotspot). Mirrors

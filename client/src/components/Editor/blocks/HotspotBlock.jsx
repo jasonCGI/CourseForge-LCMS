@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import useEditorStore from '../../../store/editorStore'
 import { BlockHeader } from './BlockHeader'
-import { blockWrap, fieldLabel, inputStyle, helpText, btnDanger } from './blockStyles'
+import { blockWrap, fieldLabel, inputStyle, textareaStyle, selectStyle, helpText, btnDanger } from './blockStyles'
 import { hotspotStyle, shapeRadius, HOTSPOT_AMBER } from '../../../utils/hotspotStyle'
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -31,6 +31,9 @@ export default function HotspotBlock({ block }) {
   const regions = block.data.regions || []
   const hasImg  = !!(block.data.image_id || block.data.background_url)
   const commit  = next => updateBlock(block.id, { regions: next })
+  const mode    = block.data.mode || 'explore'
+  const isQuiz  = mode === 'quiz'
+  const setCorrect = (id, correct) => commit(regions.map(r => (r.id === id ? { ...r, correct } : r)))
 
   const relPos = e => {
     const r = canvasRef.current.getBoundingClientRect()
@@ -117,6 +120,72 @@ export default function HotspotBlock({ block }) {
     <div style={blockWrap}>
       <BlockHeader label="Hotspot" color="#533AB7" blockId={block.id} onRemove={removeBlock} onMove={moveBlock} />
       <div style={{ padding: 16 }}>
+
+        {/* Mode toggle — Explore (click a region to reveal its description) vs.
+            Quiz (graded: click the correct region, tiered feedback/hint/reveal). */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <span style={{ ...fieldLabel, margin: 0 }}>Mode</span>
+          {['explore', 'quiz'].map(m => (
+            <button key={m} type="button" onClick={() => updateBlock(block.id, { mode: m })}
+              aria-pressed={mode === m}
+              style={{
+                padding: '5px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, cursor: 'pointer',
+                border: '1px solid var(--forge-amber)',
+                background: mode === m ? 'var(--forge-amber)' : 'transparent',
+                color: mode === m ? '#042C53' : 'var(--forge-amber)',
+              }}>{m === 'explore' ? 'Explore' : 'Quiz'}</button>
+          ))}
+        </div>
+
+        {/* Quiz-mode settings */}
+        {isQuiz && (
+          <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'color-mix(in srgb, var(--forge-amber) 6%, transparent)', border: '1px solid var(--color-border-tertiary)' }}>
+            <div style={{ marginBottom: 12 }}>
+              <label htmlFor={`hotspot-prompt-${block.id}`} style={fieldLabel}>Prompt</label>
+              <textarea id={`hotspot-prompt-${block.id}`} value={block.data.prompt || ''}
+                onChange={e => updateBlock(block.id, { prompt: e.target.value })} rows={2}
+                placeholder="e.g. Click the portafilter." style={textareaStyle} />
+            </div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+              <div>
+                <label htmlFor={`hotspot-reveal-${block.id}`} style={fieldLabel}>Region visibility</label>
+                <select id={`hotspot-reveal-${block.id}`} value={block.data.reveal || 'subtle'}
+                  onChange={e => updateBlock(block.id, { reveal: e.target.value })} style={{ ...selectStyle, width: 'auto' }}>
+                  <option value="outline">Outline (clearly visible)</option>
+                  <option value="subtle">Subtle (faint hint)</option>
+                  <option value="invisible">Invisible (find it)</option>
+                </select>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                Attempts
+                <input type="number" min={1} max={9} value={block.data.attempts_allowed ?? 2}
+                  onChange={e => updateBlock(block.id, { attempts_allowed: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{ ...inputStyle, width: 60 }} />
+              </label>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label htmlFor={`hotspot-fbc-${block.id}`} style={fieldLabel}>Correct feedback</label>
+                <textarea id={`hotspot-fbc-${block.id}`} value={block.data.feedback_correct || ''}
+                  onChange={e => updateBlock(block.id, { feedback_correct: e.target.value })} rows={2}
+                  placeholder="That's the one!" style={textareaStyle} />
+              </div>
+              <div>
+                <label htmlFor={`hotspot-fbi-${block.id}`} style={fieldLabel}>Incorrect feedback</label>
+                <textarea id={`hotspot-fbi-${block.id}`} value={block.data.feedback_incorrect || ''}
+                  onChange={e => updateBlock(block.id, { feedback_incorrect: e.target.value })} rows={2}
+                  placeholder="Not there — look again." style={textareaStyle} />
+              </div>
+            </div>
+            <div>
+              <label htmlFor={`hotspot-hint-${block.id}`} style={fieldLabel}>Hint (shown after a wrong attempt)</label>
+              <textarea id={`hotspot-hint-${block.id}`} value={block.data.hint || ''}
+                onChange={e => updateBlock(block.id, { hint: e.target.value })} rows={2}
+                placeholder="Optional nudge before the answer is revealed on the last attempt…" style={textareaStyle} />
+            </div>
+            <p style={helpText}>Tick the correct region(s) below. Clicking a correct region scores right; a wrong region or off-target counts as a wrong attempt.</p>
+          </div>
+        )}
 
         {/* Image ID field */}
         <div style={{ marginBottom: 14 }}>
@@ -219,6 +288,13 @@ export default function HotspotBlock({ block }) {
                   transition: 'background .12s, box-shadow .12s' }}>
                 <div style={{ width: 14, height: 14, flexShrink: 0, border: `2px solid ${hotspotStyle(r.color).border}`,
                   background: hotspotStyle(r.color).fill, borderRadius: shapeRadius(r.shape) }} />
+                {isQuiz && (
+                  <label title="Mark this region as a correct answer" aria-label={`Mark ${r.label} correct`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontSize: 11, fontWeight: 600, color: r.correct ? '#3B8A4A' : 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!r.correct} onChange={e => setCorrect(r.id, e.target.checked)} />
+                    ✓
+                  </label>
+                )}
                 <input value={r.label} onChange={e => setLabel(r.id, e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                 <input type="color" value={r.color || HOTSPOT_AMBER} onChange={e => setColor(r.id, e.target.value)}
                   title="Hotspot color — overrides the inherited GUI color (use for 508 contrast, e.g. on a light background)"
