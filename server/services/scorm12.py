@@ -1268,16 +1268,61 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 
 _QUIZ_RUNTIME_JS = r"""<script>
 if(!window.cfQuizInit){
-window.cfQuizReport=function(score){
+// ── SCORM reporting: per-quiz cmi.interactions + SCO-level aggregation ──────────
+// One page-level registry shared by every quiz on the SCO. Each quiz registers on
+// load (so the aggregate knows the denominator), and on finish writes ONE
+// interaction record (cmi.interactions.n.*) plus recomputes the core score as the
+// percentage of quizzes passed. This replaces the old last-writer-wins single
+// score/status write, and emits the interaction detail an LMS needs for item
+// analysis. The SCORM version is detected by which API global is present: 1.2 =
+// window.API (LMS* verbs); 2004 = window.API_1484_11.
+window.cfScorm=(function(){
   function find(n){var w=window;for(var i=0;i<8&&w;i++){try{if(w[n])return w[n];}catch(e){}if(w===w.parent)break;w=w.parent;}try{if(window.opener&&window.opener[n])return window.opener[n];}catch(e){}return null;}
-  var a12=find('API'),a04=find('API_1484_11');
-  // Pass/fail signal by score (100 -> passed, else failed). The runtime knows which
-  // SCORM version it's in by WHICH API global is present: a SCORM 1.2 package exposes
-  // only window.API (LMS* verbs); a 2004 package exposes only window.API_1484_11.
-  var pass=(Number(score)>=100)?'passed':'failed';
-  try{if(a12){a12.LMSSetValue('cmi.core.score.raw',String(score));a12.LMSSetValue('cmi.core.lesson_status',pass);a12.LMSCommit('');}}catch(e){}
-  try{if(a04){a04.SetValue('cmi.score.raw',String(score));a04.SetValue('cmi.completion_status','completed');a04.SetValue('cmi.success_status',pass);a04.Commit('');}}catch(e){}
-};
+  var a12=null,a04=null,located=false;
+  function api(){if(!located){a12=find('API');a04=find('API_1484_11');located=true;}}
+  var quizzes={},nextIdx=0;
+  function two(n){return(n<10?'0':'')+n;}
+  function clock(){var d=new Date();return two(d.getHours())+':'+two(d.getMinutes())+':'+two(d.getSeconds());}
+  function s12(k,v){try{if(a12)a12.LMSSetValue(k,v);}catch(e){}}
+  function s04(k,v){try{if(a04)a04.SetValue(k,v);}catch(e){}}
+  // SCORM 1.2 CMIString255 cap so strict LMSs don't reject an over-long value.
+  function cap(s){s=String(s==null?'':s);return s.length>255?s.slice(0,255):s;}
+  function register(id){api();if(!(id in quizzes))quizzes[id]={done:false,passed:false,idx:nextIdx++};return quizzes[id].idx;}
+  function writeItn(idx,it){
+    var id=cap(it.id),resp=cap(it.resp),patt=cap(it.patt),p='cmi.interactions.'+idx+'.';
+    // SCORM 1.2
+    s12(p+'id',id);s12(p+'type',it.type);s12(p+'student_response',resp);
+    s12(p+'correct_responses.0.pattern',patt);s12(p+'result',it.result);s12(p+'time',clock());
+    // SCORM 2004 (learner_response + ISO timestamp)
+    s04(p+'id',id);s04(p+'type',it.type);s04(p+'learner_response',resp);
+    s04(p+'correct_responses.0.pattern',patt);s04(p+'result',it.result);
+    try{s04(p+'timestamp',new Date().toISOString());}catch(e){}
+  }
+  function aggregate(){
+    var ids=Object.keys(quizzes),total=ids.length,done=0,passed=0,i;
+    for(i=0;i<total;i++){if(quizzes[ids[i]].done)done++;if(quizzes[ids[i]].passed)passed++;}
+    var raw=total?Math.round(100*passed/total):0,allDone=(total>0&&done===total);
+    var status=allDone?(passed===total?'passed':'failed'):'incomplete';
+    s12('cmi.core.score.raw',String(raw));s12('cmi.core.score.min','0');s12('cmi.core.score.max','100');
+    s12('cmi.core.lesson_status',status);
+    s04('cmi.score.raw',String(raw));s04('cmi.score.min','0');s04('cmi.score.max','100');s04('cmi.score.scaled',String(total?(passed/total):0));
+    s04('cmi.completion_status',allDone?'completed':'incomplete');
+    s04('cmi.success_status',allDone?(passed===total?'passed':'failed'):'unknown');
+    try{if(a12)a12.LMSCommit('');}catch(e){}
+    try{if(a04)a04.Commit('');}catch(e){}
+  }
+  // Record a finished quiz: it={id,type,resp,patt}; ok = passed. Writes the
+  // interaction at the quiz's stable index and recomputes the SCO aggregate.
+  function complete(it,ok){
+    api();
+    var q=quizzes[it.id]||(quizzes[it.id]={done:false,passed:false,idx:nextIdx++});
+    q.done=true;q.passed=!!ok;
+    it.result=ok?'correct':'wrong';
+    writeItn(q.idx,it);
+    aggregate();
+  }
+  return {register:register,complete:complete};
+})();
 window.cfQuizShuffle=function(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;};
 function cfqAttempts(cfg,state,root){
   var span=root.querySelector('.cf-iq-attempts');
@@ -1302,10 +1347,14 @@ function cfqTier(cfg,state){
 }
 // Score is reported to the LMS ONLY when the quiz is DONE (correct => 100, or the
 // final wrong attempt => 0); intermediate wrong attempts just escalate the feedback.
-function cfqFinish(cfg,state,root,ok){
+// itn (optional) = {type,resp,patt} — the per-type SCORM interaction for THIS
+// submission. When the quiz reaches a terminal state (correct, or the final
+// 'reveal'), record the interaction + update the SCO aggregate via cfScorm.
+function cfqFinish(cfg,state,root,ok,itn){
   var phase;
-  if(ok){phase='correct';state.done=true;window.cfQuizReport(100);}
-  else{state.used++;phase=cfqTier(cfg,state);if(phase==='reveal'){state.done=true;window.cfQuizReport(0);}}
+  if(ok){phase='correct';state.done=true;}
+  else{state.used++;phase=cfqTier(cfg,state);if(phase==='reveal'){state.done=true;}}
+  if(state.done&&itn){itn.id=cfg.id;window.cfScorm.complete(itn,ok);}
   state.phase=phase;cfqFeedback(cfg,root,phase);cfqAttempts(cfg,state,root);
   return phase;
 }
@@ -1404,7 +1453,15 @@ function cfqInitDnd(root,cfg){
   check.addEventListener('click',function(){
     if(state.done)return;
     var ok=order.every(function(id){return state.place[id]===cfg.correct[id];});
-    var phase=cfqFinish(cfg,state,root,ok);
+    // matching: 'source.target' pairs joined by commas (SCORM 1.2). Use COMPACT
+    // indices (item index . target index), not the raw UUID ids, so the pattern
+    // stays a valid short CMIString (raw uuids overflow the 255-char cap).
+    var tids=[];targets.forEach(function(t){tids.push(t.getAttribute('data-id'));});
+    function _ti(tid){return tids.indexOf(tid);}
+    var itn={type:'matching',
+      resp:order.map(function(id,i){return i+'.'+_ti(state.place[id]);}).join(','),
+      patt:order.map(function(id,i){return i+'.'+_ti(cfg.correct[id]);}).join(',')};
+    var phase=cfqFinish(cfg,state,root,ok,itn);
     // Final tier: snap every item into its correct target so the answer is revealed.
     if(phase==='reveal'){state.place={};order.forEach(function(id){state.place[id]=cfg.correct[id];});}
     render();
@@ -1456,7 +1513,11 @@ function cfqInitSeq(root,cfg){
   root.querySelector('.cf-iq-check').addEventListener('click',function(){
     if(state.done)return;
     var ok=state.order.every(function(id,i){return id===cfg.correct[i];});
-    var phase=cfqFinish(cfg,state,root,ok);
+    // sequencing: ordered COMPACT indices (each id → its canonical position), not
+    // raw UUID ids, so the pattern stays a short valid CMIString. Correct = 0,1,2..
+    function _si(id){return cfg.correct.indexOf(id);}
+    var itn={type:'sequencing',resp:state.order.map(_si).join(','),patt:cfg.correct.map(function(_,i){return i;}).join(',')};
+    var phase=cfqFinish(cfg,state,root,ok,itn);
     // Final tier: reorder into the correct sequence so the answer is revealed.
     if(phase==='reveal')state.order=cfg.correct.slice();
     render();
@@ -1478,7 +1539,11 @@ function cfqInitFb(root,cfg){
   check.addEventListener('click',function(){
     if(state.done)return;var ok=true;
     selects.forEach(function(s){if(s.value!==s.getAttribute('data-correct'))ok=false;});
-    var phase=cfqFinish(cfg,state,root,ok);
+    // fill-in: compact per-blank option indices (kept short → well under CMIString255).
+    var resp=[],patt=[];
+    selects.forEach(function(s){resp.push(s.value);patt.push(s.getAttribute('data-correct'));});
+    var itn={type:'fill-in',resp:resp.join(','),patt:patt.join(',')};
+    var phase=cfqFinish(cfg,state,root,ok,itn);
     // Final tier: fill every blank with its correct value so the answer is revealed.
     if(phase==='reveal')selects.forEach(function(s){s.value=s.getAttribute('data-correct');});
     // Color + lock the blanks only once done (correct answer or final reveal).
@@ -1514,7 +1579,9 @@ function cfqInitMc(root,cfg){
   }
   check.addEventListener('click',function(){
     if(state.done||state.sel===null)return;
-    cfqFinish(cfg,state,root,state.sel===cfg.correct);
+    // choice: the ORIGINAL choice index (state.sel is unshuffled), not the display slot.
+    var itn={type:'choice',resp:String(state.sel),patt:String(cfg.correct)};
+    cfqFinish(cfg,state,root,state.sel===cfg.correct,itn);
     render();sync();
   });
   root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.sel=null;state.used=0;state.done=false;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();sync();});
@@ -1534,7 +1601,11 @@ function cfqInitHotspot(root,cfg){
   function answer(el){
     if(state.done)return;
     var ok=!!(el&&el!==off&&el.getAttribute('data-correct')==='1');
-    var phase=cfqFinish(cfg,state,root,ok);
+    // choice (visual): clicked region index (or 'off'); correct = the correct region indices.
+    var ridx=(el&&el!==off)?Array.prototype.indexOf.call(regions,el):-1;
+    var patt=[];for(var pi=0;pi<regions.length;pi++){if(regions[pi].getAttribute('data-correct')==='1')patt.push(pi);}
+    var itn={type:'choice',resp:(ridx>=0?String(ridx):'off'),patt:patt.join(',')};
+    var phase=cfqFinish(cfg,state,root,ok,itn);
     if(ok){markCorrect();lock();return;}
     // Mark only the last-clicked wrong region red (clear any prior red).
     regions.forEach(function(r){r.classList.remove('cf-bad');});
@@ -1557,6 +1628,8 @@ window.cfQuizInit=function(bid){
   var root=document.getElementById('iq-'+bid);if(!root||root.__cfInit)return;root.__cfInit=1;
   var cfgEl=document.getElementById('cfq-cfg-'+bid);if(!cfgEl)return;
   var cfg;try{cfg=JSON.parse(cfgEl.textContent);}catch(e){return;}
+  cfg.id=bid;                          // stable interaction id = the block id
+  window.cfScorm.register(cfg.id);     // count this quiz toward the SCO aggregate on load
   if(cfg.qtype==='drag_drop')cfqInitDnd(root,cfg);
   else if(cfg.qtype==='sequencing')cfqInitSeq(root,cfg);
   else if(cfg.qtype==='fill_blank')cfqInitFb(root,cfg);
