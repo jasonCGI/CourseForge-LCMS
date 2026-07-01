@@ -1135,6 +1135,14 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-feedback{display:none;margin-top:14px;padding:10px 14px;border-radius:6px;font:500 13px/1.4 inherit}
 .cf-iq-feedback.cf-ok{display:block;background:#EAF6EC;color:#1E7E34;border:1px solid #3B8A4A}
 .cf-iq-feedback.cf-bad{display:block;background:#FDECEA;color:#C0392B;border:1px solid #C0392B}
+.cf-iq-feedback.cf-hint{display:block;background:#FFF6E6;color:#7a5b00;border:1px solid #D4820A}
+.cf-iq-choices{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.cf-iq-choice{padding:10px 14px;border:2px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font:14px/1.3 inherit;text-align:left;cursor:pointer}
+.cf-iq-choice.cf-sel{border-color:#185FA5;background:#F0F6FF}
+.cf-iq-choice.cf-ok{border-color:#3B8A4A;background:#EAF6EC;color:#1E7E34}
+.cf-iq-choice.cf-bad{border-color:#C0392B;background:#FDECEA;color:#C0392B}
+.cf-iq-choice:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
+.cf-iq-choice:disabled{cursor:default}
 </style>"""
 
 _QUIZ_RUNTIME_JS = r"""<script>
@@ -1156,15 +1164,29 @@ function cfqAttempts(cfg,state,root){
   if(state.done||left>=cfg.attempts){span.textContent='';}
   else{span.textContent=left+(left===1?' attempt left':' attempts left');}
 }
-function cfqFeedback(cfg,root,ok){
+function cfqFeedback(cfg,root,phase){
   var fb=root.querySelector('.cf-iq-feedback');
+  if(phase==='hint'){fb.className='cf-iq-feedback cf-hint';fb.textContent='Hint: '+(cfg.hint||'');return;}
+  var ok=phase==='correct';
   fb.className='cf-iq-feedback '+(ok?'cf-ok':'cf-bad');
   fb.textContent=ok?cfg.fbCorrect:cfg.fbWrong;
 }
+// Tiered ladder — MUST match client quizTier (FramePreview.jsx): remaining>1 =>
+// 'incorrect'; remaining===1 & a hint set => 'hint'; remaining<=0 => 'reveal' (final).
+function cfqTier(cfg,state){
+  var remaining=cfg.attempts-state.used;
+  if(remaining<=0)return 'reveal';
+  if(cfg.hint&&remaining===1)return 'hint';
+  return 'incorrect';
+}
+// Score is reported to the LMS ONLY when the quiz is DONE (correct => 100, or the
+// final wrong attempt => 0); intermediate wrong attempts just escalate the feedback.
 function cfqFinish(cfg,state,root,ok){
-  if(ok){window.cfQuizReport(100);state.done=true;}
-  else{state.used++;window.cfQuizReport(0);if(state.used>=cfg.attempts)state.done=true;}
-  cfqFeedback(cfg,root,ok);cfqAttempts(cfg,state,root);
+  var phase;
+  if(ok){phase='correct';state.done=true;window.cfQuizReport(100);}
+  else{state.used++;phase=cfqTier(cfg,state);if(phase==='reveal'){state.done=true;window.cfQuizReport(0);}}
+  state.phase=phase;cfqFeedback(cfg,root,phase);cfqAttempts(cfg,state,root);
+  return phase;
 }
 
 // ── drag_drop (match item → target) ─────────────────────────────
@@ -1216,7 +1238,10 @@ function cfqInitDnd(root,cfg){
   check.addEventListener('click',function(){
     if(state.done)return;
     var ok=order.every(function(id){return state.place[id]===cfg.correct[id];});
-    cfqFinish(cfg,state,root,ok);render();
+    var phase=cfqFinish(cfg,state,root,ok);
+    // Final tier: snap every item into its correct target so the answer is revealed.
+    if(phase==='reveal'){state.place={};order.forEach(function(id){state.place[id]=cfg.correct[id];});}
+    render();
   });
   root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.place={};state.sel=null;state.used=0;state.done=false;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
   render();
@@ -1255,9 +1280,12 @@ function cfqInitSeq(root,cfg){
   root.querySelector('.cf-iq-check').addEventListener('click',function(){
     if(state.done)return;
     var ok=state.order.every(function(id,i){return id===cfg.correct[i];});
-    var btns=list.querySelectorAll('button');
-    state.order.forEach(function(id,i){btns[i].classList.add(id===cfg.correct[i]?'cf-ok':'cf-bad');});
-    cfqFinish(cfg,state,root,ok);
+    var phase=cfqFinish(cfg,state,root,ok);
+    // Final tier: reorder into the correct sequence so the answer is revealed.
+    if(phase==='reveal')state.order=cfg.correct.slice();
+    render();
+    // Color the rows only once done (correct answer or final reveal), never mid-attempt.
+    if(state.done){var btns=list.querySelectorAll('button');state.order.forEach(function(id,i){btns[i].classList.add(id===cfg.correct[i]?'cf-ok':'cf-bad');});}
   });
   root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();state.used=0;state.done=false;state.grabbed=null;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();});
   render();
@@ -1273,11 +1301,48 @@ function cfqInitFb(root,cfg){
   selects.forEach(function(s){s.addEventListener('change',function(){s.classList.remove('cf-ok','cf-bad');sync();});});
   check.addEventListener('click',function(){
     if(state.done)return;var ok=true;
-    selects.forEach(function(s){var good=s.value===s.getAttribute('data-correct');s.classList.add(good?'cf-ok':'cf-bad');if(!good)ok=false;});
-    cfqFinish(cfg,state,root,ok);if(state.done)selects.forEach(function(s){s.disabled=true;});
+    selects.forEach(function(s){if(s.value!==s.getAttribute('data-correct'))ok=false;});
+    var phase=cfqFinish(cfg,state,root,ok);
+    // Final tier: fill every blank with its correct value so the answer is revealed.
+    if(phase==='reveal')selects.forEach(function(s){s.value=s.getAttribute('data-correct');});
+    // Color + lock the blanks only once done (correct answer or final reveal).
+    if(state.done)selects.forEach(function(s){s.classList.remove('cf-ok','cf-bad');s.classList.add(s.value===s.getAttribute('data-correct')?'cf-ok':'cf-bad');s.disabled=true;});
   });
   root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.used=0;state.done=false;selects.forEach(function(s){s.value='';s.disabled=false;s.classList.remove('cf-ok','cf-bad');});root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';sync();});
   sync();
+}
+
+// ── multiple_choice (single-select radios) ─────────────────────
+function cfqInitMc(root,cfg){
+  var wrap=root.querySelector('.cf-iq-choices');
+  var check=root.querySelector('.cf-iq-check');
+  var state={sel:null,used:0,done:false};
+  // Shuffle DISPLAY order but keep the ORIGINAL index so scoring stays correct.
+  var order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();
+  function sync(){check.disabled=(state.sel===null)||state.done;}
+  function render(){
+    wrap.innerHTML='';
+    order.forEach(function(idx){
+      var b=document.createElement('button');b.type='button';b.className='cf-iq-choice';
+      b.setAttribute('role','radio');b.setAttribute('data-index',idx);
+      b.setAttribute('aria-checked',state.sel===idx?'true':'false');
+      b.textContent=cfg.choices[idx];
+      // Reveal the correct choice only once done (correct answer or final reveal).
+      if(state.done&&idx===cfg.correct)b.classList.add('cf-ok');
+      else if(state.done&&state.sel===idx&&idx!==cfg.correct)b.classList.add('cf-bad');
+      else if(state.sel===idx)b.classList.add('cf-sel');
+      if(state.done)b.disabled=true;
+      b.addEventListener('click',function(){if(state.done)return;state.sel=idx;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();sync();});
+      wrap.appendChild(b);
+    });
+  }
+  check.addEventListener('click',function(){
+    if(state.done||state.sel===null)return;
+    cfqFinish(cfg,state,root,state.sel===cfg.correct);
+    render();sync();
+  });
+  root.querySelector('.cf-iq-reset').addEventListener('click',function(){state.sel=null;state.used=0;state.done=false;root.querySelector('.cf-iq-feedback').className='cf-iq-feedback';render();sync();});
+  render();sync();
 }
 
 window.cfQuizInit=function(bid){
@@ -1287,6 +1352,7 @@ window.cfQuizInit=function(bid){
   if(cfg.qtype==='drag_drop')cfqInitDnd(root,cfg);
   else if(cfg.qtype==='sequencing')cfqInitSeq(root,cfg);
   else if(cfg.qtype==='fill_blank')cfqInitFb(root,cfg);
+  else cfqInitMc(root,cfg);
 };
 }
 </script>"""
@@ -1299,8 +1365,10 @@ def _quiz_cfg_json(cfg):
 
 
 def _render_quiz_interactive(data, safe_bid):
-    """Build the published HTML (+ guarded runtime) for a drag_drop / sequencing /
-    fill_blank quiz. Returns the HTML string. qtype is taken from data."""
+    """Build the published HTML (+ guarded runtime) for a quiz of ANY qtype
+    (multiple_choice / drag_drop / sequencing / fill_blank). Returns the HTML string.
+    All four route through the shared cfq* runtime so the tiered feedback→hint→reveal
+    scaffold and cfQuizReport scoring are one implementation (twin of PreviewQuiz*)."""
     qtype = data.get('qtype', 'multiple_choice')
     attempts = data.get('attempts_allowed', 2)
     try:
@@ -1309,6 +1377,7 @@ def _render_quiz_interactive(data, safe_bid):
         attempts = 2
     fb_correct = data.get('feedback_correct', 'Correct!')
     fb_wrong   = data.get('feedback_incorrect', 'Incorrect — please review.')
+    hint       = data.get('hint', '') or ''
     randomize  = bool(data.get('randomize', False))
     prompt = esc(data.get('prompt', data.get('question', '')))
 
@@ -1329,7 +1398,7 @@ def _render_quiz_interactive(data, safe_bid):
         cfg = {'qtype': 'drag_drop', 'items': item_map, 'order': order,
                'correct': {str(k): str(v) for k, v in correct.items()},
                'randomize': randomize, 'attempts': attempts,
-               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong, 'hint': hint}
         targets_html = ''.join(
             f'<button type="button" class="cf-iq-target" data-id="{esc(str(t.get("id")))}">'
             f'<span class="cf-iq-tlabel">{esc(t.get("label",""))}</span>'
@@ -1350,13 +1419,13 @@ def _render_quiz_interactive(data, safe_bid):
         cfg = {'qtype': 'sequencing', 'items': item_map, 'order': order,
                'correct': [str(x) for x in correct_order],
                'randomize': randomize, 'attempts': attempts,
-               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong, 'hint': hint}
         body = (
             f'<p class="cf-iq-hint">Drag the rows into order — or focus a row, press Enter to pick it '
             f'up, move with the arrow keys, and Enter to drop.</p>'
             f'<div class="cf-iq-list"></div>'
         )
-    else:  # fill_blank
+    elif qtype == 'fill_blank':
         segments = data.get('segments', [])
         n = 0
         runs = []
@@ -1377,8 +1446,23 @@ def _render_quiz_interactive(data, safe_bid):
             else:
                 runs.append(esc(seg.get('text', '')))
         cfg = {'qtype': 'fill_blank', 'randomize': randomize, 'attempts': attempts,
-               'fbCorrect': fb_correct, 'fbWrong': fb_wrong}
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong, 'hint': hint}
         body = f'<p class="cf-fbq-text">{"".join(runs)}</p>'
+    else:  # multiple_choice (default)
+        choices = data.get('choices', [])
+        try:
+            correct_idx = int(data.get('correct_index', data.get('correct_idx', 0)) or 0)
+        except (TypeError, ValueError):
+            correct_idx = 0
+        cfg = {'qtype': 'multiple_choice',
+               'choices': {str(i): c for i, c in enumerate(choices)},
+               'order': [str(i) for i in range(len(choices))],
+               'correct': str(correct_idx),
+               'randomize': randomize, 'attempts': attempts,
+               'fbCorrect': fb_correct, 'fbWrong': fb_wrong, 'hint': hint}
+        # The radio buttons are built by cfqInitMc from cfg (keeps the shuffled
+        # display order in sync with scoring by original index).
+        body = '<div class="cf-iq-choices" role="radiogroup" aria-label="Answer choices"></div>'
 
     prompt_html = f'<p class="cf-iq-prompt">{prompt}</p>' if prompt else ''
     return (
@@ -1773,40 +1857,12 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
 
         elif btype == 'quiz':
             safe_bid = esc(bid)
-            qtype = data.get('qtype', 'multiple_choice')
-            if qtype in ('drag_drop', 'sequencing', 'fill_blank'):
-                parts.append(_render_quiz_interactive(data, safe_bid))
-                continue
-            # ── multiple_choice (default) ──
-            # Optionally shuffle the DISPLAY order; data-index stays the ORIGINAL
-            # index so the shell's cfSubmitQuiz(correctIndex) still scores correctly.
-            choice_order = list(enumerate(data.get('choices', [])))
-            if data.get('randomize'):
-                random.shuffle(choice_order)
-            choices_html = ''
-            for i, choice in choice_order:
-                choices_html += (
-                    f'<button class="cf-choice" data-index="{i}" '
-                    f'onclick="cfSelectChoice(\'{safe_bid}\', this)">'
-                    f'{esc(choice)}</button>'
-                )
-            fb_correct   = esc(data.get('feedback_correct',   'Correct!'))
-            fb_incorrect = esc(data.get('feedback_incorrect', 'Incorrect — please review.'))
-            # correct_index/correct_idx -> int so it can't inject JS into onclick.
-            try:
-                correct_idx = int(data.get('correct_index', data.get('correct_idx', 0)) or 0)
-            except (TypeError, ValueError):
-                correct_idx = 0
-            parts.append(
-                f'<div class="cf-quiz" id="quiz-{safe_bid}">'
-                f'<p class="cf-quiz-question">{esc(data.get("question",""))}</p>'
-                f'{choices_html}'
-                f'<button class="cf-submit" '
-                f'onclick="cfSubmitQuiz(\'{safe_bid}\', {correct_idx})">Submit</button>'
-                f'<div class="cf-feedback correct" id="feedback-{safe_bid}">{fb_correct}</div>'
-                f'<div class="cf-feedback incorrect" id="feedback-{safe_bid}-wrong">{fb_incorrect}</div>'
-                f'</div>'
-            )
+            # All four qtypes (multiple_choice/drag_drop/sequencing/fill_blank) render
+            # through the shared interactive runtime so the tiered feedback→hint→reveal
+            # scaffold and cfQuizReport pass/fail scoring are ONE implementation, a twin
+            # of the React PreviewQuiz* renders. (The shell's legacy cfSubmitQuiz path is
+            # retained in the SCO templates for back-compat but is no longer emitted.)
+            parts.append(_render_quiz_interactive(data, safe_bid))
 
         elif btype == 'hotspot':
             regions_html = ''

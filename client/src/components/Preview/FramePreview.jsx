@@ -1913,7 +1913,23 @@ const QUIZ_BTN = {
 }
 const QUIZ_BTN_GHOST = { ...QUIZ_BTN, background: 'transparent', color: '#185FA5', border: '1px solid #185FA5' }
 
-function QuizFeedback({ ok, block }) {
+// Tiered-feedback renderer. `phase` is the shared ladder state (see quizTier):
+//   'correct' → green correct feedback · 'incorrect'/'reveal' → red incorrect feedback
+//   'hint'    → amber hint text. Byte-parity with scorm12 cfqFeedback.
+function QuizFeedback({ phase, block }) {
+  if (!phase) return null
+  if (phase === 'hint') {
+    return (
+      <div role="status" aria-live="polite" style={{
+        padding: '10px 14px', marginTop: 14,
+        background: '#FFF6E6', border: '1px solid #D4820A',
+        borderRadius: 6, fontSize: 13, color: '#7a5b00', fontWeight: 500,
+      }}>
+        {'Hint: ' + (block.data.hint || '')}
+      </div>
+    )
+  }
+  const ok = phase === 'correct'
   return (
     <div role="status" aria-live="polite" style={{
       padding: '10px 14px', marginTop: 14,
@@ -1926,7 +1942,22 @@ function QuizFeedback({ ok, block }) {
   )
 }
 
-// Shared attempts gate: returns { attemptsLeft, exhausted, registerWrong, reset }
+// Tiered feedback ladder — shared by EVERY qtype's React render AND mirrored in the
+// published cfq* runtime (scorm12._QUIZ_RUNTIME_JS / cfqTier). Given the wrong-attempt
+// count so far (`used`, already incremented for the attempt being scored) and the cap
+// (`max`):
+//   remaining > 1          → 'incorrect'  (show the incorrect feedback)
+//   remaining === 1 & hint → 'hint'       (last chance; skip this tier if no hint set)
+//   remaining <= 0 (final) → 'reveal'     (lock + highlight the correct answer)
+function quizTier(used, max, hasHint) {
+  const remaining = max - used
+  if (remaining <= 0) return 'reveal'
+  if (hasHint && remaining === 1) return 'hint'
+  return 'incorrect'
+}
+const hasHintFor = (block) => !!(block.data.hint && String(block.data.hint).trim())
+
+// Shared attempts gate: returns { max, used, attemptsLeft, exhausted, bump, reset }.
 function useAttempts(block) {
   const max = Math.max(1, parseInt(block.data.attempts_allowed) || 2)
   const [used, setUsed] = useState(0)
@@ -1950,17 +1981,21 @@ function PreviewQuizMC({ block }) {
     [block.id, randomize, choices.length]
   )
   const [selected, setSelected] = useState(null)   // original index
-  const [submitted, setSubmitted] = useState(false)
+  const [phase, setPhase] = useState(null)         // null|'correct'|'incorrect'|'hint'|'reveal'
   const att = useAttempts(block)
+  const hasHint = hasHintFor(block)
   const isRight = selected === correct
-  const locked = submitted && (isRight || att.exhausted)
+  const locked = phase === 'correct' || phase === 'reveal'
+  const revealing = locked   // reveal the correct choice only on a correct answer or the final tier
 
   const submit = () => {
-    if (selected === null) return
-    setSubmitted(true)
-    if (selected !== correct) att.bump()
+    if (selected === null || locked) return
+    if (isRight) { setPhase('correct'); return }
+    const t = quizTier(att.used + 1, att.max, hasHint)   // used AFTER this wrong attempt
+    att.bump(); setPhase(t)
   }
-  const retry = () => { setSubmitted(false); setSelected(null) }
+  const reset = () => { setSelected(null); setPhase(null); att.reset() }
+  const pick = (idx) => { if (locked) return; setSelected(idx); if (phase) setPhase(null) }
 
   return (
     <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
@@ -1968,15 +2003,14 @@ function PreviewQuizMC({ block }) {
       <div role="radiogroup" aria-label="Answer choices" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
         {order.map((idx) => {
           let bg = '#fff', border = '#ddd', color = '#1a1a1a'
-          if (submitted) {
-            if (idx === correct) { bg = '#EAF6EC'; border = '#3B8A4A'; color = '#1E7E34' }
-            else if (idx === selected) { bg = '#FDECEA'; border = '#C0392B'; color = '#C0392B' }
-          } else if (idx === selected) { border = '#185FA5'; bg = '#F0F6FF' }
+          if (revealing && idx === correct) { bg = '#EAF6EC'; border = '#3B8A4A'; color = '#1E7E34' }
+          else if (phase && idx === selected && idx !== correct) { bg = '#FDECEA'; border = '#C0392B'; color = '#C0392B' }
+          else if (idx === selected) { border = '#185FA5'; bg = '#F0F6FF' }
           return (
             <button
               key={idx}
               role="radio" aria-checked={selected === idx}
-              onClick={() => !locked && setSelected(idx)}
+              onClick={() => pick(idx)}
               disabled={locked}
               style={{
                 padding: '10px 14px', border: `2px solid ${border}`, borderRadius: 6,
@@ -1991,12 +2025,12 @@ function PreviewQuizMC({ block }) {
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {!locked && <button onClick={submit} disabled={selected === null} style={QUIZ_BTN}>Submit</button>}
-        {submitted && !isRight && !att.exhausted && <button onClick={retry} style={QUIZ_BTN_GHOST}>Try again</button>}
-        {submitted && !isRight && !att.exhausted && (
+        <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
+        {(phase === 'incorrect' || phase === 'hint') && (
           <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
         )}
       </div>
-      {submitted && <QuizFeedback ok={isRight} block={block} />}
+      <QuizFeedback phase={phase} block={block} />
     </div>
   )
 }
@@ -2038,13 +2072,15 @@ function PreviewQuizDragDrop({ block }) {
   // placement: { itemId: targetId|null }
   const [placement, setPlacement] = useState({})
   const [selectedItem, setSelectedItem] = useState(null)  // keyboard/click select
-  const [submitted, setSubmitted] = useState(false)
+  const [phase, setPhase] = useState(null)                // null|'correct'|'incorrect'|'hint'|'reveal'
   const att = useAttempts(block)
+  const hasHint = hasHintFor(block)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const allPlaced = items.length > 0 && items.every(i => placement[i.id])
   const isRight = allPlaced && items.every(i => placement[i.id] === correct[i.id])
-  const locked = submitted && (isRight || att.exhausted)
+  const locked = phase === 'correct' || phase === 'reveal'
+  const revealing = locked   // color the mapping only on a correct answer or the final tier
 
   const onDragEnd = (e) => {
     if (locked) return
@@ -2053,16 +2089,24 @@ function PreviewQuizDragDrop({ block }) {
     if (!itemId) return
     if (!overId || overId === 'dd-tray') setPlacement(p => ({ ...p, [itemId]: null }))
     else setPlacement(p => ({ ...p, [itemId]: overId }))
-    setSubmitted(false)
+    if (phase) setPhase(null)
   }
   const placeSelected = (targetId) => {
     if (locked || !selectedItem) return
     setPlacement(p => ({ ...p, [selectedItem]: targetId }))
-    setSelectedItem(null); setSubmitted(false)
+    setSelectedItem(null); if (phase) setPhase(null)
   }
   const toggleSelect = (itemId) => { if (!locked) setSelectedItem(s => s === itemId ? null : itemId) }
-  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
-  const reset = () => { setPlacement({}); setSelectedItem(null); setSubmitted(false); att.reset() }
+  const submit = () => {
+    if (locked) return
+    if (isRight) { setPhase('correct'); return }
+    const t = quizTier(att.used + 1, att.max, hasHint)
+    att.bump()
+    // Final tier: snap every item into its correct target so the answer is revealed.
+    if (t === 'reveal') { const p = {}; items.forEach(i => { p[i.id] = correct[i.id] }); setPlacement(p) }
+    setPhase(t)
+  }
+  const reset = () => { setPlacement({}); setSelectedItem(null); setPhase(null); att.reset() }
 
   const tray = order.filter(id => !placement[id])
   const TrayDroppable = () => {
@@ -2093,7 +2137,7 @@ function PreviewQuizDragDrop({ block }) {
           {targets.map(t => (
             <DDTarget key={t.id} id={t.id} label={t.label} onActivate={placeSelected} selecting={!!selectedItem && !locked}>
               {order.filter(id => placement[id] === t.id).map(id => {
-                const ok = submitted ? (correct[id] === t.id) : null
+                const ok = revealing ? (correct[id] === t.id) : null
                 return (
                   <DDItemSelectable key={id} id={id} label={itemById[id]?.label} placed
                     selected={selectedItem === id} onSelect={toggleSelect} disabled={locked} result={ok} />
@@ -2106,11 +2150,11 @@ function PreviewQuizDragDrop({ block }) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
         {!locked && <button onClick={submit} disabled={!allPlaced} style={QUIZ_BTN}>Check</button>}
         <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
-        {submitted && !isRight && !att.exhausted && (
+        {(phase === 'incorrect' || phase === 'hint') && (
           <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
         )}
       </div>
-      {submitted && <QuizFeedback ok={isRight} block={block} />}
+      <QuizFeedback phase={phase} block={block} />
     </div>
   )
 }
@@ -2197,23 +2241,34 @@ function PreviewQuizSequencing({ block }) {
 
   const [order, setOrder] = useState(initial)
   useEffect(() => { setOrder(initial) }, [initial])
-  const [submitted, setSubmitted] = useState(false)
+  const [phase, setPhase] = useState(null)   // null|'correct'|'incorrect'|'hint'|'reveal'
   const att = useAttempts(block)
+  const hasHint = hasHintFor(block)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
   const isRight = order.length === correctOrder.length && order.every((id, i) => id === correctOrder[i])
-  const locked = submitted && (isRight || att.exhausted)
+  const locked = phase === 'correct' || phase === 'reveal'
+  const revealing = locked   // color rows only on a correct answer or the final tier
 
   const onDragEnd = (e) => {
+    if (locked) return
     const { active, over } = e
     if (!over || active.id === over.id) return
     setOrder(o => arrayMove(o, o.indexOf(active.id), o.indexOf(over.id)))
-    setSubmitted(false)
+    if (phase) setPhase(null)
   }
-  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
-  const reset = () => { setOrder(initial); setSubmitted(false); att.reset() }
+  const submit = () => {
+    if (locked) return
+    if (isRight) { setPhase('correct'); return }
+    const t = quizTier(att.used + 1, att.max, hasHint)
+    att.bump()
+    // Final tier: reorder into the correct sequence so the answer is revealed.
+    if (t === 'reveal') setOrder(correctOrder.slice())
+    setPhase(t)
+  }
+  const reset = () => { setOrder(initial); setPhase(null); att.reset() }
 
   return (
     <div style={{ ...previewBlockWrap, ...QUIZ_WRAP }}>
@@ -2225,18 +2280,18 @@ function PreviewQuizSequencing({ block }) {
         <SortableContext items={order} strategy={verticalListSortingStrategy}>
           {order.map((id, idx) => (
             <SeqRow key={id} id={id} index={idx} label={itemById[id]?.label || ''}
-              disabled={locked} result={submitted ? (id === correctOrder[idx]) : null} />
+              disabled={locked} result={revealing ? (id === correctOrder[idx]) : null} />
           ))}
         </SortableContext>
       </DndContext>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
         {!locked && <button onClick={submit} style={QUIZ_BTN}>Check</button>}
         <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
-        {submitted && !isRight && !att.exhausted && (
+        {(phase === 'incorrect' || phase === 'hint') && (
           <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
         )}
       </div>
-      {submitted && <QuizFeedback ok={isRight} block={block} />}
+      <QuizFeedback phase={phase} block={block} />
     </div>
   )
 }
@@ -2254,15 +2309,25 @@ function PreviewQuizFillBlank({ block }) {
   }, [block.id, randomize, blanks.length])
 
   const [answers, setAnswers] = useState({})  // { blankId: value }
-  const [submitted, setSubmitted] = useState(false)
+  const [phase, setPhase] = useState(null)    // null|'correct'|'incorrect'|'hint'|'reveal'
   const att = useAttempts(block)
+  const hasHint = hasHintFor(block)
 
   const allAnswered = blanks.length > 0 && blanks.every(b => answers[b.id])
   const isRight = allAnswered && blanks.every(b => answers[b.id] === b.correct)
-  const locked = submitted && (isRight || att.exhausted)
+  const locked = phase === 'correct' || phase === 'reveal'
+  const revealing = locked   // color blanks only on a correct answer or the final tier
 
-  const submit = () => { setSubmitted(true); if (!isRight) att.bump() }
-  const reset = () => { setAnswers({}); setSubmitted(false); att.reset() }
+  const submit = () => {
+    if (locked) return
+    if (isRight) { setPhase('correct'); return }
+    const t = quizTier(att.used + 1, att.max, hasHint)
+    att.bump()
+    // Final tier: fill every blank with its correct value so the answer is revealed.
+    if (t === 'reveal') { const a = {}; blanks.forEach(b => { a[b.id] = b.correct }); setAnswers(a) }
+    setPhase(t)
+  }
+  const reset = () => { setAnswers({}); setPhase(null); att.reset() }
 
   let blankCount = 0
   return (
@@ -2274,14 +2339,14 @@ function PreviewQuizFillBlank({ block }) {
           const n = blankCount
           const val = answers[seg.id] || ''
           let bdr = '#185FA5'
-          if (submitted) bdr = (val === seg.correct) ? '#3B8A4A' : '#C0392B'
+          if (revealing) bdr = (val === seg.correct) ? '#3B8A4A' : '#C0392B'
           return (
             <select
               key={idx}
               aria-label={`Blank ${n}`}
               value={val}
               disabled={locked}
-              onChange={e => { setAnswers(a => ({ ...a, [seg.id]: e.target.value })); setSubmitted(false) }}
+              onChange={e => { setAnswers(a => ({ ...a, [seg.id]: e.target.value })); if (phase) setPhase(null) }}
               style={{
                 margin: '0 4px', padding: '3px 6px', border: `2px solid ${bdr}`, borderRadius: 5,
                 fontSize: 14, fontFamily: 'inherit', color: '#042C53', background: '#fff',
@@ -2296,11 +2361,11 @@ function PreviewQuizFillBlank({ block }) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {!locked && <button onClick={submit} disabled={!allAnswered} style={QUIZ_BTN}>Check</button>}
         <button onClick={reset} style={QUIZ_BTN_GHOST}>Reset</button>
-        {submitted && !isRight && !att.exhausted && (
+        {(phase === 'incorrect' || phase === 'hint') && (
           <span style={{ fontSize: 12, color: '#7a5b00' }}>{att.attemptsLeft} attempt{att.attemptsLeft === 1 ? '' : 's'} left</span>
         )}
       </div>
-      {submitted && <QuizFeedback ok={isRight} block={block} />}
+      <QuizFeedback phase={phase} block={block} />
     </div>
   )
 }

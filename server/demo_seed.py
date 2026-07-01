@@ -140,13 +140,15 @@ def _callout(text='Callout', box=None, target=None, padding=10, anchor='auto'):
         'target': target or {'x': 32, 'y': 32}, 'padding': padding, 'anchor': anchor}}
 
 def _quiz(question, choices, correct_index, feedback_correct='Correct!',
-          feedback_incorrect='Not quite — review and try again.', randomize=False):
+          feedback_incorrect='Not quite — review and try again.', randomize=False,
+          hint='', attempts_allowed=2):
     return {'id': str(uuid.uuid4()), 'type': 'quiz', 'data': {
         'qtype': 'multiple_choice',
         'question': question, 'choices': choices, 'correct_index': correct_index,
         'randomize': randomize,
         'feedback_correct': feedback_correct, 'feedback_incorrect': feedback_incorrect,
-        'attempts_allowed': 2}}
+        'hint': hint,
+        'attempts_allowed': attempts_allowed}}
 
 def _quiz_dd(prompt, pairs, feedback_correct='Correct! Every match is right.',
              feedback_incorrect='Not quite — review the matches and try again.',
@@ -426,7 +428,12 @@ in this course comes back to dialing it in.</p>''',
                              'the shot develops the sweetness that balances the sourness.',
             feedback_incorrect='Not quite. A fast, sour shot is under-extracted. The fix is a finer grind to '
                                'slow the flow toward 25–30 seconds — hotter water or a longer pull won\'t '
-                               'correct a grind that is letting water race through.'),
+                               'correct a grind that is letting water race through.',
+            # Three attempts so the full ladder is visible: 1st wrong -> incorrect
+            # feedback, one attempt left -> this hint, final wrong -> reveal + lock.
+            hint='A 12-second shot is TOO FAST — the water is not spending enough time in the puck. '
+                 'Which single change adds resistance and slows the flow?',
+            attempts_allowed=3),
     ]},
     {'name': 'Quiz Block — Drag and Drop', 'frame_type': 'assessment', 'lesson': 'Assessment Blocks', 'blocks': [
         _text(body='<h2>Quiz Block — Drag and Drop</h2><p>Match each brew method to its standard '
