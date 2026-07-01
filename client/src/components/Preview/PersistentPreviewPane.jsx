@@ -241,6 +241,7 @@ export default function PersistentPreviewPane() {
           stage={stage}
           zoom={zoom} onZoom={setZoom}
           contentArea={(needsOverlay || isMenuFrame) ? contentArea : null}
+          overlayBg={contentBg || 'transparent'}
           overlay={(needsOverlay || isMenuFrame) ? (
             <PreviewErrorBoundary resetKey={activeFrame.id}>
               <FramePreview frame={activeFrame} ignoreGui hideTitle contentArea={contentArea}
@@ -272,7 +273,7 @@ export default function PersistentPreviewPane() {
 // Sizes its child to the largest box with the stage's aspect ratio that fits
 // entirely inside the pane (contain). Measured via ResizeObserver because pure
 // CSS can't contain-fit an aspect-ratio box against both dimensions at once.
-function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom }) {
+function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom, overlayBg = '#fff' }) {
   const ref = useRef(null)
   const [fitBox, setFitBox] = useState(null)
   const sw = stage?.w || 1024, sh = stage?.h || 768
@@ -319,7 +320,12 @@ function ShellFit({ stage, children, contentArea, overlay, zoom = 1, onZoom }) {
             // (image fills the area; oversized callouts clip at the edge). Long
             // shelled text still scrolls WITHIN #fgui-content, not the pane.
             overflow: 'hidden',
-            background: '#fff',
+            // Match Published: paint the shell's RESOLVED content-area bg behind the
+            // React overlay (3D/quiz/menu/etc.), not a hardcoded white. When the bg
+            // can't be resolved to a solid (image/gradient/transparent shell), stay
+            // transparent so the real shell content area shows through the iframe
+            // below — Edit and Published then agree. (Was always '#fff' → drift.)
+            background: overlayBg,
             zIndex: 5,
             // larger body text inside the shell (clean shell-off view stays 18px)
             '--cf-preview-body': '26px',

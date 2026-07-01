@@ -2,6 +2,7 @@ import React, { useEffect, useState, lazy, Suspense } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import ContentTree from './components/Sidebar/ContentTree'
 import ImportButton from './components/Sidebar/ImportButton'
+import ExportButton from './components/Sidebar/ExportButton'
 import InspectorPane from './components/Editor/InspectorPane'
 import CourseConfigPanel from './components/Editor/CourseConfigPanel'
 import PersistentPreviewPane, { flatFrameOrder } from './components/Preview/PersistentPreviewPane'
@@ -122,15 +123,19 @@ export default function App() {
   const sidebarInner = (
     <div style={{ height: '100%', background: 'var(--cf-sidebar-bg)', borderRight: '1px solid var(--cf-border-primary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {projects.length > 0 && (
-        // Project selector + Import JSON share one row: the dropdown is narrowed
-        // 25% (75% width) and Import sits to its right, sized to its content.
-        <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        // Project selector, then Import + Export paired on their own row — the two are
+        // a symmetric JSON round-trip, so they sit together here (Export was moved out
+        // of the top-bar action zone). Full-width dropdown above the button pair.
+        <div style={{ padding: 8, borderBottom: '1px solid var(--cf-border-primary)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <select onChange={e => fetchProject(e.target.value)} defaultValue="" aria-label="Select a project"
-            style={{ width: '75%', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)', border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--cf-font)' }}>
+            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--cf-input-bg)', color: 'var(--cf-input-text)', border: '1px solid var(--cf-input-border)', borderRadius: 4, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--cf-font)' }}>
             <option value="" disabled>Select a project…</option>
             {projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
           </select>
-          <ImportButton inline />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <ImportButton inline />
+            <ExportButton />
+          </div>
         </div>
       )}
       {projects.length === 0 && <ImportButton />}
@@ -312,18 +317,8 @@ export default function App() {
             aria-label="Preview course" title="Preview the whole course — walk it with Prev/Next or arrow keys" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
             ▶<span className="cf-hide-mobile"> Course</span></Button>
 
-          {/* Export the whole course build as a JSON file (backup / inspect / move) */}
-          <Button variant="ghost" disabled={!activeProject}
-            onClick={() => {
-              if (!activeProject) return
-              const a = document.createElement('a')
-              a.href = `/api/projects/${activeProject.id}/export.json`
-              a.download = ''
-              document.body.appendChild(a); a.click(); a.remove()
-            }}
-            aria-label="Export course as JSON"
-            title="Export the whole course build as a .json file (backup / inspect / move between environments)" style={{ marginLeft: 8, ...TOPBAR_BTN }}>
-            ⭳<span className="cf-hide-mobile"> JSON</span></Button>
+          {/* JSON export moved next to Import JSON by the project selector (the two are
+              a round-trip pair); the action zone is now just Shell · Course · Publish. */}
 
           {/* Publish */}
           <Button variant="primary" onClick={() => setShowPublish(true)} style={{ marginLeft: 12 }}>
