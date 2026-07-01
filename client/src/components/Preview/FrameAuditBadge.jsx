@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { auditRoot, nudgeToPass } from '../../utils/contrast'
 import useEditorStore from '../../store/editorStore'
+import ContrastChecker from '../UI/ContrastChecker'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // In-preview WCAG / 508 contrast audit — a glanceable traffic-light pill by the
@@ -47,8 +48,11 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
   const [result, setResult] = useState(null)   // {fails, manual, passCount} | null
   const [open, setOpen] = useState(false)
   const [aaa, setAaa] = useState(false)
+  // Inline color-pair checker: null = collapsed; {fg,bg} = expanded within THIS
+  // popout (pre-filled). Replaces the separate floating modal that covered the
+  // preview being audited — the checker now expands the audit panel in place.
+  const [pair, setPair] = useState(null)
   const setFrameA11y = useEditorStore(s => s.setFrameA11y)
-  const openContrast = useEditorStore(s => s.openContrast)   // launch the manual checker
   const debounce = useRef(null)
   const retry = useRef(null)
 
@@ -103,7 +107,7 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
   return (
     <div style={{ position: 'relative', display: 'inline-flex' }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(o => { if (o) setPair(null); return !o })}
         aria-label={aria}
         aria-expanded={open}
         title="WCAG / 508 contrast audit of this frame"
@@ -142,7 +146,7 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
               <input type="checkbox" checked={aaa} onChange={e => setAaa(e.target.checked)} style={{ cursor: 'pointer' }} />
               AAA
             </label>
-            <button onClick={() => setOpen(false)} aria-label="Close audit panel"
+            <button onClick={() => { setOpen(false); setPair(null) }} aria-label="Close audit panel"
               style={{ background: 'none', border: 'none', color: C.text3, fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>✕</button>
           </div>
 
@@ -175,7 +179,7 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
                     <Swatch hex={f.fg} label="text" />
                     <Swatch hex={f.bg} label="bg" />
                     <span style={{ flex: 1 }} />
-                    <button onClick={() => openContrast({ fg: f.fg, bg: f.bg })} title="Open this pair in the contrast checker"
+                    <button onClick={() => setPair({ fg: f.fg, bg: f.bg })} title="Check this pair in the panel below"
                       style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
                         background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>🎨 Check</button>
                     <button onClick={() => locate(f.el)} title="Scroll to + outline in the preview"
@@ -206,7 +210,7 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Swatch hex={m.fg} label="text" />
                   <span style={{ flex: 1, fontSize: 10, color: C.text3 }}>{m.reason}</span>
-                  <button onClick={() => openContrast({ fg: m.fg })} title="Open this text color in the contrast checker"
+                  <button onClick={() => setPair({ fg: m.fg, bg: m.bg || null })} title="Check this color in the panel below"
                     style={{ fontSize: 10, padding: '3px 8px', border: `1px solid ${C.border}`, borderRadius: 5,
                       background: C.head, color: C.text, cursor: 'pointer', fontFamily: C.font }}>🎨 Check</button>
                   <button onClick={() => locate(m.el)} title="Scroll to + outline in the preview"
@@ -216,14 +220,30 @@ export default function FrameAuditBadge({ paneRef, frameId, signature, fallbackB
               </div>
             ))}
 
-            {/* Manual color-pair check — the standalone WCAG checker, now launched
-                from here (the toolbar button was removed: one accessibility home). */}
-            <button onClick={() => openContrast()}
+            {/* Manual color-pair check — the WCAG checker now EXPANDS in place here
+                (one accessibility home) instead of a separate floating modal that
+                covered the very preview being audited. */}
+            <button onClick={() => setPair(p => (p ? null : {}))} aria-expanded={!!pair}
               style={{ width: '100%', marginTop: 4, padding: '7px', border: `1px solid ${C.border}`,
                 borderRadius: 6, background: C.head, color: C.text, cursor: 'pointer',
                 fontFamily: C.font, fontSize: 11 }}>
-              🎨 Check a color pair…
+              🎨 {pair ? 'Hide color-pair checker' : 'Check a color pair…'}
             </button>
+
+            {pair && (
+              <div style={{ marginTop: 8, border: `1px solid ${C.border}`, borderRadius: 8,
+                background: C.head, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span aria-hidden="true" style={{ color: C.manual, fontSize: 12 }}>◐</span>
+                  <span style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.text2, letterSpacing: '0.04em' }}>
+                    Contrast checker · WCAG / 508
+                  </span>
+                  <button onClick={() => setPair(null)} aria-label="Close color-pair checker"
+                    style={{ background: 'none', border: 'none', color: C.text3, fontSize: 14, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+                </div>
+                <ContrastChecker embedded initialFg={pair.fg || null} initialBg={pair.bg || null} />
+              </div>
+            )}
           </div>
         </div>
       )}
