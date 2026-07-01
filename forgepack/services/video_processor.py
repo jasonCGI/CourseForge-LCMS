@@ -211,7 +211,7 @@ def process_video_job(
         '-i', str(input_p),
         '-frames:v', '1',
         '-q:v', '3',
-        '-vf', 'scale=-2:1080',
+        '-vf', "scale=-2:'min(1080,ih)'",   # downscale-only poster (never upscale a small source)
         poster_path,
     ]
     if not run_ffmpeg(poster_cmd, job_id, 'Poster extraction', 5, 15):
@@ -220,10 +220,14 @@ def process_video_job(
     # ── Step 3: MP4 encode ────────────────────────────────────
     JOBS[job_id]['message'] = 'Encoding MP4 (H.264)…'
     mp4_cfg = preset.get('mp4', {})
+    # -vf only when the preset defines a scale ('source' resolution omits it to keep
+    # native resolution). _vf_args yields [] when absent → no -vf flag at all.
+    def _vf_args(cfg):
+        return ['-vf', cfg['vf']] if cfg.get('vf') else []
     mp4_cmd = [
         'ffmpeg', '-y',
         '-i', str(input_p),
-        '-vf',       mp4_cfg.get('vf', 'scale=-2:1080'),
+        *_vf_args(mp4_cfg),
         '-c:v',      mp4_cfg.get('vcodec', 'libx264'),
         '-crf',      mp4_cfg.get('crf', '23'),
         '-preset',   mp4_cfg.get('preset', 'slow'),
@@ -248,7 +252,7 @@ def process_video_job(
     webm_cmd = [
         'ffmpeg', '-y',
         '-i', str(input_p),
-        '-vf',   webm_cfg.get('vf', 'scale=-2:1080'),
+        *_vf_args(webm_cfg),
         '-c:v',  webm_cfg.get('vcodec', 'libvpx-vp9'),
         '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),
@@ -264,7 +268,7 @@ def process_video_job(
     webm_cmd2 = [
         'ffmpeg', '-y',
         '-i', str(input_p),
-        '-vf',   webm_cfg.get('vf', 'scale=-2:1080'),
+        *_vf_args(webm_cfg),
         '-c:v',  webm_cfg.get('vcodec', 'libvpx-vp9'),
         '-row-mt', '1', '-tile-columns', '2', '-threads', '4',  # VP9 multithreading (same output, much faster)
         '-crf',  webm_cfg.get('crf', '33'),

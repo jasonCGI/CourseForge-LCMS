@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from services.video_processor import (
     allowed_video, start_job, get_job, JOBS
 )
+from config import Config, compose_preset
 
 video_bp = Blueprint('video', __name__)
 
@@ -20,8 +21,10 @@ def upload_video():
     """
     Upload a source video file and start processing.
     Form fields:
-      file   — video file
-      preset — training_standard | low_bandwidth | high_fidelity
+      file       — video file
+      resolution — source | 2160 | 1080 | 720   (default 1080)
+      quality    — draft | standard | high      (default standard)
+    (Legacy: a single `preset` field is still accepted and mapped.)
     Returns: { job_id }
     """
     if 'file' not in request.files:
@@ -35,9 +38,17 @@ def upload_video():
     if suffix not in ALLOWED_EXTENSIONS:
         return jsonify({'error': f'Unsupported format: {suffix}. Accepted: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
 
-    preset_key = request.form.get('preset', 'training_standard')
-    presets    = current_app.config['PRESETS']
-    preset     = presets.get(preset_key, presets['training_standard'])
+    # Two-axis selection (resolution × quality). A legacy single `preset` key from
+    # the old UI maps to a resolution+quality pair for backward compatibility.
+    _LEGACY = {'training_standard': ('1080', 'standard'),
+               'low_bandwidth':     ('720',  'draft'),
+               'high_fidelity':     ('1080', 'high')}
+    if request.form.get('preset') in _LEGACY:
+        resolution_key, quality_key = _LEGACY[request.form['preset']]
+    else:
+        resolution_key = request.form.get('resolution', Config.DEFAULT_RESOLUTION)
+        quality_key    = request.form.get('quality', Config.DEFAULT_QUALITY)
+    preset = compose_preset(resolution_key, quality_key)
 
     # Save source file
     safe_name = secure_filename(f.filename)
@@ -97,13 +108,12 @@ def download_output(job_id):
 
 @video_bp.get('/api/video/presets')
 def get_presets():
-    """Return available quality presets."""
-    presets = current_app.config['PRESETS']
-    return jsonify([
-        {
-            'key':         key,
-            'label':       p['label'],
-            'description': p['description'],
-        }
-        for key, p in presets.items()
-    ])
+    """Return the two preset axes (resolution × quality) + their defaults."""
+    def _axis(d):
+        return [{'key': k, 'label': v['label'], 'description': v['description']} for k, v in d.items()]
+    return jsonify({
+        'resolutions':       _axis(Config.RESOLUTIONS),
+        'qualities':         _axis(Config.QUALITIES),
+        'default_resolution': Config.DEFAULT_RESOLUTION,
+        'default_quality':    Config.DEFAULT_QUALITY,
+    })
