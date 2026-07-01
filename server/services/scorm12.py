@@ -1281,7 +1281,10 @@ if(!window.cfQuizInit){
 window.cfScorm=(function(){
   function find(n){var w=window;for(var i=0;i<8&&w;i++){try{if(w[n])return w[n];}catch(e){}if(w===w.parent)break;w=w.parent;}try{if(window.opener&&window.opener[n])return window.opener[n];}catch(e){}return null;}
   var a12=null,a04=null,located=false;
-  function api(){if(!located){a12=find('API');a04=find('API_1484_11');located=true;}}
+  // Only latch once an API is actually found — some LMSs finalize the adapter into
+  // the frameset AFTER the content frame loads, so a null at first register() must
+  // stay re-searchable until the later complete() (fired on user interaction).
+  function api(){if(located)return;var x12=find('API'),x04=find('API_1484_11');if(x12||x04){a12=x12;a04=x04;located=true;}}
   var quizzes={},nextIdx=0;
   function two(n){return(n<10?'0':'')+n;}
   function clock(){var d=new Date();return two(d.getHours())+':'+two(d.getMinutes())+':'+two(d.getSeconds());}
@@ -1290,14 +1293,19 @@ window.cfScorm=(function(){
   // SCORM 1.2 CMIString255 cap so strict LMSs don't reject an over-long value.
   function cap(s){s=String(s==null?'':s);return s.length>255?s.slice(0,255):s;}
   function register(id){api();if(!(id in quizzes))quizzes[id]={done:false,passed:false,idx:nextIdx++};return quizzes[id].idx;}
+  // Convert a 1.2 multi-value pattern (indices joined by ',' and matching pairs by
+  // '.') to SCORM 2004's bracketed delimiters: ','→'[,]', '.'→'[.]'. Values are bare
+  // integer indices / 'off', so they contain no literal ',' or '.' to mis-hit.
+  function to04(s){return String(s).replace(/,/g,'[,]').replace(/\./g,'[.]');}
   function writeItn(idx,it){
     var id=cap(it.id),resp=cap(it.resp),patt=cap(it.patt),p='cmi.interactions.'+idx+'.';
-    // SCORM 1.2
+    // SCORM 1.2 (student_response, 'wrong', HH:MM:SS time, dot/comma delimiters)
     s12(p+'id',id);s12(p+'type',it.type);s12(p+'student_response',resp);
     s12(p+'correct_responses.0.pattern',patt);s12(p+'result',it.result);s12(p+'time',clock());
-    // SCORM 2004 (learner_response + ISO timestamp)
-    s04(p+'id',id);s04(p+'type',it.type);s04(p+'learner_response',resp);
-    s04(p+'correct_responses.0.pattern',patt);s04(p+'result',it.result);
+    // SCORM 2004 (learner_response, 'incorrect', ISO timestamp, [.]/[,] delimiters)
+    var r04=it.result==='wrong'?'incorrect':it.result;
+    s04(p+'id',id);s04(p+'type',it.type);s04(p+'learner_response',to04(resp));
+    s04(p+'correct_responses.0.pattern',to04(patt));s04(p+'result',r04);
     try{s04(p+'timestamp',new Date().toISOString());}catch(e){}
   }
   function aggregate(){
