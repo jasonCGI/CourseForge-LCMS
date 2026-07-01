@@ -229,7 +229,7 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
       aria-label="Contrast checker (WCAG / 508)"
       tabIndex={embedded ? undefined : -1}
       style={embedded ? {
-        position: 'static', width: '100%', background: 'transparent',
+        position: 'relative', width: '100%', background: 'transparent',
         color: C.text, fontFamily: C.font, outline: 'none', display: 'flex', flexDirection: 'column',
       } : {
         position: 'fixed', left: pos.x, top: pos.y, width: 360, zIndex: 4000,
