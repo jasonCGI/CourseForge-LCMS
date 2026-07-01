@@ -1195,7 +1195,9 @@ def _callout_overlay_html(data):
 #  is reported to the SCORM API exactly like the MC quiz: 100 when fully correct,
 #  else 0 (cmi.core.score.raw / cmi.score.raw), found by walking the frame tree.
 #
-#  multiple_choice is unchanged (it uses the shell's cfSubmitQuiz/cfSelectChoice).
+#  multiple_choice now ALSO renders through this interactive runtime (cfqInitMc);
+#  the shell's older cfSubmitQuiz/cfSelectChoice MC path is legacy/unused for
+#  packaged quizzes (the packager routes every qtype through _render_quiz_interactive).
 # ════════════════════════════════════════════════════════════════════════
 
 _QUIZ_CSS = """<style id="cf-iq-css">
