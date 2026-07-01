@@ -280,6 +280,9 @@ const useEditorStore = create((set, get) => ({
   pasteFrame: async () => {
     const clip = get().frameClipboard
     if (!clip?.id) return
+    // Flush a pending autosave FIRST: loadFrame(nf.id) below clears the debounce
+    // timer, which would otherwise silently drop the active frame's last edits.
+    if (get().isDirty) { try { await get().flushSave() } catch { /* keep pasting */ } }
     const afterId = get().activeFrame?.id || null
     try {
       const { data: nf } = await apiDuplicateFrame(clip.id, afterId ? { afterFrameId: afterId } : {})
@@ -298,6 +301,10 @@ const useEditorStore = create((set, get) => ({
     const i = order.indexOf(id)
     const neighbor = i >= 0 ? (order[i + 1] || order[i - 1] || null) : null
     const wasActive = get().activeFrame?.id === id
+    // Deleting the ACTIVE frame: cancel its pending autosave so a debounced PUT
+    // can't race (and 404) against the DELETE. Do NOT touch the timer when
+    // deleting a non-active frame — that would drop the active frame's save.
+    if (wasActive && autosaveTimer) clearTimeout(autosaveTimer)
     try {
       await apiDeleteFrame(id)
       const proj = useProjectStore.getState()
