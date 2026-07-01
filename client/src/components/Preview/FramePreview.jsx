@@ -1620,7 +1620,7 @@ function AudioBar({ src, caption = '', placement = 'inline', anchor = null }) {
   return (
     <div style={{ margin: '8px 0' }}>
       {bar}
-      {caption && <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{caption}</div>}
+      {caption && <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{caption}</div>}
     </div>
   )
 }

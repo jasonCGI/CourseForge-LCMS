@@ -2919,9 +2919,27 @@ def _render_blocks(blocks, scorm_bridge=False, asset_map=None, hotspot_cfg=None,
             # right AND bottom AND left) and scrolls itself. The .cf-shelled-text-top
             # rule positions it top:0/left:0 at 100%/100% so it owns the whole content
             # area edge to edge (anchored to #fgui-content's padding box = its edge).
-            # When a docked audio bar is present, reserve extra bottom room (~88px)
-            # so the bar never overlaps the last line of copy.
-            dock_pad = ' style="padding-bottom:88px"' if aux_html else ''
+            # When an edge-anchored audio BAR is present, reserve room on THAT edge
+            # (~88px) so it never overlaps the last line of copy. Anchor-aware and
+            # mini-aware (parity with sco_shell.html's :has([data-cf-placement="bar"]
+            # [data-cf-anchor=...]) rules and FramePreview's barTop/barBottom):
+            # bar+top reserves TOP, bar+bottom reserves BOTTOM, a MINI pill floats in
+            # a corner and needs no reservation.
+            bar_top = bar_bottom = False
+            for _b in blocks:
+                if _is_aux_audio(_b.get('type'), _b.get('data', {})):
+                    _pl, _an = _audio_placement(_b.get('data', {}))
+                    if _pl == 'bar':
+                        if _an == 'top':
+                            bar_top = True
+                        else:
+                            bar_bottom = True
+            _pads = []
+            if bar_top:
+                _pads.append('padding-top:88px')
+            if bar_bottom:
+                _pads.append('padding-bottom:88px')
+            dock_pad = f' style="{";".join(_pads)}"' if _pads else ''
             out = f'<div class="cf-shelled-text-top"{dock_pad}>{text_html}</div>'
         else:
             # Zone geometry as % of the content area: (left, width) per the layout.
