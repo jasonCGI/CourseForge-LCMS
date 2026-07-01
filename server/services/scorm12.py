@@ -1322,13 +1322,15 @@ var CFQ_DRAG_TH=6;
 function cfqDrag(e,el,id,isDone,dropSel,onDrop){
   if(isDone())return;
   if(e.button!=null&&e.button!==0)return;            // primary pointer only
-  var sx=e.clientX,sy=e.clientY,clone=null,curOver=null,moved=false;
+  el._cfDragged=false;                               // clear any stale flag from a prior touch-drag that ended without a click
+  var pid=e.pointerId,sx=e.clientX,sy=e.clientY,clone=null,curOver=null,moved=false;
   function dropAt(x,y){
     var stack=document.elementsFromPoint(x,y)||[];
     for(var i=0;i<stack.length;i++){var d=stack[i].closest&&stack[i].closest(dropSel);if(d)return d;}
     return null;
   }
   function onMove(ev){
+    if(ev.pointerId!==pid)return;                     // ignore a second finger's moves (no multi-touch cross-talk)
     var dx=ev.clientX-sx,dy=ev.clientY-sy;
     if(!moved&&Math.abs(dx)+Math.abs(dy)<CFQ_DRAG_TH)return;
     if(!moved){
@@ -1343,6 +1345,7 @@ function cfqDrag(e,el,id,isDone,dropSel,onDrop){
     if(over!==curOver){if(curOver)curOver.classList.remove('cf-over');curOver=over;if(curOver)curOver.classList.add('cf-over');}
   }
   function end(ev){
+    if(ev.pointerId!==pid)return;                     // only our own pointer's release ends this drag
     document.removeEventListener('pointermove',onMove,true);
     document.removeEventListener('pointerup',end,true);
     document.removeEventListener('pointercancel',end,true);
