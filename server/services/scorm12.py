@@ -1204,7 +1204,7 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-hint{font-size:12px;color:#666;margin:0 0 12px}
 .cf-iq-bank{display:flex;flex-wrap:wrap;gap:8px;min-height:46px;border:2px dashed #ccc;border-radius:8px;padding:10px;background:#fff;margin-bottom:12px}
 .cf-iq-bank.cf-over{border-color:#185FA5;background:#EAF1FB}
-.cf-iq-item{padding:7px 11px;border:2px solid #185FA5;border-radius:6px;background:#fff;color:#042C53;font:600 13px/1 inherit;cursor:grab}
+.cf-iq-item{padding:7px 11px;border:2px solid #185FA5;border-radius:6px;background:#fff;color:#042C53;font:600 13px/1 inherit;cursor:grab;touch-action:none}
 .cf-iq-item[aria-pressed=true]{border-color:#D4820A;background:#FFF6E6}
 .cf-iq-item:focus-visible,.cf-iq-target:focus-visible,.cf-iq-row button:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
 .cf-iq-targets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px}
@@ -1227,11 +1227,13 @@ _QUIZ_CSS = """<style id="cf-iq-css">
 .cf-iq-choice:focus-visible{outline:3px solid #D4820A;outline-offset:2px}
 .cf-iq-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .cf-iq-num{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px/1 inherit}
-.cf-iq-row>button{flex:1;display:flex;align-items:center;gap:8px;text-align:left;padding:10px 14px;border:2px solid #cdd6e0;border-radius:6px;background:#fff;color:#042C53;font:500 14px/1.3 inherit;cursor:grab}
+.cf-iq-row>button{flex:1;display:flex;align-items:center;gap:8px;text-align:left;padding:10px 14px;border:2px solid #cdd6e0;border-radius:6px;background:#fff;color:#042C53;font:500 14px/1.3 inherit;cursor:grab;touch-action:none}
 .cf-iq-row>button[aria-grabbed=true]{border-color:#D4820A;background:#FFF6E6;box-shadow:0 2px 8px rgba(212,130,10,.3)}
 .cf-iq-row>button.cf-ok{border-color:#3B8A4A;background:#EAF6EC}
 .cf-iq-row>button.cf-bad{border-color:#C0392B;background:#FDECEA}
 .cf-iq-grip{color:#9aa7b4;font-size:16px}
+.cf-iq-dragging{opacity:.4}
+.cf-iq-drag-clone{position:fixed;z-index:9999;pointer-events:none;margin:0;box-shadow:0 6px 18px rgba(0,0,0,.28);transform:scale(1.03);opacity:.95}
 .cf-fbq-text{font-size:15px;line-height:2;color:#042C53;margin:0 0 14px}
 .cf-fbq-blank{margin:0 4px;padding:3px 6px;border:2px solid #185FA5;border-radius:5px;font:14px inherit;color:#042C53;background:#fff;width:auto;max-width:100%;box-sizing:border-box}
 .cf-fbq-blank.cf-ok{border-color:#3B8A4A}
@@ -1308,6 +1310,55 @@ function cfqFinish(cfg,state,root,ok){
   return phase;
 }
 
+// ── Pointer-based drag (mouse + TOUCH + pen) ────────────────────
+// iOS/iPadOS Safari NEVER fires the HTML5 drag events (dragstart/dragover/drop),
+// so the old native-DnD quizzes were dead on a touch device. This unified
+// pointer-drag replaces them: a tap without movement falls through to the
+// element's own click handler (select / grab — the 508 path is untouched); a
+// drag past CFQ_DRAG_TH px spawns a floating clone that follows the pointer and
+// drops onto the nearest `dropSel` element under the release point. Works for
+// mouse and pen too, so it's the single code path for every device.
+var CFQ_DRAG_TH=6;
+function cfqDrag(e,el,id,isDone,dropSel,onDrop){
+  if(isDone())return;
+  if(e.button!=null&&e.button!==0)return;            // primary pointer only
+  el._cfDragged=false;                               // clear any stale flag from a prior touch-drag that ended without a click
+  var pid=e.pointerId,sx=e.clientX,sy=e.clientY,clone=null,curOver=null,moved=false;
+  function dropAt(x,y){
+    var stack=document.elementsFromPoint(x,y)||[];
+    for(var i=0;i<stack.length;i++){var d=stack[i].closest&&stack[i].closest(dropSel);if(d)return d;}
+    return null;
+  }
+  function onMove(ev){
+    if(ev.pointerId!==pid)return;                     // ignore a second finger's moves (no multi-touch cross-talk)
+    var dx=ev.clientX-sx,dy=ev.clientY-sy;
+    if(!moved&&Math.abs(dx)+Math.abs(dy)<CFQ_DRAG_TH)return;
+    if(!moved){
+      moved=true;el._cfDragged=true;                 // swallow the click that follows a drag
+      clone=el.cloneNode(true);clone.className+=' cf-iq-drag-clone';
+      clone.style.width=el.offsetWidth+'px';document.body.appendChild(clone);
+      el.classList.add('cf-iq-dragging');
+    }
+    ev.preventDefault();
+    clone.style.left=(ev.clientX+8)+'px';clone.style.top=(ev.clientY+8)+'px';
+    var over=dropAt(ev.clientX,ev.clientY);
+    if(over!==curOver){if(curOver)curOver.classList.remove('cf-over');curOver=over;if(curOver)curOver.classList.add('cf-over');}
+  }
+  function end(ev){
+    if(ev.pointerId!==pid)return;                     // only our own pointer's release ends this drag
+    document.removeEventListener('pointermove',onMove,true);
+    document.removeEventListener('pointerup',end,true);
+    document.removeEventListener('pointercancel',end,true);
+    if(clone)clone.remove();
+    el.classList.remove('cf-iq-dragging');
+    if(curOver)curOver.classList.remove('cf-over');
+    if(moved){onDrop(id,dropAt(ev.clientX,ev.clientY));}
+  }
+  document.addEventListener('pointermove',onMove,true);
+  document.addEventListener('pointerup',end,true);
+  document.addEventListener('pointercancel',end,true);
+}
+
 // ── drag_drop (match item → target) ─────────────────────────────
 // Multiple items may occupy one target (no eviction) — mirrors the React
 // PreviewQuizDragDrop twin. Completion = every ITEM is placed; scoring = every
@@ -1320,14 +1371,15 @@ function cfqInitDnd(root,cfg){
   var order=cfg.randomize?window.cfQuizShuffle(cfg.order):cfg.order.slice();
   function mkItem(id){
     var b=document.createElement('button');b.type='button';b.className='cf-iq-item';
-    b.setAttribute('data-id',id);b.setAttribute('draggable',state.done?'false':'true');
+    b.setAttribute('data-id',id);
     b.setAttribute('aria-pressed',state.sel===id?'true':'false');
     b.textContent=cfg.items[id];
     if(state.done&&state.place[id]!=null)b.classList.add(cfg.correct[id]===state.place[id]?'cf-ok':'cf-bad');
-    b.addEventListener('click',function(e){e.stopPropagation();if(state.done)return;state.sel=(state.sel===id?null:id);render();});
-    b.addEventListener('dragstart',function(e){if(state.done){e.preventDefault();return;}e.dataTransfer.setData('text/plain',id);});
+    b.addEventListener('click',function(e){e.stopPropagation();if(b._cfDragged){b._cfDragged=false;return;}if(state.done)return;state.sel=(state.sel===id?null:id);render();});
+    b.addEventListener('pointerdown',function(e){cfqDrag(e,b,id,function(){return state.done;},'.cf-iq-target,.cf-iq-bank',dndDrop);});
     return b;
   }
+  function dndDrop(id,drop){if(state.done||!drop)return;if(drop.classList.contains('cf-iq-bank')){delete state.place[id];state.sel=null;}else{place(id,drop.getAttribute('data-id'));}render();}
   function place(id,tid){state.place[id]=tid;state.sel=null;}
   function render(){
     bank.innerHTML='';
@@ -1343,17 +1395,12 @@ function cfqInitDnd(root,cfg){
   }
   targets.forEach(function(t){
     var tid=t.getAttribute('data-id');
+    // Tap-to-place (508 / no-drag path): select an item, then tap a target.
     t.addEventListener('click',function(){
       if(state.done)return;
       if(state.sel){place(state.sel,tid);render();}
     });
-    t.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();t.classList.add('cf-over');});
-    t.addEventListener('dragleave',function(){t.classList.remove('cf-over');});
-    t.addEventListener('drop',function(e){e.preventDefault();t.classList.remove('cf-over');if(state.done)return;var id=e.dataTransfer.getData('text/plain');if(id){place(id,tid);render();}});
   });
-  bank.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();bank.classList.add('cf-over');});
-  bank.addEventListener('dragleave',function(){bank.classList.remove('cf-over');});
-  bank.addEventListener('drop',function(e){e.preventDefault();bank.classList.remove('cf-over');if(state.done)return;var id=e.dataTransfer.getData('text/plain');if(id){delete state.place[id];render();}});
   check.addEventListener('click',function(){
     if(state.done)return;
     var ok=order.every(function(id){return state.place[id]===cfg.correct[id];});
@@ -1380,27 +1427,28 @@ function cfqInitSeq(root,cfg){
   }
   var state={order:seqStart(),used:0,done:false,grabbed:null};
   function move(id,dir){var i=state.order.indexOf(id);var j=i+dir;if(j<0||j>=state.order.length)return;var a=state.order;var t=a[i];a[i]=a[j];a[j]=t;}
+  function seqDrop(src,dropBtn){if(state.done||!dropBtn)return;var tgt=dropBtn.getAttribute('data-id');if(!tgt||tgt===src)return;var a=state.order;a.splice(a.indexOf(src),1);a.splice(a.indexOf(tgt),0,src);render();}
   function render(){
     list.innerHTML='';
     state.order.forEach(function(id,idx){
       var row=document.createElement('div');row.className='cf-iq-row';
       var num=document.createElement('span');num.className='cf-iq-num';num.setAttribute('aria-hidden','true');num.textContent=(idx+1);
-      var b=document.createElement('button');b.type='button';b.setAttribute('data-id',id);b.setAttribute('draggable','true');b.setAttribute('aria-grabbed','false');
+      var b=document.createElement('button');b.type='button';b.setAttribute('data-id',id);b.setAttribute('aria-grabbed','false');
       b.setAttribute('aria-label','Position '+(idx+1)+': '+cfg.items[id]+'. Press Enter to pick up, arrow keys to move, Enter to drop.');
       var grip=document.createElement('span');grip.className='cf-iq-grip';grip.setAttribute('aria-hidden','true');grip.textContent='⠿';
       b.appendChild(grip);b.appendChild(document.createTextNode(cfg.items[id]));
       if(state.done){/* coloring applied after check below */}
       if(state.grabbed===id)b.setAttribute('aria-grabbed','true');
-      b.addEventListener('click',function(){if(state.done)return;state.grabbed=(state.grabbed===id?null:id);render();focusId(id);});
+      b.addEventListener('click',function(){if(b._cfDragged){b._cfDragged=false;return;}if(state.done)return;state.grabbed=(state.grabbed===id?null:id);render();focusId(id);});
       b.addEventListener('keydown',function(e){
         if(state.done)return;
         if(e.key==='ArrowUp'||e.key==='ArrowDown'){
           if(state.grabbed!==id)return;e.preventDefault();move(id,e.key==='ArrowUp'?-1:1);render();focusId(id);
         }
       });
-      b.addEventListener('dragstart',function(e){if(state.done){e.preventDefault();return;}e.dataTransfer.setData('text/plain',id);});
-      b.addEventListener('dragover',function(e){if(state.done)return;e.preventDefault();});
-      b.addEventListener('drop',function(e){e.preventDefault();if(state.done)return;var src=e.dataTransfer.getData('text/plain');if(!src||src===id)return;var a=state.order;a.splice(a.indexOf(src),1);a.splice(a.indexOf(id),0,src);render();});
+      // Pointer-drag (mouse+touch): drop the dragged word-tile onto the row it
+      // should take; positions (numbers) stay static, the words resort around it.
+      b.addEventListener('pointerdown',function(e){cfqDrag(e,b,id,function(){return state.done;},'.cf-iq-row>button[data-id]',seqDrop);});
       row.appendChild(num);row.appendChild(b);list.appendChild(row);
     });
   }
