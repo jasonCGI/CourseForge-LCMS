@@ -24,7 +24,7 @@ export default function ExportButton() {
       aria-label="Export course as JSON"
       title={disabled ? 'Open a project to export' : 'Export this course as a .json file (backup / inspect / move)'}
       style={{
-        flex: '0 0 auto', whiteSpace: 'nowrap',
+        flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', whiteSpace: 'nowrap',
         padding: '8px 20px', borderRadius: 4, fontSize: 13, fontWeight: 600,
         background: 'transparent',
         color: disabled ? 'var(--cf-text-tertiary)' : '#1565C0',

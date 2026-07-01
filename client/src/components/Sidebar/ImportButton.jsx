@@ -20,11 +20,12 @@ export default function ImportButton({ inline = false }) {
   // 20px of horizontal padding each side (so the button is only as wide as it
   // needs to be). Standalone (no project yet): full-width block as before.
   const wrapStyle = inline
-    ? { flex: '0 0 auto' }
+    ? { flex: 1, minWidth: 0 }   // share the row equally with Export (matched widths)
     : { padding: '12px 8px', borderBottom: '1px solid #333' }
   const buttonStyle = inline
     ? {
-        width: 'auto',
+        width: '100%',
+        boxSizing: 'border-box',
         whiteSpace: 'nowrap',
         padding: '8px 20px',
         background: '#1565C0',
