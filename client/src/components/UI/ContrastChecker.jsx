@@ -40,7 +40,10 @@ const C = {
   failBg:  'rgba(255,138,155,0.12)',
 }
 
-export default function ContrastChecker({ open, onClose, initialFg = null, initialBg = null }) {
+// `embedded`: render inline (no fixed position, no drag header, no Escape/focus
+// trap) so the checker can live INSIDE another panel — e.g. expanded within the
+// 508 audit popout instead of a separate floating modal that covers the preview.
+export default function ContrastChecker({ open, onClose, initialFg = null, initialBg = null, embedded = false }) {
   const [fg, setFg] = useState('#2A2A2A')
   const [bg, setBg] = useState('#E8E8E8')
   const [hexFgText, setHexFgText] = useState('#2A2A2A')
@@ -67,16 +70,17 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
   // Pre-fill from a launch payload (e.g. an audit finding's fg/bg) whenever it opens
   // with one — the auto-audit → manual-check handoff.
   useEffect(() => {
-    if (!open) return
+    if (!open && !embedded) return
     const f = normHex(initialFg), b = normHex(initialBg)
     if (f) { setFg(f); setHexFgText(f) }
     if (b) { setBg(b); setHexBgText(b) }
     if (f || b) setNudge(null)
-  }, [open, initialFg, initialBg])
+  }, [open, embedded, initialFg, initialBg])
 
-  // focus the panel on open, restore on close; Escape closes
+  // focus the panel on open, restore on close; Escape closes. Skipped when
+  // embedded — it lives inside another panel and must not hijack focus/Escape.
   useEffect(() => {
-    if (!open) return
+    if (!open || embedded) return
     restoreFocusRef.current = document.activeElement
     const t = setTimeout(() => panelRef.current?.focus(), 0)
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
@@ -87,7 +91,7 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
       const el = restoreFocusRef.current
       if (el && typeof el.focus === 'function') el.focus()
     }
-  }, [open, onClose])
+  }, [open, embedded, onClose])
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
@@ -211,7 +215,7 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
     w.document.close()
   }
 
-  if (!open) return null
+  if (!open && !embedded) return null
 
   const slotData = [
     { slot: 'fg', title: 'Foreground (text)', val: fg, hexText: hexFgText },
@@ -221,17 +225,21 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
   return (
     <div
       ref={panelRef}
-      role="dialog"
+      role={embedded ? 'group' : 'dialog'}
       aria-label="Contrast checker (WCAG / 508)"
-      tabIndex={-1}
-      style={{
+      tabIndex={embedded ? undefined : -1}
+      style={embedded ? {
+        position: 'relative', width: '100%', background: 'transparent',
+        color: C.text, fontFamily: C.font, outline: 'none', display: 'flex', flexDirection: 'column',
+      } : {
         position: 'fixed', left: pos.x, top: pos.y, width: 360, zIndex: 4000,
         background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10,
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)', color: C.text, fontFamily: C.font,
         outline: 'none', maxHeight: 'calc(100vh - 24px)', display: 'flex', flexDirection: 'column',
       }}
     >
-      {/* ── drag handle / header ── */}
+      {/* ── drag handle / header (floating modal only; embedded uses its host's header) ── */}
+      {!embedded && (
       <div
         onPointerDown={onHandleDown}
         onPointerMove={onHandleMove}
@@ -253,8 +261,9 @@ export default function ContrastChecker({ open, onClose, initialFg = null, initi
           style={{ background: 'none', border: 'none', color: C.text3, fontSize: 16, cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
         >✕</button>
       </div>
+      )}
 
-      <div style={{ padding: '12px 12px 14px', overflowY: 'auto' }}>
+      <div style={{ padding: embedded ? '4px 2px 2px' : '12px 12px 14px', overflowY: embedded ? 'visible' : 'auto' }}>
         {/* ── color slots ── */}
         {slotData.map(({ slot, title, val, hexText }) => (
           <div key={slot} style={{ marginBottom: 12 }}>

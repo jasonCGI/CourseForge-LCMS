@@ -382,39 +382,48 @@ function PreviewHeader({ human, total, shell, guiOn, onToggleGui, source, onSour
       borderBottom: '1px solid color-mix(in srgb, var(--forge-amber) 30%, transparent)',
       display: 'flex', alignItems: 'center', gap: 10,
     }}>
-      <span style={{ color: '#C8D8E8', opacity: 0.75 }}>Frame {human} of {total}</span>
-      <span style={{ opacity: 0.35 }}>│</span>
-      <span style={{ color: '#C8D8E8', opacity: 0.6 }}>
-        {shell ? 'GUI shell · SCORM API stubbed' : 'SCORM API stubbed'}
-      </span>
+      {/* Left zone: frame position + mode note. flex:1 + min-width:0 so it
+          truncates rather than pushing the centered pill off-center. */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+        overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <span style={{ color: '#C8D8E8', opacity: 0.75 }}>Frame {human} of {total}</span>
+        <span style={{ opacity: 0.35 }}>│</span>
+        <span style={{ color: '#C8D8E8', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {shell ? 'GUI shell · SCORM API stubbed' : 'SCORM API stubbed'}
+        </span>
+      </div>
 
-      {/* Edit ⇄ Published — Edit = interactive React preview; Published = the
-          server-rendered /preview-html truth in an iframe. Replaces the old
-          popup Preview button that lived in the inspector action bar. */}
-      <div className="cf-seg" role="group" aria-label="Preview source" style={{ marginLeft: 'auto' }}>
+      {/* Center zone: Edit ⇄ Published — Edit = interactive React preview;
+          Published = the server-rendered /preview-html truth. Centered over the
+          preview window (equal flex:1 side zones keep it dead-center). */}
+      <div className="cf-seg" role="group" aria-label="Preview source" style={{ flexShrink: 0 }}>
         <SourceBtn active={source === 'edit'} onClick={() => onSource('edit')}
           title="Edit — the interactive in-editor preview">Edit</SourceBtn>
         <SourceBtn active={source === 'published'} onClick={() => onSource('published')}
           title="Published — the server-rendered frame (the real SCO output)">Published</SourceBtn>
       </div>
 
-      {onToggleGui && (
-        <button
-          type="button"
-          className={`cf-toggle${guiOn ? ' cf-toggle--on' : ''}`}
-          onClick={onToggleGui}
-          aria-pressed={guiOn}
-          title={guiOn ? 'GUI shell ON — showing the learner view. Click for the clean content view.'
-                       : 'GUI shell OFF — showing the clean content view. Click to wrap in the shell.'}
-          style={{ marginLeft: 'auto', flexShrink: 0 }}
-        >
-          GUI {guiOn ? 'ON' : 'OFF'}
-        </button>
-      )}
-
-      {/* WCAG / 508 contrast traffic-light for the current frame's rendered DOM. */}
-      <div style={{ marginLeft: onToggleGui ? 0 : 'auto', flexShrink: 0 }}>
-        <FrameAuditBadge paneRef={paneRef} frameId={frameId} signature={auditSig} fallbackBg={auditFallbackBg} />
+      {/* Right zone: GUI toggle + 508 badge, right-aligned. flex:1 mirrors the
+          left zone so the center pill stays centered. */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+        justifyContent: 'flex-end' }}>
+        {onToggleGui && (
+          <button
+            type="button"
+            className={`cf-toggle${guiOn ? ' cf-toggle--on' : ''}`}
+            onClick={onToggleGui}
+            aria-pressed={guiOn}
+            title={guiOn ? 'GUI shell ON — showing the learner view. Click for the clean content view.'
+                         : 'GUI shell OFF — showing the clean content view. Click to wrap in the shell.'}
+            style={{ flexShrink: 0 }}
+          >
+            GUI {guiOn ? 'ON' : 'OFF'}
+          </button>
+        )}
+        {/* WCAG / 508 contrast traffic-light for the current frame's rendered DOM. */}
+        <div style={{ flexShrink: 0 }}>
+          <FrameAuditBadge paneRef={paneRef} frameId={frameId} signature={auditSig} fallbackBg={auditFallbackBg} />
+        </div>
       </div>
     </div>
   )
