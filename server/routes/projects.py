@@ -293,12 +293,19 @@ def create_frame(lesson_id):
     Lesson.query.get_or_404(lesson_id)
     data = request.get_json()
     count = Frame.query.filter_by(lesson_id=lesson_id).count()
+    # Honor the content the client posts (e.g. a template's pre-built blocks, or a
+    # menu frame's content.menu). Previously this hardcoded an empty {'blocks': []},
+    # which silently dropped every template's blocks — a "Text + Image" frame was
+    # born empty. Fall back to an empty block list when no content is supplied.
+    content = data.get('content')
+    if not isinstance(content, dict):
+        content = {'blocks': []}
     frame = Frame(
         lesson_id=lesson_id,
         name=data['name'],
         frame_type=data.get('frame_type', 'content'),
         order_index=count,
-        content={'blocks': []}
+        content=content
     )
     db.session.add(frame)
     db.session.commit()
